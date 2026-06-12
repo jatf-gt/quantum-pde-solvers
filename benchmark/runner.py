@@ -104,13 +104,16 @@ def run_pair_2d(
     While the reference computation is computationally intensive for N=16 
     (a 256×256 coupled system), it remains highly efficient relative to the 
     subsequent HHL line-Jacobi iterative cycle.
+
+    The fine solve uses the tridiagonal residual computation so no large matrix 
+    is ever allocated.
     """
     problem = PoissonProblem2D(cfg)
     print(f"\n  → {problem.summary()}")
 
     # Classical direct reference — computed once, shared by both solver evaluations.
     t0      = time.perf_counter()
-    u_ref   = problem.classical_reference_solve()
+    u_ref   = problem.classical_reference_solve()   # fine Thomas, no full matrix
     t_ref   = time.perf_counter() - t0
     print(f"     Reference solve: {t_ref:.2f}s")
 
@@ -236,11 +239,11 @@ def sweep_e() -> list[BenchmarkResult2D]:
         SimConfig2D(N=8, epsilon=0.01, source_fn="fL"),
         SimConfig2D(N=8, epsilon=0.01, source_fn="fH"),
         # N=16, fL, ε=0.01 (Converges per literature specification)
-        SimConfig2D(N=16, epsilon=0.01, source_fn="fL"),
+        SimConfig2D(N=16, epsilon=0.01, source_fn="fL", tol=1e-4),              # TODO: Run tol=1e-8 version in remote machine
         # N=16, fS, ε=0.5 (Reference Figure 12 — relaxed precision required)
-        SimConfig2D(N=16, epsilon=0.5, source_fn="fS"),
+        SimConfig2D(N=16, epsilon=0.5, source_fn="fS", tol=1e-4),
         # N=16, fH, ε=0.03 (Reference Figure 13)
-        SimConfig2D(N=16, epsilon=0.03, source_fn="fH"),
+        SimConfig2D(N=16, epsilon=0.03, source_fn="fH", tol=1e-4),
     ]
     return _run_2d_sweep(configs)
 

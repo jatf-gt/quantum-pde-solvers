@@ -210,7 +210,26 @@ class PoissonProblem2D:
         )
         return self.A_row, b_row
 
-    def build_full_matrix(self) -> np.ndarray:
+    def build_full_matrix(self, max_gb: float = 1.0) -> np.ndarray:
+        """
+        Assemble the full N²×N² block-banded system matrix.
+
+        Used only for:
+        - Coarse-grid condition number analysis  (N ≤ 32)
+        - Verification of the line-Jacobi convergence target
+        - Classical reference solves on small grids
+
+        Parameters
+        ----------
+        max_gb : maximum allowed allocation in GiB (default 1.0).
+                Raises MemoryError before attempting allocation if the
+                matrix would exceed this limit.
+
+        Raises
+        ------
+        MemoryError : if the required allocation exceeds max_gb.
+        """
+        # Previously,
         """
         Constructs the comprehensive N²×N² block-banded system matrix.
 
@@ -226,29 +245,35 @@ class PoissonProblem2D:
         and holistic condition number analysis. The line-Jacobi methodology 
         expressly bypasses the formation of this global operator.
         """
-        N  = self.config.N
-        T  = self.A_row.copy()
-        I  = np.eye(N)
+        N          = self.config.N
+        n_elements = (N * N) ** 2
+        size_gb    = n_elements * 8 / (1024**3)   # float64 = 8 bytes
+
+        if size_gb > max_gb:
+            raise MemoryError(
+                f"build_full_matrix would allocate {size_gb:.1f} GiB for "
+                f"N={N} (shape {N*N}×{N*N}).  "
+                f"Use _compute_residual_tridiagonal for large N, or increase "
+                f"max_gb if you genuinely need the full matrix."
+            )
+
+        T      = self.A_row.copy()
+        I      = np.eye(N)
         A_full = np.zeros((N * N, N * N))
 
         for j in range(N):
-            row_start = j * N
-            row_end   = row_start + N
-            
-            # Populate the principal diagonal block
-            A_full[row_start:row_end, row_start:row_end] = T
-            
-            # Populate the off-diagonal identity blocks (inter-row coupling)
+            rs = j * N
+            re = rs + N
+            A_full[rs:re, rs:re] = T
             if j > 0:
-                col_start = (j - 1) * N
-                A_full[row_start:row_end, col_start:col_start + N] = I
+                cs = (j - 1) * N
+                A_full[rs:re, cs:cs + N] = I
             if j < N - 1:
-                col_start = (j + 1) * N
-                A_full[row_start:row_end, col_start:col_start + N] = I
+                cs = (j + 1) * N
+                A_full[rs:re, cs:cs + N] = I
 
-        # The 1/h² prefactor is analytically absorbed into the right-hand side 
-        # evaluation to maintain structural parity with the 1D methodology.
         return A_full
+    
 
     def build_full_rhs(self) -> np.ndarray:
         """
@@ -398,7 +423,7 @@ class PoissonProblem2D:
 
         return u_coarse
 
-    def coarse_direct_solve(self) -> np.ndarray:
+    def coarse_direct_solve(self, max_gb: float = 1.0) -> np.ndarray:
         """
         Computes the analytical resolution of the unrefined N²×N² discrete system.
 
@@ -406,8 +431,10 @@ class PoissonProblem2D:
         serving exclusively as a diagnostic mechanism to verify line-Jacobi convergence 
         stability and absolute discrete residuals. It does not represent the refined 
         reference methodology utilised in the primary literature evaluation.
+
+        Safe only for N ≤ ~32 (1 GiB limit by default).
         """
-        A_full = self.build_full_matrix()
+        A_full = self.build_full_matrix(max_gb=max_gb)
         b_full = self.build_full_rhs()
         u_flat = np.linalg.solve(A_full, b_full)
         return u_flat.reshape((self.config.N, self.config.N), order="C")
@@ -469,3 +496,97 @@ def _bilinear_interpolate(
             )
 
     return u_coarse
+
+
+# ── Private Utility Methods ───────────────────────────────────────────────────
+
+def _compute_residual_tridiagonal(
+    problem: "PoissonProblem2D",
+    u:       np.ndarray,
+) -> float:
+    """
+    Evaluates the global Euclidean residual, ||A_full * u - b_full||_2 / ||b_full||_2, 
+    without explicitly assembling the full dense system matrix.
+
+    The 2D block system corresponding to spatial column j is formulated as:
+        A_row * u[:,j] + u[:,j-1] + u[:,j+1] = b_full[:,j]
+
+    Where b_full[:,j] represents the exact full-system right-hand side:
+        b_full[i,j] = h² f(x_i, y_j)
+                      - bc_x0  if i == 0
+                      - bc_x1  if i == N-1
+                      - bc_y0  if j == 0
+                      - bc_y1  if j == N-1
+
+    The discrete residual vector for the j-th column:
+        r[:,j] = A_row * u[:,j] + u[:,j-1] + u[:,j+1] - b_full[:,j]
+        
+    is aggregated column-by-column utilising strictly tridiagonal matrix-vector 
+    multiplications. This architectural modification constrains the spatial memory 
+    complexity to O(N²), ensuring safe and efficient execution for arbitrarily 
+    refined mesh resolutions.
+
+    Parameters
+    ----------
+    problem : PoissonProblem2D
+        The discrete problem instance (must explicitly expose .config, .A_row, 
+        .X, .Y, and .h attributes).
+    u : np.ndarray
+        (N, N) spatial solution matrix, accessed via column-major indexing as u[:, j].
+
+    Returns
+    -------
+    float
+        The relative Euclidean residual evaluated across the full 2D coupled system.
+    """
+    from core.source_functions import SOURCE_FUNCTIONS_2D
+
+    cfg = problem.config
+    N   = cfg.N
+    h   = problem.h
+    f   = SOURCE_FUNCTIONS_2D[cfg.source_fn]
+
+    # Extract the three diagonals of A_row once — avoids repeated indexing.
+    diag_main = problem.A_row.diagonal(0)    # length N,   entries = -4
+    diag_sup  = problem.A_row.diagonal(1)    # length N-1, entries = +1
+    diag_sub  = problem.A_row.diagonal(-1)   # length N-1, entries = +1
+
+    residual_sq = 0.0
+    b_norm_sq   = 0.0
+
+    for j in range(N):
+        # ── Exact full-system RHS for column j ────────────────────────────────
+        b_col = h**2 * f(problem.X[:, j], problem.Y[:, j])
+
+        # x-direction Dirichlet BCs absorbed into first and last entries.
+        b_col[0]  -= cfg.bc_x0
+        b_col[-1] -= cfg.bc_x1
+
+        # y-direction Dirichlet BCs absorbed into boundary columns.
+        if j == 0:
+            b_col -= cfg.bc_y0
+        if j == N - 1:
+            b_col -= cfg.bc_y1
+
+        # ── A_row · u[:,j] via tridiagonal matvec ────────────────────────────
+        col = u[:, j]
+        Au_col = diag_main * col
+        Au_col[:-1] += diag_sup * col[1:]
+        Au_col[1:]  += diag_sub * col[:-1]
+
+        # ── Add identity-block coupling to adjacent columns ───────────────────
+        if j > 0:
+            Au_col += u[:, j - 1]
+        if j < N - 1:
+            Au_col += u[:, j + 1]
+
+        # ── Accumulate residual and RHS norm ──────────────────────────────────
+        r_col        = Au_col - b_col
+        residual_sq += float(np.dot(r_col, r_col))
+        b_norm_sq   += float(np.dot(b_col, b_col))
+
+    b_norm = np.sqrt(b_norm_sq)
+    if b_norm < 1e-14:
+        return float(np.sqrt(residual_sq))
+
+    return float(np.sqrt(residual_sq) / b_norm)

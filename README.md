@@ -1,6 +1,6 @@
 # Quantum Linear System Resolution of the 1D and 2D Poisson Equations
 
-This repository contains the computational framework developed to evaluate the Harrow-Hassidim-Lloyd (HHL) quantum algorithm for solving the Poisson boundary value problem across one-dimensional and two-dimensional spatial domains. 
+This repository contains the computational framework developed to evaluate the Harrow-Hassidim-Lloyd (HHL) quantum algorithm for solving the Poisson boundary value problem across one-dimensional and two-dimensional spatial domains.
 
 The codebase is engineered to systematically replicate and extend the numerical benchmarks detailed in **Ghafourpour & Laizet (2025)**. The 1D formulation employs a direct Toeplitz Symmetric Tridiagonal (TST) operator, whilst the 2D resolution is achieved via a hybrid quantum-classical line-Jacobi iterative decomposition scheme.
 
@@ -38,19 +38,23 @@ poisson_hhl/
 This framework necessitates an isolated Python environment to prevent dependency conflicts, particularly concerning Qiskit quantum information modules and classical scientific computing libraries.
 
 **1. Clone the repository (including the required solver submodule):**
+
 ```bash
 git clone --recurse-submodules [https://github.com/YourUsername/YourRepository.git](https://github.com/YourUsername/YourRepository.git)
 cd YourRepository
 ```
+
 *(Note: If the repository was cloned without the `--recurse-submodules` flag, execute `git submodule update --init --recursive` to populate the `quantum_linear_solvers` directory).*
 
 **2. Provision the Conda environment:**
+
 ```bash
 conda create -n msc_qiskit python=3.11
 conda activate msc_qiskit
 ```
 
 **3. Install dependencies and the local quantum submodule:**
+
 ```bash
 pip install -r requirements.txt
 pip install -e quantum_linear_solvers/
@@ -61,13 +65,17 @@ pip install -e quantum_linear_solvers/
 Execution authority is strictly delegated to the entry-point scripts located within the `scripts/` directory. These modules dynamically resolve system paths, ensuring internal imports function correctly regardless of the active working directory.
 
 ### 1D Benchmark Evaluations (Sections IV A–D)
+
 Evaluates direct HHL resolutions against classical Thomas baselines across varying spatial resolutions and Trotterisation precision parameters.
+
 ```bash
 python scripts/run_1d_benchmark.py
 ```
 
 ### 2D Benchmark Evaluations (Sections IV E–F)
+
 Evaluates the hybrid quantum-classical line-Jacobi iterative scheme.
+
 ```bash
 python scripts/run_2d_benchmark.py
 ```

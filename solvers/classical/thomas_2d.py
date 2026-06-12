@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from problems.poisson_2d import PoissonProblem2D
+from problems.poisson_2d import PoissonProblem2D, _compute_residual_tridiagonal
 from solvers.classical.thomas import thomas_solve_system
 from solvers.quantum.result import SolverResult2D
 
@@ -93,35 +93,29 @@ def _package_result(
     solver_label:     str,
 ) -> SolverResult2D:
     """
-    Encapsulates the numerical solver output and associated metrics into a 
+    Encapsulates the classical solver output and associated metrics into a 
     standardised `SolverResult2D` data structure.
 
     This routine computes two distinct residual metrics to facilitate comprehensive analysis:
     
     1. Euclidean Residual : ||A_full * u_flat - b_full||_2 / ||b_full||_2
        Quantifies the global deviation of the iterative solution from the exact 
-       analytical solution of the fully coupled N²×N² system. It should be noted 
-       that for the Jacobi iterative scheme, this residual may remain on the order 
-       of O(1) even when the sequential update norm is minimal. This reflects the 
-       inherent convergence properties of the outer iterative loop and does not 
-       indicate an algorithmic fault or computational bug.
+       analytical solution of the fully coupled N²×N² system. To ensure scalability 
+       and memory efficiency across highly refined meshes, this metric is evaluated 
+       dynamically via tridiagonal matrix-vector multiplications, precluding the 
+       allocation of the dense global operator. It should be noted that for the Jacobi 
+       iterative scheme, this residual may remain on the order of O(1) even when 
+       the sequential update norm is minimal, reflecting the inherent convergence 
+       properties of the outer iterative loop rather than an algorithmic fault.
        
     2. Iteration Error : Tracked sequentially within `iteration_errors`.
        The terminal value of this array represents the actual mathematical convergence 
        criterion (supremum norm) successfully satisfied by the line-Jacobi loop.
     """
-    A_full = problem.build_full_matrix()
-    b_full = problem.build_full_rhs()
-    u_flat = u.flatten(order="C")
-    
-    residual = float(
-        np.linalg.norm(A_full @ u_flat - b_full)
-        / np.linalg.norm(b_full)
-    )
-    
+    residual = _compute_residual_tridiagonal(problem, u)
     return SolverResult2D(
         u=u,
-        solver=solver_label,
+        solver="Thomas-2D",
         iterations=iterations,
         converged=converged,
         iteration_errors=iteration_errors,

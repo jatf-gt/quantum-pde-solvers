@@ -31,9 +31,10 @@ import time
 
 import numpy as np
 
-from problems.poisson_2d import PoissonProblem2D
+from problems.poisson_2d import PoissonProblem2D, _compute_residual_tridiagonal
 from solvers.quantum.hhl_1d import hhl_solve_system
 from solvers.quantum.result import SolverResult2D
+
 
 # ── Global Tolerance and Scaling Directives ───────────────────────────────────
 
@@ -151,7 +152,9 @@ def _package_result(
     
     1. Euclidean Residual : ||A_full * u_flat - b_full||_2 / ||b_full||_2
        Quantifies the global deviation of the iterative solution from the exact 
-       analytical solution of the fully coupled system. It should be noted 
+       analytical solution of the fully coupled N²×N² system. This residual is computed 
+       via highly efficient tridiagonal matrix-vector multiplications, entirely 
+       bypassing the memory allocation of the global dense matrix. It should be noted 
        that for the Jacobi iterative scheme, this residual may remain on the order 
        of O(1) even when the sequential update norm is minimal. This reflects the 
        inherent convergence properties of the outer iterative loop.
@@ -160,15 +163,7 @@ def _package_result(
        The terminal value of this array represents the actual mathematical convergence 
        criterion (supremum norm) evaluated against the predefined tolerance threshold.
     """
-    A_full = problem.build_full_matrix()
-    b_full = problem.build_full_rhs()
-    u_flat = u.flatten(order="C")
-    
-    residual = float(
-        np.linalg.norm(A_full @ u_flat - b_full)
-        / np.linalg.norm(b_full)
-    )
-    
+    residual = _compute_residual_tridiagonal(problem, u)
     return SolverResult2D(
         u=u,
         solver=solver_label,
