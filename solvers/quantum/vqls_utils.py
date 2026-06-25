@@ -356,22 +356,32 @@ def build_cost_function_pennylane(
 # ── Dimensionality Recovery ───────────────────────────────────────────────────
 
 def recover_solution(
-    params:      np.ndarray,
-    A:           np.ndarray,
-    b:           np.ndarray,
-    n_qubits:    int,
-    n_layers:    int,
-    device_name: str = "default.qubit",
+    params:       np.ndarray,
+    A:            np.ndarray,
+    b:            np.ndarray,
+    n_qubits:     int,
+    n_layers:     int,
+    device_name:  str = "default.qubit",
 ) -> Tuple[np.ndarray, float]:
     """
     Extracts the physically dimensioned solution vector from the optimally 
     trained ansatz parameters.
 
-    The converged ansatz state |x(θ*)> fundamentally represents the solution 
-    normalised to unity. To recover the physical scale, a proportionality 
-    constant 'c' satisfying c * A * x_raw ≈ b is computed. This procedure 
-    employs the identical least-squares projection methodology utilised within 
-    the HHL solver pipeline.
+    The converged ansatz state |x(θ*)> satisfies the proportional relation:
+        A_norm |x(θ*)> ∝ |b_norm>
+
+    where A_norm = A / ||A||_2 and b_norm = b / ||b||_2.
+
+    The proportionality constant is recovered against the normalised system 
+    to constrain all numerical quantities to O(1), followed by a rescaling 
+    projection to the physical domain:
+
+        u = c_norm * x_raw * (||b||_2 / ||A||_2)
+
+    This methodology explicitly mitigates the amplification of quantum noise 
+    driven by the scaling factor ||b||_2 / ||A||_2. Such regularisation is 
+    critical for physically scaled domains (e.g., the Heterogeneous Poisson 
+    equation) where ||b|| ~ α·h² ≫ 1.
 
     Parameters
     ----------
@@ -392,9 +402,11 @@ def recover_solution(
     -------
     u : np.ndarray
         Recovered physical solution array.
-    c : float
-        Optimal scaling constant derived via least-squares projection.
+    c_phys : float
+        Effective proportionality constant projected into physical units.
     """
+    import pennylane as qml
+
     @qml.qnode(qml.device(device_name, wires=n_qubits), interface="autograd")
     def state_circuit(p):
         build_ansatz(p, n_qubits, n_layers)
@@ -402,22 +414,36 @@ def recover_solution(
 
     x_raw = np.real(np.array(state_circuit(params), dtype=complex))
 
-    # Recover c: c · A · x_raw ≈ b
-    # Least-squares: c = (b · A·x_raw) / ||A·x_raw||²
-    Ax = A @ x_raw
-    denom = float(np.dot(Ax, Ax))
+    # Normalise A and b — recover c against the normalised system.
+    A_norm_factor = float(np.linalg.norm(A, ord=2))
+    b_norm_factor = float(np.linalg.norm(b))
+
+    A_norm = A / A_norm_factor
+    b_norm = b / b_norm_factor
+
+    # Least-squares recovery against normalised system:
+    #   c_norm · A_norm · x_raw ≈ b_norm
+    #   c_norm = (b_norm · A_norm·x_raw) / ||A_norm·x_raw||²
+    Ax_norm = A_norm @ x_raw
+    denom   = float(np.dot(Ax_norm, Ax_norm))
 
     if denom < 1e-14:
         raise RuntimeError(
-            "Proportionality recovery failed: ||A·x_raw||² is numerically "
-            "zero.  The ansatz may not have converged — try more layers or "
-            "a smaller optimiser tolerance."
+            "Proportionality recovery failed: ||A_norm·x_raw||² is "
+            "numerically zero.  The ansatz may not have converged."
         )
 
-    c = float(np.dot(b, Ax) / denom)
-    u = c * x_raw
+    c_norm = float(np.dot(b_norm, Ax_norm) / denom)
 
-    return u, c
+    # Rescale to physical units.
+    # u = c_norm · x_raw · ||b|| / ||A||_2
+    scale = b_norm_factor / A_norm_factor
+    u     = c_norm * scale * x_raw
+
+    # Effective proportionality constant in physical units.
+    c_phys = c_norm * scale
+
+    return u, c_phys
 
 
 # ── Private Utility Methods ───────────────────────────────────────────────────

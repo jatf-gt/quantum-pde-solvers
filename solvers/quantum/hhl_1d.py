@@ -135,12 +135,35 @@ def hhl_solve_system(
     # ── Phase 4: Statevector Extraction ───────────────────────────────────────
     x_raw = _extract_solution_statevector(solution.state, num_qubits)
 
-    # ── Phase 5: Proportionality Recovery ─────────────────────────────────────
-    # Recover the scaling constant c against the original, unnormalised A and b 
-    # to project the quantum solution back into the physical domain.
-    Ax = A @ x_raw
-    c  = float(np.dot(b, Ax) / np.dot(Ax, Ax))
-    u  = c * x_raw
+# ── Phase 5: Dimensionality Recovery ──────────────────────────────────────
+    # Recover the scaling constant against the normalised system to mitigate 
+    # the amplification of quantum noise by the geometric factor ||b||_2 / ||A||_2. 
+    # This regularisation is critical for physically scaled domains (e.g., 
+    # Heterogeneous configurations) where ||b|| ≫ 1 due to the α = L²/λ_D² prefactor.
+    #
+    # The normalised geometric relation is formulated as: 
+    #   A_norm · x_raw ≈ c_norm · b_norm
+    # where A_norm = A / ||A||_2, and b_norm = b / ||b||_2.
+    #
+    # The physical solution dimensionality is subsequently recovered via: 
+    #   u = c_norm · x_raw · (||b||_2 / ||A||_2)
+
+    A_norm = A / A_norm_factor
+    b_norm_vec = b / b_norm_factor
+
+    Ax_norm = A_norm @ x_raw
+    denom   = float(np.dot(Ax_norm, Ax_norm))
+
+    if denom < 1e-14:
+        raise RuntimeError(
+            "HHL proportionality recovery failed: ||A_norm·x_raw||² "
+            "is numerically zero."
+        )
+
+    c_norm = float(np.dot(b_norm_vec, Ax_norm) / denom)
+    scale  = b_norm_factor / A_norm_factor
+    u      = c_norm * scale * x_raw
+    c      = c_norm * scale
 
     return u, x_raw, c
 
