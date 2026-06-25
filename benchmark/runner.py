@@ -33,6 +33,7 @@ from solvers.classical.thomas_2d import thomas_solve_2d
 from solvers.classical.numpy_ref import numpy_solve
 from solvers.quantum.hhl_1d import hhl_solve
 from solvers.quantum.hhl_2d import hhl_solve_2d
+from solvers.quantum.vqls_1d import VQLSConfig
 from benchmark.metrics import (
     BenchmarkResult,
     BenchmarkResult2D,
@@ -439,3 +440,72 @@ def _plot_2d_pairs(
             [thomas_br, hhl_br],
             save_fig=save_fig,
         )
+
+
+# ── 1D Execution Orchestration ────────────────────────────────────────────────
+
+def run_pair_1d(
+    cfg:         SimConfig1D,
+    run_vqls:    bool       = True,
+    vqls_config: "VQLSConfig" = None,
+) -> tuple:
+    """
+    Instantiates the 1D problem and sequentially executes classical Thomas, 
+    quantum HHL, and optionally VQLS resolutions, aggregating the resultant metrics.
+
+    Returns a dynamically sized tuple containing the benchmark data structures 
+    contingent upon the `run_vqls` execution flag.
+
+    Parameters
+    ----------
+    cfg : SimConfig1D
+        Configuration parameters governing the 1D simulation instance.
+    run_vqls : bool, default=True
+        Boolean flag dictating the execution of the Variational Quantum Linear Solver.
+    vqls_config : VQLSConfig, optional
+        Hyperparameter structure governing the variational optimisation. 
+        Defaults to DEFAULT_VQLS_CONFIG if omitted.
+    """
+    from solvers.quantum.vqls_1d import vqls_solve, VQLSConfig, DEFAULT_VQLS_CONFIG
+
+    problem = PoissonProblem1D(cfg)
+    print(f"\n  → {problem.summary()}")
+
+    # Classical Reference Execution
+    t0        = time.perf_counter()
+    thomas_sr = thomas_solve(problem)
+    t_thomas  = time.perf_counter() - t0
+
+    # Quantum HHL Execution
+    t0     = time.perf_counter()
+    hhl_sr = hhl_solve(problem)
+    t_hhl  = time.perf_counter() - t0
+
+    print(
+        f"     Thomas: {t_thomas:.3f}s  |  "
+        f"HHL: {t_hhl:.1f}s",
+        end="",
+    )
+
+    thomas_br = compute_errors(problem, thomas_sr, u_thomas=None)
+    hhl_br    = compute_errors(problem, hhl_sr,    u_thomas=thomas_sr.u)
+
+    if not run_vqls:
+        print()
+        return thomas_br, hhl_br
+
+    # Variational Quantum Linear Solver (VQLS) Execution
+    vc = vqls_config if vqls_config is not None else DEFAULT_VQLS_CONFIG
+    t0      = time.perf_counter()
+    vqls_sr = vqls_solve(problem, config=vc)
+    t_vqls  = time.perf_counter() - t0
+
+    print(
+        f"  |  VQLS: {t_vqls:.1f}s "
+        f"(cost={vqls_sr.final_cost:.4f}, "
+        f"evals={vqls_sr.n_circuit_evals})"
+    )
+
+    vqls_br = compute_errors(problem, vqls_sr, u_thomas=thomas_sr.u)
+
+    return thomas_br, hhl_br, vqls_br

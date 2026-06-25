@@ -78,3 +78,6 @@ class SolverResult2D:
     converged:          bool
     iteration_errors:   list[float]
     euclidean_residual: Optional[float] = None
+
+# Re-export VQLSSolverResult from vqls_1d for convenience.
+from solvers.quantum.vqls_1d import VQLSSolverResult
