@@ -84,9 +84,14 @@ class VQLSConfig:
     verbose:     bool  = False
 
 
-# Default configuration utilised when vqls_solve is invoked without explicit overrides.
-DEFAULT_VQLS_CONFIG = VQLSConfig()
-
+# More layers and iterations needed for physically scaled problems.
+DEFAULT_VQLS_CONFIG = VQLSConfig(
+    n_layers  = 6,
+    optimiser = "COBYLA",
+    max_iter  = 300,    # per restart — 3 restarts = 900 total
+    tol       = 1e-6,
+    random_seed = 42,
+)
 
 # ── Extended Result Container ─────────────────────────────────────────────────
 
@@ -168,28 +173,13 @@ def vqls_solve_system(
     Resolves the linear system Au = b employing the VQLS algorithm directly 
     on raw NumPy arrays.
 
-    This decoupled function serves as the primary variational execution engine. 
-    It structurally mirrors `hhl_solve_system` to seamlessly interface with 
-    the 2D line-Jacobi solver loops.
-
-    Execution Pipeline
-    ------------------
-    Stage 1: Validation and Normalisation
-        Verifies matrix dimensionality and Hermitian symmetry. The system 
-        matrix A is spectrally normalised, and b is normalised to a unit vector.
-    Stage 2: Pauli Decomposition
-        Decomposes the normalised operator into a Linear Combination of 
-        Unitaries (LCU). For the Poisson TST matrix, this yields O(n) terms.
-    Stage 3: Ansatz Initialisation
-        Constructs a hardware-efficient ansatz utilising `n_layers` on 
-        n = log2(N) qubits. Allocates parameters randomly or via `init_params`.
-    Stage 4: Optimisation
-        Minimises the objective function C(θ) via the designated SciPy 
-        optimiser, continuously tracking the convergence trajectory.
-    Stage 5: Dimensionality Recovery
-        Extracts the physical solution vector from the optimally converged 
-        ansatz state via least-squares proportionality projection.
-
+    Incorporates an automated restart heuristic: should the initial optimisation 
+    phase fail to satisfy the target cost tolerance, the solver iteratively 
+    restarts from the optimal parameter vector discovered, employing progressively 
+    reduced step sizes. This architecture constitutes a critical enhancement for 
+    ill-conditioned systems (e.g., severe condition numbers, elevated RHS norms, 
+    non-homogeneous boundary constraints).
+    
     Parameters
     ----------
     A : np.ndarray
@@ -209,23 +199,17 @@ def vqls_solve_system(
 
     if 2**n_qubits != N:
         raise ValueError(
-            f"System size N={N} must be a strict power of 2 for amplitude encoding."
+            f"System size N={N} must be a power of 2 for amplitude encoding."
         )
 
-    # ── Stage 1: Validation and Normalisation ─────────────────────────────────
     _validate_system(A, b)
 
     b_norm_factor = float(np.linalg.norm(b))
     if b_norm_factor < 1e-14:
-        raise ValueError(
-            "RHS vector b is numerically zero — cannot normalise for VQLS."
-        )
+        raise ValueError("RHS vector b is numerically zero.")
     b_norm = b / b_norm_factor
 
-    # ── Stage 2: Pauli Decomposition ──────────────────────────────────────────
-    # Decompose the normalised matrix A/||A||_2 into Pauli strings.
-    # The normalisation ensures eigenvalues lie within (-1, 1], which is
-    # mathematically requisite for well-conditioned cost function evaluation.
+    # ── Pauli Decomposition ───────────────────────────────────────────────────
     pauli_terms, A_norm_factor = pauli_decompose_normalised(
         N         = N,
         main_diag = A[0, 0],
@@ -237,10 +221,11 @@ def vqls_solve_system(
             f"  VQLS: N={N}, n_qubits={n_qubits}, "
             f"n_layers={config.n_layers}, "
             f"LCU terms={len(pauli_terms)}, "
-            f"||A||_2={A_norm_factor:.4f}"
+            f"||A||_2={A_norm_factor:.4f}, "
+            f"||b||={b_norm_factor:.4e}"
         )
 
-    # ── Stage 3: Ansatz Initialisation ────────────────────────────────────────
+    # ── Parameter Initialisation ──────────────────────────────────────────────
     n_p = n_params(n_qubits, config.n_layers)
 
     if config.init_params is not None:
@@ -254,7 +239,7 @@ def vqls_solve_system(
         rng        = np.random.default_rng(config.random_seed)
         theta_init = rng.uniform(0, 2 * np.pi, size=n_p)
 
-    # ── Stage 4: Optimisation ─────────────────────────────────────────────────
+    # ── Objective Function Construction ───────────────────────────────────────
     cost_fn = build_cost_function(
         pauli_terms  = pauli_terms,
         b_norm       = b_norm,
@@ -263,45 +248,72 @@ def vqls_solve_system(
         device_name  = config.device_name,
     )
 
-    cost_history:  List[float] = []
-    eval_counter   = [0]   # Mutable container to facilitate callback modification
+    # ── Optimisation with Restart Heuristics ──────────────────────────────────
+    # Execute up to n_restarts sequential optimisation phases. Each phase 
+    # initiates from the optimal parameter configuration identified previously, 
+    # applying a monotonically decreasing COBYLA step size (rhobeg) to refine 
+    # the solution vector.
+    # This protocol is crucial for complex landscapes: the initial pass with 
+    # a large rhobeg explores the global topography, whereas subsequent passes 
+    # with a diminished rhobeg refine the targeted local minima.
+    n_restarts     = 3
+    rhobeg_values  = [0.5, 0.1, 0.01]
+    cost_history:  list[float] = []
+    total_evals    = 0
+    best_params    = theta_init.copy()
+    best_cost      = float(cost_fn(theta_init))
 
-    def callback(theta):
-        """Records the objective cost at each iteration for convergence telemetry."""
-        c = float(cost_fn(theta))
-        cost_history.append(c)
-        eval_counter[0] += 1
-        if config.verbose and eval_counter[0] % 50 == 0:
+    for restart_idx in range(n_restarts):
+        rhobeg = rhobeg_values[restart_idx]
+
+        if config.verbose:
             print(
-                f"    iter {eval_counter[0]:4d}  "
-                f"cost={c:.6f}"
+                f"  Restart {restart_idx+1}/{n_restarts}: "
+                f"rhobeg={rhobeg}, starting cost={best_cost:.6f}"
             )
 
-    opt_result = minimize(
-        fun      = cost_fn,
-        x0       = theta_init,
-        method   = config.optimiser,
-        tol      = config.tol,
-        options  = {"maxiter": config.max_iter, "rhobeg": 0.5},
-        callback = callback if config.optimiser == "COBYLA" else None,
-    )
+        opt_result = minimize(
+            fun     = cost_fn,
+            x0      = best_params,
+            method  = "COBYLA",
+            tol     = config.tol,
+            options = {
+                "maxiter": config.max_iter,
+                "rhobeg":  rhobeg,
+            },
+        )
 
-    # Re-evaluate terminal cost history for non-COBYLA gradient-based methods.
-    if config.optimiser != "COBYLA":
-        cost_history.append(float(opt_result.fun))
+        total_evals += int(opt_result.nfev)
+        current_cost = float(opt_result.fun)
+        cost_history.append(current_cost)
 
-    optimal_params = opt_result.x
-    final_cost     = float(opt_result.fun)
-    n_evals        = int(opt_result.nfev)
+        if current_cost < best_cost:
+            best_cost   = current_cost
+            best_params = opt_result.x.copy()
+
+        if config.verbose:
+            print(
+                f"    → cost={current_cost:.6f}, "
+                f"evals={opt_result.nfev}, "
+                f"success={opt_result.success}"
+            )
+
+        # Terminate heuristic loops prematurely if the target tolerance is achieved.
+        if best_cost <= config.tol:
+            break
+
+    optimal_params    = best_params
+    final_cost        = best_cost
+    optimiser_success = final_cost <= config.tol * 10
 
     if config.verbose:
         print(
-            f"  VQLS converged: {opt_result.success}  "
-            f"cost={final_cost:.6f}  "
-            f"evals={n_evals}"
+            f"  VQLS final: cost={final_cost:.6f}, "
+            f"total_evals={total_evals}, "
+            f"converged={optimiser_success}"
         )
 
-    # ── Stage 5: Dimensionality Recovery ──────────────────────────────────────
+    # ── Dimensionality Recovery ───────────────────────────────────────────────
     u, c = recover_solution(
         params      = optimal_params,
         A           = A,
@@ -318,12 +330,12 @@ def vqls_solve_system(
     return VQLSSolverResult(
         u                 = u,
         solver            = "VQLS",
-        raw_state         = None,   # Handled natively by recovery projection
+        raw_state         = None,
         prop_const        = c,
         euclidean_residual= residual,
         final_cost        = final_cost,
-        n_circuit_evals   = n_evals,
-        optimiser_success = bool(opt_result.success),
+        n_circuit_evals   = total_evals,
+        optimiser_success = optimiser_success,
         cost_history      = cost_history,
         optimal_params    = optimal_params,
         n_layers          = config.n_layers,
