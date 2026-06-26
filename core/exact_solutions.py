@@ -46,3 +46,36 @@ EXACT_SOLUTIONS: dict[str, Callable[[np.ndarray], np.ndarray]] = {
     "fL": u_fL,
     "fH": u_fH,
 }
+
+
+# ── HET Analytical Solutions (Homogeneous Boundaries) ─────────────────────────
+
+def het_phi_linear(
+    x:     np.ndarray,
+    rho_0: float,
+    alpha: float,
+) -> np.ndarray:
+    """
+    Evaluates the exact analytical solution for the linear HET charge density 
+    profile under homogeneous Dirichlet boundary conditions (φ(0) = φ(1) = 0).
+
+    Mathematical Derivation:
+        Governing PDE: d²φ/dx² = -α · ρ_0 · x
+        
+        Integrating sequentially and applying φ(0) = 0:
+            φ'(x) = -α · ρ_0 · x² / 2 + C_1
+            φ(x)  = -α · ρ_0 · x³ / 6 + C_1 · x
+            
+        Applying the terminal boundary constraint φ(1) = 0:
+            0 = -α · ρ_0 / 6 + C_1  =>  C_1 = α · ρ_0 / 6
+            
+        Yielding the final closed-form spatial potential:
+            φ(x) = α · ρ_0 · x · (1 - x²) / 6
+    """
+    return alpha * rho_0 * x * (1.0 - x**2) / 6.0
+
+
+# Dictionary mapping HET exact solution models.
+HET_EXACT_SOLUTIONS = {
+    "linear": het_phi_linear,
+}
