@@ -9,3 +9,7 @@ __pycache__/
 *.png
 *.jpg
 *.egg-info/
+
+quick_test_het.py
+quick_test_VQLS.py
+smoke_test_norm.py

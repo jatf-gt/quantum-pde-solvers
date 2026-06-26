@@ -36,7 +36,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from core.het_config import HETConfig
+from core.het_config import HETConfig, HETPhysicalConfig
 from core.source_functions import HET_SOURCE_FUNCTIONS
 from core.exact_solutions import HET_EXACT_SOLUTIONS
 
@@ -98,6 +98,28 @@ class HETPoissonProblem1D:
         # ── Right-Hand Side Assembly ──────────────────────────────────────────
         self.b      = self._build_rhs()
         self.b_phys = self.b * cfg.phi_0   # Dimensional projection for telemetry
+
+        # ── Sanity check: solution scale should be O(alpha_bc) ───────────────
+        # The dominant contribution to the potential is the applied voltage,
+        # so the solution norm should be comparable to alpha_bc = V_d/phi_0.
+        # The space charge contribution is alpha * delta_0 = delta_0_factor.
+        # Total expected scale: alpha_bc + delta_0_factor.
+        expected_scale = cfg.alpha_bc + cfg.delta_0_factor
+        rhs_scale      = np.max(np.abs(self.b)) / (cfg.alpha * self.dx**2 + 1e-14)
+
+        # Warn if the RHS-implied solution scale is more than 3x the expected.
+        if rhs_scale > 3.0 * expected_scale and expected_scale > 0:
+            import warnings
+            warnings.warn(
+                f"RHS scale ({rhs_scale:.2f}) is {rhs_scale/expected_scale:.1f}x "
+                f"larger than expected ({expected_scale:.2f}). "
+                f"Check delta_0 ({cfg.delta_0:.2e}) — it may be too large. "
+                f"Physical requirement: delta_0 ~ 1/alpha = {1/cfg.alpha:.2e}.",
+                UserWarning,
+            )
+
+        eigs       = np.abs(np.linalg.eigvalsh(self.A))
+        self.kappa = float(eigs.max() / eigs.min())
 
         # ── Condition Number Evaluation ───────────────────────────────────────
         eigs       = np.abs(np.linalg.eigvalsh(self.A))
@@ -163,3 +185,153 @@ class HETPoissonProblem1D:
             f"{self.config.summary()} | "
             f"κ(A)={self.kappa:.2f}"
         )
+    
+
+# ── Physical Problem Container ────────────────────────────────────────────────
+
+class HETPhysicalProblem1D:
+    """
+    Constructs the discretised 1D HET plasma Poisson system, utilising the 
+    Boeuf-Garrigues (1998) density profile as the prescribed analytical source term.
+
+    The non-dimensionalised Poisson equation is formulated as:
+        d²φ̃/dx̃² = -α · δñ(x̃)
+
+    where δñ = (n_i - n_e)/n_0 characterises the prescribed non-dimensional net 
+    charge density, and α = L²/λ_D² constitutes the dimensionless physical scaling.
+
+    Dirichlet Boundary Constraints:
+        φ̃(0) = V_discharge / φ_0   (Anode)
+        φ̃(1) = 0                   (Cathode, grounded potential)
+
+    The macroscopic physical electric field is recovered via differentiation:
+        Ẽ(x̃) = -dφ̃/dx̃ ≈ -(φ̃_{i+1} - φ̃_{i-1}) / (2Δx̃)
+    Projected into physical units as: 
+        E(x) = Ẽ · φ_0 / L [V/m]
+
+    References
+    ----------
+    - Boeuf & Garrigues (1998), J. Appl. Phys. 84(7), 3541-3554.
+    - Hagelaar et al. (2002), Phys. Rev. E 62(1).
+    """
+
+    def __init__(self, cfg: "HETPhysicalConfig") -> None:
+        from core.het_config import HETPhysicalConfig
+        self.config = cfg
+        N           = cfg.N
+        self.dx     = 1.0 / (N + 1)
+        self.x      = np.arange(1, N + 1) * self.dx
+
+        # ── System Matrix Construction ────────────────────────────────────────
+        # Identical TST operator to the generic 1D Poisson methodology.
+        self.A = (
+            -2.0 * np.diag(np.ones(N))
+            +  1.0 * np.diag(np.ones(N - 1), k=1)
+            +  1.0 * np.diag(np.ones(N - 1), k=-1)
+        )
+
+        # ── Prescribed Analytical Distributions ───────────────────────────────
+        self.n_profile    = self._density_profile()
+        self.delta_n      = self._charge_separation()
+
+        # ── Right-Hand Side Assembly ──────────────────────────────────────────
+        self.b = self._build_rhs()
+
+        # ── Condition Number Evaluation ───────────────────────────────────────
+        eigs       = np.abs(np.linalg.eigvalsh(self.A))
+        self.kappa = float(eigs.max() / eigs.min())
+
+    def _density_profile(self) -> np.ndarray:
+        """
+        Evaluates the Gaussian plasma density profile approximating the empirical 
+        data from Boeuf-Garrigues (1998).
+
+        Formulation:
+            n(x̃)/n_0 = n_min + (1 - n_min) · exp(-(x̃ - x_peak)² / (2σ_n²))
+
+        The distribution peaks in proximity to the thruster exit plane (x̃ ≈ 0.75) 
+        and decays to n_min at the defined axial boundaries.
+        """
+        cfg = self.config
+        return (
+            cfg.n_min
+            + (1.0 - cfg.n_min)
+            * np.exp(-((self.x - cfg.x_peak)**2) / (2.0 * cfg.sigma_n**2))
+        )
+
+    def _charge_separation(self) -> np.ndarray:
+        """
+        Evaluates the prescribed non-dimensional net charge density, δñ = (n_i - n_e)/n_0.
+
+        This distribution analytically models the plasma sheath regions:
+          - Positive space charge accumulation near the anode (x̃ → 0)
+          - Negative space charge accumulation near the cathode (x̃ → 1)
+        Interspersed by a quasi-neutral bulk plasma regime.
+
+        Formulation:
+            δñ(x̃) = δ_0 · [exp(-x̃/σ_a) - exp(-(1-x̃)²/σ_c²)]
+        """
+        cfg = self.config
+        anode_term   = np.exp(-self.x / cfg.sigma_anode)
+        cathode_term = np.exp(-((1.0 - self.x)**2) / cfg.sigma_cath**2)
+        return cfg.delta_0 * (anode_term - cathode_term)
+
+    def _build_rhs(self) -> np.ndarray:
+        """
+        Assembles the non-dimensional right-hand side vector encoding the 
+        physical source topology and boundary states.
+
+        Evaluation at interior nodes:
+            b[i] = -α · Δx̃² · δñ(x̃_i)
+
+        The fixed anode potential is subtracted from the primary entry b[0], 
+        whilst the grounded cathode contributes nothing to the terminal entry b[-1].
+        """
+        cfg = self.config
+        b   = -cfg.alpha * self.dx**2 * self.delta_n
+        b[0]  -= cfg.alpha_bc    # Anode constraint: φ̃(0) = V_d/φ_0
+        return b
+
+    def electric_field(self, phi_nondim: np.ndarray) -> np.ndarray:
+        """
+        Computes the macroscopic physical electric field E(x) [V/m] derived from 
+        the non-dimensional spatial potential array φ̃.
+
+        The derivation employs second-order centred differences across interior 
+        nodes and strictly first-order one-sided differences at the axial boundaries.
+
+        Boundary Constraints applied prior to differentiation:
+            φ̃(0) = alpha_bc,  φ̃(1) = 0
+
+        Physical Field Recovery:
+            E = -dφ/dx = -(φ_0/L) · dφ̃/dx̃
+        """
+        cfg = self.config
+        N   = cfg.N
+        dx  = self.dx
+
+        # Augment the solution vector with explicit boundary constraints.
+        phi_full        = np.zeros(N + 2)
+        phi_full[0]     = cfg.alpha_bc   # Anode
+        phi_full[1:N+1] = phi_nondim
+        phi_full[N+1]   = 0.0            # Cathode
+
+        # Instantiate extended arrays.
+        x_full   = np.linspace(0, 1, N + 2)
+        E_nondim = np.zeros(N + 2)
+
+        # Interior Nodes: Second-order centred difference.
+        E_nondim[1:-1] = -(phi_full[2:] - phi_full[:-2]) / (2.0 * dx)
+
+        # Boundary Nodes: First-order one-sided difference.
+        E_nondim[0]  = -(phi_full[1]  - phi_full[0])  / dx
+        E_nondim[-1] = -(phi_full[-1] - phi_full[-2]) / dx
+
+        # Rescale differentiated field to dimensional physical units [V/m].
+        E_phys = E_nondim * cfg.phi_0 / cfg.L
+
+        return x_full, E_phys
+
+    def summary(self) -> str:
+        """Generates a concise execution string detailing configuration and matrix status."""
+        return f"{self.config.summary()} | κ(A)={self.kappa:.2f}"

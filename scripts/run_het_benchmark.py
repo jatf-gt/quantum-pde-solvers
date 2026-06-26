@@ -18,9 +18,18 @@ from __future__ import annotations
 
 import time
 import csv
+import sys
 from pathlib import Path
 
 import numpy as np
+
+# ── System Path Resolution ────────────────────────────────────────────────────
+
+# Dynamically resolve the project root directory (one level up from this script)
+# and append it to the system path to enable absolute imports.
+project_root = Path(__file__).resolve().parents[1]
+if str(project_root) not in sys.path:
+    sys.path.append(str(project_root))
 
 from core.het_config import HETConfig
 from problems.het_plasma_1d import HETPoissonProblem1D

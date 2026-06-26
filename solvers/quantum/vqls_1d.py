@@ -2,6 +2,22 @@
 Implements the Variational Quantum Linear Solver (VQLS) for 1D Poisson systems 
 characterised by a Toeplitz Symmetric Tridiagonal (TST) matrix structure.
 
+Mathematical formulation
+------------------------
+VQLS minimises the normalised cost function:
+
+    C(θ) = 1 − |⟨b|A|x(θ)⟩|² / ⟨x(θ)|A†A|x(θ)⟩
+
+over the variational parameters θ of a hardware-efficient ansatz
+|x(θ)⟩ = V(θ)|0⟩, where V(θ) is a layered circuit of RY rotations
+and nearest-neighbour CNOT gates. The matrix A is decomposed into a
+Linear Combination of Unitaries (LCU):
+
+    A = Σ_l c_l U_l
+
+via Pauli string decomposition, enabling efficient evaluation of the
+cost function on a statevector simulator.
+
 Public Interface
 ----------------
 vqls_solve(problem) : 
@@ -22,17 +38,23 @@ Bravo-Prieto et al. (2023):
   4. Recover the physical solution dimensionality via proportionality constant projection.
 
 Framework: PennyLane
+
+References
+----------
+Bravo-Prieto et al., "Variational Quantum Linear Solver",
+    Quantum 7, 1188 (2023).
+Ghafourpour & Laizet, Phys. Rev. Applied 24, 024032 (2025).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import numpy as np
 from scipy.optimize import minimize
 
 from problems.poisson_1d import PoissonProblem1D
-from solvers.quantum.result import SolverResult
+from solvers.quantum.result import SolverResult, VQLSSolverResult
 from solvers.quantum.vqls_utils import (
     pauli_decompose_normalised,
     build_cost_function,
@@ -92,41 +114,6 @@ DEFAULT_VQLS_CONFIG = VQLSConfig(
     tol       = 1e-6,
     random_seed = 42,
 )
-
-# ── Extended Result Container ─────────────────────────────────────────────────
-
-@dataclass
-class VQLSSolverResult(SolverResult):
-    """
-    Standardised solver output extended with VQLS-specific optimisation diagnostics.
-
-    Inherits core attributes (u, solver, raw_state, prop_const, euclidean_residual) 
-    from `SolverResult` and appends variational telemetry.
-
-    Attributes
-    ----------
-    final_cost : float
-        Terminal value of the objective function C(θ) upon convergence (0 = optimal).
-    n_circuit_evals : int
-        Aggregate count of cost function evaluations performed during optimisation.
-    optimiser_success : bool
-        Boolean flag indicating successful convergence reported by the SciPy optimiser.
-    cost_history : List[float]
-        Sequential trajectory of cost evaluations at each iteration.
-    optimal_params : Optional[np.ndarray]
-        The optimally converged parameter vector, θ*.
-    n_layers : int
-        Total number of entangling ansatz layers utilised.
-    n_parameters : int
-        Total dimensionality of the variational parameter space.
-    """
-    final_cost:        float            = 0.0
-    n_circuit_evals:   int              = 0
-    optimiser_success: bool             = False
-    cost_history:      List[float]      = field(default_factory=list, repr=False)
-    optimal_params:    Optional[np.ndarray] = field(default=None, repr=False)
-    n_layers:          int              = 0
-    n_parameters:      int              = 0
 
 
 # ── Public High-Level Interface ───────────────────────────────────────────────

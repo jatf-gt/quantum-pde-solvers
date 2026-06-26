@@ -132,3 +132,128 @@ class HETConfig:
             f"λ_D={self.lambda_D*1e6:.2f}μm, α={self.alpha:.1f}, "
             f"φ_0={self.phi_0:.1f}V, N={self.N}, ε={self.epsilon}"
         )
+    
+
+# ── Physical Configuration (Boeuf-Garrigues) ──────────────────────────────────
+
+@dataclass
+class HETPhysicalConfig:
+    """
+    Encapsulates the physical configuration parameters for the Boeuf-Garrigues 
+    1D Hall Effect Thruster (HET) benchmark.
+
+    The parameters strictly align with Table 1 of Boeuf & Garrigues (1998), 
+    J. Appl. Phys. 84(7), 3541-3554. The spatial plasma density profile is 
+    approximated by a Gaussian distribution centred in proximity to the exit plane.
+
+    The net charge density, δn = n_i - n_e, is prescribed analytically to 
+    represent the distinct sheath boundaries at the anode and cathode. This 
+    formulation adheres to the quasi-neutral bulk approximation incorporating 
+    sheath corrections derived from Hagelaar et al. (2002), Phys. Rev. E 62(1).
+
+    Key correction: delta_0 must be of order 1/alpha ~ (lambda_D/L)^2
+    to ensure the space charge term is a physically realistic small
+    perturbation on the applied voltage.  The value delta_0 = 0.02 (2%)
+    was unphysically large, driving the solution 10x above the correct
+    scale.
+
+    In a quasi-neutral HET plasma, the departure from charge neutrality
+    satisfies:
+        (n_i - n_e)/n_0 ~ (lambda_D/L)^2 = 1/alpha ~ 2.65e-5
+
+    delta_0 = 5/alpha is used as a physically motivated amplitude that
+    produces a visible but realistic space charge effect.
+
+    Attributes
+    ----------
+    Physical Parameters (SI Units)
+        L : float
+            Axial channel length [m].
+        V_discharge : float
+            Applied discharge voltage establishing the anode potential [V].
+        T_e_eV : float
+            Uniform electron temperature approximation [eV].
+        n_0 : float
+            Reference bulk plasma density [m⁻³].
+    
+    Density Profile Parameters
+        x_peak : float
+            Non-dimensional spatial location of the density peak, mapped to [0,1].
+        sigma_n : float
+            Non-dimensional Gaussian distribution width.
+        n_min : float
+            Minimum boundary density expressed as a fractional scalar of n_0.
+            
+    Charge Separation Parameters (Sheath Modelling)
+        delta_0 : float
+            Non-dimensional peak charge separation amplitude.
+        sigma_anode : float
+            Non-dimensional characteristic thickness of the anode sheath.
+        sigma_cath : float
+            Non-dimensional characteristic thickness of the cathode sheath.
+            
+    Numerical Parameters
+        N : int
+            System matrix dimension (interior nodes, must be a power of 2).
+        epsilon : float
+            Precision threshold for HHL Trotterisation and VQLS tolerance.
+    """
+    # Physical parameters — Boeuf & Garrigues (1998) Table 1.
+    L:            float = 0.025          # 25 mm axial channel
+    V_discharge:  float = 300.0          # 300 V discharge potential
+    T_e_eV:       float = 20.0           # 20 eV uniform electron temperature
+    n_0:          float = 5e17           # 5×10¹⁷ m⁻³ reference density
+
+    # Density profile parameters.
+    x_peak:       float = 0.75           # Peak density proximity to exit plane
+    sigma_n:      float = 0.20           # Spatial profile width
+    n_min:        float = 0.05           # Minimum boundary density fraction
+
+    # Charge separation parameters (Analytical sheath model).
+    # Set delta_0_factor to control the amplitude: delta_0 = factor/alpha.
+    delta_0_factor: float = 5.0          # dimensionless, O(1)    
+    sigma_anode:  float = 0.08           # Anode sheath exponential thickness
+    sigma_cath:   float = 0.06           # Cathode sheath exponential thickness
+
+    # Numerical execution parameters.
+    N:            int   = 8
+    epsilon:      float = 0.01
+
+    # Derived constants — systematically populated by __post_init__.
+    lambda_D:     float = field(init=False, repr=True)
+    phi_0:        float = field(init=False, repr=True)
+    alpha:        float = field(init=False, repr=True)
+    alpha_bc:     float = field(init=False, repr=True)
+    delta_0:      float = field(init=False, repr=True)
+
+    def __post_init__(self) -> None:
+        """Validates numerical constraints and computes physical dimensionless scalings."""
+        if self.N <= 0 or (self.N & (self.N - 1)) != 0:
+            raise ValueError(
+                f"System dimension N must be a positive power of 2, received {self.N}."
+            )
+
+        T_e_J         = self.T_e_eV * EV_TO_J
+        self.lambda_D = float(np.sqrt(
+            EPS_0 * T_e_J / (E_CHARGE**2 * self.n_0)
+        ))
+        self.phi_0    = float(self.T_e_eV)
+        self.alpha    = float((self.L / self.lambda_D)**2)
+        self.alpha_bc = float(self.V_discharge / self.phi_0)
+
+        # Physical charge separation amplitude: delta_0 = factor / alpha.
+        # This ensures alpha * delta_0 = factor ~ O(1), so the space charge
+        # contribution to the potential is of order factor, which is a small
+        # fraction of alpha_bc = V_d/phi_0 = 15.
+        self.delta_0 = self.delta_0_factor / self.alpha
+
+    def summary(self) -> str:
+        """Generates a concise execution string detailing core physical configurations."""
+        return (
+            f"HET (Boeuf-Garrigues 1998): "
+            f"L={self.L*1e3:.1f}mm, V_d={self.V_discharge}V, "
+            f"T_e={self.T_e_eV}eV, n_0={self.n_0:.1e}m⁻³ | "
+            f"λ_D={self.lambda_D*1e6:.2f}μm, α={self.alpha:.1f}, "
+            f"α_bc={self.alpha_bc:.1f}, δ_0={self.delta_0:.2e}, "
+            f"N={self.N}"
+        )
