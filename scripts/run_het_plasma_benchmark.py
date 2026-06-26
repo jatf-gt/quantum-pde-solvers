@@ -57,7 +57,7 @@ from core.het_config import HETPhysicalConfig
 from problems.het_plasma_1d import HETPhysicalProblem1D
 from solvers.classical.thomas import thomas_solve_system
 from solvers.quantum.hhl_1d import hhl_solve_system
-from solvers.quantum.vqls_1d import vqls_solve_system, VQLSConfig
+from solvers.quantum.vqls_1d import vqls_solve_system, VQLSConfig1D
 
 RESULTS_DIR = Path("results/het_plasma")
 
@@ -86,7 +86,7 @@ def rel_err_pct(u: np.ndarray, ref: np.ndarray) -> float:
 
 def run_benchmark(
     cfg:     HETPhysicalConfig,
-    vc:      VQLSConfig,
+    vc:      VQLSConfig1D,
     verbose: bool = True,
 ) -> dict:
     """
@@ -457,7 +457,7 @@ def main() -> None:
     print("  Reference: Boeuf & Garrigues (1998), J. Appl. Phys. 84, 3541")
     print("═"*70)
 
-    vc = VQLSConfig(
+    vc = VQLSConfig1D(
         n_layers    = 6,
         optimiser   = "COBYLA",
         max_iter    = 3000,

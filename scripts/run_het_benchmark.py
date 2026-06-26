@@ -35,7 +35,7 @@ from core.het_config import HETConfig
 from problems.het_plasma_1d import HETPoissonProblem1D
 from solvers.classical.thomas import thomas_solve_system
 from solvers.quantum.hhl_1d import hhl_solve_system
-from solvers.quantum.vqls_1d import vqls_solve_system, VQLSConfig
+from solvers.quantum.vqls_1d import vqls_solve_system, VQLSConfig1D
 from benchmark.reporting import print_result_table
 
 RESULTS_DIR = Path("results/het")
@@ -45,7 +45,7 @@ RESULTS_DIR = Path("results/het")
 
 def run_het_trio(
     cfg:         HETConfig,
-    vqls_config: VQLSConfig = None,
+    vqls_config: VQLSConfig1D = None,
     verbose:     bool       = False,
 ) -> dict:
     """
@@ -178,7 +178,7 @@ def sweep_h1(verbose: bool = True) -> list[dict]:
     print("SWEEP H1 — HET Gaussian profile, homogeneous BCs")
     print("=" * 70)
 
-    vc = VQLSConfig(n_layers=5, optimiser="COBYLA",
+    vc = VQLSConfig1D(n_layers=5, optimiser="COBYLA",
                     max_iter=500, tol=1e-5, verbose=verbose)
 
     results = []
@@ -206,7 +206,7 @@ def sweep_h2(verbose: bool = True) -> list[dict]:
     print("SWEEP H2 — HET Physical BCs (V_d=300V), Gaussian profile")
     print("=" * 70)
 
-    vc = VQLSConfig(n_layers=5, optimiser="COBYLA",
+    vc = VQLSConfig1D(n_layers=5, optimiser="COBYLA",
                     max_iter=500, tol=1e-5, verbose=verbose)
 
     results = []
@@ -233,7 +233,7 @@ def sweep_h3(verbose: bool = True) -> list[dict]:
     print("SWEEP H3 — HET All profiles, N=8, physical BCs")
     print("=" * 70)
 
-    vc = VQLSConfig(n_layers=5, optimiser="COBYLA",
+    vc = VQLSConfig1D(n_layers=5, optimiser="COBYLA",
                     max_iter=500, tol=1e-5, verbose=verbose)
 
     results = []

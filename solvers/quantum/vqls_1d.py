@@ -66,7 +66,7 @@ from solvers.quantum.vqls_utils import (
 # ── VQLS Configuration ────────────────────────────────────────────────────────
 
 @dataclass
-class VQLSConfig:
+class VQLSConfig1D:
     """
     Encapsulates the hyperparameters governing the VQLS variational optimisation.
 
@@ -107,7 +107,7 @@ class VQLSConfig:
 
 
 # More layers and iterations needed for physically scaled problems.
-DEFAULT_VQLS_CONFIG = VQLSConfig(
+DEFAULT_VQLS_CONFIG = VQLSConfig1D(
     n_layers  = 6,
     optimiser = "COBYLA",
     max_iter  = 300,    # per restart — 3 restarts = 900 total
@@ -120,7 +120,7 @@ DEFAULT_VQLS_CONFIG = VQLSConfig(
 
 def vqls_solve(
     problem: PoissonProblem1D,
-    config:  VQLSConfig = DEFAULT_VQLS_CONFIG,
+    config:  VQLSConfig1D = DEFAULT_VQLS_CONFIG,
 ) -> VQLSSolverResult:
     """
     Resolves the 1D Poisson system Au = b utilising the VQLS algorithm.
@@ -133,7 +133,7 @@ def vqls_solve(
     ----------
     problem : PoissonProblem1D
         Discretised 1D problem instance defining the linear system.
-    config : VQLSConfig, default=DEFAULT_VQLS_CONFIG
+    config : VQLSConfig1D, default=DEFAULT_VQLS_CONFIG
         Hyperparameter structure governing the variational optimisation.
 
     Returns
@@ -154,7 +154,7 @@ def vqls_solve(
 def vqls_solve_system(
     A:      np.ndarray,
     b:      np.ndarray,
-    config: VQLSConfig = DEFAULT_VQLS_CONFIG,
+    config: VQLSConfig1D = DEFAULT_VQLS_CONFIG,
 ) -> VQLSSolverResult:
     """
     Resolves the linear system Au = b employing the VQLS algorithm directly 
@@ -173,7 +173,7 @@ def vqls_solve_system(
         N×N TST system matrix (must be Hermitian).
     b : np.ndarray
         Right-hand side target vector of length N.
-    config : VQLSConfig, default=DEFAULT_VQLS_CONFIG
+    config : VQLSConfig1D, default=DEFAULT_VQLS_CONFIG
         Hyperparameter structure governing the variational optimisation.
 
     Returns

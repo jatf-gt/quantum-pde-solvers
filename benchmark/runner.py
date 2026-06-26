@@ -33,7 +33,8 @@ from solvers.classical.thomas_2d import thomas_solve_2d
 from solvers.classical.numpy_ref import numpy_solve
 from solvers.quantum.hhl_1d import hhl_solve
 from solvers.quantum.hhl_2d import hhl_solve_2d
-from solvers.quantum.vqls_1d import VQLSConfig
+from solvers.quantum.vqls_1d import VQLSConfig1D
+from solvers.quantum.vqls_2d import VQLSConfig2D
 from benchmark.metrics import (
     BenchmarkResult,
     BenchmarkResult2D,
@@ -91,57 +92,80 @@ def run_pair_1d(cfg: SimConfig1D) -> tuple[BenchmarkResult, BenchmarkResult]:
 # ── 2D Execution Orchestration ────────────────────────────────────────────────
 
 def run_pair_2d(
-    cfg: SimConfig2D,
-) -> tuple[BenchmarkResult2D, BenchmarkResult2D]:
+    cfg         : SimConfig2D,
+    run_vqls    : bool         = True,
+    vqls_config : "VQLSConfig2D" = None,
+) -> tuple:
     """
-    Instantiates the 2D problem and evaluates both Thomas-2D and HHL-2D 
-    line-Jacobi iterative solvers.
+    Build the 2-D problem, solve with Thomas-2D, HHL-2D, and optionally
+    VQLS-2D, and return all benchmark results.
 
-    The high-fidelity classical reference solution (direct NumPy resolution 
-    on the full N²×N² system) is computed precisely once and shared between 
-    both error evaluation pipelines. This replicates the refined-mesh Thomas 
-    solution utilised as ground truth in Section IV E of the primary literature.
+    The classical reference solution (direct NumPy solve on the full
+    N²×N² system) is computed once and shared between all error
+    computations.
 
-    While the reference computation is computationally intensive for N=16 
-    (a 256×256 coupled system), it remains highly efficient relative to the 
-    subsequent HHL line-Jacobi iterative cycle.
+    Parameters
+    ----------
+    cfg : SimConfig2D
+        Problem configuration.
+    run_vqls : bool
+        Whether to run the VQLS-2D solver. Default True.
+    vqls_config : VQLSConfig2D or None
+        VQLS hyperparameters. Uses DEFAULT_VQLS_CONFIG_2D if None.
 
-    The fine solve uses the tridiagonal residual computation so no large matrix 
-    is ever allocated.
+    Returns
+    -------
+    tuple of BenchmarkResult2D
+        (thomas_br, hhl_br) if run_vqls is False, else
+        (thomas_br, hhl_br, vqls_br).
     """
+    # Inline import to avoid circular dependency at module level.
+    from solvers.quantum.vqls_2d import vqls_solve_2d, DEFAULT_VQLS_CONFIG_2D
+
     problem = PoissonProblem2D(cfg)
     print(f"\n  → {problem.summary()}")
 
-    # Classical direct reference — computed once, shared by both solver evaluations.
-    t0      = time.perf_counter()
-    u_ref   = problem.classical_reference_solve()   # fine Thomas, no full matrix
-    t_ref   = time.perf_counter() - t0
+    t0    = time.perf_counter()
+    u_ref = problem.classical_reference_solve()
+    t_ref = time.perf_counter() - t0
     print(f"     Reference solve: {t_ref:.2f}s")
 
-    # Classical Thomas line-Jacobi execution.
     t0        = time.perf_counter()
     thomas_sr = thomas_solve_2d(problem)
     t_thomas  = time.perf_counter() - t0
     print(
         f"     Thomas-2D: {t_thomas:.2f}s, "
-        f"{thomas_sr.iterations} iters, "
+        f"{thomas_sr.iterations} iterations, "
         f"converged={thomas_sr.converged}"
     )
 
-    # Quantum HHL line-Jacobi execution.
     t0     = time.perf_counter()
     hhl_sr = hhl_solve_2d(problem)
     t_hhl  = time.perf_counter() - t0
     print(
         f"     HHL-2D:    {t_hhl:.1f}s, "
-        f"{hhl_sr.iterations} iters, "
+        f"{hhl_sr.iterations} iterations, "
         f"converged={hhl_sr.converged}"
     )
 
     thomas_br = compute_errors_2d(problem, thomas_sr, u_reference=u_ref)
     hhl_br    = compute_errors_2d(problem, hhl_sr,    u_reference=u_ref)
 
-    return thomas_br, hhl_br
+    if not run_vqls:
+        return thomas_br, hhl_br
+
+    vc = vqls_config if vqls_config is not None else DEFAULT_VQLS_CONFIG_2D
+    t0      = time.perf_counter()
+    vqls_sr = vqls_solve_2d(problem, config=vc)
+    t_vqls  = time.perf_counter() - t0
+    print(
+        f"     VQLS-2D:   {t_vqls:.1f}s, "
+        f"{vqls_sr.iterations} iterations, "
+        f"converged={vqls_sr.converged}"
+    )
+
+    vqls_br = compute_errors_2d(problem, vqls_sr, u_reference=u_ref)
+    return thomas_br, hhl_br, vqls_br
 
 
 # ── 1D Benchmark Sweeps ───────────────────────────────────────────────────────
@@ -447,7 +471,7 @@ def _plot_2d_pairs(
 def run_pair_1d(
     cfg:         SimConfig1D,
     run_vqls:    bool       = True,
-    vqls_config: "VQLSConfig" = None,
+    vqls_config: "VQLSConfig1D" = None,
 ) -> tuple:
     """
     Instantiates the 1D problem and sequentially executes classical Thomas, 
@@ -462,11 +486,11 @@ def run_pair_1d(
         Configuration parameters governing the 1D simulation instance.
     run_vqls : bool, default=True
         Boolean flag dictating the execution of the Variational Quantum Linear Solver.
-    vqls_config : VQLSConfig, optional
+    vqls_config : VQLSConfig1D, optional
         Hyperparameter structure governing the variational optimisation. 
         Defaults to DEFAULT_VQLS_CONFIG if omitted.
     """
-    from solvers.quantum.vqls_1d import vqls_solve, VQLSConfig, DEFAULT_VQLS_CONFIG
+    from solvers.quantum.vqls_1d import vqls_solve, VQLSConfig1D, DEFAULT_VQLS_CONFIG
 
     problem = PoissonProblem1D(cfg)
     print(f"\n  → {problem.summary()}")

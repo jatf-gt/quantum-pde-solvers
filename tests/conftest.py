@@ -21,7 +21,7 @@ from core.het_config import HETConfig, HETPhysicalConfig
 from problems.poisson_1d import PoissonProblem1D
 from problems.poisson_2d import PoissonProblem2D
 from problems.het_plasma_1d import HETPoissonProblem1D, HETPhysicalProblem1D
-from solvers.quantum.vqls_1d import VQLSConfig
+from solvers.quantum.vqls_1d import VQLSConfig1D
 
 
 # ── 1D Poisson fixtures ───────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ def vqls_cfg_fast():
     Tolerance is loose (1e-3) — we are checking the solver runs and
     produces a reasonable answer, not publication-level accuracy.
     """
-    return VQLSConfig(
+    return VQLSConfig1D(
         n_layers    = 3,
         optimiser   = "COBYLA",
         max_iter    = 150,

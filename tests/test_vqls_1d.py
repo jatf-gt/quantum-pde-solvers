@@ -3,7 +3,7 @@ test_vqls_1d.py
 ---------------
 Tests for the VQLS 1D solver.
 
-Uses N=4 (2 qubits) and a fast VQLSConfig (n_layers=3, max_iter=150)
+Uses N=4 (2 qubits) and a fast VQLSConfig1D (n_layers=3, max_iter=150)
 to keep each test under ~15 seconds.  Tolerances are loose (15%).
 """
 from __future__ import annotations
@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from solvers.quantum.vqls_1d import (
-    vqls_solve, vqls_solve_system, VQLSConfig, VQLSSolverResult,
+    vqls_solve, vqls_solve_system, VQLSConfig1D, VQLSSolverResult,
 )
 from solvers.classical.thomas import thomas_solve
 from conftest import VQLS_REL_ERROR_TOL, VQLS_COST_TOL
@@ -116,7 +116,7 @@ class TestVQLSSolve1D:
 
     def test_reproducible_with_same_seed(self, problem_1d_N4_fS):
         """Same random seed must produce the same result."""
-        cfg = VQLSConfig(n_layers=2, max_iter=50, tol=1e-2,
+        cfg = VQLSConfig1D(n_layers=2, max_iter=50, tol=1e-2,
                          random_seed=99, verbose=False)
         r1 = vqls_solve(problem_1d_N4_fS, config=cfg)
         r2 = vqls_solve(problem_1d_N4_fS, config=cfg)
