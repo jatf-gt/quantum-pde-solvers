@@ -328,3 +328,147 @@ class HETPoissonProblem2D(PoissonProblem2D):
             f"{self.het_config.summary()} | "
             f"κ(A_row)={self.kappa_row:.4f}"
         )
+    
+
+# ── HET Sinusoidal Problem Benchmark Case ─────────────────────────
+
+class HETSinusoidalProblem2D(HETPoissonProblem2D):
+    """
+    2-D HET plasma Poisson problem with a sinusoidal charge density
+    profile admitting an exact analytical solution.
+
+    Source term:
+        f(x̃, ỹ) = -2π² sin(πx̃) sin(πỹ)
+
+    This corresponds to a charge density:
+        δñ(x̃, ỹ) = (2π²/α) sin(πx̃) sin(πỹ)
+
+    which is separable, peaks at the domain centre, and vanishes at all
+    boundaries. The analytical solution is:
+        φ̃(x̃, ỹ) = sin(πx̃) sin(πỹ)
+
+    Boundary conditions: homogeneous Dirichlet on all four edges.
+
+    The α prefactor in the source term is absorbed into the RHS
+    normalisation, so the system matrix is identical to the generic
+    2-D Poisson case (a = −4, b = 1). The physical parameters of
+    HETConfig2D determine the conversion to dimensional quantities.
+
+    Attributes
+    ----------
+    het_config : HETConfig2D
+        Physical and numerical parameters.
+    """
+
+    def __init__(self, cfg: HETConfig2D) -> None:
+        # Force homogeneous BCs — required for the analytical solution.
+        cfg_hom        = HETConfig2D(
+            L_x            = cfg.L_x,
+            L_y            = cfg.L_y,
+            V_discharge    = 0.0,      # homogeneous: anode at ground
+            T_e_eV         = cfg.T_e_eV,
+            n_0            = cfg.n_0,
+            x_peak         = cfg.x_peak,
+            sigma_n        = cfg.sigma_n,
+            n_min          = cfg.n_min,
+            delta_0_factor = cfg.delta_0_factor,
+            sigma_anode    = cfg.sigma_anode,
+            sigma_cath     = cfg.sigma_cath,
+            sigma_wall     = cfg.sigma_wall,
+            N              = cfg.N,
+            epsilon        = cfg.epsilon,
+            tol            = cfg.tol,
+            max_iter       = cfg.max_iter,
+        )
+        super().__init__(cfg_hom)
+
+    def get_row_system(
+        self,
+        j      : int,
+        u_prev : np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Return (A_row, b_row) for the line-Jacobi update of row j,
+        using the sinusoidal source term f = -2π² sin(πx̃) sin(πỹ_j).
+
+        Parameters
+        ----------
+        j : int
+            Row index (0-indexed), 0 ≤ j ≤ N−1.
+        u_prev : np.ndarray, shape (N, N)
+            Solution field from the previous iteration.
+
+        Returns
+        -------
+        A_row : np.ndarray, shape (N, N)
+        b_row : np.ndarray, shape (N,)
+        """
+        N   = self.config.N
+        h   = self.h
+
+        # Sinusoidal source evaluated at row j interior nodes.
+        x_row = self.X[:, j]
+        y_row = self.Y[:, j]
+        f_row = -2.0 * np.pi**2 * np.sin(np.pi * x_row) * np.sin(np.pi * y_row)
+        b_row = h**2 * f_row
+
+        # y-neighbour contributions (line-Jacobi coupling).
+        if j == 0:
+            b_row -= 0.0           # inner wall BC: φ̃ = 0
+        else:
+            b_row -= u_prev[:, j - 1]
+
+        if j == N - 1:
+            b_row -= 0.0           # outer wall BC: φ̃ = 0
+        else:
+            b_row -= u_prev[:, j + 1]
+
+        # x-direction BCs: both anode and cathode are zero.
+        b_row[0]  -= 0.0
+        b_row[-1] -= 0.0
+
+        return self.A_row, b_row
+
+    def analytical_solution(self) -> np.ndarray:
+        """
+        Return the exact analytical solution at all interior nodes.
+
+        Returns
+        -------
+        phi_exact : np.ndarray, shape (N, N)
+            φ̃(x̃_i, ỹ_j) = sin(πx̃_i) sin(πỹ_j).
+        """
+        from core.exact_solutions import phi_2d_sinusoidal
+        return phi_2d_sinusoidal(self.X, self.Y)
+
+    def analytical_electric_field(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Return the exact analytical electric field components at all
+        interior nodes in physical units [V/m].
+
+        Returns
+        -------
+        E_x : np.ndarray, shape (N, N)
+            Axial electric field [V/m].
+        E_y : np.ndarray, shape (N, N)
+            Radial electric field [V/m].
+        """
+        from core.exact_solutions import E_field_2d_sinusoidal
+        return E_field_2d_sinusoidal(
+            self.X, self.Y,
+            self.het_config.phi_0,
+            self.het_config.L_x,
+            self.het_config.L_y,
+        )
+
+    def summary(self) -> str:
+        cfg = self.het_config
+        return (
+            f"HET-2D Sinusoidal (analytical solution available): "
+            f"L_x={cfg.L_x*1e3:.1f}mm, L_y={cfg.L_y*1e3:.1f}mm, "
+            f"T_e={cfg.T_e_eV}eV | "
+            f"φ_0={cfg.phi_0:.1f}V, N={cfg.N}, "
+            f"κ(A_row)={self.kappa_row:.4f}"
+        )

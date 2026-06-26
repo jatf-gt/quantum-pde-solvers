@@ -79,3 +79,93 @@ def het_phi_linear(
 HET_EXACT_SOLUTIONS = {
     "linear": het_phi_linear,
 }
+
+
+# -- 2-D analytical solutions -------------------------------------------------
+
+def phi_2d_sinusoidal(X: np.ndarray, Y: np.ndarray) -> np.ndarray:
+    """
+    Analytical solution for the 2-D Poisson equation with sinusoidal
+    source term and homogeneous Dirichlet boundary conditions.
+
+    Problem:
+        ∂²φ̃/∂x̃² + ∂²φ̃/∂ỹ² = -2π² sin(πx̃) sin(πỹ)
+        φ̃ = 0 on ∂[0,1]²
+
+    Solution:
+        φ̃(x̃, ỹ) = sin(πx̃) sin(πỹ)
+
+    Derived by substitution: the Laplacian of sin(πx̃)sin(πỹ) is
+    -π²sin(πx̃)sin(πỹ) - π²sin(πx̃)sin(πỹ) = -2π²sin(πx̃)sin(πỹ).
+
+    Physical interpretation for HET modelling
+    ------------------------------------------
+    With the source term interpreted as -α·δñ(x̃,ỹ), this corresponds
+    to a separable charge density profile:
+
+        δñ(x̃,ỹ) = (2π²/α) sin(πx̃) sin(πỹ)
+
+    which peaks at the domain centre and vanishes at all boundaries,
+    approximating the quasi-neutral bulk plasma in a 2-D cross-section
+    of the discharge channel.
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (N, N)
+        Meshgrid of x-coordinates at interior nodes.
+    Y : np.ndarray, shape (N, N)
+        Meshgrid of y-coordinates at interior nodes.
+
+    Returns
+    -------
+    phi : np.ndarray, shape (N, N)
+        Analytical potential field at interior nodes.
+    """
+    return np.sin(np.pi * X) * np.sin(np.pi * Y)
+
+
+def E_field_2d_sinusoidal(
+    X    : np.ndarray,
+    Y    : np.ndarray,
+    phi_0: float,
+    L_x  : float,
+    L_y  : float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Analytical electric field components for the sinusoidal 2-D Poisson
+    solution, converted to physical units.
+
+    Derivation:
+        Ẽ_x = -∂φ̃/∂x̃ = -π cos(πx̃) sin(πỹ)
+        Ẽ_y = -∂φ̃/∂ỹ = -π sin(πx̃) cos(πỹ)
+
+    Physical conversion:
+        E_x [V/m] = Ẽ_x · φ_0 / L_x
+        E_y [V/m] = Ẽ_y · φ_0 / L_y
+
+    Parameters
+    ----------
+    X, Y : np.ndarray, shape (N, N)
+        Meshgrid coordinates at interior nodes.
+    phi_0 : float
+        Thermal voltage [V]: φ_0 = T_e [eV].
+    L_x : float
+        Axial channel length [m].
+    L_y : float
+        Radial channel height [m].
+
+    Returns
+    -------
+    E_x : np.ndarray, shape (N, N)
+        Axial electric field component [V/m].
+    E_y : np.ndarray, shape (N, N)
+        Radial electric field component [V/m].
+    """
+    E_x = -np.pi * np.cos(np.pi * X) * np.sin(np.pi * Y) * phi_0 / L_x
+    E_y = -np.pi * np.sin(np.pi * X) * np.cos(np.pi * Y) * phi_0 / L_y
+    return E_x, E_y
+
+
+EXACT_SOLUTIONS_2D = {
+    "sinusoidal": phi_2d_sinusoidal,
+}
