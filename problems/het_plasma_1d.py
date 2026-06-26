@@ -99,25 +99,6 @@ class HETPoissonProblem1D:
         self.b      = self._build_rhs()
         self.b_phys = self.b * cfg.phi_0   # Dimensional projection for telemetry
 
-        # ── Sanity check: solution scale should be O(alpha_bc) ───────────────
-        # The dominant contribution to the potential is the applied voltage,
-        # so the solution norm should be comparable to alpha_bc = V_d/phi_0.
-        # The space charge contribution is alpha * delta_0 = delta_0_factor.
-        # Total expected scale: alpha_bc + delta_0_factor.
-        expected_scale = cfg.alpha_bc + cfg.delta_0_factor
-        rhs_scale      = np.max(np.abs(self.b)) / (cfg.alpha * self.dx**2 + 1e-14)
-
-        # Warn if the RHS-implied solution scale is more than 3x the expected.
-        if rhs_scale > 3.0 * expected_scale and expected_scale > 0:
-            import warnings
-            warnings.warn(
-                f"RHS scale ({rhs_scale:.2f}) is {rhs_scale/expected_scale:.1f}x "
-                f"larger than expected ({expected_scale:.2f}). "
-                f"Check delta_0 ({cfg.delta_0:.2e}) — it may be too large. "
-                f"Physical requirement: delta_0 ~ 1/alpha = {1/cfg.alpha:.2e}.",
-                UserWarning,
-            )
-
         eigs       = np.abs(np.linalg.eigvalsh(self.A))
         self.kappa = float(eigs.max() / eigs.min())
 
@@ -236,6 +217,25 @@ class HETPhysicalProblem1D:
 
         # ── Right-Hand Side Assembly ──────────────────────────────────────────
         self.b = self._build_rhs()
+
+        # ── Sanity check: solution scale should be O(alpha_bc) ───────────────
+        # The dominant contribution to the potential is the applied voltage,
+        # so the solution norm should be comparable to alpha_bc = V_d/phi_0.
+        # The space charge contribution is alpha * delta_0 = delta_0_factor.
+        # Total expected scale: alpha_bc + delta_0_factor.
+        expected_scale = cfg.alpha_bc + cfg.delta_0_factor
+        rhs_scale      = np.max(np.abs(self.b)) / (cfg.alpha * self.dx**2 + 1e-14)
+
+        # Warn if the RHS-implied solution scale is more than 3x the expected.
+        if rhs_scale > 3.0 * expected_scale and expected_scale > 0:
+            import warnings
+            warnings.warn(
+                f"RHS scale ({rhs_scale:.2f}) is {rhs_scale/expected_scale:.1f}x "
+                f"larger than expected ({expected_scale:.2f}). "
+                f"Check delta_0 ({cfg.delta_0:.2e}) — it may be too large. "
+                f"Physical requirement: delta_0 ~ 1/alpha = {1/cfg.alpha:.2e}.",
+                UserWarning,
+            )
 
         # ── Condition Number Evaluation ───────────────────────────────────────
         eigs       = np.abs(np.linalg.eigvalsh(self.A))
