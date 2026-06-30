@@ -240,29 +240,43 @@ def qsvt_solve_system(
         )
 
     # -- Stage 2: QSP phase angles --------------------------------------------
-    est_degree = polynomial_degree_estimate(kappa_eff, config.epsilon)
-    if est_degree > config.max_degree:
-        import warnings
-        warnings.warn(
-            f"Estimated polynomial degree {est_degree} exceeds max_degree "
-            f"={config.max_degree}. Capping at {config.max_degree}. "
-            f"Solution accuracy may be reduced.",
-            RuntimeWarning,
-        )
-        est_degree = config.max_degree
+    # If the config carries pre-computed angles (injected by the 2-D solver
+    # to avoid redundant recomputation), use them directly.
+    if (
+        hasattr(config, "_precomputed_angles")
+        and config._precomputed_angles is not None
+    ):
+        angles = config._precomputed_angles
+        degree = config._precomputed_degree
+        if config.verbose:
+            print(
+                f"  QSVT: using pre-computed angles, "
+                f"degree={degree}, n_angles={len(angles)}"
+            )
+    else:
+        est_degree = polynomial_degree_estimate(kappa_eff, config.epsilon)
+        if est_degree > config.max_degree:
+            import warnings
+            warnings.warn(
+                f"Estimated polynomial degree {est_degree} exceeds "
+                f"max_degree={config.max_degree}. Capping.",
+                RuntimeWarning,
+            )
+            est_degree = config.max_degree
 
-    angles, degree = compute_inversion_angles(
-        kappa   = kappa_eff,
-        epsilon = config.epsilon,
-        method  = config.angle_method,
-    )
-
-    if config.verbose:
-        print(
-            f"  QSVT: polynomial degree={degree}, "
-            f"n_angles={len(angles)}, "
-            f"circuit_depth_estimate={degree * (be_circuit.depth() + 1)}"
+        angles, degree = compute_inversion_angles(
+            kappa   = kappa_eff,
+            epsilon = config.epsilon,
+            method  = config.angle_method,
         )
+
+        if config.verbose:
+            print(
+                f"  QSVT: polynomial degree={degree}, "
+                f"n_angles={len(angles)}, "
+                f"circuit_depth_estimate="
+                f"{degree * (be_circuit.depth() + 1)}"
+            )
 
     # -- Stage 3: QSVT circuit construction -----------------------------------
     qsvt_circuit = _build_qsvt_circuit(
