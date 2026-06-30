@@ -105,6 +105,53 @@ class VQLSSolverResult(SolverResult):
     n_parameters:      int                      = 0
 
 
+# ── QSVT result container ────────────────────────────────────────────────────
+
+@dataclass
+class QSVTSolverResult(SolverResult):
+    """
+    SolverResult extended with QSVT-specific circuit diagnostics.
+
+    Inherits all fields from SolverResult and appends the circuit
+    complexity metadata required for the thesis benchmarking analysis.
+
+    Attributes
+    ----------
+    polynomial_degree : int
+        Degree d of the QSP polynomial approximation to 1/x.
+        Determines the number of block encoding oracle calls: O(d).
+    n_angles : int
+        Number of QSP phase angles: d + 1.
+    circuit_depth : int
+        Total gate depth of the QSVT circuit as reported by Qiskit.
+        Includes state preparation, QSVT sequence, and ancilla management.
+    n_qubits : int
+        Total qubit count: n (data) + n_a (block encoding ancilla)
+        + 1 (QSVT signal qubit).
+    alpha : float
+        Block encoding subnormalisation factor: alpha = |a| + 2|b|
+        for a TST matrix with main diagonal a and off-diagonal b.
+    kappa_effective : float
+        Effective condition number after subnormalisation:
+        kappa_eff = alpha * kappa(A) / ||A||_2.
+        This is the condition number seen by the QSVT polynomial and
+        determines the polynomial degree requirement.
+    angles : np.ndarray or None, shape (d+1,)
+        QSP phase angles phi_0, ..., phi_d. Stored for reproducibility
+        and for circuit reconstruction without recomputation.
+    """
+
+    polynomial_degree : int                     = 0
+    n_angles          : int                     = 0
+    circuit_depth     : int                     = 0
+    n_qubits          : int                     = 0
+    alpha             : float                   = 0.0
+    kappa_effective   : float                   = 0.0
+    angles            : Optional[np.ndarray]    = field(
+                            default=None, repr=False
+                        )
+
+
 # ── 2-D solver result ─────────────────────────────────────────────────────────
 
 @dataclass
