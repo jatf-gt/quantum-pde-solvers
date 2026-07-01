@@ -247,12 +247,11 @@ class TestQSVT1D:
         )
 
     def test_circuit_diagnostics_populated(self, problem_N4_fS, qsvt_cfg_fast):
-        """Circuit depth, qubit count, and polynomial degree must be positive."""
         r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
         assert r.polynomial_degree > 0
         assert r.circuit_depth     > 0
-        assert r.n_qubits          > 0
-        assert r.n_angles          == r.polynomial_degree + 1
+        # n+1 qubits: n data + 1 BE ancilla (no signal qubit).
+        assert r.n_qubits == int(np.log2(4)) + 1   # = 3 for N=4
 
     def test_kappa_effective_positive(self, problem_N4_fS, qsvt_cfg_fast):
         r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)

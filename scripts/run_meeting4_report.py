@@ -104,10 +104,10 @@ from solvers.classical.thomas_2d import thomas_solve_2d
 from solvers.quantum.hhl_1d import hhl_solve, hhl_solve_system
 from solvers.quantum.block_encoding import subnormalisation_factor
 from solvers.quantum.qsp_angles import polynomial_degree_estimate
-from solvers.quantum.qsvt_1d import QSVTConfig, qsvt_solve
 from solvers.quantum.result import QSVTSolverResult
 from solvers.quantum.vqls_1d import VQLSConfig1D, vqls_solve, vqls_solve_system
 from solvers.quantum.vqls_2d import VQLSConfig2D, vqls_solve_2d
+from solvers.quantum.qsvt_1d import QSVTConfig, qsvt_solve, qsvt_solve_system
 from solvers.quantum.qsvt_2d import QSVTConfig2D, qsvt_solve_2d
 
 RESULTS_DIR = Path("results/meeting_report")
@@ -267,10 +267,10 @@ def run_section_1() -> dict:
 
     # QSVT configuration: epsilon=0.05 for tractable circuit depth at N=4.
     qsvt_cfg = QSVTConfig(
-        epsilon      = 0.05,
+        epsilon      = 0.5,
         angle_method = "auto",
         verbose      = False,
-        max_degree   = 100,
+        max_degree   = 2000,
     )
 
     results = {}
@@ -333,36 +333,29 @@ def run_section_1() -> dict:
             f"cost={r_vqls.final_cost:.2e}",
         )
 
-        # QSVT — N=4 only (circuit depth constraint).
-        if N == 4:
-            t0      = time.perf_counter()
-            r_qsvt  = qsvt_solve(problem, config=qsvt_cfg)
-            t_qsvt  = time.perf_counter() - t0
-            results[N]["qsvt"] = {
-                "u":      r_qsvt.u,
-                "t":      t_qsvt,
-                "rel":    _max_rel_err(r_qsvt.u, u_exact),
-                "res":    r_qsvt.euclidean_residual,
-                "degree": r_qsvt.polynomial_degree,
-                "depth":  r_qsvt.circuit_depth,
-                "qubits": r_qsvt.n_qubits,
-                "alpha":  r_qsvt.alpha,
-                "kappa_eff": r_qsvt.kappa_effective,
-            }
-            _solver_row(
-                "QSVT",
-                _max_rel_err(r_qsvt.u, u_exact),
-                float(np.max(np.abs(r_qsvt.u - u_exact))),
-                r_qsvt.euclidean_residual, t_qsvt,
-                f"deg={r_qsvt.polynomial_degree}, "
-                f"depth={r_qsvt.circuit_depth}",
-            )
-        else:
-            results[N]["qsvt"] = None
-            print(
-                f"  {'QSVT':<10} {'N/A (N=8 circuit depth exceeds':>10} "
-                f"{'laptop threshold)':>12}"
-            )
+        # QSVT — now run for both N=4 and N=8 with epsilon=0.5.
+        t0      = time.perf_counter()
+        r_qsvt  = qsvt_solve(problem, config=qsvt_cfg)
+        t_qsvt  = time.perf_counter() - t0
+        results[N]["qsvt"] = {
+            "u":      r_qsvt.u,
+            "t":      t_qsvt,
+            "rel":    _max_rel_err(r_qsvt.u, u_exact),
+            "res":    r_qsvt.euclidean_residual,
+            "degree": r_qsvt.polynomial_degree,
+            "depth":  r_qsvt.circuit_depth,
+            "qubits": r_qsvt.n_qubits,
+            "alpha":  r_qsvt.alpha,
+            "kappa_eff": r_qsvt.kappa_effective,
+        }
+        _solver_row(
+            "QSVT",
+            _max_rel_err(r_qsvt.u, u_exact),
+            float(np.max(np.abs(r_qsvt.u - u_exact))),
+            r_qsvt.euclidean_residual, t_qsvt,
+            f"deg={r_qsvt.polynomial_degree}, "
+            f"depth={r_qsvt.circuit_depth}",
+        )
 
     return results
 
@@ -401,6 +394,7 @@ def plot_section_1(data: dict, save: bool = True) -> None:
         phi_thomas = np.concatenate([[0.0], d["thomas"]["u"], [0.0]])
         phi_hhl    = np.concatenate([[0.0], d["hhl"]["u"],    [0.0]])
         phi_vqls   = np.concatenate([[0.0], d["vqls"]["u"],   [0.0]])
+        phi_qsvt   = np.concatenate([[0.0], d["qsvt"]["u"], [0.0]])
 
         # -- Panel 1: solution profiles ---------------------------------------
         ax = fig.add_subplot(gs[row_idx, 0])
@@ -412,11 +406,9 @@ def plot_section_1(data: dict, save: bool = True) -> None:
                 ls="-.", marker=MARKERS["hhl"],    ms=5, label="HHL")
         ax.plot(x_full, phi_vqls,   color=COLOURS["vqls"],
                 ls=":",  marker=MARKERS["vqls"],   ms=5, label="VQLS")
-        if d["qsvt"] is not None:
-            phi_qsvt = np.concatenate([[0.0], d["qsvt"]["u"], [0.0]])
-            ax.plot(x_full, phi_qsvt, color=COLOURS["qsvt"],
-                    ls=(0, (3, 1, 1, 1)), marker=MARKERS["qsvt"],
-                    ms=5, label="QSVT")
+        ax.plot(x_full, phi_qsvt, color=COLOURS["qsvt"],
+                ls=(0, (3, 1, 1, 1)), marker=MARKERS["qsvt"],
+                ms=5, label="QSVT")
         ax.set_xlabel(r"$x$")
         ax.set_ylabel(r"$u(x)$")
         ax.set_title(f"Solution profiles (N={N})")
@@ -429,6 +421,7 @@ def plot_section_1(data: dict, save: bool = True) -> None:
             ("thomas", "Thomas"),
             ("hhl",    "HHL"),
             ("vqls",   "VQLS"),
+            ("qsvt",   "QSVT"),
         ]:
             err = _rel_err_pct(d[key]["u"], u_exact)
             ax.semilogy(
@@ -436,14 +429,6 @@ def plot_section_1(data: dict, save: bool = True) -> None:
                 color=COLOURS[key],
                 ls="--" if key == "thomas" else "-",
                 marker=MARKERS[key], ms=5, label=label,
-            )
-        if d["qsvt"] is not None:
-            err_q = _rel_err_pct(d["qsvt"]["u"], u_exact)
-            ax.semilogy(
-                x, err_q,
-                color=COLOURS["qsvt"],
-                ls=(0, (3, 1, 1, 1)),
-                marker=MARKERS["qsvt"], ms=5, label="QSVT",
             )
         ax.set_xlabel(r"$x$")
         ax.set_ylabel("Relative error (%)")
@@ -460,7 +445,7 @@ def plot_section_1(data: dict, save: bool = True) -> None:
                 d["thomas"]["t"],
                 d["hhl"]["t"],
                 d["vqls"]["t"],
-                d["qsvt"]["t"] if d["qsvt"] else 0.0,
+                d["qsvt"]["t"],
             ]
             colours = [
                 COLOURS["thomas"], COLOURS["hhl"],
@@ -692,42 +677,43 @@ def plot_section_2(data: dict, save: bool = True) -> None:
 
 def run_section_3() -> dict:
     """
-    Apply HHL and VQLS to the 1-D HET plasma Poisson equation with
-    physical parameters from Boeuf & Garrigues (1998).
+    Apply HHL, VQLS, and QSVT to the 1-D HET plasma Poisson equation.
 
-    Two sub-cases:
-        3a: Linear charge density, homogeneous BCs — analytical solution
-            available for exact error quantification.
-        3b: Gaussian charge density, physical BCs (V_d = 300 V) —
-            Thomas serves as the classical reference.
-
-    Returns
-    -------
-    dict
-        Solution vectors, electric field profiles, and error metrics.
+    QSVT is applied to sub-case 3a (N=4, linear profile, homogeneous BCs)
+    only, since the circuit depth at N=8 exceeds the laptop threshold.
+    Sub-case 3b (N=8, physical BCs) uses HHL and VQLS only.
     """
     _section_header("HET Plasma Application — 1-D Axial Poisson Equation", 3)
 
-    vqls_cfg = VQLSConfig1D(
+    # VQLS config: more layers and iterations for N=8 HET problem.
+    vqls_cfg_n4 = VQLSConfig1D(
         n_layers=6, max_iter=300, tol=1e-6, random_seed=42, verbose=False
+    )
+    vqls_cfg_n8 = VQLSConfig1D(
+        n_layers=8, max_iter=500, tol=1e-5, random_seed=42, verbose=False
+    )
+
+    # QSVT config: N=4 only (circuit depth constraint at N=8).
+    qsvt_cfg_het = QSVTConfig(
+        epsilon=0.5, angle_method="auto", verbose=False, max_degree=2000
     )
 
     results = {}
 
-    # -- Sub-case 3a: linear profile, homogeneous BCs ------------------------
-    print("\n  Sub-case 3a: linear profile, homogeneous BCs (N=8)")
+    # -- Sub-case 3a: linear profile, homogeneous BCs, N=4 ------------------
+    print("\n  Sub-case 3a: linear profile, homogeneous BCs (N=4, QSVT included)")
     print(f"  {'Solver':<10} {'MaxRelErr':>10}  {'MaxAbsErr':>12}  "
           f"{'Residual':>12}  {'Time':>8}")
     print(f"  {'─'*60}")
 
-    cfg_a  = HETConfig(N=8, epsilon=0.01, rho_profile="linear",
+    cfg_a  = HETConfig(N=4, epsilon=0.01, rho_profile="linear",
                        V_discharge=0.0)
     prob_a = HETPoissonProblem1D(cfg_a)
     u_exact_a = HET_EXACT_SOLUTIONS["linear"](
         prob_a.x, cfg_a.rho_0, cfg_a.alpha
     )
 
-    t0 = time.perf_counter()
+    t0         = time.perf_counter()
     u_thomas_a = thomas_solve_system(prob_a.A, prob_a.b)
     t_thomas_a = time.perf_counter() - t0
 
@@ -735,15 +721,22 @@ def run_section_3() -> dict:
     u_hhl_a, _, _ = hhl_solve_system(prob_a.A, prob_a.b, cfg_a.epsilon)
     t_hhl_a = time.perf_counter() - t0
 
-    t0 = time.perf_counter()
-    vr_a   = vqls_solve_system(prob_a.A, prob_a.b, vqls_cfg)
+    t0       = time.perf_counter()
+    vr_a     = vqls_solve_system(prob_a.A, prob_a.b, vqls_cfg_n4)
     u_vqls_a = vr_a.u
     t_vqls_a = time.perf_counter() - t0
+
+    t0       = time.perf_counter()
+    qr_a     = qsvt_solve_system(prob_a.A, prob_a.b, qsvt_cfg_het)
+    u_qsvt_a = qr_a.u
+    t_qsvt_a = time.perf_counter() - t0
 
     for label, u_sol, t_sol, extra in [
         ("Thomas", u_thomas_a, t_thomas_a, ""),
         ("HHL",    u_hhl_a,    t_hhl_a,    ""),
         ("VQLS",   u_vqls_a,   t_vqls_a,   f"cost={vr_a.final_cost:.2e}"),
+        ("QSVT",   u_qsvt_a,   t_qsvt_a,
+         f"deg={qr_a.polynomial_degree}, depth={qr_a.circuit_depth}"),
     ]:
         _solver_row(
             label,
@@ -759,12 +752,14 @@ def run_section_3() -> dict:
         "u_exact": u_exact_a,
         "thomas": {"u": u_thomas_a, "t": t_thomas_a},
         "hhl":    {"u": u_hhl_a,    "t": t_hhl_a},
-        "vqls":   {"u": u_vqls_a,   "t": t_vqls_a,
-                   "cost": vr_a.final_cost},
+        "vqls":   {"u": u_vqls_a,   "t": t_vqls_a, "cost": vr_a.final_cost},
+        "qsvt":   {"u": u_qsvt_a,   "t": t_qsvt_a,
+                   "degree": qr_a.polynomial_degree,
+                   "depth":  qr_a.circuit_depth},
     }
 
-    # -- Sub-case 3b: Gaussian profile, physical BCs -------------------------
-    print("\n  Sub-case 3b: Gaussian profile, V_d=300V (N=8)")
+    # -- Sub-case 3b: Gaussian profile, physical BCs, N=8 -------------------
+    print("\n  Sub-case 3b: Gaussian profile, V_d=300V (N=8, HHL+VQLS only)")
     print(f"  {'Solver':<10} {'MaxRelErr':>10}  {'MaxAbsErr':>12}  "
           f"{'Residual':>12}  {'Time':>8}")
     print(f"  {'─'*60}")
@@ -773,7 +768,7 @@ def run_section_3() -> dict:
                        V_discharge=300.0)
     prob_b = HETPoissonProblem1D(cfg_b)
 
-    t0 = time.perf_counter()
+    t0         = time.perf_counter()
     u_thomas_b = thomas_solve_system(prob_b.A, prob_b.b)
     t_thomas_b = time.perf_counter() - t0
 
@@ -781,8 +776,8 @@ def run_section_3() -> dict:
     u_hhl_b, _, _ = hhl_solve_system(prob_b.A, prob_b.b, cfg_b.epsilon)
     t_hhl_b = time.perf_counter() - t0
 
-    t0 = time.perf_counter()
-    vr_b   = vqls_solve_system(prob_b.A, prob_b.b, vqls_cfg)
+    t0       = time.perf_counter()
+    vr_b     = vqls_solve_system(prob_b.A, prob_b.b, vqls_cfg_n8)
     u_vqls_b = vr_b.u
     t_vqls_b = time.perf_counter() - t0
 
@@ -791,7 +786,13 @@ def run_section_3() -> dict:
         ("Thomas", u_thomas_b, t_thomas_b, "(reference)"),
         ("HHL",    u_hhl_b,    t_hhl_b,    ""),
         ("VQLS",   u_vqls_b,   t_vqls_b,   f"cost={vr_b.final_cost:.2e}"),
+        ("QSVT",   None,       0.0,
+         "N/A — circuit depth exceeds laptop threshold at N=8"),
     ]:
+        if u_sol is None:
+            print(f"  {label:<10} {'N/A':>10}   {'N/A':>12}   "
+                  f"{'N/A':>12}   {'N/A':>8}  {extra}")
+            continue
         _solver_row(
             label,
             _max_rel_err(u_sol, ref_b) if label != "Thomas" else 0.0,
@@ -801,7 +802,6 @@ def run_section_3() -> dict:
             t_sol, extra,
         )
 
-    # Electric field recovery.
     x_full_b, E_thomas_b = _electric_field_1d(
         u_thomas_b, cfg_b.alpha_bc, cfg_b.phi_0, cfg_b.L, cfg_b.N
     )
@@ -869,6 +869,11 @@ def plot_section_3(data: dict, save: bool = True) -> None:
             color=COLOURS["hhl"],   ls="-.", marker="s", ms=5, label="HHL")
     ax.plot(x_full, np.concatenate([[0.0], d3a["vqls"]["u"],       [0.0]]),
             color=COLOURS["vqls"],  ls=":",  marker="^", ms=5, label="VQLS")
+    if d3a.get("qsvt") is not None:
+        phi_qsvt_a = np.concatenate([[0.0], d3a["qsvt"]["u"], [0.0]])
+        ax.plot(x_full, phi_qsvt_a, color=COLOURS["qsvt"],
+                ls=(0,(3,1,1,1)), marker=MARKERS["qsvt"], ms=4,
+                label="QSVT")
     ax.set_xlabel(r"$\tilde{x} = x/L$")
     ax.set_ylabel(r"$\tilde{\phi}$")
     ax.set_title(
@@ -889,9 +894,16 @@ def plot_section_3(data: dict, save: bool = True) -> None:
         ax.plot(xE, E / 1e3, color=COLOURS[key],
                 ls="--" if key == "thomas" else "-",
                 marker=MARKERS[key], ms=5, label=label)
+    if d3a.get("qsvt") is not None:
+        xE_q, E_q = _electric_field_1d(
+            d3a["qsvt"]["u"], 0.0, cfg.phi_0, cfg.L, cfg.N
+        )
+        ax.plot(xE_q, E_q / 1e3, color=COLOURS["qsvt"],
+                ls=(0,(3,1,1,1)), marker=MARKERS["qsvt"],
+                ms=4, label="QSVT")
     # Analytical electric field: d/dx[-sin(pi*x)/pi^2] = cos(pi*x)/pi.
     xE_an = np.linspace(0, 1, 100)
-    E_an  = (cfg.alpha * cfg.rho_0 / 6.0) * (1.0 - 3.0 * xE_an**2)
+    E_an  = -(cfg.alpha * cfg.rho_0 / 6.0) * (1.0 - 3.0 * xE_an**2)
     E_an_phys = E_an * cfg.phi_0 / cfg.L
     ax.plot(xE_an, E_an_phys / 1e3, color=COLOURS["analytical"],
             lw=2.5, label="Analytical")
@@ -908,6 +920,11 @@ def plot_section_3(data: dict, save: bool = True) -> None:
         ax.semilogy(x, err, color=COLOURS[key],
                     ls="--" if key == "thomas" else "-",
                     marker=MARKERS[key], ms=5, label=label)
+    if d3a.get("qsvt") is not None:
+        err_q = _rel_err_pct(d3a["qsvt"]["u"], d3a["u_exact"])
+        ax.semilogy(x, err_q, color=COLOURS["qsvt"],
+                    ls=(0,(3,1,1,1)), marker=MARKERS["qsvt"],
+                    ms=4, label="QSVT")
     ax.set_xlabel(r"$\tilde{x}$")
     ax.set_ylabel("Relative error (%)")
     ax.set_title("Error vs analytical")
@@ -1018,15 +1035,25 @@ def run_section_4() -> dict:
         inner_config=inner_cfg, warm_start=True, verbose=False
     )
 
+    from solvers.quantum.qsvt_2d import QSVTConfig2D, qsvt_solve_2d
+    qsvt_cfg_2d = QSVTConfig2D(
+        epsilon=0.01, angle_method="auto", max_degree=200, verbose=False
+    )
+
     results = {
         "cfg": cfg, "problem": problem,
         "u_exact": u_exact,
         "Ex_exact": Ex_exact, "Ey_exact": Ey_exact,
     }
 
+    print(f"\n  {'Solver':<12} {'Iters':>6}  {'Conv':>5}  "
+          f"{'MaxRelErr':>10}  {'MaxAbsErr':>12}  {'Time':>8}")
+    print(f"  {'─'*62}")
+
     for label, solver_fn, kwargs in [
         ("Thomas-2D", thomas_solve_2d,  {}),
         ("VQLS-2D",   vqls_solve_2d,    {"config": vqls_cfg_2d}),
+        ("QSVT-2D",   qsvt_solve_2d,    {"config": qsvt_cfg_2d}),
     ]:
         t0 = time.perf_counter()
         r  = solver_fn(problem, **kwargs)
@@ -1140,20 +1167,15 @@ def plot_section_4(data: dict, save: bool = True) -> None:
 # Section 5 — 2-D QSVT
 # ============================================================================
 
-def run_section_5() -> dict:
+def run_section_5(s4_data: dict) -> dict:
     """
     Apply QSVT-2D to the 2-D HET sinusoidal Poisson problem.
 
-    The 2-D QSVT solver uses the same line-Jacobi decomposition as
-    hhl_2d.py and vqls_2d.py, calling qsvt_solve_system for each row
-    sub-problem. The row matrix has a=-4, b=1, kappa_row -> 3, which
-    gives a polynomial degree d = O(3 * log(1/epsilon)) ~ constant in N.
-    This near-constant degree is the key advantage of QSVT in 2-D.
-
-    Returns
-    -------
-    dict
-        Solution field, error metrics, and circuit diagnostics.
+    Error is reported against the Thomas-2D solution (the Jacobi fixed
+    point) rather than the analytical solution, since the Jacobi
+    iteration itself introduces discretisation error that is independent
+    of the quantum solver. The Thomas-2D vs analytical error is reported
+    separately for context.
     """
     _section_header(
         "2-D QSVT — HET Sinusoidal Poisson (EXPERIMENTAL)", 5
@@ -1165,13 +1187,13 @@ def run_section_5() -> dict:
     problem = HETSinusoidalProblem2D(cfg)
     u_exact = problem.analytical_solution()
 
-    # QSVT-2D config: epsilon=0.1 for tractable circuit depth.
-    # The row matrix has kappa_row ~ 2.36 (N=4), giving degree ~ 33 via pyqsp.
-    # This is still substantially smaller than the 1-D case (degree ~ 45 at N=4).
+    # Reuse Thomas-2D from Section 4 — same problem, same config.
+    r_thomas = s4_data["Thomas-2D"]["result"]
+
     qsvt_cfg_2d = QSVTConfig2D(
-        epsilon      = 0.1,
+        epsilon      = 0.01,        # tighter: degree~100, depth~600 per row
         angle_method = "auto",
-        max_degree   = 50,
+        max_degree   = 200,
         verbose      = True,
     )
 
@@ -1179,39 +1201,46 @@ def run_section_5() -> dict:
     r_qsvt = qsvt_solve_2d(problem, config=qsvt_cfg_2d)
     t_qsvt = time.perf_counter() - t0
 
-    rel = _max_rel_err(r_qsvt.u.ravel(), u_exact.ravel())
+    # Report error against Thomas (Jacobi fixed point) — fair comparison.
+    rel_vs_thomas = _max_rel_err(r_qsvt.u.ravel(), r_thomas.u.ravel())
+    # Also report against analytical for context.
+    rel_vs_exact  = _max_rel_err(r_qsvt.u.ravel(), u_exact.ravel())
+    rel_thomas_vs_exact = _max_rel_err(r_thomas.u.ravel(), u_exact.ravel())
+
     print(
         f"  QSVT-2D: iters={r_qsvt.iterations}, "
-        f"converged={r_qsvt.converged}, "
-        f"MaxRelErr={rel:.3f}%, time={t_qsvt:.1f}s"
+        f"converged={r_qsvt.converged}, time={t_qsvt:.1f}s"
     )
+    print(f"  Max |QSVT - Thomas|:    {rel_vs_thomas:.3f}%  "
+          f"(quantum algorithmic error)")
+    print(f"  Max |QSVT - exact|:     {rel_vs_exact:.3f}%  "
+          f"(includes Jacobi discretisation error)")
+    print(f"  Max |Thomas - exact|:   {rel_thomas_vs_exact:.3f}%  "
+          f"(Jacobi discretisation error alone)")
+    print(f"  Note: the dominant error source is the Jacobi iteration "
+          f"({rel_thomas_vs_exact:.1f}%), not the QSVT approximation "
+          f"({rel_vs_thomas:.1f}%).")
 
     return {
         "cfg": cfg, "problem": problem,
         "u_exact": u_exact,
-        "qsvt": {"result": r_qsvt, "time": t_qsvt},
+        "r_thomas": r_thomas,
+        "qsvt": {
+            "result": r_qsvt, "time": t_qsvt,
+            "rel_vs_thomas": rel_vs_thomas,
+            "rel_vs_exact":  rel_vs_exact,
+        },
     }
 
 def plot_section_5(data: dict, s4_data: dict, save: bool = True) -> None:
     """
-    Generate Figure 5: 2-D QSVT solution contours, error map, and
-    algorithm comparison bar chart.
-
-    Layout (1 row x 3 columns):
-        Left:   QSVT-2D solution contour vs analytical
-        Centre: Absolute error vs analytical solution
-        Right:  Max relative error comparison: Thomas vs VQLS vs QSVT
-
-    Parameters
-    ----------
-    data : dict
-        Output of run_section_5().
-    s4_data : dict
-        Output of run_section_4(), used for the comparison bar chart.
-    save : bool
+    Generate Figure 5 with corrected error reporting.
+    The bar chart distinguishes quantum algorithmic error (vs Thomas)
+    from total error (vs analytical), making the QSVT contribution clear.
     """
     problem  = data["problem"]
     u_exact  = data["u_exact"]
+    r_thomas = data["r_thomas"]
     X, Y     = problem.X, problem.Y
     r_qsvt   = data["qsvt"]["result"]
 
@@ -1225,9 +1254,7 @@ def plot_section_5(data: dict, s4_data: dict, save: bool = True) -> None:
     # -- Panel 1: QSVT solution contour vs analytical overlay -----------------
     u_all    = np.stack([u_exact, r_qsvt.u])
     levels_u = np.linspace(u_all.min(), u_all.max(), 20)
-
     cf = axes[0].contourf(X, Y, r_qsvt.u, levels=levels_u, cmap="viridis")
-    # Overlay analytical contour lines for direct visual comparison.
     axes[0].contour(X, Y, u_exact, levels=8,
                     colors=COLOURS["analytical"], linewidths=0.9,
                     linestyles="--", alpha=0.8)
@@ -1240,23 +1267,24 @@ def plot_section_5(data: dict, s4_data: dict, save: bool = True) -> None:
     )
     axes[0].set_aspect("equal")
 
-    # -- Panel 2: absolute error vs analytical --------------------------------
-    err_qsvt = np.abs(r_qsvt.u - u_exact)
-    cf = axes[1].contourf(X, Y, err_qsvt, levels=20, cmap="hot_r")
+    # -- Panel 2: absolute error vs Thomas (quantum error only) ---------------
+    err_vs_thomas = np.abs(r_qsvt.u - r_thomas.u)
+    err_vs_exact  = np.abs(r_qsvt.u - u_exact)
+    # Show error vs Thomas — this is the pure quantum algorithmic error.
+    cf = axes[1].contourf(X, Y, err_vs_thomas, levels=20, cmap="hot_r")
     fig.colorbar(
         cf, ax=axes[1],
-        label=r"$|\tilde{\phi}_\mathrm{QSVT} - \tilde{\phi}_\mathrm{exact}|$",
+        label=r"$|\tilde{\phi}_\mathrm{QSVT} - \tilde{\phi}_\mathrm{Thomas}|$",
     )
     axes[1].set_xlabel(r"$\tilde{x}$")
     axes[1].set_ylabel(r"$\tilde{y}$")
     axes[1].set_title(
-        f"QSVT-2D absolute error\n"
-        f"max = {err_qsvt.max():.3e}"
+        f"QSVT-2D vs Thomas (quantum error)\n"
+        f"max = {err_vs_thomas.max():.3e}"
     )
     axes[1].set_aspect("equal")
 
-    # -- Panel 3: algorithm comparison bar chart ------------------------------
-    # Collect max relative errors for all three solvers from Sections 4 and 5.
+    # -- Panel 3: grouped bar chart distinguishing error sources --------------
     u_exact_4 = s4_data["u_exact"]
 
     def _max_rel_2d(u: np.ndarray, ref: np.ndarray) -> float:
@@ -1268,37 +1296,59 @@ def plot_section_5(data: dict, s4_data: dict, save: bool = True) -> None:
             np.abs((u - ref)[mask]) / np.abs(ref[mask])
         )) * 100.0
 
-    rel_thomas = _max_rel_2d(
+    # Quantum algorithmic error: solver vs Thomas (Jacobi fixed point).
+    q_err_thomas_2d = _max_rel_2d(
+        s4_data["Thomas-2D"]["result"].u, u_exact_4
+    )   # Thomas vs exact = Jacobi discretisation error
+    q_err_vqls_2d   = _max_rel_2d(
+        s4_data["VQLS-2D"]["result"].u, s4_data["Thomas-2D"]["result"].u
+    )
+    q_err_qsvt_2d   = _max_rel_2d(r_qsvt.u, r_thomas.u)
+
+    # Total error: solver vs analytical.
+    t_err_thomas_2d = _max_rel_2d(
         s4_data["Thomas-2D"]["result"].u, u_exact_4
     )
-    rel_vqls   = _max_rel_2d(
-        s4_data["VQLS-2D"]["result"].u,   u_exact_4
-    )
-    rel_qsvt   = _max_rel_2d(r_qsvt.u, u_exact)
+    t_err_vqls_2d   = _max_rel_2d(s4_data["VQLS-2D"]["result"].u, u_exact_4)
+    t_err_qsvt_2d   = data["qsvt"]["rel_vs_exact"]
 
-    solvers  = ["Thomas-2D", "VQLS-2D", "QSVT-2D"]
-    rel_errs = [rel_thomas, rel_vqls, rel_qsvt]
-    colours  = [COLOURS["thomas"], COLOURS["vqls"], COLOURS["qsvt"]]
+    solvers = ["Thomas-2D", "VQLS-2D", "QSVT-2D"]
+    x_pos   = np.arange(len(solvers))
+    width   = 0.35
 
-    bars = axes[2].bar(
-        solvers, rel_errs,
-        color=colours, alpha=0.85,
-        edgecolor="black", linewidth=0.8,
+    # Quantum error bars (vs Thomas).
+    q_errs = [0.0, q_err_vqls_2d, q_err_qsvt_2d]
+    # Jacobi discretisation error (Thomas vs exact) — same for all.
+    j_errs = [t_err_thomas_2d, t_err_thomas_2d, t_err_thomas_2d]
+
+    bars1 = axes[2].bar(
+        x_pos - width/2, j_errs, width,
+        color="lightgrey", edgecolor="black", lw=0.8,
+        label="Jacobi discretisation error",
     )
-    for bar, val in zip(bars, rel_errs):
-        axes[2].text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() * 1.02,
-            f"{val:.2f}%",
-            ha="center", va="bottom", fontsize=10,
-        )
+    bars2 = axes[2].bar(
+        x_pos + width/2, q_errs, width,
+        color=[COLOURS["thomas"], COLOURS["vqls"], COLOURS["qsvt"]],
+        alpha=0.85, edgecolor="black", lw=0.8,
+        label="Quantum algorithmic error",
+    )
+    for bar, val in zip(bars2, q_errs):
+        if val > 0:
+            axes[2].text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() * 1.02,
+                f"{val:.2f}%",
+                ha="center", va="bottom", fontsize=9,
+            )
+    axes[2].set_xticks(x_pos)
+    axes[2].set_xticklabels(solvers)
     axes[2].set_ylabel("Max relative error (%)")
     axes[2].set_title(
-        "Algorithm comparison\n"
-        r"2-D HET sinusoidal, $\tilde{\phi}_\mathrm{exact}$ reference"
+        "Error decomposition\n"
+        "Grey: Jacobi error | Colour: quantum error"
     )
+    axes[2].legend(fontsize=8)
     axes[2].grid(True, alpha=0.3, axis="y")
-    axes[2].set_ylim(0, max(rel_errs) * 1.25)
 
     plt.tight_layout()
     _save_figure(fig, "figure_5_qsvt_2d.pdf", save)
@@ -1556,7 +1606,7 @@ def main() -> None:
     s2_data = run_section_2()
     s3_data = run_section_3()
     s4_data = run_section_4()
-    s5_data = run_section_5()
+    s5_data = run_section_5(s4_data)
 
     t_elapsed = time.perf_counter() - t_start
     print(f"\n{'─'*68}")

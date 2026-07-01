@@ -218,6 +218,26 @@ def qsvt_solve_system(
     b_norm = float(np.linalg.norm(b))
     if b_norm < 1e-14:
         raise ValueError("RHS vector b is numerically zero.")
+    
+    # -- Stage 0: sign normalisation for negative definite matrices -----------
+    # The QSVT polynomial p(x) approximates 1/x for x in [1/kappa, 1].
+    # This requires the matrix to be positive semidefinite after normalisation.
+    # The 1-D and 2-D Poisson TST matrices are negative definite (all
+    # eigenvalues negative), so we negate both A and b before proceeding.
+    # Since (-A)u = -b is equivalent to Au = b, the solution u is unchanged.
+    eigs_sign = np.linalg.eigvalsh(A)
+    if np.all(eigs_sign < 0):
+        A = -A.copy()
+        b = -b.copy()
+    # If A has mixed-sign eigenvalues (indefinite), the QSVT polynomial
+    # cannot be applied directly — raise an informative error.
+    elif not np.all(eigs_sign > 0):
+        raise ValueError(
+            "QSVT requires A to be positive or negative definite. "
+            "The matrix has mixed-sign eigenvalues (indefinite). "
+            f"Eigenvalue range: [{eigs_sign.min():.4f}, {eigs_sign.max():.4f}]"
+        )
+    # A is now positive definite; proceed with standard QSVT.
 
     # -- Stage 1: block encoding ----------------------------------------------
     main_diag = float(A[0, 0])
@@ -291,7 +311,7 @@ def qsvt_solve_system(
 
     if config.verbose:
         print(
-            f"  QSVT: total qubits={n_qubits}, "
+            f"  QSVT: total qubits={n + _N_ANCILLA_BE}, "
             f"circuit depth={circuit_depth}"
         )
 
@@ -349,28 +369,27 @@ def _build_qsvt_circuit(
     b_norm_vec : np.ndarray,
 ) -> QuantumCircuit:
     """
-    Assemble the full QSVT circuit for matrix inversion.
+    Assemble the QSVT circuit for matrix inversion.
 
-    The QSVT sequence implements the polynomial transformation p(A/alpha)
-    via alternating applications of U_A and U_A^dagger interleaved with
-    projector-controlled phase rotations on the signal qubit:
+    Correct architecture: phase rotations are Rz gates on the block
+    encoding ancilla qubit. No separate signal qubit is used.
 
-        U_QSVT = [prod_{k=0}^{d} R(phi_k) . (U_A or U_A^dag)]
+    The QSVT sequence (Lin & Tong 2022, Algorithm 1) is:
 
-    where R(phi_k) is a Z-rotation by 2*phi_k on the signal qubit
-    conditioned on the block encoding ancilla being in |0>.
+        U_QSVT = Rz(2*phi_d) . U_A^dag . Rz(2*phi_{d-1}) . U_A
+                 . Rz(2*phi_{d-2}) . U_A^dag . ... . Rz(2*phi_0)
 
-    Register layout (Qiskit little-endian, LSB first):
-        qubits 0..n-1  : data register (solution)
-        qubit  n       : block encoding ancilla (single qubit, Sz.-Nagy)
-        qubit  n+1     : QSVT signal qubit
+    where Rz(theta) = diag(e^{i*theta/2}, e^{-i*theta/2}) acts on the
+    block encoding ancilla qubit (qubit index n).
+
+    Total qubits: n + 1 (data + 1 BE ancilla). No signal qubit.
 
     Parameters
     ----------
     be_circuit : QuantumCircuit
-        Block encoding circuit on n+1 qubits (data + 1 ancilla).
+        Block encoding on n+1 qubits (data[0..n-1] + anc[n]).
     angles : np.ndarray, shape (d+1,)
-        QSP phase angles.
+        QSP phase angles phi_0, ..., phi_d.
     n : int
         Number of data qubits.
     b_norm_vec : np.ndarray, shape (N,)
@@ -378,42 +397,31 @@ def _build_qsvt_circuit(
 
     Returns
     -------
-    QuantumCircuit
-        Full QSVT circuit ready for statevector simulation.
+    QuantumCircuit on n+1 qubits.
     """
     from qiskit.circuit.library import Isometry
 
-    N      = 2**n
-    n_a    = _N_ANCILLA_BE   # = 1 for Sz.-Nagy encoding
-    degree = len(angles) - 1
-
-    # Total qubits: n (data) + 1 (block encoding ancilla) + 1 (signal).
-    n_total = n + n_a + 1
-    sig_idx = n + n_a   # index of the signal qubit
+    degree  = len(angles) - 1
+    n_total = n + _N_ANCILLA_BE   # n + 1, no signal qubit
+    anc_idx = n                   # ancilla qubit index
 
     qc = QuantumCircuit(n_total, name="QSVT")
 
-    # -- State preparation: encode |b_norm> in the data register -------------
-    qc.append(
-        Isometry(b_norm_vec, 0, 0),
-        list(range(n)),
-    )
+    # -- State preparation on data register -----------------------------------
+    qc.append(Isometry(b_norm_vec, 0, 0), list(range(n)))
 
     # -- QSVT sequence --------------------------------------------------------
-    # Block encoding acts on qubits 0..n (data + ancilla).
-    be_qubits  = list(range(n + n_a))
-    be_gate    = be_circuit.to_gate(label="U_A")
+    # Rz(2*phi) on ancilla implements exp(i*phi*Z_anc):
+    #   |0>_anc -> e^{i*phi}|0>_anc
+    #   |1>_anc -> e^{-i*phi}|1>_anc
+    # This is the projector-controlled phase required by QSVT.
+    be_gate     = be_circuit.to_gate(label="U_A")
     be_inv_gate = be_circuit.inverse().to_gate(label="U_A†")
+    be_qubits   = list(range(n_total))
 
     for k, phi in enumerate(angles):
-        # Projector-controlled phase rotation on signal qubit.
-        # R(phi) = exp(i*phi*(2*Pi_0 - I)) where Pi_0 = |0><0| on ancilla.
-        # Implemented as: X on ancilla -> controlled-Z(2*phi) -> X on ancilla.
-        # This applies phase exp(i*phi) when ancilla=0 and exp(-i*phi) when
-        # ancilla=1, which is the correct projector-controlled rotation.
-        qc.x(n)                          # flip ancilla: |0> -> |1>
-        qc.cp(2.0 * phi, n, sig_idx)     # controlled phase: ancilla=1 -> signal
-        qc.x(n)                          # restore ancilla
+        # Phase rotation on ancilla qubit.
+        qc.rz(2.0 * phi, anc_idx)
 
         # Alternate U_A and U_A^dagger after each phase rotation.
         if k < degree:
@@ -425,67 +433,6 @@ def _build_qsvt_circuit(
     return qc
 
 
-def _apply_signal_rotation(
-    qc    : QuantumCircuit,
-    sig   : QuantumRegister,
-    anc   : AncillaRegister,
-    n_a   : int,
-    phi   : float,
-) -> None:
-    """
-    Apply the QSVT signal rotation R(phi) on the signal qubit.
-
-    The rotation is:
-        R(phi) = exp(i * phi * (2|0><0| - I))
-
-    on the signal qubit, conditioned on the block encoding ancilla
-    register being in state |0^{n_a}>. This implements the projector-
-    controlled phase shift required by the QSVT algorithm.
-
-    In practice, for the statevector simulation this is implemented as:
-        X on each anc qubit -> multi-controlled phase(2*phi) on sig -> X
-
-    Parameters
-    ----------
-    qc : QuantumCircuit
-    sig : QuantumRegister
-        Single-qubit signal register.
-    anc : AncillaRegister
-        Block encoding ancilla register (n_a qubits).
-    n_a : int
-        Number of ancilla qubits.
-    phi : float
-        Phase angle in radians.
-    """
-    # Flip ancilla qubits so |0^{n_a}> -> |1^{n_a}>.
-    for i in range(n_a):
-        qc.x(anc[i])
-
-    # Multi-controlled phase rotation on signal qubit.
-    # Controlled on all n_a ancilla qubits being in |1> (after X flip).
-    control_qubits = [anc[i] for i in range(n_a)]
-    qc.append(
-        QuantumCircuit(n_a + 1, name=f"CP({phi:.3f})").to_gate(),
-        control_qubits + [sig[0]],
-    )
-    # Direct implementation for small n_a.
-    if n_a == 1:
-        qc.cp(2.0 * phi, anc[0], sig[0])
-    elif n_a == 2:
-        qc.ccx(anc[0], anc[1], sig[0])
-        qc.p(2.0 * phi, sig[0])
-        qc.ccx(anc[0], anc[1], sig[0])
-    else:
-        # General case: decompose multi-controlled phase via ancilla chain.
-        qc.mcx(control_qubits, sig[0])
-        qc.p(2.0 * phi, sig[0])
-        qc.mcx(control_qubits, sig[0])
-
-    # Restore ancilla qubits.
-    for i in range(n_a):
-        qc.x(anc[i])
-
-
 def _extract_solution(
     sv    : np.ndarray,
     n     : int,
@@ -495,41 +442,37 @@ def _extract_solution(
     """
     Extract the solution vector from the QSVT statevector.
 
-    Post-selects on:
-        - Block encoding ancilla (qubit n) = |0>
-        - Signal qubit (qubit n+n_a) = |0>
+    Post-selects on the block encoding ancilla (qubit n) = |0>.
+    Total qubits = n + 1. No signal qubit.
 
-    Register layout (Qiskit little-endian):
-        bits 0..n-1  : data register
-        bit  n       : block encoding ancilla
-        bit  n+n_a   : signal qubit
+    In Qiskit little-endian convention, qubit k corresponds to bit k
+    of the statevector index. The ancilla is qubit n (bit n).
 
     Parameters
     ----------
-    sv : np.ndarray, shape (2^{n+n_a+1},), complex
+    sv : np.ndarray, shape (2^{n+1},), complex
     n : int
+        Number of data qubits.
     n_a : int
+        Number of block encoding ancilla qubits (= 1).
     degree : int
+        Polynomial degree (used for diagnostics only).
 
     Returns
     -------
-    x_raw : np.ndarray, shape (N,)
+    x_raw : np.ndarray, shape (N,), real
     """
     N       = 2**n
-    n_total = n + n_a + 1
-
-    # Bit positions (Qiskit little-endian: bit k = qubit k).
-    anc_bit = n          # block encoding ancilla qubit index
-    sig_bit = n + n_a    # signal qubit index
+    n_total = n + n_a   # n + 1
+    anc_bit = n         # ancilla qubit index = bit position in index
 
     x_raw = np.zeros(N, dtype=complex)
 
     for idx in range(2**n_total):
         anc_val = (idx >> anc_bit) & 1
-        sig_val = (idx >> sig_bit) & 1
         dat_idx = idx & (N - 1)   # lowest n bits
 
-        if anc_val == 0 and sig_val == 0:
+        if anc_val == 0:
             x_raw[dat_idx] = sv[idx]
 
     x_raw_real = np.real(x_raw)
@@ -540,14 +483,13 @@ def _extract_solution(
         print("\n  DEBUG — top 8 statevector amplitudes after QSVT:")
         for idx in top_indices:
             anc_v = (idx >> anc_bit) & 1
-            sig_v = (idx >> sig_bit) & 1
             dat_v = idx & (N - 1)
             print(
                 f"    idx={idx:4d}  |amp|={magnitudes[idx]:.6f}  "
-                f"data={dat_v}  anc={anc_v}  sig={sig_v}"
+                f"data={dat_v}  anc={anc_v}"
             )
         raise RuntimeError(
-            f"QSVT solution extraction returned an all-zero vector. "
+            f"QSVT extraction returned all-zero vector. "
             f"n_total={n_total}, n={n}, n_a={n_a}, degree={degree}."
         )
 
