@@ -151,6 +151,7 @@ class TestHET2DSolverCompatibility:
         assert r.u.shape == (4, 4)
         assert np.all(np.isfinite(r.u))
 
+    @pytest.mark.slow
     def test_all_solvers_agree_in_sign(self, het_problem_2d_N4):
         """
         Thomas, HHL, and VQLS must agree on the sign of the dominant

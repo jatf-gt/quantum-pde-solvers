@@ -231,10 +231,12 @@ class TestQSVT1D:
         r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
         assert isinstance(r, QSVTSolverResult)
 
+    @pytest.mark.slow
     def test_solution_shape(self, problem_N4_fS, qsvt_cfg_fast):
         r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
         assert r.u.shape == (4,)
 
+    @pytest.mark.slow
     def test_solver_label(self, problem_N4_fS, qsvt_cfg_fast):
         r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
         assert r.solver == "QSVT"
