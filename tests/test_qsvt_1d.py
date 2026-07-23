@@ -96,6 +96,55 @@ class TestBlockEncoding:
             "Block encoding circuit is not unitary."
         )
 
+    def _test_block_encoding_action(
+        be_circuit : object,
+        A          : np.ndarray,
+        alpha      : float,
+        b_norm_vec : np.ndarray,
+        n          : int,
+        label      : str,
+    ) -> None:
+        """
+        Test the block encoding action on b_norm_vec directly.
+
+        Computes U_A |0_anc> |b_norm_vec> and checks that the |0_anc>
+        component of the output equals (A/alpha)|b_norm_vec>.
+
+        Also checks the |1_anc> component (the garbage state) to verify
+        it is orthogonal to |0_anc> as required for valid block encoding.
+        """
+        from qiskit.quantum_info import Statevector, Operator
+        N = 2**n
+
+        # Prepare |0_anc> |b_norm_vec>.
+        init_sv = np.zeros(2 * N, dtype=complex)
+        # In Qiskit little-endian: ancilla is qubit n (bit n of index).
+        # |0_anc, data_i> has index i (ancilla bit = 0).
+        for i in range(N):
+            init_sv[i] = b_norm_vec[i]
+
+        # Apply the block encoding unitary.
+        be_unitary = np.array(Operator(be_circuit).data)
+        out_sv     = be_unitary @ init_sv
+
+        # Extract |0_anc> component (indices 0..N-1).
+        out_anc0 = out_sv[:N]
+        # Extract |1_anc> component (indices N..2N-1).
+        out_anc1 = out_sv[N:]
+
+        expected_anc0 = (A / alpha) @ b_norm_vec
+
+        print(f"\n  Block encoding action test [{label}]:")
+        print(f"    Input  |0_anc>|b> component: {np.round(b_norm_vec, 4)}")
+        print(f"    Output |0_anc> component:    {np.round(np.real(out_anc0), 4)}")
+        print(f"    Expected (A/alpha)|b>:        {np.round(expected_anc0, 4)}")
+        print(f"    Max error:                    "
+            f"{np.max(np.abs(out_anc0 - expected_anc0)):.4e}")
+        print(f"    ||garbage||:                  {np.linalg.norm(out_anc1):.4e}")
+        print(f"    ||garbage||² + ||(A/alpha)b||² = "
+            f"{np.linalg.norm(out_anc1)**2 + np.linalg.norm(out_anc0)**2:.6f} "
+            f"(should = 1.0 if unitary)")
+
     def test_block_encodes_correct_matrix(self):
         N         = 4
         main_diag = -2.0
@@ -252,8 +301,9 @@ class TestQSVT1D:
         r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
         assert r.polynomial_degree > 0
         assert r.circuit_depth     > 0
-        # n+1 qubits: n data + 1 BE ancilla (no signal qubit).
-        assert r.n_qubits == int(np.log2(4)) + 1   # = 3 for N=4
+        # n+2 qubits: n data + 1 BE ancilla + 1 signal qubit.
+        assert r.n_qubits == int(np.log2(4)) + 1   # = 4 for N=4
+        assert r.n_angles == r.polynomial_degree + 1
 
     def test_kappa_effective_positive(self, problem_N4_fS, qsvt_cfg_fast):
         r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)

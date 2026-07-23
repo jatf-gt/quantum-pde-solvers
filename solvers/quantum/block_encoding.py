@@ -232,23 +232,28 @@ def subnormalisation_factor(
 def _sznagy_dilation(M: np.ndarray) -> np.ndarray:
     """
     Construct the Sz.-Nagy unitary dilation of a Hermitian matrix M
-    satisfying ||M||_2 <= 1.
+    satisfying ||M||_2 <= 1, using the Wx signal convention.
 
-    The dilation is the 2N x 2N unitary:
+    The Wx convention dilation is the 2N x 2N unitary:
 
-        U = [[M,              sqrt(I - M^2)],
-             [sqrt(I - M^2), -M            ]]
+        U = [[M,               i * sqrt(I - M^2)],
+             [i * sqrt(I - M^2), M              ]]
 
-    where sqrt(I - M^2) is the positive semidefinite square root,
-    computed via eigendecomposition of I - M^2.
+    This matches the Wx signal processing unitary used by pyqsp sym_qsp:
 
-    The block structure is arranged so that:
-        (<0_anc| x I_N) U (|0_anc> x I_N) = M
+        W_x = [[x,          i * sqrt(1 - x^2)],
+               [i * sqrt(1 - x^2), x         ]]
 
-    In Qiskit's little-endian convention with the ancilla as the MSB,
-    the 2N x 2N matrix is laid out as:
-        rows/cols 0..N-1   : ancilla = 0 (data register)
-        rows/cols N..2N-1  : ancilla = 1
+    at the scalar level, ensuring that the QSP phase angles computed by
+    pyqsp for the Wx convention are correctly applied by the circuit.
+
+    The original Sz.-Nagy dilation uses -M in the bottom-right block
+    (the Rx convention). This causes sign alternations in the garbage
+    space that interfere destructively for multi-eigenvector inputs,
+    causing QSVT to fail for asymmetric RHS vectors (e.g. the HET
+    linear profile) while accidentally working for symmetric inputs
+    (e.g. the generic Poisson fS source, which is approximately a
+    single eigenvector).
 
     Parameters
     ----------
@@ -258,25 +263,26 @@ def _sznagy_dilation(M: np.ndarray) -> np.ndarray:
     Returns
     -------
     U : np.ndarray, shape (2N, 2N), complex
-        Unitary dilation.
+        Unitary dilation in the Wx convention.
     """
-    N    = M.shape[0]
-    I    = np.eye(N)
+    N   = M.shape[0]
+    I   = np.eye(N)
 
-    # Compute sqrt(I - M^2) via eigendecomposition.
+    # Compute i * sqrt(I - M^2) via eigendecomposition.
     # Since M is Hermitian and ||M||_2 <= 1, all eigenvalues of I - M^2
     # are non-negative, so the square root is real and PSD.
     ImM2     = I - M @ M
     eigs, V  = np.linalg.eigh(ImM2)
-    # Clip small negative values from floating-point errors.
     eigs_pos = np.clip(eigs, 0.0, None)
     sqrtImM2 = V @ np.diag(np.sqrt(eigs_pos)) @ V.conj().T
 
-    # Assemble the 2N x 2N dilation.
+    # Assemble the 2N x 2N Wx-convention dilation.
+    # Both diagonal blocks are +M (not M and -M as in the Rx convention).
+    # Off-diagonal blocks carry a factor of i.
     U = np.zeros((2 * N, 2 * N), dtype=complex)
-    U[:N,  :N]  =  M           # top-left:     ancilla 0 -> ancilla 0
-    U[:N,  N:]  =  sqrtImM2    # top-right:    ancilla 1 -> ancilla 0
-    U[N:,  :N]  =  sqrtImM2    # bottom-left:  ancilla 0 -> ancilla 1
-    U[N:,  N:]  = -M           # bottom-right: ancilla 1 -> ancilla 1
+    U[:N, :N] =  M                  # top-left:     ancilla 0 -> ancilla 0
+    U[:N, N:] =  1j * sqrtImM2      # top-right:    ancilla 1 -> ancilla 0
+    U[N:, :N] =  1j * sqrtImM2      # bottom-left:  ancilla 0 -> ancilla 1
+    U[N:, N:] =  M                  # bottom-right: ancilla 1 -> ancilla 1
 
     return U

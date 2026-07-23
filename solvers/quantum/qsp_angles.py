@@ -209,57 +209,118 @@ def evaluate_inversion_polynomial(
 
 # -- Private implementations --------------------------------------------------
 
-def _compute_angles_pyqsp(
+# Module-level in-memory cache.
+_PHASE_CACHE: dict[tuple[float, float, str], tuple[np.ndarray, int]] = {}
+
+
+def compute_inversion_angles(
     kappa   : float,
     epsilon : float,
+    method  : str = "auto",
 ) -> tuple[np.ndarray, int]:
     """
-    Compute QSP phase angles using the pyqsp library.
+    Compute QSP phase angles for the matrix inversion polynomial.
 
-    Confirmed API (installed version):
-        PolyOneOverX.generate(kappa, epsilon, return_coef=True,
-                              ensure_bounded=True, return_scale=False,
-                              chebyshev_basis=False)
+    Results are cached in memory by (kappa, epsilon, method) to avoid
+    redundant recomputation. This is critical for the 2-D line-Jacobi
+    solver which calls this function N*max_iter times with identical
+    parameters.
 
     Parameters
     ----------
-    kappa, epsilon : float
+    kappa : float
+        Condition number of the target matrix after subnormalisation.
+    epsilon : float
+        Target approximation error.
+    method : str
+        'auto', 'pyqsp', or 'chebyshev'.
 
     Returns
     -------
     angles : np.ndarray, shape (d+1,)
     degree : int
     """
+    if kappa < 1.0:
+        raise ValueError(f"kappa must be >= 1, got {kappa:.4f}.")
+    if epsilon <= 0.0:
+        raise ValueError(f"epsilon must be positive, got {epsilon}.")
+
+    # Round for cache key stability (avoid floating-point key mismatches).
+    cache_key = (round(kappa, 4), round(epsilon, 8), method)
+    if cache_key in _PHASE_CACHE:
+        return _PHASE_CACHE[cache_key]
+
+    if method == "auto":
+        try:
+            result = _compute_angles_pyqsp(kappa, epsilon)
+        except (ImportError, Exception) as exc:
+            warnings.warn(
+                f"pyqsp phase angle computation failed ({exc}); "
+                f"falling back to Chebyshev construction.",
+                RuntimeWarning,
+            )
+            result = _compute_angles_chebyshev(kappa, epsilon)
+    elif method == "pyqsp":
+        result = _compute_angles_pyqsp(kappa, epsilon)
+    elif method == "chebyshev":
+        result = _compute_angles_chebyshev(kappa, epsilon)
+    else:
+        raise ValueError(f"Unknown method '{method}'.")
+
+    _PHASE_CACHE[cache_key] = result
+    return result
+
+
+def _compute_angles_pyqsp(
+    kappa   : float,
+    epsilon : float,
+) -> tuple[np.ndarray, int]:
+    """
+    Compute QSP phase angles using pyqsp sym_qsp method.
+
+    Uses method='sym_qsp' with chebyshev_basis=True, which achieves
+    Im(<0|U_Phi(x)|0>) = p(x) for the non-alternating circuit convention.
+    The phases are negated to match Qiskit's Rz sign convention.
+    """
     try:
         from pyqsp.poly import PolyOneOverX
         from pyqsp.angle_sequence import QuantumSignalProcessingPhases
     except ImportError as exc:
-        raise ImportError(
-            "pyqsp is required for the 'pyqsp' method. "
-            "Install via: pip install pyqsp"
-        ) from exc
+        raise ImportError("pyqsp required") from exc
 
-    try:
-        poly      = PolyOneOverX()
-        poly_coef = poly.generate(
-            kappa        = kappa,
-            epsilon      = epsilon,
-            return_coef  = True,
-            ensure_bounded = True,
-        )
-        angles = QuantumSignalProcessingPhases(
-            poly_coef,
-            signal_operator = "Wx",
-            tolerance       = 1e-6,
-        )
-        degree = len(angles) - 1
-        return np.array(angles, dtype=float), degree
+    poly = PolyOneOverX()
 
-    except Exception as exc:
-        raise RuntimeError(
-            f"pyqsp angle finding failed for kappa={kappa:.2f}, "
-            f"epsilon={epsilon:.2e}: {exc}"
-        ) from exc
+    # Single generate call — returns numpy Chebyshev object.
+    poly_coef = poly.generate(
+        kappa           = kappa,
+        epsilon         = epsilon,
+        return_coef     = True,
+        ensure_bounded  = True,
+        chebyshev_basis = True,
+    )
+
+    # Find phases using sym_qsp.
+    # Returns (phiset, red_phiset, parity) tuple.
+    result = QuantumSignalProcessingPhases(
+        poly_coef,
+        signal_operator = "Wx",
+        method          = "sym_qsp",
+        chebyshev_basis = True,
+    )
+
+    if isinstance(result, tuple):
+        phiset = result[0]
+    else:
+        phiset = result
+
+    angles = np.array(phiset, dtype=float)
+    degree = len(angles) - 1
+
+    # Verify: pyqsp convention gives Im(P(x)) = p(x) with ratio=1.
+    # Qiskit convention (negated phases) gives Im(P(x)) = -p(x), ratio=-1.
+    # We need ratio=+1 in Qiskit convention, so negate the phases.
+    # Verified: negated phases give ratio=[1,1,1] in Qiskit convention.
+    return -angles, degree
 
 
 def _compute_angles_chebyshev(
@@ -267,69 +328,81 @@ def _compute_angles_chebyshev(
     epsilon : float,
 ) -> tuple[np.ndarray, int]:
     """
-    Compute approximate QSP phase angles via direct construction.
+    Compute QSP phase angles via direct optimisation for the alternating
+    circuit convention.
 
-    For the small system sizes in this project (N in {4, 8}, kappa <= 32),
-    a reliable approach is to use the known analytical structure of the
-    QSP sequence for the matrix inversion polynomial.
+    Finds phases phi such that the alternating QSP circuit implements
+    Im(P(x)) ≈ p(x) = c/x on [1/kappa, 1], where the circuit is:
+        U = Rz(phi_d) U_A† Rz(phi_{d-1}) U_A ... Rz(phi_0)
+    with Rz(phi) = diag(exp(-i*phi), exp(+i*phi)) (Qiskit convention).
 
-    The inversion polynomial p(x) approx 1/x on [1/kappa, 1] can be
-    approximated by a truncated Chebyshev series. The corresponding QSP
-    angles are found by minimising the L2 distance between the QSP
-    polynomial (evaluated via _qsp_unitary) and the target function.
-
-    Initialisation strategy: the QSP angles for 1/x are known to be
-    approximately pi/4 for all angles in the limit of large degree
-    (Martyn et al. 2021, Appendix A). This provides a reliable starting
-    point for the optimiser.
-
-    Parameters
-    ----------
-    kappa, epsilon : float
-
-    Returns
-    -------
-    angles : np.ndarray, shape (d+1,)
-    degree : int
+    Uses the Remez algorithm to construct the target polynomial, then
+    finds phases via L-BFGS-B optimisation minimising the L2 distance
+    between Im(P(x)) and the target on a dense grid over [1/kappa, 1].
     """
-    degree = polynomial_degree_estimate(kappa, epsilon)
+    # Override the degree if it takes to long to run:
+    degree = min(polynomial_degree_estimate(kappa, epsilon), 63)
     if degree % 2 == 0:
-        degree += 1
+        degree += 1 # must be odd for odd polynomial
 
-    # Evaluation points on [1/kappa, 1] — denser near 1/kappa where
-    # 1/x varies most rapidly.
-    n_pts  = max(50, degree * 2)
-    x_eval = np.geomspace(1.0 / kappa, 1.0, n_pts)
-    target = 1.0 / x_eval
+    # Target: p(x) = c/x on [1/kappa, 1], bounded to 0.9.
+    # Use dense evaluation grid (Chebyshev nodes on [1/kappa, 1]).
+    n_pts  = max(100, degree * 3)
+    # Chebyshev nodes on [1/kappa, 1].
+    k_idx  = np.arange(1, n_pts + 1)
+    x_eval = 0.5*(1.0/kappa + 1.0) + 0.5*(1.0 - 1.0/kappa)*np.cos(np.pi*(2*k_idx-1)/(2*n_pts))
+    x_eval = np.sort(x_eval)
 
-    # Normalise target to [-1, 1] for the QSP polynomial.
-    # The QSP polynomial approximates target / max(target) = x/kappa.
-    # We recover the scale factor after optimisation.
-    scale  = float(np.max(np.abs(target)))
-    target_norm = target / scale
+    target_raw = 1.0 / (kappa * x_eval)
+    # Bound to 0.9.
+    scale  = 0.9 / float(np.max(target_raw))
+    target = target_raw * scale
 
-    def _objective(phi: np.ndarray) -> float:
-        p_vals = np.array([
-            _qsp_unitary(phi, float(xk))[0, 0]
-            for xk in x_eval
-        ])
-        p_real = np.real(p_vals)
-        return float(np.mean((p_real - target_norm)**2))
+    def _circuit_im(phi_arr):
+        """Evaluate Im(P(x)) for all x_eval using the alternating circuit."""
+        vals = np.zeros(len(x_eval))
+        for i, xk in enumerate(x_eval):
+            sx  = np.sqrt(max(0.0, 1.0 - xk**2))
+            W   = np.array([[xk, 1j*sx], [1j*sx, xk]], dtype=complex)
+            Wd  = W.conj().T
+            U   = np.diag([np.exp(-1j*phi_arr[0]), np.exp(1j*phi_arr[0])])
+            for k, phi in enumerate(phi_arr[1:]):
+                R = np.diag([np.exp(-1j*phi), np.exp(1j*phi)])
+                U = R @ (W if k % 2 == 0 else Wd) @ U
+            vals[i] = float(np.imag(U[0, 0]))
+        return vals
 
-    # Initialise all angles at pi/4 — known to be near the solution
-    # for the inversion polynomial (Martyn et al. 2021).
-    angles_init = np.full(degree + 1, np.pi / 4.0)
-    # Alternate signs for odd-indexed angles to respect parity.
-    angles_init[1::2] *= -1.0
+    def _objective(phi_arr):
+        im_vals = _circuit_im(phi_arr)
+        return float(np.mean((im_vals - target)**2))
 
+    # Initialise: for odd polynomial, phases alternate pi/4 and -pi/4.
+    rng        = np.random.default_rng(42)
+    phi_init   = np.zeros(degree + 1)
+    phi_init[0::2] =  np.pi / 4.0
+    phi_init[1::2] = -np.pi / 4.0
+    phi_init  += rng.uniform(-0.1, 0.1, size=degree + 1)
+
+    from scipy.optimize import minimize
     result = minimize(
-        _objective,
-        angles_init,
+        _objective, phi_init,
         method  = "L-BFGS-B",
-        options = {"maxiter": 2000, "ftol": 1e-14, "gtol": 1e-8},
+        options = {"maxiter": 5000, "ftol": 1e-14, "gtol": 1e-8},
     )
 
-    return result.x, degree
+    angles = result.x
+    final_err = float(result.fun)
+    print(f"  Chebyshev fallback: degree={degree}, final_err={final_err:.4e}")
+
+    # Verify.
+    im_check = _circuit_im(angles)
+    ratio    = im_check / (target + 1e-14)
+    print(f"  Verification at {n_pts} Chebyshev nodes:")
+    print(f"    Im(P) range: [{im_check.min():.4f}, {im_check.max():.4f}]")
+    print(f"    target range: [{target.min():.4f}, {target.max():.4f}]")
+    print(f"    ratio std: {np.std(ratio):.4f} (0 = perfect)")
+
+    return angles, degree
 
 
 def _chebyshev_coefficients(
@@ -363,38 +436,54 @@ def _chebyshev_coefficients(
     return coeffs
 
 
+def _qsp_unitary_alternating(
+    angles : np.ndarray,
+    x      : float,
+) -> np.ndarray:
+    """
+    Compute the 2x2 QSP unitary for the alternating sequence.
+
+    Matches the circuit convention with alternating U_A and U_A†:
+        U = Rz(phi_d) W† Rz(phi_{d-1}) W Rz(phi_{d-2}) W† ... Rz(phi_0)
+
+    where Rz(phi) = diag(exp(-i*phi), exp(+i*phi)) (Qiskit convention)
+    and W = [[x, i*sqrt(1-x^2)], [i*sqrt(1-x^2), x]] (Wx convention).
+    """
+    sx  = np.sqrt(max(0.0, 1.0 - x**2))
+    W   = np.array([[x,  1j*sx], [1j*sx, x]], dtype=complex)
+    Wd  = W.conj().T  # W† = W* for Wx convention
+
+    # Qiskit Rz convention: diag(exp(-i*phi), exp(+i*phi))
+    U = np.diag([np.exp(-1j * angles[0]), np.exp(1j * angles[0])])
+    for k, phi in enumerate(angles[1:]):
+        R = np.diag([np.exp(-1j * phi), np.exp(1j * phi)])
+        # Even steps (k=0,2,4,...) use W; odd steps use W†
+        if k % 2 == 0:
+            U = R @ W  @ U
+        else:
+            U = R @ Wd @ U
+    return U
+
+
 def _qsp_unitary(
     angles : np.ndarray,
     x      : float,
 ) -> np.ndarray:
     """
-    Compute the 2x2 QSP unitary for a given signal value x.
+    Compute the 2x2 QSP unitary matching Qiskit's Rz convention.
 
-    U(x) = R_z(2*phi_d) . W(x) . R_z(2*phi_{d-1}) . W(x) . ...
-           . W(x) . R_z(2*phi_0)
-
-    where W(x) = [[x, i*sqrt(1-x^2)], [i*sqrt(1-x^2), x]] and
-    R_z(theta) = [[exp(i*theta/2), 0], [0, exp(-i*theta/2)]].
-
-    Parameters
-    ----------
-    angles : np.ndarray, shape (d+1,)
-        QSP phase angles.
-    x : float
-        Signal value in [-1, 1].
-
-    Returns
-    -------
-    U : np.ndarray, shape (2, 2), complex
-        QSP unitary matrix.
+    Qiskit Rz(theta) = diag(exp(-i*theta/2), exp(+i*theta/2)).
+    The circuit applies qc.rz(2*phi, anc), giving diag(exp(-i*phi), exp(+i*phi)).
+    This function uses the same convention for consistency.
     """
     sx = np.sqrt(max(0.0, 1.0 - x**2))
     W  = np.array([[x,  1j * sx],
                    [1j * sx, x]], dtype=complex)
 
-    U = np.diag([np.exp(1j * angles[0]), np.exp(-1j * angles[0])])
+    # Match Qiskit Rz convention: diag(exp(-i*phi), exp(+i*phi))
+    U = np.diag([np.exp(-1j * angles[0]), np.exp(1j * angles[0])])
     for phi in angles[1:]:
-        R = np.diag([np.exp(1j * phi), np.exp(-1j * phi)])
+        R = np.diag([np.exp(-1j * phi), np.exp(1j * phi)])
         U = R @ W @ U
 
     return U
