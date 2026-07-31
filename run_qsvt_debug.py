@@ -124,7 +124,7 @@ def run_generic_poisson() -> None:
             epsilon      = 0.1,
             angle_method = "auto",
             verbose      = True,
-            max_degree   = 5000,
+            max_degree   = 500,
             label        = f"generic-fS-N{N}",
         )
 
@@ -196,7 +196,7 @@ def run_het_1d() -> None:
         epsilon      = 0.01,
         angle_method = "auto",
         verbose      = True,
-        max_degree   = 5000,
+        max_degree   = 600,
         label        = "HET-3a",   # triggers polynomial and recovery diagnostics
     )
 

@@ -264,37 +264,108 @@ def _canonicalise_method(method: str) -> str:
 
 # -- Private: computation -----------------------------------------------------
 
+def _fit_capped_reduced_coefs(
+    kappa: float, epsilon: float, degree: int,
+) -> np.ndarray:
+    """
+    Build a degree-`degree` odd-parity Chebyshev approximation to
+    1/(kappa*x) directly, via a single linear least-squares solve on
+    samples restricted to [1/kappa, 1] -- WITHOUT calling
+    PolyOneOverX.generate(), whose internal cost is O(kappa^2 log(kappa/
+    epsilon)) regardless of the degree eventually wanted (see module
+    docstring / commit notes). This function's cost depends only on
+    `degree`, not on kappa, which is the whole point: it's what makes
+    max_degree actually bound the runtime for large kappa.
+
+    This does not carry PolyOneOverX's analytic, provable boundedness
+    guarantee -- boundedness is checked and enforced numerically on a
+    dense grid afterward instead. Only used when a cap is requested,
+    i.e. only when the caller has already accepted a precision/runtime
+    tradeoff.
+    """
+    if degree % 2 == 0:
+        degree += 1
+
+    n_pts = max(2 * degree, 2000)
+    k_idx = np.arange(1, n_pts + 1)
+    x_eval = (
+        0.5 * (1.0 / kappa + 1.0)
+        + 0.5 * (1.0 - 1.0 / kappa) * np.cos(np.pi * (2 * k_idx - 1) / (2 * n_pts))
+    )
+    x_eval = np.sort(x_eval)
+
+    target_raw = 1.0 / (kappa * x_eval)
+    scale = 0.9 / float(np.max(target_raw))
+    target = target_raw * scale
+
+    # Fit ONLY the odd-order Chebyshev basis -- enforces odd parity
+    # exactly (coefficients at even indices are exactly zero, not just
+    # numerically small), rather than fitting all orders and hoping.
+    odd_orders = np.arange(1, degree + 1, 2)
+    full_vander = np.polynomial.chebyshev.chebvander(x_eval, degree)
+    basis_odd = full_vander[:, odd_orders]
+
+    coefs_odd, *_ = np.linalg.lstsq(basis_odd, target, rcond=None)
+
+    coef_array = np.zeros(degree + 1)
+    coef_array[odd_orders] = coefs_odd
+
+    # Global boundedness check over the full domain (both branches by
+    # odd symmetry, and through the [-1/kappa, 1/kappa] dead zone that
+    # wasn't part of the fit).
+    x_check = np.linspace(-1.0, 1.0, 2000)
+    p_max = float(np.max(np.abs(
+        np.polynomial.chebyshev.chebval(x_check, coef_array)
+    )))
+    if p_max > 0.9:
+        coef_array *= 0.9 / p_max
+
+    # Diagnostic only, not fatal: warn if the capped degree clearly
+    # can't represent 1/x well over the kappa-domain, so a too-aggressive
+    # cap doesn't fail silently.
+    fit_vals = np.polynomial.chebyshev.chebval(x_eval, coef_array)
+    rel_err = np.max(np.abs(fit_vals - target) / np.abs(target))
+    if rel_err > 0.05:
+        warnings.warn(
+            f"Capped-degree fit (degree={degree}, kappa={kappa:.2f}) has "
+            f"max relative error {rel_err:.2%} against the target on "
+            f"[1/kappa, 1] -- max_degree may be too small for this kappa.",
+            RuntimeWarning,
+        )
+
+    return coef_array
+
+
 def _target_reduced_coefs(
     kappa: float, epsilon: float, cap: Optional[int],
 ) -> tuple[np.ndarray, int, int]:
     """
-    Build the Chebyshev coefficients of the 1/(kappa*x) approximation via
-    pyqsp's PolyOneOverX, optionally truncated to `cap`, and reduce to the
-    parity-folded coefficient array pyqsp's Newton solver expects.
+    Build the Chebyshev coefficients of the 1/(kappa*x) approximation,
+    then reduce to the parity-folded coefficient array pyqsp's Newton
+    solver expects.
+
+    If `cap` is given, PolyOneOverX.generate() is bypassed entirely (see
+    _fit_capped_reduced_coefs) -- its cost is O(kappa^2 log(kappa/
+    epsilon)) and is paid in full BEFORE any post-hoc truncation could
+    help, so truncating its output does not bound runtime. If `cap` is
+    None, PolyOneOverX's exact/rigorous construction is used, as before.
 
     Returns (reduced_coefs, parity, degree).
     """
-    from pyqsp.poly import PolyOneOverX
+    if cap is not None:
+        coef_array = _fit_capped_reduced_coefs(kappa, epsilon, cap)
+    else:
+        from pyqsp.poly import PolyOneOverX
 
-    poly = PolyOneOverX()
-    poly_coef_raw = poly.generate(
-        kappa=kappa, epsilon=epsilon,
-        return_coef=True, ensure_bounded=True, chebyshev_basis=True,
-    )
-    coef_array = np.asarray(
-        poly_coef_raw.coef if hasattr(poly_coef_raw, "coef") else poly_coef_raw,
-        dtype=float,
-    )
-
-    if cap is not None and (len(coef_array) - 1) > cap:
-        capped = coef_array[: cap + 1].copy()
-        x_check = np.linspace(1.0 / kappa, 1.0, 500)
-        p_max = float(np.max(np.abs(
-            np.polynomial.chebyshev.chebval(x_check, capped)
-        )))
-        if p_max > 0.9:
-            capped *= 0.9 / p_max
-        coef_array = capped
+        poly = PolyOneOverX()
+        poly_coef_raw = poly.generate(
+            kappa=kappa, epsilon=epsilon,
+            return_coef=True, ensure_bounded=True, chebyshev_basis=True,
+        )
+        coef_array = np.asarray(
+            poly_coef_raw.coef if hasattr(poly_coef_raw, "coef") else poly_coef_raw,
+            dtype=float,
+        )
 
     degree = len(coef_array) - 1
     is_even = np.max(np.abs(coef_array[0::2])) > 1e-8

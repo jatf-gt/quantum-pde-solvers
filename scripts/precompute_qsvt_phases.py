@@ -1,48 +1,44 @@
 #!/usr/bin/env python3
 """
-precompute_qsvt_phases.py
-=========================
-Precompute and cache QSVT phase angles for all (kappa, epsilon) pairs
-used in the benchmark sweep (N = 4, 8, 16, 32, 64).
+Offline precompute of QSVT phase angles into the disk cache used by
+solvers/quantum/qsp_angles.py. Run this on the HPC as a batch job (see
+submit_precompute_hpc.sh) -- not interactively, since a login-node/
+interactive session will get killed on disconnect or idle timeout long
+before the larger N values finish.
 
-Run this script ONCE on the HPC before launching the main benchmark:
+N values are always processed in ASCENDING order, regardless of the
+order given on the command line. Each individual (N, epsilon) result
+is written to disk the moment it's computed (via qsp_angles's own
+_save_disk, inside compute_inversion_angles) -- nothing is batched or
+held in memory until the end. So if the job is killed partway through
+a large N (walltime, OOM), everything already computed for smaller N
+is already safe on disk; nothing is lost, and re-running with the same
+--n-values simply skips what's already cached.
 
-    python scripts/precompute_qsvt_phases.py [--include-n64] [--epsilon 0.01]
+kappa is computed from problems.poisson_1d.build_tst_matrix -- the SAME
+matrix construction the live 1D/2D solvers use -- rather than a
+separately maintained formula, so a precomputed cache entry is
+guaranteed to match what qsvt_1d.py/qsvt_2d.py will look up at runtime.
+(qsvt_1d.py's kappa_eff = alpha * kappa_A / ||A||_2 reduces to plain
+kappa_A = lambda_max/lambda_min, because alpha is set equal to
+||A||_2 = lambda_max there -- see the comment in qsvt_1d.py Stage 1.)
+Generic Poisson and both current HET problem classes build the
+identical -2/+1/+1 TST matrix for a given N, so one set of phases per
+(N, epsilon) serves all of them; there is no separate HET kappa.
 
-The computed phases are saved to results/qsvt_phase_cache/ as individual
-.npz files. All subsequent calls to compute_inversion_angles() with the
-same parameters will load from disk instantly, with zero recomputation.
+Usage
+-----
+    python scripts/precompute_qsvt_phases.py --n-values 4,8,16
+    python scripts/precompute_qsvt_phases.py --n-values 32 --max-degree 2000
+    python scripts/precompute_qsvt_phases.py --n-values 64 --max-degree 2000
 
-This script can also be run in parallel for different N values using
-multiple PBS jobs, since each (kappa, epsilon) pair is independent.
-
-Usage examples
---------------
-    # Standard benchmark (N=4,8,16,32), epsilon=0.01
-    python scripts/precompute_qsvt_phases.py
-
-    # Include N=64 (large kappa, may take several minutes)
-    python scripts/precompute_qsvt_phases.py --include-n64
-
-    # Use reduced degree for fast approximate computation
-    python scripts/precompute_qsvt_phases.py --include-n64 --reduced-degree 255
-
-    # Custom epsilon
-    python scripts/precompute_qsvt_phases.py --epsilon 0.5
-
-PBS job example (compute all N including N=64)
------------------------------------------------
-    #!/bin/bash
-    #PBS -N qsvt_precompute
-    #PBS -l select=1:ncpus=1:mem=8gb
-    #PBS -l walltime=04:00:00
-    #PBS -q cpu72
-    cd $PBS_O_WORKDIR
-    source activate quantum-pde-solvers
-    python scripts/precompute_qsvt_phases.py --include-n64
-
-Author : Juan Antonio Trobajo Flecha
-Date   : July 2026
+--max-degree caps the degree solved for (trades approximation error for
+tractable Newton-solve runtime/memory). NOTE: per the analysis behind
+this script, PolyOneOverX.generate() -- which builds the target
+polynomial *before* any cap is applied -- has its own cost that grows
+steeply with kappa and is NOT avoided by --max-degree. Treat N=32/64
+as exploratory: they may still be impractical even capped. N=4,8,16
+are expected to be safe.
 """
 from __future__ import annotations
 
@@ -53,153 +49,109 @@ from pathlib import Path
 
 import numpy as np
 
-# Ensure repo root is on path.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from solvers.quantum.qsp_angles import compute_inversion_angles, _DISK_CACHE_DIR
+import solvers.quantum.qsp_angles as qsp_angles
+from problems.poisson_1d import build_tst_matrix
 
 
 def _kappa_for_N(N: int) -> float:
-    """
-    Compute the condition number of the N×N TST Poisson matrix.
-
-    The exact spectral norm is lambda_max = 2 - 2*cos(pi/(N+1)) * ... 
-    but for the subnormalisation we use the spectral norm of the
-    negated positive-definite matrix, which equals the largest eigenvalue:
-        lambda_max = 2 - 2*cos(pi/(N+1))  ... no, that's lambda_min.
-    
-    For the TST with a=-2, b=1 (negated: a=+2, b=-1):
-        lambda_k = 2 - 2*cos(k*pi/(N+1))  for k=1,...,N
-        lambda_max = 2 - 2*cos(N*pi/(N+1)) ≈ 4 for large N
-        lambda_min = 2 - 2*cos(pi/(N+1))  ≈ pi^2/(N+1)^2 for large N
-        kappa = lambda_max / lambda_min
-    """
-    A = -2.0 * np.eye(N) + np.diag(np.ones(N-1), 1) + np.diag(np.ones(N-1), -1)
-    # Negate to get positive definite matrix.
-    A_pos = -A
-    eigs  = np.linalg.eigvalsh(A_pos)
+    """kappa_A = lambda_max/lambda_min of the same TST matrix qsvt_1d.py builds."""
+    A = build_tst_matrix(N)
+    eigs = np.abs(np.linalg.eigvalsh(A))
     return float(eigs.max() / eigs.min())
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Precompute QSVT phase angles for the benchmark sweep.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--include-n64", action="store_true",
-        help="Include N=64 (kappa~1700). May take several minutes.",
+        "--n-values", type=str, default="4,8,16",
+        help="Comma-separated N values, e.g. '4,8,16'. Always processed "
+             "in ascending order regardless of the order given. (default: 4,8,16)",
     )
     parser.add_argument(
         "--epsilon", type=float, default=0.01,
-        help="Approximation error epsilon (default: 0.01).",
+        help="Primary target epsilon (default: 0.01).",
     )
     parser.add_argument(
         "--extra-epsilons", type=str, default="0.5,0.1",
-        help="Comma-separated additional epsilon values to precompute "
-             "(default: '0.5,0.1'). These are used by the runner script "
-             "for fast approximate QSVT.",
+        help="Additional epsilon values to also precompute (default: 0.5,0.1). "
+             "Within each N, epsilons are processed largest-first (cheapest "
+             "first), same ascending-safety idea as the N ordering.",
     )
     parser.add_argument(
-        "--reduced-degree", type=int, default=None,
-        help="If set, also precompute reduced-degree phases with this cap. "
-             "Recommended: 255 for N=32, 511 for N=64.",
-    )
-    parser.add_argument(
-        "--method", type=str, default="sym_qsp_direct",
-        choices=["sym_qsp_direct", "sym_qsp_wrapper"],
-        help="Phase computation method (default: sym_qsp_direct).",
+        "--max-degree", type=int, default=None,
+        help="Cap solved degree (see module docstring caveat). Applies to "
+             "every (N, epsilon) pair in this invocation -- run separate "
+             "invocations if you want different caps for different N.",
     )
     args = parser.parse_args()
 
-    # N values to precompute.
-    N_values = [4, 8, 16, 32]
-    if args.include_n64:
-        N_values.append(64)
+    N_values = sorted({int(n) for n in args.n_values.split(",") if n.strip()})
+    eps_values = sorted(
+        {round(args.epsilon, 8), *[round(float(e), 8) for e in args.extra_epsilons.split(",") if e.strip()]},
+        reverse=True,  # largest (cheapest) epsilon first within each N
+    )
 
-    # Epsilon values.
-    extra_eps = [float(e) for e in args.extra_epsilons.split(",") if e.strip()]
-    epsilon_values = sorted(set([args.epsilon] + extra_eps), reverse=True)
+    # Only this script writes to the disk cache; live solver runs only read.
+    qsp_angles._ENABLE_DISK_WRITE = True
 
     print("=" * 68)
     print("  QSVT Phase Precomputation")
-    print("  Imperial College London, Department of Aeronautics")
     print("=" * 68)
-    print(f"  N values:      {N_values}")
-    print(f"  Epsilon values: {epsilon_values}")
-    print(f"  Method:        {args.method}")
-    print(f"  Reduced degree: {args.reduced_degree}")
-    print(f"  Cache dir:     {_DISK_CACHE_DIR.resolve()}")
-    print()
+    print(f"  N values (ascending) : {N_values}")
+    print(f"  epsilon values        : {eps_values}")
+    print(f"  max_degree cap        : {args.max_degree}")
+    print(f"  cache dir              : {qsp_angles._DISK_CACHE_DIR.resolve()}")
+    print(flush=True)
 
+    n_ok = n_skip = n_fail = 0
     t_total = time.perf_counter()
-    n_computed = 0
-    n_cached   = 0
 
     for N in N_values:
         kappa = _kappa_for_N(N)
-        print(f"  N={N:3d}  kappa={kappa:.2f}")
+        print(f"N={N:3d}  kappa={kappa:.4f}", flush=True)
 
-        for epsilon in epsilon_values:
-            # Standard method.
-            key = (round(kappa, 4), round(epsilon, 8), args.method, None)
-            from solvers.quantum.qsp_angles import _load_disk
-            if _load_disk(key) is not None:
-                print(f"    epsilon={epsilon:.3f}  [{args.method}]  "
-                      f"→ already cached, skipping.")
-                n_cached += 1
+        for eps in eps_values:
+            max_deg_key = args.max_degree if args.max_degree is not None else -1
+            cache_key = (round(kappa, 4), round(eps, 8), "auto", max_deg_key)
+
+            if qsp_angles._load_disk(cache_key) is not None:
+                print(f"    epsilon={eps:<8.4g} -> already cached, skipping.", flush=True)
+                n_skip += 1
                 continue
 
             t0 = time.perf_counter()
-            print(f"    epsilon={epsilon:.3f}  [{args.method}]  computing...",
-                  end="", flush=True)
+            print(f"    epsilon={eps:<8.4g} computing...", end="", flush=True)
             try:
-                angles, degree = compute_inversion_angles(
-                    kappa, epsilon, method=args.method
+                angles, degree = qsp_angles.compute_inversion_angles(
+                    kappa, eps, method="auto", max_degree=args.max_degree,
                 )
-                elapsed = time.perf_counter() - t0
-                print(f" done. degree={degree}, time={elapsed:.1f}s")
-                n_computed += 1
+                print(
+                    f" done. degree={degree}, n_angles={len(angles)}, "
+                    f"time={time.perf_counter() - t0:.1f}s",
+                    flush=True,
+                )
+                n_ok += 1
             except Exception as exc:
-                print(f" FAILED: {exc}")
+                # Deliberately not fatal: must not discard results already
+                # written for smaller N, or block remaining (N, epsilon)
+                # pairs in this same run.
+                print(f" FAILED: {exc}", flush=True)
+                n_fail += 1
+                continue
 
-            # Reduced degree variant.
-            if args.reduced_degree is not None:
-                cap = args.reduced_degree
-                key_rd = (round(kappa, 4), round(epsilon, 8),
-                          "reduced_degree", cap)
-                if _load_disk(key_rd) is not None:
-                    print(f"    epsilon={epsilon:.3f}  [reduced_degree={cap}]  "
-                          f"→ already cached, skipping.")
-                    n_cached += 1
-                    continue
+        print(flush=True)  # blank line between N blocks
 
-                t0 = time.perf_counter()
-                print(f"    epsilon={epsilon:.3f}  [reduced_degree={cap}]  "
-                      f"computing...", end="", flush=True)
-                try:
-                    angles_rd, degree_rd = compute_inversion_angles(
-                        kappa, epsilon,
-                        method     = "reduced_degree",
-                        max_degree = cap,
-                    )
-                    elapsed = time.perf_counter() - t0
-                    print(f" done. degree={degree_rd}, time={elapsed:.1f}s")
-                    n_computed += 1
-                except Exception as exc:
-                    print(f" FAILED: {exc}")
-
-        print()
-
-    elapsed_total = time.perf_counter() - t_total
     print("=" * 68)
-    print(f"  Precomputation complete.")
-    print(f"  Computed: {n_computed} phase sets.")
-    print(f"  Skipped (already cached): {n_cached} phase sets.")
-    print(f"  Total time: {elapsed_total:.1f}s")
-    print(f"  Cache location: {_DISK_CACHE_DIR.resolve()}")
+    print(
+        f"  Done in {time.perf_counter() - t_total:.1f}s. "
+        f"{n_ok} computed, {n_skip} already cached, {n_fail} failed."
+    )
+    print(f"  Cache dir: {qsp_angles._DISK_CACHE_DIR.resolve()}")
     print("=" * 68)
 
 
