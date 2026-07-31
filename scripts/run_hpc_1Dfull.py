@@ -86,14 +86,14 @@ logging.getLogger("qiskit.compiler").setLevel(logging.CRITICAL)
 # ── QSVT time limit: skip if estimated wall time exceeds this (seconds) ───────
 # N=8 QSVT took ~222s on a laptop. On HPC it will be faster but still long.
 # Set to None to disable the guard entirely.
-QSVT_TIME_LIMIT_S: Optional[float] = 1200.0   # 20 minutes per QSVT call
+QSVT_TIME_LIMIT_S: Optional[float] = 1800.0   # 20 minutes per QSVT call
 
 # ── N values to run ───────────────────────────────────────────────────────────
 N_VALUES_DEFAULT = [4, 8, 16, 32]
 N_VALUES_WITH_64 = [4, 8, 16, 32, 64]
 
 # ── QSVT is only attempted for small N (circuit depth manageable) ─────────────
-QSVT_MAX_N = 8
+QSVT_MAX_N = 32
 
 # -- Parallelisation configuration --------------------------------------------
 # Maximum number of worker processes for case-level parallelisation.
@@ -418,15 +418,37 @@ def _run_vqls(
     Execute the VQLS solver via the validated project module.
     """
     try:
-        from solvers.quantum.vqls_1d import vqls_solve_system
+        from solvers.quantum.vqls_1d import vqls_solve_system, VQLSConfig1D
+
+        n_qubits  = int(np.log2(N))
+        n_layers  = max(6, 2 * n_qubits + 2)
+        n_restarts = max(3, 2*n_qubits)
+        vqls_cfg = VQLSConfig1D(
+            n_layers   = n_layers,
+            max_iter   = 500,
+            tol        = 1e-6,
+            random_seed = 42,
+            verbose    = False,
+            n_restarts = n_restarts,
+        )
 
         t0 = time.perf_counter()
-        result = vqls_solve_system(A, b)
+        result = vqls_solve_system(A, b, config=vqls_cfg)
         wall = time.perf_counter() - t0
 
         u          = result.u
         converged  = result.optimiser_success
         final_cost = result.final_cost
+
+        # Flag runs where VQLS clearly diverged (cost > threshold indicates non-convergence)
+        if final_cost > 0.1:
+            log.warning(
+                "    VQLS cost=%.2e exceeds convergence threshold (0.1); "
+                "solution is likely non-physical for N=%d. "
+                "Result retained for reporting purposes.",
+                final_cost, N
+            )
+
         return u, _relative_residual(A, u, b), wall, converged, float(final_cost)
 
     except Exception as exc:
@@ -980,4 +1002,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main() 

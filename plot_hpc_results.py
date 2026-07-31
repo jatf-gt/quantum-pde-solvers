@@ -13,8 +13,8 @@ Plots produced:
   5. HET 1D: potential profiles and electric field (sub-cases 3a, 3b, 3c)
 
 Usage:
-  python plot_hpc_results.py --results-dir results/hpc_run
-  python plot_hpc_results.py --results-dir results/hpc_run --save-pdf
+  python plot_hpc_results.py --results-dir results_hpc/hpc_run
+  python plot_hpc_results.py --results-dir results_hpc/hpc_run --save-pdf
 
 Author : Juan Antonio Trobajo Flecha
 Date   : July 2026
@@ -498,7 +498,7 @@ def main() -> None:
         description="Post-process and plot HPC benchmark results."
     )
     parser.add_argument(
-        "--results-dir", type=Path, default=Path("results/hpc_run"),
+        "--results-dir", type=Path, default=Path("results_hpc/hpc_run"),
         help="Directory containing results_full.json and solution NPZ files."
     )
     parser.add_argument(

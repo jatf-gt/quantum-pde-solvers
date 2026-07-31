@@ -10,3 +10,4 @@ __pycache__/
 *.png
 *.jpg
 *.egg-info/
+results_hpc/

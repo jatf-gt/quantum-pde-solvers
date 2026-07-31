@@ -1135,18 +1135,18 @@ def main() -> None:
     print(f"  Output directory: {RESULTS_DIR.resolve()}")
 
     s1_data = run_section_1()
-    s3_data = run_section_3()
-    s4_data = run_section_4()
+    # s3_data = run_section_3()
+    # s4_data = run_section_4()
 
     t_sections = time.perf_counter() - t_start
     print(f"\n{'─'*68}")
     print(f"  All sections completed in {t_sections:.1f}s. Generating figures...")
 
     plot_section_1(s1_data, save=True)
-    plot_section_3(s3_data, save=True)
-    plot_section_4(s4_data, save=True)
+    # plot_section_3(s3_data, save=True)
+    # plot_section_4(s4_data, save=True)
 
-    export_excel(s1_data, s3_data, s4_data)
+    # export_excel(s1_data, s3_data, s4_data)
 
     print(f"\n  Total elapsed: {time.perf_counter() - t_start:.1f}s")
     print(f"  All outputs saved to: {RESULTS_DIR.resolve()}")
