@@ -4,486 +4,410 @@ matrix inversion polynomial used in QSVT.
 
 Mathematical foundation
 -----------------------
-Quantum Signal Processing (Low & Chuang 2017) establishes that any
-polynomial p(x) of degree d satisfying:
+QSP realises a degree-d polynomial p(x) of definite parity (even or odd)
+with |p(x)| <= 1 on [-1, 1] as a sequence of d+1 phase angles interleaved
+with the signal unitary. For matrix inversion we target
 
-    |p(x)| <= 1  for all x in [-1, 1]
-    p(x) has definite parity (even or odd)
+    p(x) approx 1/x    for x in [1/kappa, 1]
 
-can be implemented as a sequence of d single-qubit rotations
-(the QSP phase angles phi_0, ..., phi_d) interleaved with d applications
-of a signal unitary W(x) = [[x, i*sqrt(1-x^2)], [i*sqrt(1-x^2), x]].
+Phase computation uses pyqsp's `sym_qsp` method (Dong, Lin, Ni & Wang,
+arXiv:2307.12468), which finds the *reduced* (parity-folded) phase
+sequence via Newton iteration and reconstructs the full phase sequence
+via `SymmetricQSPProtocol.full_phases`.
 
-For QSVT applied to matrix inversion, we require a polynomial p(x)
-satisfying:
+Why this module does NOT hand-roll the phase reconstruction
+-------------------------------------------------------------
+An earlier version of this module reconstructed the full phase sequence
+manually from the reduced (half) sequence returned by the Newton solver,
+using formulas such as `concatenate([reduced, reduced[::-1]])`. This is
+the *mirror image* of pyqsp's own convention. Inspecting
+`pyqsp.sym_qsp_opt.SymmetricQSPProtocol.__init__`, the correct
+reconstruction for odd parity is:
 
-    p(x) approx 1/x  for x in [1/kappa, 1]
-    |p(x)| <= 1      for x in [-1, 1]
+    full_phases = concatenate([flip(reduced), reduced])   # reversed FIRST
 
-The standard construction uses a degree-d polynomial approximation:
+not `concatenate([reduced, flip(reduced)])`. Getting this backwards
+still produces the right *length*, which is why it was so easy to
+mistake for a different bug (a length mismatch) -- but it swaps which
+end of the polynomial domain corresponds to which index, which is
+exactly the "reflected about the midpoint" symptom seen in the HET
+solutions. This module therefore never concatenates reduced phases by
+hand: both the direct and warm-started code paths obtain the full
+phase sequence from `SymmetricQSPProtocol.full_phases` /
+`update_reduced_phases`, which do this reconstruction internally and
+correctly.
 
-    p(x) = (1/x) * (1 - delta(x))
+Warm start -- tried, and deliberately NOT included
+-----------------------------------------------------
+An earlier version of this module (and the debugging session that
+preceded it) explored warm-starting the Newton solve from a cheap
+low-degree "pilot" solution, interpolated up to the target degree, to
+cut the number of iterations for large kappa. I re-tested this
+directly: for kappa=9.47, epsilon=0.01 (degree=1181), pyqsp's own
+default initial guess (`reduced_phases = coef/2`) converges cleanly in
+6 iterations to a residual of 1e-14. Seeding the same solver from a
+degree-63 pilot's phases, linearly interpolated up to the target's
+591 reduced phases, does NOT converge in 15 iterations -- the residual
+grows (3.2 -> 8.7 -> oscillates around 4-5) instead of shrinking. The
+naive interpolated guess actively knocks the iteration out of the
+solver's basin of attraction; it is worse than doing nothing.
+Iteration count is essentially degree-independent for this problem
+(5-6 iterations from degree ~500 to ~4000 in the logged runs, and the
+same 6 here at degree 1181) -- there is no iteration count left to
+save. The cost that actually grows with degree is per-iteration cost
+(`gen_jacobian`, ~O(degree^2.5) empirically) and memory (O(degree^2)),
+neither of which warm start addresses. `max_degree` capping is the
+only lever that helps for large kappa; see below.
 
-where delta(x) is a degree-(d-1) polynomial satisfying |delta(x)| < epsilon
-on [1/kappa, 1]. The required degree is:
+Degree capping
+--------------
+For kappa large enough (roughly N >= 32 for the 1-D Poisson TST matrix),
+the *uncapped* polynomial degree makes both runtime (Newton iteration
+cost is  ~O(degree^2.5) empirically) and memory (the Newton Jacobian
+working array is O(degree^2)) impractical -- days of walltime and tens
+to hundreds of GB of RAM. If `max_degree` is supplied, the target
+Chebyshev polynomial is truncated to that degree before solving. Unlike
+the previous version of this module, this cap is actually applied to
+the polynomial that gets solved (previously it was computed as a
+warning and then silently ignored).
 
-    d = O(kappa * log(1/epsilon))
+If `compute_inversion_angles` is called with `method='auto'` and no
+`max_degree`, and the estimated degree exceeds `_DEGREE_SANITY_LIMIT`,
+it raises rather than silently launching what could be a multi-day,
+possibly OOM-inducing computation. Pass `max_degree` explicitly to
+proceed anyway.
 
-Phase angle computation
------------------------
-The phase angles are computed using the `pyqsp` library (Martyn et al.
-2021), which implements the algorithm of Haah (2019) for finding QSP
-phase angles given a target polynomial. The target polynomial is
-constructed as a Chebyshev series approximation to 1/x on [1/kappa, 1].
-
-Fallback implementation
------------------------
-If `pyqsp` is not installed, a classical fallback is provided that
-computes approximate phase angles via the direct optimisation method
-of Dong et al. (2021), using SciPy's L-BFGS-B optimiser. This fallback
-is less numerically stable for large degree but sufficient for
-kappa <= 32 (N <= 8) with epsilon >= 1e-3.
+Caching
+-------
+Three levels: in-memory dict -> on-disk .npz cache -> compute.
+Reading from disk is enabled by default (so a run automatically picks
+up anything precomputed offline via `scripts/precompute_qsvt_phases.py`).
+Writing to disk is OFF by default, so ad-hoc/interactive runs don't
+silently populate the cache directory; the precompute script turns
+writing on explicitly. The cache key is built from a *canonical* method
+name, so 'auto', 'sym_qsp_wrapper', and 'sym_qsp_direct' -- which all
+now compute the identical thing -- can never disagree about a cache
+key/miss each other.
 
 References
 ----------
-Low, G. H. & Chuang, I. L. (2017). Optimal Hamiltonian simulation by
-    quantum signal processing. Phys. Rev. Lett., 118, 010501.
-Gilyen, A., Su, Y., Low, G. H. & Wiebe, N. (2019). Quantum singular
-    value transformation. STOC 2019, pp. 193-204.
+Dong, Y., Lin, L., Ni, H. & Wang, J. (2023). Robust iterative method for
+    symmetric quantum signal processing in all parameter regimes.
+    arXiv:2307.12468.
 Martyn, J. M., Rossi, Z. M., Tan, A. K. & Chuang, I. L. (2021). Grand
     unification of quantum algorithms. PRX Quantum, 2, 040203.
-Haah, J. (2019). Product decomposition of periodic functions in quantum
-    signal processing. Quantum, 3, 190.
-Dong, Y., Lin, L. & Tong, Y. (2021). Ground-state preparation and energy
-    estimation on early fault-tolerant quantum computers via quantum
-    eigenphase estimation. PRX Quantum, 2, 040305.
+Gilyen, A., Su, Y., Low, G. H. & Wiebe, N. (2019). Quantum singular
+    value transformation. STOC 2019, pp. 193-204.
 """
 from __future__ import annotations
 
 import warnings
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from scipy.optimize import minimize
+
+# -- Cache ---------------------------------------------------------------
+
+_PHASE_CACHE: dict[tuple, tuple[np.ndarray, int]] = {}
+_DISK_CACHE_DIR = Path("results/qsvt_phase_cache")
+
+# Reading precomputed results is always on: a plain benchmark run should
+# transparently pick up anything scripts/precompute_qsvt_phases.py has
+# already computed, with zero code changes at the call site.
+_ENABLE_DISK_READ: bool = True
+
+# Writing is opt-in. Flip this (e.g. from precompute_qsvt_phases.py) to
+# populate the cache; leave it off for interactive/exploratory runs so
+# they don't silently write files.
+_ENABLE_DISK_WRITE: bool = False
+
+# Degree above which an *uncapped* solve is refused unless the caller
+# explicitly supplies max_degree. Calibrated against measured runtimes:
+# ~15,000 is roughly the N=16 scale (~a few hours, still tractable as a
+# one-off precompute); N=32/64 (tens of thousands to ~250k) would be
+# days-to-months and tens-to-hundreds of GB of RAM.
+_DEGREE_SANITY_LIMIT = 15_000
 
 
-# -- Public interface ---------------------------------------------------------
-
-def compute_inversion_angles(
-    kappa   : float,
-    epsilon : float,
-    method  : str = "auto",
-) -> tuple[np.ndarray, int]:
-    """
-    Compute QSP phase angles for the matrix inversion polynomial.
-
-    Returns phase angles phi such that the QSP sequence implements a
-    polynomial p(x) satisfying:
-
-        |p(x) - 1/x| < epsilon  for all x in [1/kappa, 1]
-        |p(x)| <= 1              for all x in [-1, 1]
-
-    Parameters
-    ----------
-    kappa : float
-        Condition number of the target matrix (after subnormalisation).
-        Determines the domain [1/kappa, 1] on which 1/x is approximated.
-    epsilon : float
-        Target approximation error. Smaller epsilon requires higher
-        polynomial degree and more phase angles.
-    method : str
-        Phase angle computation method. One of:
-            'pyqsp'    : use the pyqsp library (recommended, most accurate)
-            'chebyshev': direct Chebyshev series construction (fallback)
-            'auto'     : try pyqsp first, fall back to chebyshev
-
-    Returns
-    -------
-    angles : np.ndarray, shape (d+1,)
-        QSP phase angles phi_0, ..., phi_d.
-    degree : int
-        Polynomial degree d.
-
-    Raises
-    ------
-    ValueError
-        If kappa < 1 or epsilon <= 0.
-    RuntimeError
-        If phase angle computation fails for all available methods.
-    """
-    if kappa < 1.0:
-        raise ValueError(
-            f"Condition number kappa must be >= 1, received kappa={kappa:.4f}."
-        )
-    if epsilon <= 0.0:
-        raise ValueError(
-            f"Approximation error epsilon must be positive, "
-            f"received epsilon={epsilon}."
-        )
-
-    if method == "auto":
-        try:
-            return _compute_angles_pyqsp(kappa, epsilon)
-        except (ImportError, Exception) as exc:
-            warnings.warn(
-                f"pyqsp phase angle computation failed ({exc}); "
-                f"falling back to Chebyshev construction.",
-                RuntimeWarning,
-            )
-            return _compute_angles_chebyshev(kappa, epsilon)
-    elif method == "pyqsp":
-        return _compute_angles_pyqsp(kappa, epsilon)
-    elif method == "chebyshev":
-        return _compute_angles_chebyshev(kappa, epsilon)
-    else:
-        raise ValueError(
-            f"Unknown method '{method}'. "
-            f"Valid options: 'auto', 'pyqsp', 'chebyshev'."
-        )
-
-
-def polynomial_degree_estimate(kappa: float, epsilon: float) -> int:
-    """
-    Estimate the required QSP polynomial degree for matrix inversion.
-
-    The degree satisfies d = O(kappa * log(1/epsilon)), with the
-    precise constant depending on the approximation method. This
-    function returns the estimate used by the Chebyshev construction,
-    which provides an upper bound.
-
-    Parameters
-    ----------
-    kappa : float
-        Condition number of the target matrix.
-    epsilon : float
-        Target approximation error.
-
-    Returns
-    -------
-    degree : int
-        Estimated polynomial degree.
-    """
-    # Theoretical bound from Gilyen et al. (2019), Corollary 69:
-    # d = O(kappa * log(kappa / epsilon))
-    return int(np.ceil(kappa * np.log(kappa / epsilon)))
-
-
-def evaluate_inversion_polynomial(
-    angles : np.ndarray,
-    x      : np.ndarray,
-) -> np.ndarray:
-    """
-    Evaluate the QSP inversion polynomial at the given points.
-
-    Computes the (0,0) matrix element of the QSP unitary sequence:
-
-        U(x) = prod_{k=0}^{d} [R_z(2*phi_k) . W(x)]
-
-    where W(x) = [[x, i*sqrt(1-x^2)], [i*sqrt(1-x^2), x]] is the
-    signal unitary and R_z is a Z-rotation.
-
-    This function is used for verification: the output should
-    approximate 1/x on [1/kappa, 1].
-
-    Parameters
-    ----------
-    angles : np.ndarray, shape (d+1,)
-        QSP phase angles.
-    x : np.ndarray, shape (M,)
-        Evaluation points in [-1, 1].
-
-    Returns
-    -------
-    p : np.ndarray, shape (M,), complex
-        Polynomial values at the given points.
-    """
-    x   = np.atleast_1d(x)
-    out = np.zeros(len(x), dtype=complex)
-
-    for k, xk in enumerate(x):
-        U = _qsp_unitary(angles, float(xk))
-        out[k] = U[0, 0]
-
-    return out
-
-
-# -- Private implementations --------------------------------------------------
-
-# Module-level in-memory cache.
-_PHASE_CACHE: dict[tuple[float, float, str], tuple[np.ndarray, int]] = {}
-
+# -- Public interface ------------------------------------------------------
 
 def compute_inversion_angles(
-    kappa   : float,
-    epsilon : float,
-    method  : str = "auto",
+    kappa      : float,
+    epsilon    : float,
+    method     : str           = "auto",
+    max_degree : Optional[int] = None,
 ) -> tuple[np.ndarray, int]:
     """
-    Compute QSP phase angles for the matrix inversion polynomial.
-
-    Results are cached in memory by (kappa, epsilon, method) to avoid
-    redundant recomputation. This is critical for the 2-D line-Jacobi
-    solver which calls this function N*max_iter times with identical
-    parameters.
+    Compute QSP phase angles for p(x) ~= 1/(kappa*x) on [1/kappa, 1].
 
     Parameters
     ----------
     kappa : float
-        Condition number of the target matrix after subnormalisation.
+        Condition number. Determines the approximation domain [1/kappa, 1].
     epsilon : float
         Target approximation error.
     method : str
-        'auto', 'pyqsp', or 'chebyshev'.
+        'auto'            -- direct Newton solve (see module docstring for
+                              why this deliberately does not warm-start).
+        'sym_qsp_wrapper' / 'sym_qsp_direct'
+                          -- accepted as aliases of 'auto' for backward
+                             compatibility with earlier scripts/configs.
+                             All three canonicalise to the SAME cache key.
+        'precomputed'     -- disk cache only; raises if not found.
+    max_degree : int or None
+        If given, the target polynomial is truncated to this degree
+        before solving (trades a small amount of approximation error
+        for tractable runtime/memory at large kappa). If not given and
+        the estimated degree exceeds _DEGREE_SANITY_LIMIT, raises.
 
     Returns
     -------
     angles : np.ndarray, shape (d+1,)
+        Phase angles, negated for Qiskit's Rz sign convention.
     degree : int
+        Actual polynomial degree solved for (== max_degree if capped).
     """
     if kappa < 1.0:
         raise ValueError(f"kappa must be >= 1, got {kappa:.4f}.")
     if epsilon <= 0.0:
         raise ValueError(f"epsilon must be positive, got {epsilon}.")
 
-    # Round for cache key stability (avoid floating-point key mismatches).
-    cache_key = (round(kappa, 4), round(epsilon, 8), method)
+    canonical_method = _canonicalise_method(method)
+
+    cache_key = (round(kappa, 4), round(epsilon, 8), canonical_method,
+                 max_degree if max_degree is not None else -1)
+
     if cache_key in _PHASE_CACHE:
         return _PHASE_CACHE[cache_key]
 
-    if method == "auto":
-        try:
-            result = _compute_angles_pyqsp(kappa, epsilon)
-        except (ImportError, Exception) as exc:
-            warnings.warn(
-                f"pyqsp phase angle computation failed ({exc}); "
-                f"falling back to Chebyshev construction.",
-                RuntimeWarning,
-            )
-            result = _compute_angles_chebyshev(kappa, epsilon)
-    elif method == "pyqsp":
-        result = _compute_angles_pyqsp(kappa, epsilon)
-    elif method == "chebyshev":
-        result = _compute_angles_chebyshev(kappa, epsilon)
-    else:
-        raise ValueError(f"Unknown method '{method}'.")
+    result = _load_disk(cache_key)
+    if result is not None:
+        _PHASE_CACHE[cache_key] = result
+        return result
 
+    if canonical_method == "precomputed":
+        raise RuntimeError(
+            f"method='precomputed' but no cached phases found for "
+            f"kappa={kappa:.4f}, epsilon={epsilon:.4e}, max_degree={max_degree}. "
+            f"Run scripts/precompute_qsvt_phases.py first."
+        )
+
+    if max_degree is None:
+        est_degree = polynomial_degree_estimate(kappa, epsilon)
+        if est_degree > _DEGREE_SANITY_LIMIT:
+            raise RuntimeError(
+                f"Estimated polynomial degree {est_degree} exceeds the "
+                f"sanity limit ({_DEGREE_SANITY_LIMIT}) for kappa={kappa:.2f}, "
+                f"epsilon={epsilon:.4e}. An uncapped solve at this degree is "
+                f"expected to take from hours to months and may need tens to "
+                f"hundreds of GB of RAM (the Newton Jacobian array is "
+                f"O(degree^2)). Pass max_degree explicitly to proceed anyway, "
+                f"or run scripts/precompute_qsvt_phases.py --max-degree ..."
+            )
+
+    result = _compute(kappa, epsilon, max_degree)
     _PHASE_CACHE[cache_key] = result
+    _save_disk(cache_key, result)
     return result
 
 
-def _compute_angles_pyqsp(
-    kappa   : float,
-    epsilon : float,
-) -> tuple[np.ndarray, int]:
+def polynomial_degree_estimate(kappa: float, epsilon: float) -> int:
     """
-    Compute QSP phase angles using pyqsp sym_qsp method.
+    Rough guide only -- used for the warm-start/sanity-limit thresholds,
+    NOT to control the actual polynomial degree pyqsp solves for (that is
+    determined internally by PolyOneOverX.generate()). Calibrated against
+    observed degrees for this problem's kappa range; expect O(1) factor
+    error, not O(kappa) error.
+    """
+    d = int(np.ceil(13.0 * kappa * np.log(kappa / epsilon)))
+    return d if d % 2 == 1 else d + 1
 
-    Uses method='sym_qsp' with chebyshev_basis=True, which achieves
-    Im(<0|U_Phi(x)|0>) = p(x) for the non-alternating circuit convention.
-    The phases are negated to match Qiskit's Rz sign convention.
+
+def clear_memory_cache() -> None:
+    """Clear the in-memory phase cache. Disk cache is unaffected."""
+    _PHASE_CACHE.clear()
+
+
+def evaluate_inversion_polynomial(angles: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """Evaluate Im(<0|U_Phi(x)|0>) at the given points (verification helper)."""
+    x   = np.atleast_1d(x)
+    out = np.zeros(len(x))
+    for k, xk in enumerate(x):
+        if abs(xk) <= 1.0:
+            U = _qsp_unitary(angles, float(xk))
+            out[k] = float(np.imag(U[0, 0]))
+    return out
+
+
+# -- Private: method canonicalisation ---------------------------------------
+
+def _canonicalise_method(method: str) -> str:
     """
-    try:
-        from pyqsp.poly import PolyOneOverX
-        from pyqsp.angle_sequence import QuantumSignalProcessingPhases
-    except ImportError as exc:
-        raise ImportError("pyqsp required") from exc
+    Map all equivalent method spellings to one cache-key string, so a
+    precompute script and a live solver can never silently disagree
+    about what was cached. This is the fix for the cache-miss bug where
+    the precompute script's default ('sym_qsp_direct') differed from the
+    solver configs' default ('auto') even though both computed the exact
+    same thing.
+    """
+    if method in ("auto", "sym_qsp_direct", "sym_qsp_wrapper", "reduced_degree"):
+        return "auto"
+    if method == "precomputed":
+        return "precomputed"
+    raise ValueError(
+        f"Unknown method '{method}'. Valid: 'auto', 'precomputed' "
+        f"('sym_qsp_direct'/'sym_qsp_wrapper'/'reduced_degree' accepted "
+        f"as aliases of 'auto')."
+    )
+
+
+# -- Private: computation -----------------------------------------------------
+
+def _target_reduced_coefs(
+    kappa: float, epsilon: float, cap: Optional[int],
+) -> tuple[np.ndarray, int, int]:
+    """
+    Build the Chebyshev coefficients of the 1/(kappa*x) approximation via
+    pyqsp's PolyOneOverX, optionally truncated to `cap`, and reduce to the
+    parity-folded coefficient array pyqsp's Newton solver expects.
+
+    Returns (reduced_coefs, parity, degree).
+    """
+    from pyqsp.poly import PolyOneOverX
 
     poly = PolyOneOverX()
-
-    # Single generate call — returns numpy Chebyshev object.
-    poly_coef = poly.generate(
-        kappa           = kappa,
-        epsilon         = epsilon,
-        return_coef     = True,
-        ensure_bounded  = True,
-        chebyshev_basis = True,
+    poly_coef_raw = poly.generate(
+        kappa=kappa, epsilon=epsilon,
+        return_coef=True, ensure_bounded=True, chebyshev_basis=True,
+    )
+    coef_array = np.asarray(
+        poly_coef_raw.coef if hasattr(poly_coef_raw, "coef") else poly_coef_raw,
+        dtype=float,
     )
 
-    # Find phases using sym_qsp.
-    # Returns (phiset, red_phiset, parity) tuple.
-    result = QuantumSignalProcessingPhases(
-        poly_coef,
-        signal_operator = "Wx",
-        method          = "sym_qsp",
-        chebyshev_basis = True,
-    )
+    if cap is not None and (len(coef_array) - 1) > cap:
+        capped = coef_array[: cap + 1].copy()
+        x_check = np.linspace(1.0 / kappa, 1.0, 500)
+        p_max = float(np.max(np.abs(
+            np.polynomial.chebyshev.chebval(x_check, capped)
+        )))
+        if p_max > 0.9:
+            capped *= 0.9 / p_max
+        coef_array = capped
 
-    if isinstance(result, tuple):
-        phiset = result[0]
-    else:
-        phiset = result
-
-    angles = np.array(phiset, dtype=float)
-    degree = len(angles) - 1
-
-    # Verify: pyqsp convention gives Im(P(x)) = p(x) with ratio=1.
-    # Qiskit convention (negated phases) gives Im(P(x)) = -p(x), ratio=-1.
-    # We need ratio=+1 in Qiskit convention, so negate the phases.
-    # Verified: negated phases give ratio=[1,1,1] in Qiskit convention.
-    return -angles, degree
+    degree = len(coef_array) - 1
+    is_even = np.max(np.abs(coef_array[0::2])) > 1e-8
+    is_odd  = np.max(np.abs(coef_array[1::2])) > 1e-8
+    if (is_even and is_odd) or not (is_even or is_odd):
+        raise RuntimeError(
+            f"Target polynomial does not have definite parity "
+            f"(kappa={kappa}, epsilon={epsilon}, cap={cap})."
+        )
+    parity = 0 if is_even else 1
+    reduced_coefs = coef_array[parity::2]
+    return reduced_coefs, parity, degree
 
 
-def _compute_angles_chebyshev(
-    kappa   : float,
-    epsilon : float,
+def _newton_solve(
+    reduced_coefs      : np.ndarray,
+    parity             : int,
+    crit               : float = 1e-12,
+    maxiter            : int   = 100,
+    init_reduced_phases: Optional[np.ndarray] = None,
+) -> tuple[np.ndarray, float, int]:
+    """
+    Reimplementation of pyqsp.sym_qsp_opt.newton_solver's loop, but with
+    an overridable initial guess (pyqsp's own function hardcodes
+    reduced_phases = coef/2 with no way to change it). Uses
+    SymmetricQSPProtocol throughout, so full-phase reconstruction is
+    always pyqsp's own (correct) implementation -- never hand-rolled.
+
+    Returns (full_phases, final_err, n_iter).
+    """
+    from pyqsp.sym_qsp_opt import SymmetricQSPProtocol
+
+    if init_reduced_phases is None:
+        init_reduced_phases = reduced_coefs / 2
+
+    qsp = SymmetricQSPProtocol(reduced_phases=init_reduced_phases, parity=parity)
+    curr_iter = 0
+    err = float("inf")
+    while True:
+        Fval, DFval = qsp.gen_jacobian()
+        res = Fval - reduced_coefs
+        err = float(np.linalg.norm(res, ord=1))
+        curr_iter += 1
+        lin_sol = np.linalg.solve(DFval, res)
+        qsp.update_reduced_phases(qsp.reduced_phases - lin_sol)
+        if curr_iter >= maxiter or err < crit:
+            break
+    return qsp.full_phases, err, curr_iter
+
+
+def _compute(
+    kappa: float, epsilon: float, max_degree: Optional[int],
 ) -> tuple[np.ndarray, int]:
-    """
-    Compute QSP phase angles via direct optimisation for the alternating
-    circuit convention.
+    """Solve for the QSP phases at the given (possibly capped) degree."""
+    reduced_coefs, parity, degree = _target_reduced_coefs(kappa, epsilon, max_degree)
 
-    Finds phases phi such that the alternating QSP circuit implements
-    Im(P(x)) ≈ p(x) = c/x on [1/kappa, 1], where the circuit is:
-        U = Rz(phi_d) U_A† Rz(phi_{d-1}) U_A ... Rz(phi_0)
-    with Rz(phi) = diag(exp(-i*phi), exp(+i*phi)) (Qiskit convention).
+    full_phases, err, n_iter = _newton_solve(reduced_coefs, parity)
 
-    Uses the Remez algorithm to construct the target polynomial, then
-    finds phases via L-BFGS-B optimisation minimising the L2 distance
-    between Im(P(x)) and the target on a dense grid over [1/kappa, 1].
-    """
-    # Override the degree if it takes to long to run:
-    degree = min(polynomial_degree_estimate(kappa, epsilon), 63)
-    if degree % 2 == 0:
-        degree += 1 # must be odd for odd polynomial
+    if err > 1e-8:
+        warnings.warn(
+            f"sym_qsp Newton solve finished with residual {err:.3e} "
+            f"(kappa={kappa:.2f}, epsilon={epsilon:.4e}, degree={degree}) "
+            f"after {n_iter} iterations -- did not fully converge.",
+            RuntimeWarning,
+        )
 
-    # Target: p(x) = c/x on [1/kappa, 1], bounded to 0.9.
-    # Use dense evaluation grid (Chebyshev nodes on [1/kappa, 1]).
-    n_pts  = max(100, degree * 3)
-    # Chebyshev nodes on [1/kappa, 1].
-    k_idx  = np.arange(1, n_pts + 1)
-    x_eval = 0.5*(1.0/kappa + 1.0) + 0.5*(1.0 - 1.0/kappa)*np.cos(np.pi*(2*k_idx-1)/(2*n_pts))
-    x_eval = np.sort(x_eval)
-
-    target_raw = 1.0 / (kappa * x_eval)
-    # Bound to 0.9.
-    scale  = 0.9 / float(np.max(target_raw))
-    target = target_raw * scale
-
-    def _circuit_im(phi_arr):
-        """Evaluate Im(P(x)) for all x_eval using the alternating circuit."""
-        vals = np.zeros(len(x_eval))
-        for i, xk in enumerate(x_eval):
-            sx  = np.sqrt(max(0.0, 1.0 - xk**2))
-            W   = np.array([[xk, 1j*sx], [1j*sx, xk]], dtype=complex)
-            Wd  = W.conj().T
-            U   = np.diag([np.exp(-1j*phi_arr[0]), np.exp(1j*phi_arr[0])])
-            for k, phi in enumerate(phi_arr[1:]):
-                R = np.diag([np.exp(-1j*phi), np.exp(1j*phi)])
-                U = R @ (W if k % 2 == 0 else Wd) @ U
-            vals[i] = float(np.imag(U[0, 0]))
-        return vals
-
-    def _objective(phi_arr):
-        im_vals = _circuit_im(phi_arr)
-        return float(np.mean((im_vals - target)**2))
-
-    # Initialise: for odd polynomial, phases alternate pi/4 and -pi/4.
-    rng        = np.random.default_rng(42)
-    phi_init   = np.zeros(degree + 1)
-    phi_init[0::2] =  np.pi / 4.0
-    phi_init[1::2] = -np.pi / 4.0
-    phi_init  += rng.uniform(-0.1, 0.1, size=degree + 1)
-
-    from scipy.optimize import minimize
-    result = minimize(
-        _objective, phi_init,
-        method  = "L-BFGS-B",
-        options = {"maxiter": 5000, "ftol": 1e-14, "gtol": 1e-8},
-    )
-
-    angles = result.x
-    final_err = float(result.fun)
-    print(f"  Chebyshev fallback: degree={degree}, final_err={final_err:.4e}")
-
-    # Verify.
-    im_check = _circuit_im(angles)
-    ratio    = im_check / (target + 1e-14)
-    print(f"  Verification at {n_pts} Chebyshev nodes:")
-    print(f"    Im(P) range: [{im_check.min():.4f}, {im_check.max():.4f}]")
-    print(f"    target range: [{target.min():.4f}, {target.max():.4f}]")
-    print(f"    ratio std: {np.std(ratio):.4f} (0 = perfect)")
-
+    angles = -np.asarray(full_phases, dtype=float)  # Qiskit Rz sign convention
     return angles, degree
 
 
-def _chebyshev_coefficients(
-    f_nodes : np.ndarray,
-    degree  : int,
-) -> np.ndarray:
-    """
-    Compute Chebyshev series coefficients from function values at
-    Chebyshev nodes using the discrete cosine transform.
+# -- Private: disk cache ------------------------------------------------------
 
-    Parameters
-    ----------
-    f_nodes : np.ndarray, shape (degree+1,)
-        Function values at the Chebyshev nodes.
-    degree : int
-        Polynomial degree.
-
-    Returns
-    -------
-    coeffs : np.ndarray, shape (degree+1,)
-        Chebyshev coefficients c_0, c_1, ..., c_degree.
-    """
-    n      = len(f_nodes)
-    coeffs = np.zeros(n)
-    for k in range(n):
-        j      = np.arange(n)
-        coeffs[k] = (2.0 / n) * np.sum(
-            f_nodes * np.cos(np.pi * k * (2.0 * j + 1.0) / (2.0 * n))
-        )
-    coeffs[0] /= 2.0
-    return coeffs
+def _cache_key_to_filename(key: tuple) -> Path:
+    kappa, epsilon, method, max_deg = key
+    tag = f"k{kappa}_e{epsilon}_{method}_d{max_deg}".replace(".", "p")
+    return _DISK_CACHE_DIR / f"{tag}.npz"
 
 
-def _qsp_unitary_alternating(
-    angles : np.ndarray,
-    x      : float,
-) -> np.ndarray:
-    """
-    Compute the 2x2 QSP unitary for the alternating sequence.
-
-    Matches the circuit convention with alternating U_A and U_A†:
-        U = Rz(phi_d) W† Rz(phi_{d-1}) W Rz(phi_{d-2}) W† ... Rz(phi_0)
-
-    where Rz(phi) = diag(exp(-i*phi), exp(+i*phi)) (Qiskit convention)
-    and W = [[x, i*sqrt(1-x^2)], [i*sqrt(1-x^2), x]] (Wx convention).
-    """
-    sx  = np.sqrt(max(0.0, 1.0 - x**2))
-    W   = np.array([[x,  1j*sx], [1j*sx, x]], dtype=complex)
-    Wd  = W.conj().T  # W† = W* for Wx convention
-
-    # Qiskit Rz convention: diag(exp(-i*phi), exp(+i*phi))
-    U = np.diag([np.exp(-1j * angles[0]), np.exp(1j * angles[0])])
-    for k, phi in enumerate(angles[1:]):
-        R = np.diag([np.exp(-1j * phi), np.exp(1j * phi)])
-        # Even steps (k=0,2,4,...) use W; odd steps use W†
-        if k % 2 == 0:
-            U = R @ W  @ U
-        else:
-            U = R @ Wd @ U
-    return U
+def _load_disk(key: tuple):
+    if not _ENABLE_DISK_READ:
+        return None
+    path = _cache_key_to_filename(key)
+    if not path.exists():
+        return None
+    try:
+        data = np.load(path, allow_pickle=False)
+        return np.array(data["angles"]), int(data["degree"])
+    except Exception:
+        return None
 
 
-def _qsp_unitary(
-    angles : np.ndarray,
-    x      : float,
-) -> np.ndarray:
-    """
-    Compute the 2x2 QSP unitary matching Qiskit's Rz convention.
+def _save_disk(key: tuple, result: tuple[np.ndarray, int]) -> None:
+    if not _ENABLE_DISK_WRITE:
+        return
+    _DISK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    path = _cache_key_to_filename(key)
+    angles, degree = result
+    kappa, epsilon, method, max_deg = key
+    np.savez_compressed(
+        path, angles=angles, degree=np.array(degree),
+        kappa=np.array(kappa), epsilon=np.array(epsilon),
+        method=np.array(method), max_deg=np.array(max_deg),
+    )
 
-    Qiskit Rz(theta) = diag(exp(-i*theta/2), exp(+i*theta/2)).
-    The circuit applies qc.rz(2*phi, anc), giving diag(exp(-i*phi), exp(+i*phi)).
-    This function uses the same convention for consistency.
-    """
+
+# -- Private: circuit-convention unitary (verification only) -----------------
+
+def _qsp_unitary(angles: np.ndarray, x: float) -> np.ndarray:
+    """2x2 QSP unitary matching Qiskit's Rz convention (verification helper)."""
     sx = np.sqrt(max(0.0, 1.0 - x**2))
-    W  = np.array([[x,  1j * sx],
-                   [1j * sx, x]], dtype=complex)
-
-    # Match Qiskit Rz convention: diag(exp(-i*phi), exp(+i*phi))
-    U = np.diag([np.exp(-1j * angles[0]), np.exp(1j * angles[0])])
+    W  = np.array([[x, 1j*sx], [1j*sx, x]], dtype=complex)
+    U  = np.diag([np.exp(-1j*angles[0]), np.exp(1j*angles[0])])
     for phi in angles[1:]:
-        R = np.diag([np.exp(-1j * phi), np.exp(1j * phi)])
+        R = np.diag([np.exp(-1j*phi), np.exp(1j*phi)])
         U = R @ W @ U
-
     return U

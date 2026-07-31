@@ -9,10 +9,10 @@ N = 4, 8, 16, 32 (and optionally N = 64) using Thomas, HHL, and VQLS.
 QSVT is included for N = 4 and N = 8 only, with a hard time-limit guard.
 
 Results are saved as:
-  - JSON  : results/hpc_run/results_full.json          (machine-readable)
-  - CSV   : results/hpc_run/results_summary.csv         (human-readable)
-  - NPZ   : results/hpc_run/solutions_N{N}_{case}.npz   (solution vectors)
-  - LOG   : results/hpc_run/run.log                     (progress log)
+  - JSON  : results/1Dhpc_run/results_full.json          (machine-readable)
+  - CSV   : results/1Dhpc_run/results_summary.csv         (human-readable)
+  - NPZ   : results/1Dhpc_run/solutions_N{N}_{case}.npz   (solution vectors)
+  - LOG   : results/1Dhpc_run/run.log                     (progress log)
 
 Usage on HPC (after activating the quantum-pde-solvers venv):
   python run_hpc_1Dfull.py [--include-n64] [--skip-qsvt]
@@ -55,7 +55,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 # ── Output directory ──────────────────────────────────────────────────────────
-RESULTS_DIR = Path("results") / "hpc_run"
+RESULTS_DIR = Path("results") / "1Dhpc_run"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Logging: both stdout (for HPC job output file) and a log file ─────────────

@@ -309,6 +309,7 @@ def _build_row_cache(
         kappa   = kappa_eff,
         epsilon = config.epsilon,
         method  = config.angle_method,
+        max_degree = config.max_degree,
     )
 
     # Build an inner QSVTConfig with the angles pre-injected.

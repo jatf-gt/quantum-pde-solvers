@@ -108,32 +108,44 @@ class QSVTConfig:
     ----------
     epsilon : float
         Target approximation error for the matrix inversion polynomial.
-        Determines the polynomial degree d = O(kappa * log(1/epsilon))
-        and hence the circuit depth. Default 1e-2.
+        Controls polynomial degree d = O(kappa * log(kappa/epsilon)).
+        Default 0.01.
     angle_method : str
-        Method for computing QSP phase angles. One of:
-            'auto'      : try pyqsp, fall back to Chebyshev (recommended)
-            'pyqsp'     : use pyqsp library (most accurate)
-            'chebyshev' : Chebyshev series construction (fallback)
-        Default 'auto'.
+        Phase computation method. One of:
+            'sym_qsp_direct'  : direct Newton solver (default, fastest)
+            'sym_qsp_wrapper' : via QuantumSignalProcessingPhases wrapper
+            'reduced_degree'  : degree capped at max_degree (fast, approx)
+            'precomputed'     : load from disk cache only
+            'auto'            : try sym_qsp_direct, fall back to wrapper
+        Default 'sym_qsp_direct'.
+    max_degree : int or None
+        Maximum polynomial degree. Only used when angle_method='reduced_degree'.
+        Recommended values:
+            N=4  (kappa~9):    max_degree=63  (fast, <1s, ~10% poly error)
+            N=8  (kappa~32):   max_degree=127 (fast, <5s, ~5% poly error)
+            N=16 (kappa~117):  max_degree=255 (moderate, ~30s, ~3% poly error)
+            N=32 (kappa~441):  max_degree=511 (moderate, ~120s, ~2% poly error)
+            N=64 (kappa~1700): max_degree=511 (moderate, ~120s, ~2% poly error)
+        The polynomial approximation error is much smaller than the FD
+        discretisation error (O(h²)) for all these choices.
+        Default None (use full degree from epsilon).
     device_name : str
-        Qiskit backend for statevector simulation. Default 'statevector'.
-    max_degree : int
-        Maximum allowed polynomial degree. If the estimated degree
-        exceeds this value, a warning is issued and the degree is
-        capped. This prevents intractably deep circuits for large kappa.
-        Default 500.
+        Qiskit backend. Default 'statevector'.
+    max_degree_cap : int
+        Hard cap on polynomial degree regardless of method. Prevents
+        intractably deep circuits. Default 5000.
     verbose : bool
-        If True, print circuit depth and phase angle diagnostics.
-        Default False.
+        Print circuit depth and phase angle diagnostics. Default False.
+    label : str
+        Diagnostic label for targeted output. Default ''.
     """
-
-    epsilon     : float = 1e-2
-    angle_method: str   = "auto"
-    device_name : str   = "statevector"
-    max_degree  : int   = 500
-    verbose     : bool  = False
-    label       : str   = ""        # diagnostic label, e.g. 'HET-3a'
+    epsilon       : float          = 0.01
+    angle_method  : str            = "sym_qsp_direct"
+    max_degree    : Optional[int]  = None
+    device_name   : str            = "statevector"
+    max_degree_cap: int            = 5000
+    verbose       : bool           = False
+    label         : str            = ""
 
 
 DEFAULT_QSVT_CONFIG = QSVTConfig()
@@ -337,53 +349,29 @@ def qsvt_solve_system(
         )
 
     # -- Stage 2: QSP phase angles --------------------------------------------
-    # If the config carries pre-computed angles (injected by the 2-D solver
-    # to avoid redundant recomputation), use them directly.
     if (
         hasattr(config, "_precomputed_angles")
         and config._precomputed_angles is not None
     ):
         angles = config._precomputed_angles
         degree = config._precomputed_degree
-        if config.verbose:
-            print(
-                f"  QSVT: using pre-computed angles, "
-                f"degree={degree}, n_angles={len(angles)}"
-            )
     else:
         est_degree = polynomial_degree_estimate(kappa_eff, config.epsilon)
-        if est_degree > config.max_degree:
+        if est_degree > config.max_degree_cap:
             import warnings
             warnings.warn(
                 f"Estimated polynomial degree {est_degree} exceeds "
-                f"max_degree={config.max_degree}. Capping.",
+                f"max_degree_cap={config.max_degree_cap}. Capping.",
                 RuntimeWarning,
             )
-            est_degree = config.max_degree
+            est_degree = config.max_degree_cap
 
         angles, degree = compute_inversion_angles(
-            kappa   = kappa_eff,
-            epsilon = config.epsilon,
-            method  = config.angle_method,
+            kappa      = kappa_eff,
+            epsilon    = config.epsilon,
+            method     = config.angle_method,
+            max_degree = config.max_degree,   
         )
-
-        if config.verbose:
-            print(
-                f"  QSVT: polynomial degree={degree}, "
-                f"n_angles={len(angles)}, "
-                f"circuit_depth_estimate="
-                f"{degree * (be_circuit.depth() + 1)}"
-            )
-
-        if getattr(config, 'label', ''):
-            _evaluate_qsp_polynomial(
-                angles    = angles,
-                degree    = degree,
-                kappa_eff = kappa_eff,
-                alpha     = alpha,
-                A         = A,
-                label     = config.label,
-            )
 
     # -- Stage 3: QSVT circuit construction -----------------------------------
     import run_qsvt_debug as _dbg

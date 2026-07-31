@@ -36,8 +36,8 @@
 
 # --- Job metadata ---
 #PBS -N quantum_pde_gpu_run
-#PBS -o results/hpc_run/pbs_gpu_stdout.log
-#PBS -e results/hpc_run/pbs_gpu_stderr.log
+#PBS -o results/1Dhpc_run/pbs_gpu_stdout.log
+#PBS -e results/1Dhpc_run/pbs_gpu_stderr.log
 
 # --- Email notifications ---
 #PBS -M j.trobajo-flecha24@imperial.ac.uk
@@ -91,7 +91,7 @@ export OMP_NUM_THREADS=8
 # Enable GPU backend in the Python code via environment variable.
 export QUANTUM_PDE_USE_GPU=1
 
-mkdir -p results/hpc_run
+mkdir -p results/1Dhpc_run
 
 # ============================================================
 #  Run the benchmark — serial mode required for GPU
@@ -120,7 +120,7 @@ echo "GPU benchmark finished at $(date) with exit code ${EXIT_CODE}"
 
 RDS_RESULTS="${HOME}/qpde-results/hpc_gpu_run_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${RDS_RESULTS}"
-cp -r results/hpc_run/* "${RDS_RESULTS}/"
+cp -r results/1Dhpc_run/* "${RDS_RESULTS}/"
 echo "Results archived to: ${RDS_RESULTS}"
 
 echo "============================================================"

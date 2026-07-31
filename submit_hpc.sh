@@ -11,7 +11,7 @@
 #
 #  Monitor:
 #    qstat -u $USER
-#    tail -f results/hpc_run/run.log
+#    tail -f results/1Dhpc_run/run.log
 #
 #  Reference: https://icl-rcs-user-guide.readthedocs.io/
 # ============================================================
@@ -24,8 +24,8 @@
 
 # --- Job metadata ---
 #PBS -N quantum_pde_1Dfull_run
-#PBS -o results/hpc_run/pbs_stdout.log
-#PBS -e results/hpc_run/pbs_stderr.log
+#PBS -o results/1Dhpc_run/pbs_stdout.log
+#PBS -e results/1Dhpc_run/pbs_stderr.log
 
 # --- Email notifications (replace with your Imperial email) ---
 #PBS -M j.trobajo-flecha24@imperial.ac.uk
@@ -67,7 +67,7 @@ echo "Python: $(which python3)"
 echo "Python version: $(python3 --version)"
 
 # Create output directory (in case it does not exist yet).
-mkdir -p results/hpc_run
+mkdir -p results/1Dhpc_run
 
 # ============================================================
 #  Run the benchmark
@@ -99,9 +99,9 @@ echo "Benchmark finished at $(date) with exit code ${EXIT_CODE}"
 # ============================================================
 # The RDS home directory is permanent; ephemeral is for scratch.
 # Copy the results there for safekeeping.
-RDS_RESULTS="${HOME}/qpde-results/hpc_run_$(date +%Y%m%d_%H%M%S)"
+RDS_RESULTS="${HOME}/qpde-results/1Dhpc_run_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${RDS_RESULTS}"
-cp -r results/hpc_run/* "${RDS_RESULTS}/"
+cp -r results/1Dhpc_run/* "${RDS_RESULTS}/"
 echo "Results copied to: ${RDS_RESULTS}"
 
 echo "============================================================"
