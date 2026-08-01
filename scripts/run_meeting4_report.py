@@ -96,7 +96,7 @@ from solvers.quantum.qsp_angles import polynomial_degree_estimate
 from solvers.quantum.result import QSVTSolverResult
 from solvers.quantum.vqls_1d import VQLSConfig1D, vqls_solve, vqls_solve_system
 from solvers.quantum.vqls_2d import VQLSConfig2D, vqls_solve_2d
-from solvers.quantum.qsvt_1d import QSVTConfig, qsvt_solve, qsvt_solve_system
+from solvers.quantum.qsvt_1d import QSVTConfig1D, qsvt_solve, qsvt_solve_system
 from solvers.quantum.qsvt_2d import QSVTConfig2D, qsvt_solve_2d
 
 RESULTS_DIR = Path("results/meeting5_report")
@@ -287,7 +287,7 @@ def run_section_1() -> dict:
         random_seed = 42,
         verbose     = False,
     )
-    qsvt_cfg = QSVTConfig(
+    qsvt_cfg = QSVTConfig1D(
         epsilon=0.5, angle_method="auto", verbose=False, max_degree=2000,
     )
 
@@ -668,7 +668,7 @@ def run_section_3() -> dict:
     vqls_cfg_n8 = VQLSConfig1D(
         n_layers=8, max_iter=500, tol=1e-5, random_seed=42, verbose=False
     )
-    qsvt_cfg_het = QSVTConfig(
+    qsvt_cfg_het = QSVTConfig1D(
         epsilon=0.5, angle_method="auto", verbose=False, max_degree=2000, label = "HET-3a",
     )
 

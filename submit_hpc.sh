@@ -2,12 +2,20 @@
 # ============================================================
 #  submit_hpc.sh
 #  PBS Pro job submission script for Imperial College CX3 HPC.
-#  Uses the throughput72 queue (1-8 CPUs, up to 72h walltime).
+#
+#  Runs the full 1-D benchmark sweep, N = 4..64, all cases,
+#  all solvers (Thomas, HHL, VQLS, QSVT).
 #
 #  Usage:
 #    qsub submit_hpc.sh
-#    qsub -v INCLUDE_N64=1 submit_hpc.sh   # to add N=64
-#    qsub -v SKIP_QSVT=1 submit_hpc.sh     # to skip QSVT
+#
+#    # Fast validation pass before committing the full walltime:
+#    export MAX_N=16
+#    qsub -v MAX_N submit_hpc.sh
+#
+#    # Skip QSVT entirely:
+#    export SKIP_QSVT=1
+#    qsub -v SKIP_QSVT submit_hpc.sh
 #
 #  Monitor:
 #    qstat -u $USER
@@ -17,17 +25,27 @@
 # ============================================================
 
 # --- Resource requests ---
-# N=4,8,16,32 with QSVT for N<=8: estimated ~2-4h on HPC.
-# Increase walltime to 24:00:00 if including N=64.
-#PBS -l walltime=12:00:00
-#PBS -l select=1:ncpus=4:mem=32gb
+# NOTE ON ncpus vs --max-workers: the runner's MAX_WORKERS_DEFAULT is 4 and
+# MUST NOT exceed the ncpus requested here. Aer simulations are already
+# OpenMP-threaded internally, so running more worker processes than allocated
+# cores oversubscribes the node and makes the sweep slower, not faster.
+# If you raise one, raise the other.
+#
+# Walltime: the full N=4..64 sweep with QSVT is substantially longer than the
+# previous N<=32 runs. 24h is a starting point; check the actual elapsed time
+# reported at the end of run.log and adjust. If the job is killed on walltime,
+# results already written to results/1Dhpc_run/ are preserved (each solution
+# NPZ is written as it is produced), but results_full.json / results_summary.csv
+# are written only at the END, so a killed job loses the summary table.
+#PBS -l walltime=24:00:00
+#PBS -l select=1:ncpus=4:mem=64gb
 
 # --- Job metadata ---
 #PBS -N quantum_pde_1Dfull_run
 #PBS -o results/1Dhpc_run/pbs_stdout.log
 #PBS -e results/1Dhpc_run/pbs_stderr.log
 
-# --- Email notifications (replace with your Imperial email) ---
+# --- Email notifications ---
 #PBS -M j.trobajo-flecha24@imperial.ac.uk
 #PBS -m abe
 
@@ -41,48 +59,60 @@ echo "  Job ID    : $PBS_JOBID"
 echo "  Node      : $(hostname)"
 echo "  Date/Time : $(date)"
 echo "  Work dir  : $PBS_O_WORKDIR"
+echo "  MAX_N     : ${MAX_N:-<not set: full sweep to N=64>}"
+echo "  SKIP_QSVT : ${SKIP_QSVT:-0}"
 echo "============================================================"
 
-# Change to the submission directory (where the script was qsubmitted from).
 cd "${PBS_O_WORKDIR}" || { echo "ERROR: Cannot cd to PBS_O_WORKDIR"; exit 1; }
 
-# Load the production module environment (required on CX3 Phase 2).
-# On CX3 Phase 2, tools/prod is auto-loaded on login but must be
-# explicitly loaded in batch jobs.
 module load tools/prod
 module load Python/3.12.3-GCCcore-13.3.0
 
-# Activate the project virtual environment.
-# Adjust this path to wherever you created your venv on the RDS.
 VENV_PATH="${HOME}/venvs/qpde"
 if [ ! -d "${VENV_PATH}" ]; then
     echo "ERROR: Virtual environment not found at ${VENV_PATH}"
-    echo "       Create it first with: virtualenv ${VENV_PATH}"
-    echo "       Then: source ${VENV_PATH}/bin/activate && pip install -r requirements.txt"
+    echo "       See setup_hpc_env.sh."
     exit 1
 fi
-
 source "${VENV_PATH}/bin/activate"
-echo "Python: $(which python3)"
-echo "Python version: $(python3 --version)"
+echo "Python: $(which python3) -- $(python3 --version)"
 
-# Create output directory (in case it does not exist yet).
-mkdir -p results/1Dhpc_run
+# pyqsp is in requirements.txt but is NOT in setup_hpc_env.sh's explicit
+# install list. Guard against that gap here rather than failing on a missing
+# import hours into a queued job.
+python3 -c "import pyqsp" 2>/dev/null || {
+    echo "pyqsp not found in venv; installing..."
+    pip install pyqsp==0.2.0
+}
+
+# IMPORTANT: this must match RESULTS_DIR in scripts/run_hpc_1Dfull.py.
+# The previous version created and archived results/hpc_run/ while the runner
+# wrote to results/1Dhpc_run/, so the RDS copy at the end contained only the
+# PBS logs and none of the actual benchmark output.
+RESULTS_SUBDIR="results/1Dhpc_run"
+mkdir -p "${RESULTS_SUBDIR}"
+
+# Keep Aer's internal OpenMP threading within the allocated core count.
+# Without this, each of the 4 worker processes may spawn as many OpenMP
+# threads as there are physical cores on the node.
+export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}
+echo "OMP_NUM_THREADS = ${OMP_NUM_THREADS}"
 
 # ============================================================
 #  Run the benchmark
 # ============================================================
 
-# Parse optional environment variables passed via qsub -v.
 EXTRA_ARGS=""
-if [ "${INCLUDE_N64:-0}" = "1" ]; then
-    EXTRA_ARGS="${EXTRA_ARGS} --include-n64"
-    echo "INFO: N=64 included in sweep."
+if [ -n "${MAX_N}" ]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --max-n ${MAX_N}"
+    echo "INFO: sweep truncated at N=${MAX_N}."
 fi
 if [ "${SKIP_QSVT:-0}" = "1" ]; then
     EXTRA_ARGS="${EXTRA_ARGS} --skip-qsvt"
     echo "INFO: QSVT disabled."
 fi
+# Worker count is pinned to the ncpus requested above.
+EXTRA_ARGS="${EXTRA_ARGS} --max-workers 4"
 
 echo "Starting benchmark at $(date)"
 echo "Arguments: ${EXTRA_ARGS}"
@@ -97,11 +127,9 @@ echo "Benchmark finished at $(date) with exit code ${EXIT_CODE}"
 # ============================================================
 #  Copy results to permanent RDS storage
 # ============================================================
-# The RDS home directory is permanent; ephemeral is for scratch.
-# Copy the results there for safekeeping.
 RDS_RESULTS="${HOME}/qpde-results/1Dhpc_run_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${RDS_RESULTS}"
-cp -r results/1Dhpc_run/* "${RDS_RESULTS}/"
+cp -r "${RESULTS_SUBDIR}"/* "${RDS_RESULTS}/" 2>/dev/null
 echo "Results copied to: ${RDS_RESULTS}"
 
 echo "============================================================"

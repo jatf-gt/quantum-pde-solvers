@@ -63,7 +63,7 @@ from solvers.quantum.block_encoding import subnormalisation_factor
 from solvers.quantum.qsp_angles import polynomial_degree_estimate
 from solvers.quantum.vqls_1d import VQLSConfig1D, vqls_solve, vqls_solve_system
 from solvers.quantum.vqls_2d import VQLSConfig2D, vqls_solve_2d
-from solvers.quantum.qsvt_1d import QSVTConfig, qsvt_solve, qsvt_solve_system
+from solvers.quantum.qsvt_1d import QSVTConfig1D, qsvt_solve, qsvt_solve_system
 from solvers.quantum.qsvt_2d import QSVTConfig2D, qsvt_solve_2d
 
 RESULTS_DIR = Path("results/meeting5_report")
@@ -207,8 +207,8 @@ def run_section_1() -> dict:
         n_layers=6, optimiser="COBYLA", max_iter=300,
         tol=1e-6, random_seed=42, verbose=False,
     )
-    qsvt_cfg = QSVTConfig(
-        epsilon=0.5, angle_method="auto", verbose=False, max_degree=2000,
+    qsvt_cfg = QSVTConfig1D(
+        epsilon=0.5, angle_method="auto", verbose=False, max_degree=500,
     )
 
     results = {}
@@ -472,8 +472,8 @@ def run_section_3() -> dict:
     vqls_cfg_n8 = VQLSConfig1D(
         n_layers=8, max_iter=500, tol=1e-5, random_seed=42, verbose=False
     )
-    qsvt_cfg_het = QSVTConfig(
-        epsilon=0.5, angle_method="auto", verbose=False, max_degree=2000,
+    qsvt_cfg_het = QSVTConfig1D(
+        epsilon=0.5, angle_method="auto", verbose=False, max_degree=1000,
     )
 
     results = {}
@@ -1135,7 +1135,7 @@ def main() -> None:
     print(f"  Output directory: {RESULTS_DIR.resolve()}")
 
     s1_data = run_section_1()
-    # s3_data = run_section_3()
+    s3_data = run_section_3()
     # s4_data = run_section_4()
 
     t_sections = time.perf_counter() - t_start
@@ -1143,7 +1143,7 @@ def main() -> None:
     print(f"  All sections completed in {t_sections:.1f}s. Generating figures...")
 
     plot_section_1(s1_data, save=True)
-    # plot_section_3(s3_data, save=True)
+    plot_section_3(s3_data, save=True)
     # plot_section_4(s4_data, save=True)
 
     # export_excel(s1_data, s3_data, s4_data)

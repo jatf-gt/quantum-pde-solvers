@@ -110,7 +110,12 @@ import numpy as np
 # -- Cache ---------------------------------------------------------------
 
 _PHASE_CACHE: dict[tuple, tuple[np.ndarray, int]] = {}
-_DISK_CACHE_DIR = Path("results/qsvt_phase_cache")
+
+# Anchor to the repo root (this file lives at solvers/quantum/qsp_angles.py, so
+# three parents up), NOT the process CWD. A relative path here silently
+# produces a cache miss -- and a from-scratch recompute -- whenever the caller
+# runs from anywhere other than the repo root.
+_DISK_CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "results" / "qsvt_phase_cache"
 
 # Reading precomputed results is always on: a plain benchmark run should
 # transparently pick up anything scripts/precompute_qsvt_phases.py has
@@ -320,16 +325,25 @@ def _fit_capped_reduced_coefs(
     if p_max > 0.9:
         coef_array *= 0.9 / p_max
 
-    # Diagnostic only, not fatal: warn if the capped degree clearly
-    # can't represent 1/x well over the kappa-domain, so a too-aggressive
-    # cap doesn't fail silently.
+    # Diagnostic: measure SHAPE error with the best global scale factor
+    # projected out. QSVT recovers the proportionality constant downstream,
+    # so a uniform rescale of the polynomial (which the boundedness step above
+    # deliberately applies) is benign and must not be reported as fit error.
+    # Measuring it naively reports ~27% for a fit that is actually exact.
     fit_vals = np.polynomial.chebyshev.chebval(x_eval, coef_array)
-    rel_err = np.max(np.abs(fit_vals - target) / np.abs(target))
-    if rel_err > 0.05:
+    denom = float(np.dot(fit_vals, fit_vals))
+    if denom > 0.0:
+        s_opt = float(np.dot(fit_vals, target)) / denom      # best global scale
+        shape_err = np.max(np.abs(s_opt * fit_vals - target) / np.abs(target))
+    else:
+        shape_err = float("inf")
+
+    if shape_err > 0.05:
         warnings.warn(
             f"Capped-degree fit (degree={degree}, kappa={kappa:.2f}) has "
-            f"max relative error {rel_err:.2%} against the target on "
-            f"[1/kappa, 1] -- max_degree may be too small for this kappa.",
+            f"max shape-relative error {shape_err:.2%} on [1/kappa, 1] after "
+            f"removing the global scale factor -- max_degree may be too small "
+            f"for this kappa.",
             RuntimeWarning,
         )
 

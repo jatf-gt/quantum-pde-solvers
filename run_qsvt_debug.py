@@ -44,7 +44,7 @@ from core.het_config import HETConfig
 from problems.het_plasma_1d import HETPoissonProblem1D
 from problems.poisson_1d import PoissonProblem1D
 from solvers.classical.thomas import thomas_solve, thomas_solve_system
-from solvers.quantum.qsvt_1d import QSVTConfig, qsvt_solve, qsvt_solve_system
+from solvers.quantum.qsvt_1d import QSVTConfig1D, qsvt_solve, qsvt_solve_system
 
 RESULTS_DIR = Path("results/qsvt_debug")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -119,12 +119,11 @@ def run_generic_poisson() -> None:
             t_thomas,
         )
 
-        # QSVT with full diagnostics.
-        qsvt_cfg = QSVTConfig(
-            epsilon      = 0.1,
+        qsvt_cfg = QSVTConfig1D(
+            epsilon      = 0.01,                             
             angle_method = "auto",
             verbose      = True,
-            max_degree   = 500,
+            max_degree   = None if N <= 16 else 5000,          # match QSVT_MAX_DEGREE_BY_N
             label        = f"generic-fS-N{N}",
         )
 
@@ -192,7 +191,7 @@ def run_het_1d() -> None:
     print(f"  Analytical:        {np.round(u_exact,   2).tolist()}")
 
     # QSVT with full diagnostics.
-    qsvt_cfg = QSVTConfig(
+    qsvt_cfg = QSVTConfig1D(
         epsilon      = 0.01,
         angle_method = "auto",
         verbose      = True,

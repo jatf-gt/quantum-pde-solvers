@@ -83,7 +83,7 @@ import numpy as np
 from problems.poisson_2d import PoissonProblem2D
 from solvers.quantum.block_encoding import build_tst_block_encoding
 from solvers.quantum.qsp_angles import compute_inversion_angles
-from solvers.quantum.qsvt_1d import QSVTConfig, qsvt_solve_system
+from solvers.quantum.qsvt_1d import QSVTConfig1D, qsvt_solve_system
 from solvers.quantum.result import SolverResult2D
 
 _ZERO_RHS_TOL = 1e-14
@@ -152,7 +152,7 @@ class _RowSolverCache:
     kappa_eff : float
         Effective condition number: kappa(A_row) (equals kappa since
         alpha = ||A_row||_2 for the Sz.-Nagy encoding).
-    inner_config : QSVTConfig
+    inner_config : QSVTConfig1D
         Inner 1-D QSVT configuration with pre-computed angles injected.
         Passed directly to qsvt_solve_system to skip recomputation.
     """
@@ -162,7 +162,7 @@ class _RowSolverCache:
     degree      : int
     alpha       : float
     kappa_eff   : float
-    inner_config: QSVTConfig
+    inner_config: QSVTConfig1D
 
 
 # -- Public interface ---------------------------------------------------------
@@ -312,10 +312,10 @@ def _build_row_cache(
         max_degree = config.max_degree,
     )
 
-    # Build an inner QSVTConfig with the angles pre-injected.
+    # Build an inner QSVTConfig1D with the angles pre-injected.
     # The inner solver will use these angles directly rather than
     # recomputing them, bypassing the angle computation step.
-    inner_config = _QSVTConfigWithAngles(
+    inner_config = _QSVTConfig1DWithAngles(
         epsilon      = config.epsilon,
         angle_method = config.angle_method,
         max_degree   = config.max_degree,
@@ -435,7 +435,7 @@ def _solve_row_worker(
     j            : int,
     A_row        : np.ndarray,
     b_row        : np.ndarray,
-    inner_config : QSVTConfig,
+    inner_config : QSVTConfig1D,
 ) -> np.ndarray:
     """
     Worker function for parallel row solving.
@@ -449,7 +449,7 @@ def _solve_row_worker(
         Row index (used only for zero-RHS detection logging).
     A_row : np.ndarray, shape (N, N)
     b_row : np.ndarray, shape (N,)
-    inner_config : QSVTConfig
+    inner_config : QSVTConfig1D
 
     Returns
     -------
@@ -500,10 +500,10 @@ def _package_result(
     )
 
 
-# -- Extended QSVTConfig with pre-computed angles -----------------------------
+# -- Extended QSVTConfig1D with pre-computed angles -----------------------------
 
 @dataclass
-class _QSVTConfigWithAngles(QSVTConfig):
+class _QSVTConfig1DWithAngles(QSVTConfig1D):
     """
     QSVTConfig extended with pre-computed phase angles and block encoding
     parameters.

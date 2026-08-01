@@ -100,7 +100,7 @@ from solvers.quantum.result import SolverResult, QSVTSolverResult
 # -- QSVT configuration -------------------------------------------------------
 
 @dataclass
-class QSVTConfig:
+class QSVTConfig1D:
     """
     Configuration for the QSVT 1-D Poisson solver.
 
@@ -148,14 +148,14 @@ class QSVTConfig:
     label         : str            = ""
 
 
-DEFAULT_QSVT_CONFIG = QSVTConfig()
+DEFAULT_QSVT_CONFIG = QSVTConfig1D()
 
 
 # -- Public interface ---------------------------------------------------------
 
 def qsvt_solve(
     problem : PoissonProblem1D,
-    config  : QSVTConfig = DEFAULT_QSVT_CONFIG,
+    config  : QSVTConfig1D = DEFAULT_QSVT_CONFIG,
 ) -> QSVTSolverResult:
     """
     Solve the 1-D Poisson system Au = b using QSVT.
@@ -167,7 +167,7 @@ def qsvt_solve(
     ----------
     problem : PoissonProblem1D
         Discretised 1-D Poisson problem.
-    config : QSVTConfig
+    config : QSVTConfig1D
         QSVT solver hyperparameters.
 
     Returns
@@ -185,7 +185,7 @@ def qsvt_solve(
 def qsvt_solve_system(
     A      : np.ndarray,
     b      : np.ndarray,
-    config : QSVTConfig = DEFAULT_QSVT_CONFIG,
+    config : QSVTConfig1D = DEFAULT_QSVT_CONFIG,
 ) -> QSVTSolverResult:
     """
     Solve the linear system Au = b using QSVT on raw NumPy arrays.
@@ -200,7 +200,7 @@ def qsvt_solve_system(
         Hermitian TST system matrix.
     b : np.ndarray, shape (N,)
         Right-hand side vector.
-    config : QSVTConfig
+    config : QSVTConfig1D
         Solver hyperparameters.
 
     Returns
