@@ -11,3 +11,4 @@ __pycache__/
 *.jpg
 *.egg-info/
 results_hpc/
+results/2Dhpc_run/
