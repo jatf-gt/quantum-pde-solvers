@@ -66,6 +66,7 @@ from typing import Optional
 
 # -- Third-party --------------------------------------------------------------
 import numpy as np
+import multiprocessing as mp
 
 # -- Local --------------------------------------------------------------------
 # Ensure the repository root is on sys.path regardless of invocation location.
@@ -83,6 +84,11 @@ RESULTS_DIR = Path("results") / "1Dhpc_run"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 LOG_FILE = RESULTS_DIR / "run.log"
+# True only in the original parent process -- reliable under fork, spawn,
+# or forkserver, unlike checking __name__ (which doesn't distinguish a
+# respawned worker from the entry script the same way).
+_IS_MAIN_PROCESS = mp.current_process().name == "MainProcess"
+
 logging.basicConfig(
     level=logging.INFO,
     # The process ID is included because work units run in a ProcessPoolExecutor
@@ -92,7 +98,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_FILE, mode="w"),
+        logging.FileHandler(LOG_FILE, mode="w" if _IS_MAIN_PROCESS else "a"),
     ],
 )
 log = logging.getLogger(__name__)
@@ -142,21 +148,13 @@ QSVT_MAX_DEGREE_BY_N: dict[int, Optional[int]] = {
     4: None, 8: None, 16: None,
     32: 5000, 64: 5000,
 }
+# Cheap cap for any kappa that has NO precomputed entry (checked dynamically
+# below, not hardcoded per case) -- e.g. sub-case 3c, whose Neumann row gives
+# it a different kappa than the standard TST matrix at the same N (confirmed
+# in your run.log: 437.70 at N=16 vs 116.46 everywhere else). 1000 computes
+# live in a few seconds regardless of kappa, per the capped-fit path.
+QSVT_UNCACHED_FALLBACK_DEGREE: int = 1000
 QSVT_MAX_DEGREE_FALLBACK: int = 5000
-
-# ── QSVT: which case families it runs on ─────────────────────────────────────
-# QSVT phases are cached per condition number. Sections 1, 1b, 3a and 3b all
-# use the SAME standard TST matrix for a given N, hence the same kappa, hence
-# the same (already precomputed) cache entry -- adding QSVT to them costs only
-# circuit simulation time, no phase recomputation.
-#
-# Sub-case 3c is different: its Neumann row changes the matrix, so its kappa
-# differs and NO phases have been precomputed for it. Running QSVT there would
-# trigger a live phase solve mid-benchmark. It is therefore excluded by default.
-# To include it, precompute 3c's kappa first, then add the case id here.
-QSVT_CASES: set[str] = {
-    "1D_Poisson_fS_hom", "1D_Poisson_fL_hom", "1D_Poisson_fH_hom",
-}
 
 # ── HHL / VQLS configuration ─────────────────────────────────────────────────
 HHL_EPSILON: float = 0.01
@@ -656,31 +654,51 @@ def _run_thomas(A: np.ndarray, b: np.ndarray,
         log.warning("    Thomas failed: %s", exc)
         return None, float("nan"), 0.0, 0.0, 0.0
 
+def _hhl_worker(A, b, epsilon, q):
+    from solvers.quantum.hhl_1d import hhl_solve_system
+    q.put(hhl_solve_system(A, b, epsilon))
 
 def _run_hhl(A: np.ndarray, b: np.ndarray, N: int,
-             epsilon: float = HHL_EPSILON
+             epsilon: float = HHL_EPSILON,
+             timeout_s: float = 3600.0,
              ) -> tuple[Optional[np.ndarray], float, float, bool, float]:
     """
-    HHL via the validated project module solvers/quantum/hhl_1d.py.
+    HHL via the project module solvers/quantum/hhl_1d.py, with a HARD wall-clock timeout.
 
     Returns (u, residual, wall_s, converged, scale_c).
 
     `scale_c` is the proportionality-recovery constant. It is NOT derivable
     from the returned solution vector afterwards, so it is propagated rather
     than discarded.
+
+    Unlike QSVT's post-hoc warning, this actually terminates the underlying
+    process on timeout -- statevector-simulated HHL scales with the clock
+    register size (which grows with kappa) and has no existing guard, so a
+    large-kappa case can otherwise block a worker indefinitely.
     """
+    ctx = mp.get_context("spawn")
+    q = ctx.Queue()
+    p = ctx.Process(target=_hhl_worker, args=(A, b, epsilon, q))
+    t0 = time.perf_counter()
+    p.start()
+    p.join(timeout=timeout_s)
+
+    if p.is_alive():
+        p.terminate()
+        p.join()
+        log.warning("    HHL: killed after exceeding %.0fs timeout (N=%d).",
+                   timeout_s, N)
+        return None, float("nan"), time.perf_counter() - t0, False, float("nan")
+
     try:
-        from solvers.quantum.hhl_1d import hhl_solve_system
-
-        t0 = time.perf_counter()
-        u, x_raw, c = hhl_solve_system(A, b, epsilon)
-        wall = time.perf_counter() - t0
-
-        return u, _relative_residual(A, u, b), wall, True, float(c)
+        u, x_raw, c = q.get_nowait()
 
     except Exception as exc:
         log.warning("    HHL failed: %s", exc)
-        return None, float("nan"), 0.0, False, float("nan")
+        return None, float("nan"), time.perf_counter() - t0, False, float("nan")
+
+    wall = time.perf_counter() - t0
+    return u, _relative_residual(A, u, b), wall, True, float(c)
 
 
 def _run_vqls(A: np.ndarray, b: np.ndarray, N: int
@@ -727,53 +745,53 @@ def _run_vqls(A: np.ndarray, b: np.ndarray, N: int
         return None, float("nan"), 0.0, False, float("nan"), -1, -1
 
 
-def _build_qsvt_config(N: int):
+def _resolve_qsvt_max_degree(kappa: float, epsilon: float, N: int) -> Optional[int]:
     """
-    Construct a QSVTConfig1D, passing only the fields it actually declares.
+    Use the precomputed phases if they exist for this exact kappa; otherwise
+    fall back to a cheap cap rather than skip QSVT or risk an expensive/
+    uncapped live solve.
 
-    The QSVT module is under active development and its config field names have
-    changed; filtering against the dataclass's declared fields means a renamed
-    or removed field degrades to "not passed" rather than raising TypeError
-    hours into a queued job. Anything filtered out is logged, so a silently
-    ignored cap cannot go unnoticed.
+    QSVT_MAX_DEGREE_BY_N assumes every case at a given N shares one kappa --
+    true for Sections 1, 1b, 3a, 3b (identical TST matrix), false for 3c
+    (Neumann row -> different kappa at the same N). Checking the disk cache
+    directly, instead of hardcoding a second per-case table, means this stays
+    correct even if 3c's kappa changes, and it needs no special-casing here.
     """
+    import solvers.quantum.qsp_angles as qsp_angles
+
+    candidate = QSVT_MAX_DEGREE_BY_N.get(N, QSVT_MAX_DEGREE_FALLBACK)
+    key = (round(kappa, 4), round(epsilon, 8), "auto",
+           candidate if candidate is not None else -1)
+    if qsp_angles._load_disk(key) is not None:
+        return candidate                       # cache hit: use the real cap
+    return QSVT_UNCACHED_FALLBACK_DEGREE        # cache miss: cheap fallback
+
+
+def _build_qsvt_config(max_degree: Optional[int]):
+    """Construct a QSVTConfig1D, passing only the fields it actually declares."""
     from solvers.quantum.qsvt_1d import QSVTConfig1D
 
     desired = {
         "epsilon":      HHL_EPSILON,
         "angle_method": "auto",
-        "max_degree":   QSVT_MAX_DEGREE_BY_N.get(N, QSVT_MAX_DEGREE_FALLBACK),
+        "max_degree":   max_degree,
     }
-
     try:
         declared = {f.name for f in dataclasses.fields(QSVTConfig1D)}
-    except TypeError:                       # not a dataclass; pass everything
+    except TypeError:
         return QSVTConfig1D(**desired)
 
     accepted = {k: v for k, v in desired.items() if k in declared}
     dropped  = set(desired) - set(accepted)
     if dropped:
-        log.warning("QSVTConfig1D does not declare %s; not passed. "
-                    "Check the cache key still matches the precompute!", dropped)
+        log.warning("QSVTConfig1D does not declare %s; not passed.", dropped)
     return QSVTConfig1D(**accepted)
 
 
-def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int,
+def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int, kappa: float,
               time_limit: Optional[float]
               ) -> tuple[Optional[np.ndarray], float, float, bool, int, int, Optional[int]]:
-    """
-    QSVT via solvers/quantum/qsvt_1d.py.
-
-    Returns (u, residual, wall_s, converged, degree, circuit_depth, max_degree).
-
-    The `time_limit` check is POST-HOC only: QSVT is not interruptible
-    mid-solve, so this warns after the fact rather than aborting.
-
-    Circuit metrics beyond depth (gate counts, success probability) would have
-    to be returned by qsvt_solve_system itself; they are left as None here
-    rather than fabricated.
-    """
-    max_deg = QSVT_MAX_DEGREE_BY_N.get(N, QSVT_MAX_DEGREE_FALLBACK)
+    max_deg = _resolve_qsvt_max_degree(kappa, HHL_EPSILON, N)
 
     if N > QSVT_MAX_N:
         log.info("    QSVT: skipping N=%d > QSVT_MAX_N=%d", N, QSVT_MAX_N)
@@ -782,7 +800,7 @@ def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int,
     try:
         from solvers.quantum.qsvt_1d import qsvt_solve_system
 
-        cfg = _build_qsvt_config(N)
+        cfg = _build_qsvt_config(max_deg)
 
         t0 = time.perf_counter()
         result = qsvt_solve_system(A, b, config=cfg, verbose=True)
@@ -792,9 +810,13 @@ def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int,
             log.warning("    QSVT: completed but exceeded soft time limit "
                         "(%.1fs > %.1fs). Result retained.", wall, time_limit)
 
-        return (result.u, _relative_residual(A, result.u, b), wall,
-                bool(result.converged), int(result.degree),
-                int(result.circuit_depth), max_deg)
+        u = result.u
+        converged = (bool(getattr(result, "converged", True))
+                    and u is not None and not np.any(np.isnan(u)))
+        degree = getattr(result, "degree", getattr(result, "polynomial_degree", -1))
+        depth  = getattr(result, "circuit_depth", -1)
+
+        return u, _relative_residual(A, u, b), wall, converged, int(degree), int(depth), max_deg
 
     except Exception as exc:
         log.warning("    QSVT failed: %s", exc)
@@ -887,16 +909,11 @@ def _run_all_solvers(
             random_seed=VQLS_SEED)
 
     # ── QSVT ─────────────────────────────────────────────────────────────────
-    # Restricted to case families with precomputed phases -- see QSVT_CASES.
     if skip_qsvt:
         return
-    if case_id not in QSVT_CASES:
-        log.info("    QSVT    skipped for case %s (no precomputed phases; "
-                 "see QSVT_CASES).", case_id)
-        return
-
     u_Q, res_Q, t_Q, conv_Q, deg_Q, dep_Q, cap_Q = _run_qsvt(
-        A, b, N, QSVT_TIME_LIMIT_S)
+        A, b, N, kappa, QSVT_TIME_LIMIT_S)
+
     if u_Q is not None and u_ref is not None:
         log.info("    QSVT    MaxRelErr=%7.3f%%  Residual=%.3e  Time=%.1fs  "
                  "deg=%d  depth=%d",
@@ -1087,8 +1104,8 @@ def _save_run_metadata(N_values: list[int], skip_qsvt: bool,
         "max_workers":         max_workers,
         "qsvt_max_n":          QSVT_MAX_N,
         "qsvt_time_limit_s":   QSVT_TIME_LIMIT_S,
-        "qsvt_cases":          sorted(QSVT_CASES),
         "qsvt_max_degree_by_N": {str(k): v for k, v in QSVT_MAX_DEGREE_BY_N.items()},
+        "qsvt_uncached_fallback_degree": QSVT_UNCACHED_FALLBACK_DEGREE,
         "qsvt_max_degree_fallback": QSVT_MAX_DEGREE_FALLBACK,
         "hhl_epsilon":         HHL_EPSILON,
         "vqls_seed":           VQLS_SEED,
@@ -1202,9 +1219,6 @@ def main() -> None:
 
     _banner("QUANTUM PDE SOLVER - FULL 1D HPC BENCHMARK RUN")
     log.info("  N values      : %s", N_values)
-    log.info("  QSVT          : %s",
-             "DISABLED" if args.skip_qsvt
-             else f"enabled for N <= {QSVT_MAX_N} on {len(QSVT_CASES)} case(s)")
     log.info("  QSVT deg caps : %s", QSVT_MAX_DEGREE_BY_N)
     log.info("  Max workers   : %d", args.max_workers)
     log.info("  Output dir    : %s", RESULTS_DIR.resolve())
@@ -1225,11 +1239,15 @@ def main() -> None:
     all_solutions: dict = {}
 
     # -- Build the work unit list --------------------------------------------
-    # Largest N first: the long-running units start earliest, so the pool is
-    # not left waiting on one huge unit after all the small ones have drained.
+    # Smallest N first: with only a handful of workers and a large spread in
+    # per-unit cost (HHL/QSVT scale badly with kappa -- see Problem 2 below),
+    # dispatching largest-N units first saturates every worker on the slowest
+    # cases immediately and starves the fast, informative small-N validation
+    # runs behind them. Ascending order guarantees N=4/8/16 complete and are
+    # written to disk before any worker can get tied up on N=32/64.
     work_units = [
         (family, N, args.skip_qsvt)
-        for N in sorted(N_values, reverse=True)
+        for N in sorted(N_values)
         for family in ("generic_poisson", "generic_poisson_nonhom", "het_1d")
     ]
 
@@ -1248,7 +1266,8 @@ def main() -> None:
         log.info("Parallel execution: %d work units across %d workers.",
                  len(work_units), args.max_workers)
         with concurrent.futures.ProcessPoolExecutor(
-            max_workers=args.max_workers
+            max_workers=args.max_workers,
+            max_tasks_per_child=1,   # fresh process per work unit
         ) as executor:
             futures = {
                 executor.submit(_execute_work_unit, wt, N, sq): (wt, N)

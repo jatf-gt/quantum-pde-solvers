@@ -38,7 +38,7 @@
 # NPZ is written as it is produced), but results_full.json / results_summary.csv
 # are written only at the END, so a killed job loses the summary table.
 #PBS -l walltime=24:00:00
-#PBS -l select=1:ncpus=4:mem=64gb
+#PBS -l select=1:ncpus=4:mem=128gb
 
 # --- Job metadata ---
 #PBS -N quantum_pde_1Dfull_run

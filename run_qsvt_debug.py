@@ -92,14 +92,12 @@ def _row(label: str, rel: float, res: float, t: float, extra: str = "") -> None:
 def run_generic_poisson() -> None:
     """
     Run QSVT on the generic 1-D Poisson equation with fS source and
-    homogeneous BCs at N=4 and N=8. Benchmark against Thomas.
+    homogeneous BCs at N=4, N=8, and N=16. Benchmark against Thomas.
     Analytical solution u = -sin(πx)/π² is available for exact error.
     """
     _section("QSVT Debug — Generic 1-D Poisson, fS source, homogeneous BCs")
 
-    for N in (4, 8):
-        if N == 8:
-            break  # skip N=8 for now, too slow for debugging
+    for N in (4, 8, 16):
         print(f"\n  {'─'*60}")
         print(f"  N={N}")
         print(f"  {'─'*60}")
@@ -122,8 +120,8 @@ def run_generic_poisson() -> None:
         qsvt_cfg = QSVTConfig1D(
             epsilon      = 0.01,                             
             angle_method = "auto",
-            verbose      = True,
-            max_degree   = None if N <= 16 else 5000,          # match QSVT_MAX_DEGREE_BY_N
+            verbose      = False,
+            max_degree   = None if N <= 16 else 5000,          
             label        = f"generic-fS-N{N}",
         )
 
@@ -140,11 +138,11 @@ def run_generic_poisson() -> None:
         )
 
         print(f"\n  Pointwise relative error vs analytical:")
-        print(f"    x      = {np.round(problem.x, 4).tolist()}")
+        print(f"    x      = {np.round(problem.x, 3).tolist()}")
         err = _rel_err_pct(r_qsvt.u, u_exact)
-        print(f"    QSVT % = {np.round(err, 4).tolist()}")
+        print(f"    QSVT % = {np.round(err, 3).tolist()}")
         err_t = _rel_err_pct(r_thomas.u, u_exact)
-        print(f"    Thom % = {np.round(err_t, 4).tolist()}")
+        print(f"    Thom % = {np.round(err_t, 3).tolist()}")
 
         print(f"\n  Solution vectors:")
         print(f"    Thomas = {np.round(r_thomas.u, 6).tolist()}")
@@ -163,75 +161,73 @@ def run_het_1d() -> None:
     encoding being correct (Max error = 0). The polynomial diagnostic
     will show whether Im(P(λ_k/α)) is proportional to 1/λ_k for all k.
     """
-    _section("QSVT Debug — HET 1-D Linear Profile, homogeneous BCs, N=4")
+    _section("QSVT Debug — HET 1-D Linear Profile, homogeneous BCs")
 
-    cfg     = HETConfig(N=4, epsilon=0.01, rho_profile="linear", V_discharge=0.0)
-    problem = HETPoissonProblem1D(cfg)
-    u_exact = HET_EXACT_SOLUTIONS["linear"](problem.x, cfg.rho_0, cfg.alpha)
+    for N in (4, 8, 16):
+        print(f"\n  {'─'*60}")
+        print(f"  N={N}")
+        print(f"  {'─'*60}")
 
-    print(f"\n  Problem parameters:")
-    print(f"    N={cfg.N}, alpha={cfg.alpha:.2f}, rho_0={cfg.rho_0:.4f}")
-    print(f"    ||b||   = {np.linalg.norm(problem.b):.4e}")
-    print(f"    ||b||/||b_fS|| ratio ≈ "
-          f"{np.linalg.norm(problem.b) / 0.003:.1f}x larger than generic Poisson")
-    print(f"    b_norm_vec = {np.round(problem.b/np.linalg.norm(problem.b), 4)}")
+        cfg     = HETConfig(N=N, epsilon=0.01, rho_profile="linear", V_discharge=0.0)
+        problem = HETPoissonProblem1D(cfg)
+        u_exact = HET_EXACT_SOLUTIONS["linear"](problem.x, cfg.rho_0, cfg.alpha)
 
-    # Thomas reference.
-    t0         = time.perf_counter()
-    u_thomas   = thomas_solve_system(problem.A, problem.b)
-    t_thomas   = time.perf_counter() - t0
-    _row(
-        "Thomas",
-        _max_rel_err(u_thomas, u_exact),
-        _residual(problem.A, u_thomas, problem.b),
-        t_thomas,
-    )
+        print(f"\n  Problem parameters:")
+        print(f"    N={cfg.N}, alpha={cfg.alpha:.2f}, rho_0={cfg.rho_0:.4f}")
 
-    print(f"\n  Thomas solution:   {np.round(u_thomas, 2).tolist()}")
-    print(f"  Analytical:        {np.round(u_exact,   2).tolist()}")
-
-    # QSVT with full diagnostics.
-    qsvt_cfg = QSVTConfig1D(
-        epsilon      = 0.01,
-        angle_method = "auto",
-        verbose      = True,
-        max_degree   = 600,
-        label        = "HET-3a",   # triggers polynomial and recovery diagnostics
-    )
-
-    t0     = time.perf_counter()
-    r_qsvt = qsvt_solve_system(problem.A, problem.b, config=qsvt_cfg)
-    t_qsvt = time.perf_counter() - t0
-
-    import run_qsvt_debug as _dbg
-    if _dbg._debug_be_circuit is not None:
-        _verify_qsvt_polynomial_directly(
-            _dbg._debug_be_circuit,
-            _dbg._debug_angles,
-            _dbg._debug_n,
-            _dbg._debug_alpha,
-            problem.A * -1,  # negated A (positive definite)
-            label="HET-3a direct",
+        # Thomas reference.
+        t0         = time.perf_counter()
+        u_thomas   = thomas_solve_system(problem.A, problem.b)
+        t_thomas   = time.perf_counter() - t0
+        _row(
+            "Thomas",
+            _max_rel_err(u_thomas, u_exact),
+            _residual(problem.A, u_thomas, problem.b),
+            t_thomas,
         )
 
-    _row(
-        "QSVT",
-        _max_rel_err(r_qsvt.u, u_exact),
-        _residual(problem.A, r_qsvt.u, problem.b),
-        t_qsvt,
-        f"deg={r_qsvt.polynomial_degree}",
-    )
+        # QSVT with full diagnostics.
+        qsvt_cfg = QSVTConfig1D(
+            epsilon      = 0.01,
+            angle_method = "auto",
+            verbose      = False,
+            max_degree   = None if N <= 16 else 5000,  
+            label        = "",   # if == "HET-3a" triggers polynomial and recovery diagnostics
+        )
 
-    print(f"\n  QSVT solution:     {np.round(r_qsvt.u, 2).tolist()}")
-    print(f"  Thomas solution:   {np.round(u_thomas,   2).tolist()}")
-    print(f"  Analytical:        {np.round(u_exact,    2).tolist()}")
+        t0     = time.perf_counter()
+        r_qsvt = qsvt_solve_system(problem.A, problem.b, config=qsvt_cfg)
+        t_qsvt = time.perf_counter() - t0
 
-    print(f"\n  Pointwise relative error vs analytical:")
-    print(f"    x      = {np.round(problem.x, 4).tolist()}")
-    err_q = _rel_err_pct(r_qsvt.u, u_exact)
-    err_t = _rel_err_pct(u_thomas,  u_exact)
-    print(f"    QSVT % = {np.round(err_q, 4).tolist()}")
-    print(f"    Thom % = {np.round(err_t, 4).tolist()}")
+        import run_qsvt_debug as _dbg
+        if _dbg._debug_be_circuit is not None:
+            _verify_qsvt_polynomial_directly(
+                _dbg._debug_be_circuit,
+                _dbg._debug_angles,
+                _dbg._debug_n,
+                _dbg._debug_alpha,
+                problem.A * -1,  # negated A (positive definite)
+                label="HET-3a direct",
+            )
+
+        _row(
+            "QSVT",
+            _max_rel_err(r_qsvt.u, u_exact),
+            _residual(problem.A, r_qsvt.u, problem.b),
+            t_qsvt,
+            f"deg={r_qsvt.polynomial_degree}",
+        )
+
+        print(f"\n  Thomas solution:   {np.round(u_thomas, 2).tolist()}")
+        print(f"  Analytical:        {np.round(u_exact,    2).tolist()}")
+        print(f"  QSVT solution:     {np.round(r_qsvt.u,   2).tolist()}")
+
+        print(f"\n  Pointwise relative error vs analytical:")
+        print(f"    x      = {np.round(problem.x, 3).tolist()}")
+        err_q = _rel_err_pct(r_qsvt.u, u_exact)
+        print(f"    QSVT % = {np.round(err_q, 3).tolist()}")
+        err_t = _rel_err_pct(u_thomas,  u_exact)
+        print(f"    Thom % = {np.round(err_t, 3).tolist()}")
 
 
 def _verify_qsvt_polynomial_directly(
@@ -261,13 +257,6 @@ def _verify_qsvt_polynomial_directly(
     N = 2**n
     eig_vals, eig_vecs = np.linalg.eigh(A)
 
-    print(f"\n  Direct polynomial verification [{label}]:")
-    print(
-        f"  {'lambda_k':>10}  {'x=lam/alpha':>12}  "
-        f"{'Im(P) circuit':>14}  {'1/(kappa*x)*0.9':>16}  "
-        f"{'ratio':>8}"
-    )
-
     kappa = float(eig_vals.max() / eig_vals.min())
     be_gate     = be_circuit.to_gate(label="U_A")
     be_inv_gate = be_circuit.inverse().to_gate(label="U_A†")
@@ -288,10 +277,6 @@ def _verify_qsvt_polynomial_directly(
         test_qc = QuantumCircuit(n)
         test_qc.append(Isometry(v_k, 0, 0), list(range(n)))
         prepared_sv = np.real(np.array(QSV(test_qc).data))
-        print(f"  Eigenvector {k} preparation check:")
-        print(f"    v_k prepared: {np.round(prepared_sv, 4)}")
-        print(f"    v_k expected: {np.round(v_k, 4)}")
-        print(f"    match: {np.allclose(prepared_sv, v_k, atol=1e-6)}")
 
         qc.append(Isometry(v_k, 0, 0), list(range(n)))
 
@@ -321,12 +306,6 @@ def _verify_qsvt_polynomial_directly(
         expected = 0.9 / (kappa * x) if x > 1e-10 else float("nan")
         ratio    = im_P / expected if abs(expected) > 1e-14 else float("nan")
 
-        print(
-            f"  {lam_k:>10.4f}  {x:>12.6f}  "
-            f"{im_P:>14.6f}  {expected:>16.6f}  "
-            f"{ratio:>8.4f}"
-        )
-
 
 # ── Section 3: 2-D cases -------------------------------------------------
 
@@ -351,7 +330,7 @@ def run_generic_2d() -> None:
         epsilon      = 0.1,
         angle_method = "auto",
         max_degree   = 200,
-        verbose      = True,
+        verbose      = False,
     )
     r_qsvt = qsvt_solve_2d(prob_2d, config=qsvt_cfg_2d)
 

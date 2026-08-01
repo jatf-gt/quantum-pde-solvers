@@ -143,7 +143,7 @@ class QSVTConfig1D:
     angle_method  : str            = "sym_qsp_direct"
     max_degree    : Optional[int]  = None
     device_name   : str            = "statevector"
-    max_degree_cap: int            = 5000
+    max_degree_cap: int            = 15000
     verbose       : bool           = False
     label         : str            = ""
 
@@ -295,9 +295,6 @@ def qsvt_solve_system(
     full_error = float(np.max(np.abs(be_unitary_circuit - be_unitary_exact)))
     topL_error = float(np.max(np.abs(be_unitary_circuit[:N, :N] - M)))
 
-    print(f"  Block encoding full unitary check:")
-    print(f"    Top-left N×N block error:  {topL_error:.4e}  (should be ~0)")
-    print(f"    Full 2N×2N unitary error:  {full_error:.4e}  (should be ~0)")
     if full_error > 1e-6:
         print(
             f"    WARNING: full unitary error {full_error:.4e} > 1e-6.\n"
@@ -329,11 +326,6 @@ def qsvt_solve_system(
             row_idx = j  # ancilla bit 0, data bits = j
             col_idx = i  # ancilla bit 0, data bits = i
             A_encoded[j, i] = be_unitary[row_idx, col_idx]
-
-    print(f"  Block encoding check:")
-    print(f"    A/alpha (exact)   = {np.round(A/alpha, 4)}")
-    print(f"    <0|U_A|0> (circuit) = {np.round(np.real(A_encoded), 4)}")
-    print(f"    Max error: {np.max(np.abs(A_encoded - A/alpha)):.4e}")
 
     # Effective condition number after subnormalisation.
     # kappa_eff = alpha * kappa(A) / ||A||_2
@@ -612,10 +604,6 @@ def _extract_solution(
 
     norm_im = float(np.linalg.norm(x_raw_im))
     norm_re = float(np.linalg.norm(x_raw_re))
-    print(
-        f"  QSVT extraction: ||Re||={norm_re:.4e}, ||Im||={norm_im:.4e}, "
-        f"ratio Im/Re={norm_im/(norm_re + 1e-14):.2f}"
-    )
 
     if norm_im < 1e-12:
         raise RuntimeError(
