@@ -299,7 +299,7 @@ def qsvt_solve_system(
         print(
             f"    WARNING: full unitary error {full_error:.4e} > 1e-6.\n"
             f"    The UnitaryGate decomposition is introducing numerical errors.\n"
-            f"    These errors accumulate over {len(angles)-1} block encoding\n"
+            f"    These errors accumulate across repeated block encoding\n"
             f"    applications and corrupt the QSVT polynomial for multi-\n"
             f"    eigenvector inputs (HET case) while being hidden for\n"
             f"    single-eigenvector inputs (generic Poisson case)."

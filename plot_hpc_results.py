@@ -6,7 +6,7 @@ Post-processing script: reads the JSON/CSV output from run_hpc_full.py
 and produces publication-quality plots for thesis Chapter 5.
 
 Plots produced:
-  1. Solution profiles: Thomas vs HHL vs VQLS (per case, per N)
+  1. Solution profiles: Thomas vs HHL vs VQLS vs QSVT (per case, per N)
   2. Max relative error vs N: all solvers on one axis (log-log)
   3. Residual vs N: all solvers (log-log)
   4. Wall time vs N: all solvers (log-log)
@@ -44,7 +44,7 @@ plt.rcParams.update({
     "xtick.labelsize":   10,
     "ytick.labelsize":   10,
     "lines.linewidth":   1.8,
-    "lines.markersize":  7,
+    "lines.markersize":  4,
     "figure.dpi":        150,
     "savefig.dpi":       300,
     "savefig.bbox":      "tight",
@@ -154,7 +154,7 @@ def plot_solution_profiles(
             ax_sol.plot(sol["x"], sol["u"],
                         color=st["color"], marker=st["marker"],
                         ls=st["ls"], label=st["label"],
-                        markevery=max(1, len(sol["x"]) // 8))
+                        markevery=max(1, len(sol["x"]) // 32))
 
         if u_exact is not None:
             ax_sol.plot(x_ref, u_exact, "k--", lw=1.2, label="Exact", zorder=0)
@@ -226,7 +226,7 @@ def plot_error_vs_N(
                       ls=st["ls"], label=st["label"])
 
         # Reference O(N^-2) line.
-        Ns_ref = np.array([4, 8, 16, 32])
+        Ns_ref = np.array([4, 8, 16, 32, 64])
         ax.loglog(Ns_ref, 10.0 / Ns_ref**2, "k:", lw=1.0, label=r"$\mathcal{O}(N^{-2})$")
 
         ax.set_xlabel(r"$N$ (system size)")
@@ -459,7 +459,7 @@ def plot_summary_table(
                       color=st["color"], marker=st["marker"],
                       ls=st["ls"], label=st["label"])
 
-        Ns_ref = np.array([4, 8, 16, 32])
+        Ns_ref = np.array([4, 8, 16, 32, 64])
         ax.loglog(Ns_ref, 10.0 / Ns_ref**2, "k:", lw=1.0, label=r"$\mathcal{O}(N^{-2})$")
         ax.set_xlabel(r"$N$")
         ax.set_ylabel(r"Max rel. error (\%)")
@@ -498,7 +498,7 @@ def main() -> None:
         description="Post-process and plot HPC benchmark results."
     )
     parser.add_argument(
-        "--results-dir", type=Path, default=Path("results_hpc/hpc_run"),
+        "--results-dir", type=Path, default=Path("results_hpc/results/1Dhpc_run"),
         help="Directory containing results_full.json and solution NPZ files."
     )
     parser.add_argument(
@@ -506,8 +506,8 @@ def main() -> None:
         help="Also save figures as PDF (in addition to PNG)."
     )
     parser.add_argument(
-        "--N-profile", type=int, default=8,
-        help="N value to use for solution profile plots (default: 8)."
+        "--N-profile", type=int, default=32,
+        help="N value to use for solution profile plots (default: 32)."
     )
     args = parser.parse_args()
 

@@ -803,7 +803,7 @@ def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int, kappa: float,
         cfg = _build_qsvt_config(max_deg)
 
         t0 = time.perf_counter()
-        result = qsvt_solve_system(A, b, config=cfg, verbose=True)
+        result = qsvt_solve_system(A, b, config=cfg)
         wall = time.perf_counter() - t0
 
         if time_limit is not None and wall > time_limit:

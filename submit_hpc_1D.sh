@@ -1,21 +1,21 @@
 #!/bin/bash
 # ============================================================
-#  submit_hpc.sh
+#  submit_hpc_1D.sh
 #  PBS Pro job submission script for Imperial College CX3 HPC.
 #
 #  Runs the full 1-D benchmark sweep, N = 4..64, all cases,
 #  all solvers (Thomas, HHL, VQLS, QSVT).
 #
 #  Usage:
-#    qsub submit_hpc.sh
+#    qsub submit_hpc_1D.sh
 #
 #    # Fast validation pass before committing the full walltime:
 #    export MAX_N=16
-#    qsub -v MAX_N submit_hpc.sh
+#    qsub -v MAX_N submit_hpc_1D.sh
 #
 #    # Skip QSVT entirely:
 #    export SKIP_QSVT=1
-#    qsub -v SKIP_QSVT submit_hpc.sh
+#    qsub -v SKIP_QSVT submit_hpc_1D.sh
 #
 #  Monitor:
 #    qstat -u $USER
