@@ -199,7 +199,7 @@ def run_het_1d() -> None:
         r_qsvt = qsvt_solve_system(problem.A, problem.b, config=qsvt_cfg)
         t_qsvt = time.perf_counter() - t0
 
-        import run_qsvt_debug as _dbg
+        import scripts.run_qsvt_debug as _dbg
         if _dbg._debug_be_circuit is not None:
             _verify_qsvt_polynomial_directly(
                 _dbg._debug_be_circuit,

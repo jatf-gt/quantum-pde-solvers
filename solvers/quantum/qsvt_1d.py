@@ -366,7 +366,7 @@ def qsvt_solve_system(
         )
 
     # -- Stage 3: QSVT circuit construction -----------------------------------
-    import run_qsvt_debug as _dbg
+    import scripts.run_qsvt_debug as _dbg
     _dbg._debug_be_circuit = be_circuit
     _dbg._debug_angles     = angles
     _dbg._debug_n          = n
