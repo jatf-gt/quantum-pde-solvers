@@ -246,7 +246,9 @@ def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
                 res = solve(prob, inner=inner, scheme=scheme,
                             inner_options=io, **kw)
             except Exception as exc:
+                import traceback
                 print(f"  {_R}[FAIL] {inner}/{scheme}: {exc}{_X}")
+                # traceback.print_exc()
                 continue
             wall = time.perf_counter() - t0
             if ref is None and inner == "thomas":
