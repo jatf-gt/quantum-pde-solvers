@@ -79,9 +79,10 @@ from scipy.interpolate import RegularGridInterpolator
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from solvers.outer import (InnerConfig, PoissonLine2D, available_inner,
-                           available_schemes, build_hierarchy, describe_inner,
-                           describe_scheme, get_inner, resolve_options, solve)
+from problems.poisson_line_2d import PoissonLine2D
+from solvers.outer import (InnerConfig, available_inner,available_schemes, 
+                           build_hierarchy, describe_inner, describe_scheme, 
+                           get_inner, resolve_options, solve)
 
 # ============================================================================
 #  Output directory and logging

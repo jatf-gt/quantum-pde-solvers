@@ -12,19 +12,12 @@ protocols only.  It therefore knows nothing about Poisson, about Hall
 thrusters, or about whether the strip solve is classical or quantum, and a
 new problem or a new inner solver can be added without touching any scheme.
 
-Sign and scaling convention
----------------------------
-Throughout this package the *physical* (unscaled) convention is used:
-
-    A_row = tridiag( 1/dx^2,  -2*(1/dx^2 + 1/dy^2),  1/dx^2 )
-    rhs   = f  (with Dirichlet contributions absorbed, see PoissonLine2D)
-
-so that A_row . u[:,j] + u[:,j-1]/dy^2 + u[:,j+1]/dy^2 = rhs[:,j].
-
-Note this differs from ``problems/poisson_2d.py``, which uses the h^2-scaled
-form (A_row diagonal = -4, rhs = h^2 f).  The two are equivalent when
-dx = dy; the physical form is used here because it extends unchanged to
-non-square cells (dz != dr in the HET geometry) and to variable coefficients.
+This module is deliberately problem-agnostic: it contains no PDE, no
+physics, and no Poisson-specific code.  Concrete problems that satisfy
+``LineProblem2D`` / ``LineProblem3D`` live in ``problems/`` -
+``problems/poisson_line_2d.py`` (PoissonLine2D) and
+``problems/poisson_line_3d.py`` (PoissonLine3D) - which is also where the
+sign and scaling convention used throughout this package is documented.
 
 Author : Juan Antonio Trobajo Flecha
 """
@@ -185,146 +178,6 @@ class LineProblem2D(Protocol):
 
 
 # =============================================================================
-#  Concrete implementation: constant-coefficient Poisson on a rectangle
-# =============================================================================
-
-class PoissonLine2D:
-    """
-    nabla^2 u = f on [0,Lx] x [0,Ly] with Dirichlet boundaries, discretised
-    by the standard 5-point stencil on a vertex-centred interior grid
-    (Nx x Ny interior nodes, dx = Lx/(Nx+1), dy = Ly/(Ny+1)) and decomposed
-    into Ny strips of length Nx along x.
-
-    This single class covers both the unit-square benchmarks and the HET
-    axial-radial channel; the HET case is just Lx=Lz, Ly=Lr with a
-    non-zero ``bc_y0``.
-
-    Boundary data
-    -------------
-    bc_x0, bc_x1 : arrays of length Ny (or scalars) - values at x=0, x=Lx
-    bc_y0, bc_y1 : arrays of length Nx (or scalars) - values at y=0, y=Ly
-
-    For the HET channel with the current benchmark convention:
-        bc_x0 = anode, bc_x1 = cathode, bc_y0 = inner wall, bc_y1 = outer wall
-    """
-
-    def __init__(
-        self,
-        f_values: np.ndarray,
-        Lx: float = 1.0,
-        Ly: float = 1.0,
-        bc_x0=0.0, bc_x1=0.0, bc_y0=0.0, bc_y1=0.0,
-        _level: int = 0,
-    ) -> None:
-        f_values = np.asarray(f_values, dtype=float)
-        if f_values.ndim != 2:
-            raise ValueError(f"f_values must be 2-D, got shape {f_values.shape}")
-
-        self.shape = (int(f_values.shape[0]), int(f_values.shape[1]))
-        Nx, Ny = self.shape
-        self.Lx, self.Ly = float(Lx), float(Ly)
-        self.dx = self.Lx / (Nx + 1)
-        self.dy = self.Ly / (Ny + 1)
-        self.level = _level
-
-        self.f = f_values
-        self.bc_x0 = np.broadcast_to(np.asarray(bc_x0, dtype=float), (Ny,)).copy()
-        self.bc_x1 = np.broadcast_to(np.asarray(bc_x1, dtype=float), (Ny,)).copy()
-        self.bc_y0 = np.broadcast_to(np.asarray(bc_y0, dtype=float), (Nx,)).copy()
-        self.bc_y1 = np.broadcast_to(np.asarray(bc_y1, dtype=float), (Nx,)).copy()
-
-        self._A = self._build_row_matrix()
-        self._rhs = self._build_rhs()
-
-    # ---------------------------------------------------------------- operator
-
-    def _build_row_matrix(self) -> np.ndarray:
-        Nx = self.shape[0]
-        a = -2.0 * (1.0 / self.dx**2 + 1.0 / self.dy**2)
-        b = 1.0 / self.dx**2
-        return (a * np.eye(Nx)
-                + b * (np.diag(np.ones(Nx - 1), 1) + np.diag(np.ones(Nx - 1), -1)))
-
-    def _build_rhs(self) -> np.ndarray:
-        r = self.f.copy()
-        r[0, :]  -= self.bc_x0 / self.dx**2
-        r[-1, :] -= self.bc_x1 / self.dx**2
-        r[:, 0]  -= self.bc_y0 / self.dy**2
-        r[:, -1] -= self.bc_y1 / self.dy**2
-        return r
-
-    def row_matrix(self) -> np.ndarray:
-        return self._A
-
-    def rhs(self) -> np.ndarray:
-        return self._rhs
-
-    def apply(self, u: np.ndarray) -> np.ndarray:
-        """5-point Laplacian with homogeneous exterior."""
-        r = np.zeros_like(u)
-        r[1:, :]  += u[:-1, :] / self.dx**2
-        r[:-1, :] += u[1:, :]  / self.dx**2
-        r[:, 1:]  += u[:, :-1] / self.dy**2
-        r[:, :-1] += u[:, 1:]  / self.dy**2
-        r += -2.0 * (1.0 / self.dx**2 + 1.0 / self.dy**2) * u
-        return r
-
-    # ---------------------------------------------------------------- coarsening
-
-    MIN_STRIP = 4          # quantum solvers need >= 2 qubits, i.e. n >= 4
-
-    def coarsen(self) -> Optional["PoissonLine2D"]:
-        """
-        Halve both directions.  Both dimensions stay powers of two, so the
-        strip operator remains a Toeplitz symmetric tridiagonal matrix of
-        power-of-two size at every level and the quantum inner solvers
-        require no modification.
-
-        Halving both directions (rather than semi-coarsening in y only) also
-        keeps dx/dy fixed, which keeps kappa(A_row) ~ 3 on every level.
-        Semi-coarsening would make kappa grow by 4x per level, driving up
-        the QSVT polynomial degree and the HHL clock register.
-
-        Returns None once either dimension reaches MIN_STRIP.
-        """
-        Nx, Ny = self.shape
-        if Nx <= self.MIN_STRIP or Ny <= self.MIN_STRIP:
-            return None
-        if Nx % 2 or Ny % 2:
-            return None
-        # Coarse levels carry the error equation: zero source, zero boundaries.
-        return PoissonLine2D(
-            np.zeros((Nx // 2, Ny // 2)),
-            Lx=self.Lx, Ly=self.Ly,
-            _level=self.level + 1,
-        )
-
-    # ---------------------------------------------------------------- utilities
-
-    def grid(self) -> tuple[np.ndarray, np.ndarray]:
-        Nx, Ny = self.shape
-        x = np.arange(1, Nx + 1) * self.dx
-        y = np.arange(1, Ny + 1) * self.dy
-        return np.meshgrid(x, y, indexing="ij")
-
-    def kappa_row(self) -> float:
-        e = np.abs(np.linalg.eigvalsh(self._A))
-        return float(e.max() / e.min())
-
-    def residual(self, u: np.ndarray) -> float:
-        """Relative 2-norm residual of the full coupled system."""
-        b = self.rhs()
-        bn = np.linalg.norm(b)
-        r = np.linalg.norm(b - self.apply(u))
-        return float(r / bn) if bn > 1e-300 else float(r)
-
-    def __repr__(self) -> str:
-        Nx, Ny = self.shape
-        return (f"PoissonLine2D({Nx}x{Ny}, dx={self.dx:.3e}, dy={self.dy:.3e}, "
-                f"kappa={self.kappa_row():.3f}, level={self.level})")
-
-
-# =============================================================================
 #  Stagnation detection
 # =============================================================================
 
@@ -390,7 +243,7 @@ class StagnationMonitor:
 # =============================================================================
 
 def strip_sweep(
-    problem:  LineProblem2D,
+    problem,
     u:        np.ndarray,
     rhs:      np.ndarray,
     inner:    Callable[[np.ndarray, np.ndarray], np.ndarray],
@@ -400,32 +253,75 @@ def strip_sweep(
     jacobi:   bool = False,
 ) -> np.ndarray:
     """
-    One line-relaxation sweep, updating u in place.
+    One line-relaxation sweep, updating u in place.  Works in any dimension.
+
+    Axis 0 is always the strip direction: the sweep visits every transverse
+    index tuple, gathers that strip's transverse neighbours into the
+    right-hand side, and hands the resulting tridiagonal system to ``inner``.
+    In 2-D the transverse index is a single j; in 3-D it is a pair (j, k).
+    The 2-D behaviour is bit-for-bit unchanged.
 
     Strips are traversed in Gauss-Seidel order (each strip sees the already
-    updated values of its predecessor), then relaxed by omega:
+    updated values of its predecessors), then relaxed by omega:
 
-        u[:,j] <- omega * inner(A, b_j) + (1 - omega) * u[:,j]
+        u[:, idx] <- omega * inner(A, b_idx) + (1 - omega) * u[:, idx]
 
-    omega = 1 gives line Gauss-Seidel, which is the correct choice as a
-    *multigrid smoother*.  Over-relaxation (omega ~ 1.9) accelerates a
-    standalone stationary iteration but destroys the smoothing property and
-    makes the iteration fragile to inner-solver error - see the omega
-    discussion in stationary.py.
+    omega = 1 gives line Gauss-Seidel, the correct choice as a *multigrid
+    smoother*.  Over-relaxation (omega ~ 1.9) accelerates a standalone
+    stationary iteration but destroys the smoothing property and makes the
+    iteration fragile to inner-solver error - see stationary.py.
+
+    Why the strip direction, and not a plane, generalises to 3-D
+    ------------------------------------------------------------
+    The natural-looking 3-D analogue of a 2-D line smoother is a *plane*
+    smoother: fix z, solve the whole (x, y) plane.  It is the wrong choice
+    here, though not for the obvious reason.  The plane operator carries a
+    -2/dz^2 diagonal shift from the z-coupling, which bounds its condition
+    number at 5 - it is not the O(N^2) system it first appears to be.  The
+    decisive objection is structural: a plane solve is an N^2 x N^2 system
+    with a 5-point stencil, needing 2*log2(N) qubits and a block encoding
+    that does not exist in this repository.  A strip solve stays an N x N
+    TST system on log2(N) qubits, identical to the 1-D case, so every
+    existing quantum solver works in 3-D with no modification whatsoever.
+    Line relaxation also gives a *better* conditioned inner system in 3-D
+    than in 2-D: kappa -> 2 rather than 3, because the two transverse
+    directions both contribute to the diagonal.
     """
-    Nx, Ny = problem.shape
+    shape = tuple(problem.shape)
+    Nx = shape[0]
+    transverse = shape[1:]
     A = problem.row_matrix()
-    dy2 = problem.dy ** 2
-    order = range(Ny - 1, -1, -1) if reverse else range(Ny)
+
+    # Spacings and periodicity, with a fallback for the original 2-D class.
+    spacings = getattr(problem, "spacings", None)
+    if spacings is None:
+        spacings = (problem.dx, problem.dy)
+    periodic = getattr(problem, "periodic", None)
+    if periodic is None:
+        periodic = (False,) * len(shape)
+    inv_h2 = [1.0 / spacings[d + 1] ** 2 for d in range(len(transverse))]
+
+    order = list(np.ndindex(*transverse)) if transverse else [()]
+    if reverse:
+        order = order[::-1]
     src = u.copy() if jacobi else u
 
-    for j in order:
-        b = rhs[:, j].copy()
-        if j > 0:      b -= src[:, j - 1] / dy2
-        if j < Ny - 1: b -= src[:, j + 1] / dy2
+    for idx in order:
+        key = (slice(None),) + idx
+        b = rhs[key].copy()
+        for d, n in enumerate(transverse):
+            for step in (-1, 1):
+                j = idx[d] + step
+                if periodic[d + 1]:
+                    j %= n
+                elif j < 0 or j >= n:
+                    continue
+                nb = (slice(None),) + idx[:d] + (j,) + idx[d + 1:]
+                b -= src[nb] * inv_h2[d]
         x = np.asarray(inner(A, b), dtype=float)
         work.add(Nx)
         if x.shape != (Nx,):
-            raise ValueError(f"inner solver returned shape {x.shape}, expected ({Nx},)")
-        u[:, j] = omega * x + (1.0 - omega) * u[:, j]
+            raise ValueError(f"inner solver returned shape {x.shape}, "
+                             f"expected ({Nx},)")
+        u[key] = omega * x + (1.0 - omega) * u[key]
     return u

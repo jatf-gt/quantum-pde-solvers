@@ -121,38 +121,86 @@ def restriction_from(P: np.ndarray) -> np.ndarray:
     return R / s
 
 
+def interpolation_1d_periodic(n_fine: int, n_coarse: int) -> np.ndarray:
+    """
+    Linear interpolation matrix for a *periodic* axis, shape (n_fine, n_coarse).
+
+    A periodic axis is discretised without boundary nodes (x_i = i*L/n), so
+    coarsening n -> n/2 is exactly nested: coarse point I coincides with fine
+    point 2I.  Odd fine points interpolate between neighbouring coarse points
+    with wraparound.  This is what makes the azimuthal direction of the HET
+    channel work: it is periodic, has no Dirichlet data, and would otherwise
+    have no valid transfer operator.
+    """
+    P = np.zeros((n_fine, n_coarse))
+    for I in range(n_coarse):
+        P[(2 * I) % n_fine, I] += 1.0
+        P[(2 * I + 1) % n_fine, I] += 0.5
+        P[(2 * I - 1) % n_fine, I] += 0.5
+    return P
+
+
+def _apply_axis_ops(mats: list[np.ndarray], arr: np.ndarray) -> np.ndarray:
+    """
+    Apply one matrix per axis, as a tensor product.
+
+    Replaces the hard-coded ``Px @ r @ Py.T`` of the 2-D-only version; this
+    form is dimension-agnostic, so the same V-cycle drives 2-D and 3-D.
+    """
+    out = arr
+    for ax, M in enumerate(mats):
+        out = np.moveaxis(np.tensordot(M, out, axes=([1], [ax])), 0, ax)
+    return out
+
+
 @dataclass
 class Level:
     """One grid in the hierarchy, plus the operators that reach the next."""
-    problem: LineProblem2D
-    P_x: Optional[np.ndarray] = None      # (Nx_f, Nx_c)
-    P_y: Optional[np.ndarray] = None      # (Ny_f, Ny_c)
-    R_x: Optional[np.ndarray] = None
-    R_y: Optional[np.ndarray] = None
+    problem: object
+    P: Optional[list] = None      # one (n_fine, n_coarse) matrix per axis
+    R: Optional[list] = None      # one (n_coarse, n_fine) matrix per axis
 
     def restrict(self, r: np.ndarray) -> np.ndarray:
-        return self.R_x @ r @ self.R_y.T
+        return _apply_axis_ops(self.R, r)
 
     def prolong(self, e: np.ndarray) -> np.ndarray:
-        return self.P_x @ e @ self.P_y.T
+        return _apply_axis_ops(self.P, e)
 
 
-def build_hierarchy(problem: LineProblem2D, max_levels: int = 10) -> list[Level]:
-    """Coarsen until ``coarsen()`` returns None or max_levels is reached."""
+def build_hierarchy(problem, max_levels: int = 10) -> list[Level]:
+    """
+    Coarsen until ``coarsen()`` returns None or max_levels is reached.
+
+    Works for any dimension: one 1-D transfer operator is built per axis,
+    choosing the periodic or Dirichlet form according to the problem's
+    ``periodic`` flags.
+    """
     levels = [Level(problem)]
     while len(levels) < max_levels:
         fine = levels[-1].problem
         coarse = fine.coarsen()
         if coarse is None:
             break
-        nxf, nyf = fine.shape
-        nxc, nyc = coarse.shape
-        Lx = getattr(fine, "Lx", nxf * fine.dx)
-        Ly = getattr(fine, "Ly", nyf * fine.dy)
-        Px = interpolation_1d(nxf, nxc, Lx)
-        Py = interpolation_1d(nyf, nyc, Ly)
-        levels[-1].P_x, levels[-1].P_y = Px, Py
-        levels[-1].R_x, levels[-1].R_y = restriction_from(Px), restriction_from(Py)
+        f_shape, c_shape = tuple(fine.shape), tuple(coarse.shape)
+        lengths = getattr(fine, "lengths", None)
+        if lengths is None:                       # original 2-D class
+            lengths = (getattr(fine, "Lx", f_shape[0] * fine.dx),
+                       getattr(fine, "Ly", f_shape[1] * fine.dy))
+        periodic = getattr(fine, "periodic", (False,) * len(f_shape))
+
+        P_ops = []
+        for ax in range(len(f_shape)):
+            if f_shape[ax] == c_shape[ax]:
+                # Axis not coarsened at this level (anisotropic
+                # semi-coarsening): the transfer is the identity.
+                P_ops.append(np.eye(f_shape[ax]))
+            elif periodic[ax]:
+                P_ops.append(interpolation_1d_periodic(f_shape[ax], c_shape[ax]))
+            else:
+                P_ops.append(interpolation_1d(f_shape[ax], c_shape[ax],
+                                              lengths[ax]))
+        levels[-1].P = P_ops
+        levels[-1].R = [restriction_from(P) for P in P_ops]
         levels.append(Level(coarse))
     return levels
 
@@ -178,7 +226,7 @@ def _v_cycle(levels, l, u, rhs, inner, work, nu1, nu2, n_coarse):
 
     r = rhs - prob.apply(u)
     r_c = lev.restrict(r)
-    e_c = np.zeros(levels[l + 1].problem.shape)
+    e_c = np.zeros(tuple(levels[l + 1].problem.shape))
     e_c = _v_cycle(levels, l + 1, e_c, r_c, inner, work, nu1, nu2, n_coarse)
     u += lev.prolong(e_c)
 
@@ -241,7 +289,7 @@ def solve_multigrid(
         for l in range(len(levels) - 1):
             rhs_levels.append(levels[l].restrict(rhs_levels[-1]))
 
-        u = np.zeros(levels[-1].problem.shape)
+        u = np.zeros(tuple(levels[-1].problem.shape))
         for _ in range(n_coarse):
             strip_sweep(levels[-1].problem, u, rhs_levels[-1], inner, work, 1.0)
         for l in range(len(levels) - 2, -1, -1):
@@ -249,7 +297,7 @@ def solve_multigrid(
             u = _v_cycle(levels, l, u, rhs_levels[l], inner, work,
                          nu1, nu2, n_coarse)
     else:
-        u = np.zeros(problem.shape)
+        u = np.zeros(tuple(problem.shape))
 
     # ---- V-cycles on the finest level ---------------------------------------
     stop = "max_cycles"

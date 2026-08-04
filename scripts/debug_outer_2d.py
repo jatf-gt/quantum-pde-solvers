@@ -58,9 +58,9 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from solvers.outer import (PoissonLine2D, available_inner, available_options,
-                           available_schemes, build_hierarchy, describe_inner,
-                           describe_scheme, solve, solve_staged)
+from problems.poisson_line_2d import PoissonLine2D
+from solvers.outer import (available_inner, available_schemes, build_hierarchy, 
+                           describe_inner, describe_scheme, solve, solve_staged)
 
 OUT_DIR = REPO_ROOT / "results" / "debugging"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

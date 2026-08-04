@@ -46,20 +46,22 @@ from typing import Callable, Sequence, Union
 import numpy as np
 
 from solvers.outer.core import (InnerSolver, LineProblem2D, OuterResult,
-                                PoissonLine2D, StagnationMonitor, WorkLog,
-                                strip_sweep)
+                                StagnationMonitor, WorkLog, strip_sweep)
 from solvers.outer.inner import (InnerConfig, Option, available as available_inner,
                                  available_options, describe as describe_inner,
                                  get_inner, resolve_options)
 from solvers.outer.multigrid import (build_hierarchy, interpolation_1d,
-                                     solve_multigrid)
+                                     interpolation_1d_periodic, solve_multigrid)
+from problems.poisson_line_2d import PoissonLine2D
+from problems.poisson_line_3d import PoissonLine3D
 from solvers.outer.stationary import optimal_omega, solve_stationary
 
 __all__ = [
     "solve", "solve_staged", "SCHEMES", "available_schemes", "available_inner",
     "InnerConfig", "Option", "available_options", "describe_inner",
     "resolve_options", "SCHEME_OPTIONS", "describe_scheme",
-    "PoissonLine2D", "OuterResult", "WorkLog", "StagnationMonitor",
+    "PoissonLine2D", "PoissonLine3D", "OuterResult", "WorkLog",
+    "StagnationMonitor", "interpolation_1d_periodic",
     "LineProblem2D", "InnerSolver",
     "get_inner", "solve_stationary", "solve_multigrid",
     "optimal_omega", "build_hierarchy", "interpolation_1d", "strip_sweep",

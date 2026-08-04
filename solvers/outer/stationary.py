@@ -53,9 +53,14 @@ from solvers.outer.core import (LineProblem2D, OuterResult, StagnationMonitor,
                                 WorkLog, strip_sweep)
 
 
-def optimal_omega(Nx: int, Ny: int) -> float:
-    """Optimal SOR parameter for the 5-point Laplacian on an Nx x Ny grid."""
-    rho_J = 0.5 * (np.cos(np.pi / (Nx + 1)) + np.cos(np.pi / (Ny + 1)))
+def optimal_omega(*shape: int) -> float:
+    """
+    Optimal SOR parameter for the Laplacian on a structured grid.
+
+    Generalises to any dimension: rho_J is the mean of cos(pi/(N_d+1)) over
+    the axes, which reduces to the standard 2-D expression for two axes.
+    """
+    rho_J = float(np.mean([np.cos(np.pi / (n + 1)) for n in shape]))
     return float(np.clip(2.0 / (1.0 + np.sqrt(1.0 - rho_J**2)), 1.0, 1.99))
 
 
@@ -94,13 +99,13 @@ def solve_stationary(
     if criterion not in ("residual", "delta"):
         raise ValueError(f"criterion must be 'residual' or 'delta', got {criterion!r}")
 
-    Nx, Ny = problem.shape
+    shape = tuple(problem.shape)
     if omega == "optimal":
-        om = 1.0 if update == "jacobi" else optimal_omega(Nx, Ny)
+        om = 1.0 if update == "jacobi" else optimal_omega(*shape)
     else:
         om = float(omega)
 
-    u = np.zeros((Nx, Ny)) if u0 is None else np.array(u0, dtype=float, copy=True)
+    u = np.zeros(shape) if u0 is None else np.array(u0, dtype=float, copy=True)
     rhs = problem.rhs()
     b_norm = np.linalg.norm(rhs)
     b_norm = b_norm if b_norm > 1e-300 else 1.0
