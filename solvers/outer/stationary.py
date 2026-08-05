@@ -74,6 +74,7 @@ def solve_stationary(
     max_iter:   int = 5000,
     symmetric:  bool = False,
     patience:   int = 20,
+    max_wall_s: float | None = None,
     u0:         np.ndarray | None = None,
     callback=None,
 ) -> OuterResult:
@@ -92,6 +93,16 @@ def solve_stationary(
     patience : stagnation window.  A quantum inner solver has an error floor;
         once the iteration reaches it, further sweeps cost circuit simulations
         and buy nothing.  Stagnation is reported as such, not as convergence.
+    max_wall_s : hard wall-clock budget in seconds.  Checked once per outer
+        iteration - never mid-strip-solve, so a partially-completed circuit
+        is never interrupted.  Exists because stagnation detection bounds the
+        *iteration count*, not the *cost per iteration*: a solver whose
+        per-strip cost is simply large (HHL, VQLS at N >~ 32) can still burn
+        many hours reaching its own stagnation point.  On timeout the current
+        iterate is returned with stop_reason="wall_time_exceeded" - a real,
+        usable data point explicitly flagged as not fully converged, rather
+        than either silently accepting a slow answer or getting nothing at
+        all for the wall-clock spent.
     callback : optional f(iteration, u, residual, delta).
     """
     if update not in ("gauss-seidel", "jacobi"):
@@ -140,6 +151,9 @@ def solve_stationary(
             break
         if monitor.update(res):
             stop = "stagnated"
+            break
+        if max_wall_s is not None and (time.perf_counter() - t0) > max_wall_s:
+            stop = "wall_time_exceeded"
             break
 
     label = ("line-jacobi" if update == "jacobi"

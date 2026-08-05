@@ -246,6 +246,7 @@ def solve_multigrid(
     fmg:       bool = True,
     max_levels: int = 10,
     patience:  int = 10,
+    max_wall_s: float | None = None,
     callback=None,
 ) -> OuterResult:
     """
@@ -261,6 +262,14 @@ def solve_multigrid(
         iteration).  Reaches discretisation accuracy in roughly 3 fine-level
         cycles instead of 5, at no extra fine-level cost.
     tol : relative residual ||b - A u|| / ||b||.
+    max_wall_s : hard wall-clock budget in seconds, checked once per V-cycle
+        (never mid-strip-solve).  See the identical parameter on
+        ``solve_stationary`` for the rationale: stagnation detection bounds
+        cycle *count*, not cost *per cycle*, and a solver with a large
+        per-strip cost (HHL, VQLS at N >~ 32) can still run for hours before
+        reaching its own stagnation point.  On timeout the current iterate is
+        returned with stop_reason="wall_time_exceeded".  Also checked once
+        after the FMG start, in case that alone exceeds the budget.
 
     Falls back to a clear error if the problem admits no coarse level; use
     ``solve_stationary`` in that case.
@@ -284,6 +293,10 @@ def solve_multigrid(
     # fine one.  Passing zeros here (a natural-looking mistake) makes every
     # intermediate V-cycle solve A e = 0, so the FMG start does nothing and
     # merely wastes strip solves.
+    def _over_budget() -> bool:
+        return max_wall_s is not None and (time.perf_counter() - t0) > max_wall_s
+
+    fmg_timed_out = False
     if fmg:
         rhs_levels = [rhs]
         for l in range(len(levels) - 1):
@@ -292,7 +305,22 @@ def solve_multigrid(
         u = np.zeros(tuple(levels[-1].problem.shape))
         for _ in range(n_coarse):
             strip_sweep(levels[-1].problem, u, rhs_levels[-1], inner, work, 1.0)
+        # Checked once per ascending level, not only once after the whole FMG
+        # start: each level's V-cycle recurses through every coarser level
+        # beneath it, so a single check point at the very end of the FMG
+        # start can let the budget overrun substantially on a deep hierarchy
+        # before the very first check fires.
         for l in range(len(levels) - 2, -1, -1):
+            if _over_budget():
+                fmg_timed_out = True
+                # u is still shaped for level l+1. Prolong the rest of the way
+                # to the fine grid (cheap - interpolation only, no further
+                # strip solves) so the field returned has the right shape and
+                # is at least the FMG-interpolated guess, rather than an
+                # arbitrary coarse-level array the caller cannot use.
+                for l2 in range(l, -1, -1):
+                    u = levels[l2].prolong(u)
+                break
             u = levels[l].prolong(u)
             u = _v_cycle(levels, l, u, rhs_levels[l], inner, work,
                          nu1, nu2, n_coarse)
@@ -301,23 +329,30 @@ def solve_multigrid(
 
     # ---- V-cycles on the finest level ---------------------------------------
     stop = "max_cycles"
-    for cyc in range(max_cycles):
-        res = float(np.linalg.norm(rhs - problem.apply(u)) / b_norm)
-        history.append(res)
-        if callback is not None:
-            callback(cyc, u, res)
-        if res < tol:
-            stop = "tol_met"
-            break
-        if not np.isfinite(res):
-            stop = "diverged"
-            break
-        if monitor.update(res):
-            stop = "stagnated"
-            break
-        u = _v_cycle(levels, 0, u, rhs, inner, work, nu1, nu2, n_coarse)
-    else:
+    if fmg_timed_out or _over_budget():
+        stop = "wall_time_exceeded"
         history.append(float(np.linalg.norm(rhs - problem.apply(u)) / b_norm))
+    else:
+        for cyc in range(max_cycles):
+            res = float(np.linalg.norm(rhs - problem.apply(u)) / b_norm)
+            history.append(res)
+            if callback is not None:
+                callback(cyc, u, res)
+            if res < tol:
+                stop = "tol_met"
+                break
+            if not np.isfinite(res):
+                stop = "diverged"
+                break
+            if monitor.update(res):
+                stop = "stagnated"
+                break
+            if _over_budget():
+                stop = "wall_time_exceeded"
+                break
+            u = _v_cycle(levels, 0, u, rhs, inner, work, nu1, nu2, n_coarse)
+        else:
+            history.append(float(np.linalg.norm(rhs - problem.apply(u)) / b_norm))
 
     return OuterResult(
         u=u,

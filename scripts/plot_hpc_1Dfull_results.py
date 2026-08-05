@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-plot_hpc_results.py
-===================
 Post-processing script: reads the JSON/CSV output from run_hpc_full.py
 and produces publication-quality plots for thesis Chapter 5.
 

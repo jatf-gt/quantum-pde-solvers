@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-plot_hpc_3Dfull_results.py
-===========================
 Post-processing plots for a run_hpc_3Dfull.py sweep.
 
 Reads results/3Dhpc_run/ (results_full.json plus the archived
