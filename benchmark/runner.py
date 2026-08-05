@@ -59,36 +59,6 @@ SAVE_FIGS   = True
 RESULTS_DIR = Path("results")
 
 
-# ── 1D Execution Orchestration ────────────────────────────────────────────────
-
-def run_pair_1d(cfg: SimConfig1D) -> tuple[BenchmarkResult, BenchmarkResult]:
-    """
-    Instantiates the 1D problem, executes both classical Thomas and quantum HHL 
-    resolutions, and aggregates the resulting metrics.
-
-    The classical baseline is explicitly executed prior to the quantum solver 
-    to ensure the Thomas solution vector is available for absolute error 
-    computations (required for non-homogeneous configurations lacking analytical derivations).
-    """
-    problem = PoissonProblem1D(cfg)
-    print(f"\n  → {problem.summary()}")
-
-    t0        = time.perf_counter()
-    thomas_sr = thomas_solve(problem)
-    t_thomas  = time.perf_counter() - t0
-
-    t0     = time.perf_counter()
-    hhl_sr = hhl_solve(problem)
-    t_hhl  = time.perf_counter() - t0
-
-    print(f"     Thomas: {t_thomas:.3f}s  |  HHL: {t_hhl:.1f}s")
-
-    thomas_br = compute_errors(problem, thomas_sr, u_thomas=None)
-    hhl_br    = compute_errors(problem, hhl_sr,    u_thomas=thomas_sr.u)
-
-    return thomas_br, hhl_br
-
-
 # ── 2D Execution Orchestration ────────────────────────────────────────────────
 
 def run_pair_2d(

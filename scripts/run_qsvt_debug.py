@@ -7,15 +7,9 @@ Runs QSVT on two problems and benchmarks against Thomas:
     1. Generic 1-D Poisson with fS source (homogeneous BCs) at N=4 and N=8.
     2. HET plasma 1-D linear profile (homogeneous BCs) at N=4.
 
-All diagnostics are active:
-    - Block encoding verification: checks <0|U_A|0> against A/alpha.
-    - State preparation verification: checks Isometry output.
-    - Full post-selected complex amplitudes.
-    - QSP polynomial evaluation at each eigenvalue.
-    - Proportionality recovery diagnostics.
+Diagnostics active:
+    - Proportionality recovery diagnostics (see qsvt_1d.py::_qsvt_recovery_diagnostics).
     - Solution comparison against Thomas and analytical.
-
-2-D cases are implemented but commented out at the bottom.
 
 Usage
 -----
@@ -48,11 +42,6 @@ from solvers.quantum.qsvt_1d import QSVTConfig1D, qsvt_solve, qsvt_solve_system
 
 RESULTS_DIR = Path("results/qsvt_debug")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-
-_debug_be_circuit = None
-_debug_angles     = None
-_debug_n          = None
-_debug_alpha      = None
 
 
 # ── Utility ------------------------------------------------------------------
@@ -199,17 +188,6 @@ def run_het_1d() -> None:
         r_qsvt = qsvt_solve_system(problem.A, problem.b, config=qsvt_cfg)
         t_qsvt = time.perf_counter() - t0
 
-        import scripts.run_qsvt_debug as _dbg
-        if _dbg._debug_be_circuit is not None:
-            _verify_qsvt_polynomial_directly(
-                _dbg._debug_be_circuit,
-                _dbg._debug_angles,
-                _dbg._debug_n,
-                _dbg._debug_alpha,
-                problem.A * -1,  # negated A (positive definite)
-                label="HET-3a direct",
-            )
-
         _row(
             "QSVT",
             _max_rel_err(r_qsvt.u, u_exact),
@@ -230,149 +208,6 @@ def run_het_1d() -> None:
         print(f"    Thom % = {np.round(err_t, 3).tolist()}")
 
 
-def _verify_qsvt_polynomial_directly(
-    be_circuit  : object,
-    angles      : np.ndarray,
-    n           : int,
-    alpha       : float,
-    A           : np.ndarray,
-    label       : str,
-) -> None:
-    """
-    Directly verify what polynomial the QSVT circuit implements by
-    applying it to each eigenvector of A separately and measuring
-    the imaginary part of the output.
-
-    For each eigenvector v_k with eigenvalue lambda_k:
-        Input:  |0_anc> |v_k>
-        Output: Im(<0_anc|U_QSVT|0_anc>|v_k>) = Im(P(lambda_k/alpha)) * |v_k>
-
-    This gives the exact polynomial values Im(P(lambda_k/alpha)) without
-    any approximation, directly from the circuit.
-    """
-    from qiskit.quantum_info import Statevector
-    from qiskit import QuantumCircuit
-    from qiskit.circuit.library import Isometry
-
-    N = 2**n
-    eig_vals, eig_vecs = np.linalg.eigh(A)
-
-    kappa = float(eig_vals.max() / eig_vals.min())
-    be_gate     = be_circuit.to_gate(label="U_A")
-    be_inv_gate = be_circuit.inverse().to_gate(label="U_A†")
-    anc_idx     = n
-    n_total     = n + 1
-    be_qubits   = list(range(n_total))
-
-    for k in range(N):
-        lam_k = float(eig_vals[k])
-        v_k   = eig_vecs[:, k]
-        x     = lam_k / alpha
-
-        # Build the QSVT circuit with v_k as input.
-        qc = QuantumCircuit(n_total, name=f"QSVT_v{k}")
-
-        # In _verify_qsvt_polynomial_directly, after building qc:
-        from qiskit.quantum_info import Statevector as QSV
-        test_qc = QuantumCircuit(n)
-        test_qc.append(Isometry(v_k, 0, 0), list(range(n)))
-        prepared_sv = np.real(np.array(QSV(test_qc).data))
-
-        qc.append(Isometry(v_k, 0, 0), list(range(n)))
-
-        degree = len(angles) - 1
-        for idx, phi in enumerate(angles):
-            qc.rz(2.0 * phi, anc_idx)
-            if idx < degree:
-                if idx % 2 == 0:
-                    qc.append(be_gate,     be_qubits)
-                else:
-                    qc.append(be_inv_gate, be_qubits)
-
-        sv = np.array(Statevector(qc).data)
-
-        # Extract post-selected imaginary part.
-        x_raw = np.zeros(N, dtype=complex)
-        for idx in range(2**n_total):
-            if ((idx >> anc_idx) & 1) == 0:
-                x_raw[idx & (N - 1)] = sv[idx]
-
-        # Im(P(lambda_k/alpha)) = Im(x_raw) / v_k (should be scalar).
-        im_part = np.imag(x_raw)
-        # The output should be Im(P(x)) * v_k.
-        # Estimate Im(P(x)) by projecting onto v_k.
-        im_P = float(np.dot(v_k, im_part))
-
-        expected = 0.9 / (kappa * x) if x > 1e-10 else float("nan")
-        ratio    = im_P / expected if abs(expected) > 1e-14 else float("nan")
-
-
-# ── Section 3: 2-D cases -------------------------------------------------
-
-def run_generic_2d() -> None:
-    """
-    Run QSVT-2D on the generic 2-D Poisson equation with fS source at N=4.
-    Uses the line-Jacobi decomposition. Benchmark against Thomas-2D.
-    """
-    from problems.poisson_2d import PoissonProblem2D
-    from core.config import SimConfig2D
-    from solvers.classical.thomas_2d import thomas_solve_2d
-    from solvers.quantum.qsvt_2d import QSVTConfig2D, qsvt_solve_2d
-
-    _section("QSVT Debug — Generic 2-D Poisson, fS source, N=4")
-
-    cfg_2d   = SimConfig2D(N=4, epsilon=0.01, source_fn="fS", max_iter=100)
-    prob_2d  = PoissonProblem2D(cfg_2d)
-
-    r_thomas = thomas_solve_2d(prob_2d)
-
-    qsvt_cfg_2d = QSVTConfig2D(
-        epsilon      = 0.1,
-        angle_method = "auto",
-        max_degree   = 200,
-        verbose      = False,
-    )
-    r_qsvt = qsvt_solve_2d(prob_2d, config=qsvt_cfg_2d)
-
-    print(f"  Thomas-2D: iters={r_thomas.iterations}, "
-          f"converged={r_thomas.converged}")
-    print(f"  QSVT-2D:   iters={r_qsvt.iterations}, "
-          f"converged={r_qsvt.converged}")
-    print(f"  Max |QSVT - Thomas|: "
-          f"{np.max(np.abs(r_qsvt.u - r_thomas.u)):.4e}")
-
-
-def run_het_2d() -> None:
-    """
-    Run QSVT-2D on the HET sinusoidal 2-D problem at N=4.
-    Analytical solution phi = sin(πx)sin(πy) is available.
-    """
-    from problems.het_plasma_2d import HETConfig2D, HETSinusoidalProblem2D
-    from solvers.classical.thomas_2d import thomas_solve_2d
-    from solvers.quantum.qsvt_2d import QSVTConfig2D, qsvt_solve_2d
-
-    _section("QSVT Debug — HET 2-D Sinusoidal, N=4")
-
-    cfg_2d   = HETConfig2D(N=4, epsilon=0.01, max_iter=300)
-    prob_2d  = HETSinusoidalProblem2D(cfg_2d)
-    u_exact  = prob_2d.analytical_solution()
-
-    r_thomas = thomas_solve_2d(prob_2d)
-
-    qsvt_cfg_2d = QSVTConfig2D(
-        epsilon      = 0.01,
-        angle_method = "auto",
-        max_degree   = 200,
-        verbose      = True,
-    )
-    r_qsvt = qsvt_solve_2d(prob_2d, config=qsvt_cfg_2d)
-
-    print(f"  Thomas-2D: iters={r_thomas.iterations}, "
-          f"max_err={_max_rel_err(r_thomas.u.ravel(), u_exact.ravel()):.4f}%")
-    print(f"  QSVT-2D:   iters={r_qsvt.iterations}, "
-          f"max_err={_max_rel_err(r_qsvt.u.ravel(), u_exact.ravel()):.4f}%")
-
-
 # ── Main ---------------------------------------------------------------------
 
 def main() -> None:
@@ -385,10 +220,6 @@ def main() -> None:
 
     run_generic_poisson()
     run_het_1d()
-
-    # Uncomment to run 2-D cases once 1-D is resolved:
-    # run_generic_2d()
-    # run_het_2d()
 
     print(f"\n{'─'*68}")
     print(f"  Total elapsed: {time.perf_counter() - t_start:.1f}s")

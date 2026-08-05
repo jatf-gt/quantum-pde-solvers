@@ -87,7 +87,6 @@ from qiskit.quantum_info import Statevector
 from problems.poisson_1d import PoissonProblem1D
 from solvers.quantum.block_encoding import (
     build_tst_block_encoding,
-    subnormalisation_factor,
     _N_ANCILLA_BE,
 )
 from solvers.quantum.qsp_angles import (
@@ -255,77 +254,16 @@ def qsvt_solve_system(
     # -- Stage 1: block encoding ----------------------------------------------
     main_diag = float(A[0, 0])
     off_diag  = float(A[0, 1])
-    #alpha     = subnormalisation_factor(main_diag, off_diag)
     # Use the spectral norm (largest eigenvalue) as the subnormalisation
-    # factor alpha. This is what build_tst_block_encoding uses internally
-    # to construct the block encoding circuit. Using |a|+2|b| instead
-    # causes a mismatch at N=8 where lambda_max > |a|+2|b|, making
-    # lambda_max/alpha > 1 and breaking the QSP polynomial domain.
+    # factor alpha, rather than |a|+2|b| (subnormalisation_factor). This is
+    # what build_tst_block_encoding uses internally to construct the block
+    # encoding circuit. Using |a|+2|b| instead causes a mismatch at N=8
+    # where lambda_max > |a|+2|b|, making lambda_max/alpha > 1 and breaking
+    # the QSP polynomial domain.
     eigs_for_alpha = np.linalg.eigvalsh(A)
     alpha          = float(np.max(np.abs(eigs_for_alpha)))
 
-    A_norm_factor = float(np.linalg.norm(A, ord=2))
-    b_norm_vec    = b / b_norm
-    A_norm_mat_   = A / A_norm_factor
-
     be_circuit, alpha_check = build_tst_block_encoding(N, main_diag, off_diag)
-
-    from qiskit.quantum_info import Operator
-    # Get the full 2N x 2N unitary from the circuit.
-    be_unitary_circuit = np.array(Operator(be_circuit).data)
-
-    # Reconstruct the exact Sz.-Nagy dilation independently.
-    # M = A / alpha (the normalised matrix, already computed above).
-    M    = A / alpha
-    N_be = 2 * N
-    I    = np.eye(N)
-    ImM2 = I - M @ M
-    eigs_be, V_be = np.linalg.eigh(ImM2)
-    eigs_pos_be   = np.clip(eigs_be, 0.0, None)
-    sqrtImM2      = V_be @ np.diag(np.sqrt(eigs_pos_be)) @ V_be.conj().T
-
-    # Wx-convention dilation (both diagonal blocks +M, off-diagonals i*sqrt).
-    be_unitary_exact = np.zeros((N_be, N_be), dtype=complex)
-    be_unitary_exact[:N, :N] =  M
-    be_unitary_exact[:N, N:] =  1j * sqrtImM2
-    be_unitary_exact[N:, :N] =  1j * sqrtImM2
-    be_unitary_exact[N:, N:] =  M
-
-    # Compare full 2N x 2N matrices.
-    full_error = float(np.max(np.abs(be_unitary_circuit - be_unitary_exact)))
-    topL_error = float(np.max(np.abs(be_unitary_circuit[:N, :N] - M)))
-
-    if full_error > 1e-6:
-        print(
-            f"    WARNING: full unitary error {full_error:.4e} > 1e-6.\n"
-            f"    The UnitaryGate decomposition is introducing numerical errors.\n"
-            f"    These errors accumulate across repeated block encoding\n"
-            f"    applications and corrupt the QSVT polynomial for multi-\n"
-            f"    eigenvector inputs (HET case) while being hidden for\n"
-            f"    single-eigenvector inputs (generic Poisson case)."
-        )
-    # Verify block encoding for both b_norm_vec and a test vector
-    from qiskit.quantum_info import Statevector as QSV, Operator
-
-    # Get the full unitary of the block encoding circuit
-    be_unitary = np.array(Operator(be_circuit).data)
-    n_total_be = n + _N_ANCILLA_BE
-    N_be = 2**n_total_be
-
-    # Extract the top-left N×N block: <0_anc|U_A|0_anc>
-    # In Qiskit little-endian: ancilla is qubit n (bit n of index)
-    # |0_anc, data_i> has index i (ancilla bit = 0, data bits = i)
-    # <0_anc, data_j|U_A|0_anc, data_i> = be_unitary[j, i]
-    # where j and i range over data register indices with ancilla=0
-
-    A_encoded = np.zeros((N, N), dtype=complex)
-    for i in range(N):
-        for j in range(N):
-            # Row index: ancilla=0, data=j → global index j (ancilla bit n = 0)
-            # Col index: ancilla=0, data=i → global index i
-            row_idx = j  # ancilla bit 0, data bits = j
-            col_idx = i  # ancilla bit 0, data bits = i
-            A_encoded[j, i] = be_unitary[row_idx, col_idx]
 
     # Effective condition number after subnormalisation.
     # kappa_eff = alpha * kappa(A) / ||A||_2
@@ -366,12 +304,6 @@ def qsvt_solve_system(
         )
 
     # -- Stage 3: QSVT circuit construction -----------------------------------
-    import scripts.run_qsvt_debug as _dbg
-    _dbg._debug_be_circuit = be_circuit
-    _dbg._debug_angles     = angles
-    _dbg._debug_n          = n
-    _dbg._debug_alpha      = alpha
-
     qsvt_circuit = _build_qsvt_circuit(
         be_circuit = be_circuit,
         angles     = angles,
@@ -402,24 +334,6 @@ def qsvt_solve_system(
 
     Ax_norm = A_norm_mat @ x_raw
     denom   = float(np.dot(Ax_norm, Ax_norm))
-
-    if getattr(config, 'label', '') == 'HET-3a':
-        A_norm_mat_diag = A / float(np.linalg.norm(A, ord=2))
-        u_expected = np.linalg.solve(A_norm_mat_diag, b / b_norm)
-        u_exp_norm = u_expected / np.linalg.norm(u_expected)
-        x_raw_norm = x_raw / (np.linalg.norm(x_raw) + 1e-14)
-        cos_xu = float(np.dot(x_raw_norm, u_exp_norm))
-        print(f"  QSVT x_raw vs A_norm^{{-1}}b_norm:")
-        print(f"    x_raw (normalised)    = {np.round(x_raw_norm, 5)}")
-        print(f"    A^{{-1}}b (normalised) = {np.round(u_exp_norm, 5)}")
-        print(f"    cos(x_raw, A^{{-1}}b) = {cos_xu:.6f}")
-        # Also check the generic Poisson expected solution
-        b_fS = np.array([-0.3717, -0.6015, -0.6015, -0.3717])
-        u_fS_expected = np.linalg.solve(A_norm_mat_diag, b_fS)
-        u_fS_norm = u_fS_expected / np.linalg.norm(u_fS_expected)
-        cos_fS = float(np.dot(x_raw_norm, u_fS_norm))
-        print(f"    cos(x_raw, A^{{-1}}b_fS) = {cos_fS:.6f}  "
-            f"(should be ~0 if x_raw is HET-specific)")
 
     # Diagnostics — always print to identify HET failure.
     _qsvt_recovery_diagnostics(
@@ -612,119 +526,3 @@ def _extract_solution(
         )
 
     return x_raw_im
-
-
-def _evaluate_qsp_polynomial(
-    angles    : np.ndarray,
-    degree    : int,
-    kappa_eff : float,
-    alpha     : float,
-    A         : np.ndarray,
-    label     : str,
-) -> None:
-    """
-    Evaluate P(λ_k/α) at each eigenvalue of A using the correct signal
-    unitary convention matching the block encoding circuit.
-
-    The block encoding circuit implements the real rotation:
-        R_x = [[ x,          sqrt(1-x²)],
-               [-sqrt(1-x²), x         ]]
-
-    NOT the W_x convention used by pyqsp internally. The relationship is:
-        W_x = diag(1, i) · R_x · diag(1, -i)
-
-    The pyqsp sym_qsp phases are designed for W_x. When applied with R_x
-    (as in the circuit), the polynomial achieved is different. This
-    diagnostic evaluates both conventions to determine which one the
-    circuit actually implements.
-    """
-    eig_vals_A, _ = np.linalg.eigh(A)
-
-    print(f"\n  QSP polynomial evaluation [{label}]:")
-    print(
-        f"  {'lambda_k':>10}  {'x':>8}  "
-        f"{'1/(kx)·0.9':>12}  "
-        f"{'Im(P_Wx)':>10}  {'Re(P_Wx)':>10}  "
-        f"{'Im(P_Rx)':>10}  {'Re(P_Rx)':>10}"
-    )
-
-    for lam_k in eig_vals_A:
-        x = lam_k / alpha
-
-        if x > 1.0:
-            print(
-                f"  {lam_k:>10.4f}  {x:>8.4f}  "
-                f"{'x>1: INVALID':>12}  "
-                f"{'overflow':>10}  {'overflow':>10}  "
-                f"{'overflow':>10}  {'overflow':>10}"
-            )
-            continue
-
-        expected = (1.0 / (kappa_eff * x)) * 0.9
-        sq       = float(np.sqrt(max(1.0 - x**2, 0.0)))
-
-        # W_x convention (pyqsp internal):
-        Wx = np.array([[x, 1j*sq], [1j*sq, x]], dtype=complex)
-
-        # R_x convention (block encoding circuit — real rotation matrix):
-        Rx = np.array([[x, sq], [-sq, x]], dtype=float)
-
-        def _apply_qsp(signal_unitary: np.ndarray) -> complex:
-            """Apply QSP sequence and return top-left element P(x)."""
-            U = np.eye(2, dtype=complex)
-            for idx_phi in range(len(angles)):
-                phi = angles[idx_phi]
-                Rz  = np.diag([np.exp(-1j * phi), np.exp(1j * phi)])
-                U   = Rz @ U
-                if idx_phi < degree:
-                    U = signal_unitary @ U
-            return complex(U[0, 0])
-
-        # P_Wx = _apply_qsp_alternating(Wx, angles, degree)
-        # P_Rx = _apply_qsp_alternating(Rx)
-
-        # print(
-        #     f"  {lam_k:>10.4f}  {x:>8.4f}  "
-        #     f"{expected:>12.6f}  "
-        #     f"{np.imag(P_Wx):>10.6f}  {np.real(P_Wx):>10.6f}  "
-        #     f"{np.imag(P_Rx):>10.6f}  {np.real(P_Rx):>10.6f}"
-        # )
-
-        P_Wx_alt = _apply_qsp_alternating(Wx, angles, degree)
-        P_Rx_alt = _apply_qsp_alternating(Rx, angles, degree)
-
-        print(
-            f"  {lam_k:>10.4f}  {x:>8.4f}  "
-            f"{expected:>12.6f}  "
-            f"{'Im(P_Wx_alt)':>14}  {'Re(P_Wx_alt)':>14}  "
-            f"{'Im(P_Rx_alt)':>14}  {'Re(P_Rx_alt)':>14}"
-        )
-        print(
-            f"  {'':>10}  {'':>8}  "
-            f"{'':>12}  "
-            f"{np.imag(P_Wx_alt):>14.6f}  {np.real(P_Wx_alt):>14.6f}  "
-            f"{np.imag(P_Rx_alt):>14.6f}  {np.real(P_Rx_alt):>14.6f}"
-        )
-
-
-def _apply_qsp_alternating(
-    signal_unitary : np.ndarray,
-    angles         : np.ndarray,
-    degree         : int,
-) -> complex:
-    """
-    Apply the QSP sequence with alternating signal_unitary and
-    signal_unitary.conj().T, matching the circuit's alternation
-    between U_A (even steps) and U_A† (odd steps).
-    """
-    U = np.eye(2, dtype=complex)
-    for idx_phi in range(len(angles)):
-        phi = angles[idx_phi]
-        Rz  = np.diag([np.exp(-1j * phi), np.exp(1j * phi)])
-        U   = Rz @ U
-        if idx_phi < degree:
-            if idx_phi % 2 == 0:
-                U = signal_unitary @ U
-            else:
-                U = signal_unitary.conj().T @ U
-    return complex(U[0, 0])

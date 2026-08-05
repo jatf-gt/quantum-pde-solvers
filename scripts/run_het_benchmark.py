@@ -36,7 +36,6 @@ from problems.het_plasma_1d import HETPoissonProblem1D
 from solvers.classical.thomas import thomas_solve_system
 from solvers.quantum.hhl_1d import hhl_solve_system
 from solvers.quantum.vqls_1d import vqls_solve_system, VQLSConfig1D
-from benchmark.reporting import print_result_table
 
 RESULTS_DIR = Path("results/het")
 

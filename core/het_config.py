@@ -25,7 +25,6 @@ import numpy as np
 
 E_CHARGE    = 1.602176634e-19   # Elementary charge [C]
 EPS_0       = 8.854187817e-12   # Vacuum permittivity [F/m]
-K_BOLTZMANN = 1.380649e-23      # Boltzmann constant [J/K]
 EV_TO_J     = E_CHARGE          # Conversion factor: 1 eV in Joules
 
 

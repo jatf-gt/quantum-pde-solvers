@@ -46,7 +46,7 @@ from solvers.quantum.qsp_angles import (
 from solvers.quantum.qsvt_1d import (
     qsvt_solve,
     qsvt_solve_system,
-    QSVTConfig,
+    QSVTConfig1D,
     DEFAULT_QSVT_CONFIG,
 )
 from solvers.quantum.result import QSVTSolverResult
@@ -71,7 +71,7 @@ def qsvt_cfg_fast():
     tolerance is appropriate for structural tests; publication-quality
     results require epsilon=0.01 or smaller.
     """
-    return QSVTConfig(
+    return QSVTConfig1D(
         epsilon      = 0.1,
         angle_method = "auto",
         verbose      = True,

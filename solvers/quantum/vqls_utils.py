@@ -291,68 +291,6 @@ def build_cost_function(
     return cost_fn
 
 
-def build_cost_function_pennylane(
-    pauli_terms:  List[Tuple[complex, str]],
-    b_norm:       np.ndarray,
-    n_qubits:     int,
-    n_layers:     int,
-    device_name:  str = "default.qubit",
-) -> callable:
-    """
-    Constructs the VQLS global cost function employing PennyLane's native 
-    circuit-level Hadamard tests.
-
-    This implementation provides strict hardware compatibility, relying exclusively 
-    on observable measurements rather than direct statevector arithmetic. It is 
-    designated for deployment on physical Quantum Processing Units (QPUs) or 
-    shot-based stochastic simulators.
-
-    For deterministic statevector simulations, `build_cost_function` is vastly 
-    more efficient. This architecture is retained to ensure comprehensive 
-    hardware portability.
-
-    The global objective is formally evaluated as:
-
-        C_G(θ) = 1 - |Σ_l c_l β_l(θ)|² / Σ_{l,l'} c_l c*_{l'} δ_{l,l'}(θ)
-
-    where the constituent overlap protocols are defined as:
-        β_l(θ)      = <0|V†(θ) U_l V(θ)|0>           (Hadamard test projection against b)
-        δ_{l,l'}(θ) = <0|V†(θ) U_l† U_{l'} V(θ)|0>   (Gram matrix cross-terms)
-    """
-    dev_hadamard = qml.device(device_name, wires=n_qubits + 1)
-    ancilla      = n_qubits
-
-    def _hadamard_test_real(params, unitary_wires_ops):
-        """
-        Evaluates Re[<0|V†(θ) W V(θ)|0>] via a controlled Hadamard test circuit.
-        The operator W is provided as a sequence of (gate, wires) instruction pairs.
-        """
-        @qml.qnode(dev_hadamard, interface="autograd")
-        def circuit():
-            # Ancilla in |+>
-            qml.Hadamard(wires=ancilla)
-            # Ansatz on data register
-            build_ansatz(params, n_qubits, n_layers)
-            # Controlled-W
-            for gate, wires in unitary_wires_ops:
-                qml.ctrl(gate, control=ancilla)(*wires)
-            # Close Hadamard test
-            qml.Hadamard(wires=ancilla)
-            return qml.expval(qml.PauliZ(ancilla))
-
-        return circuit()
-
-    def cost_fn(params: np.ndarray) -> float:
-        # For statevector sims, fall back to the faster matrix version.
-        # This function is the hardware-portable stub.
-        raise NotImplementedError(
-            "Hardware-compatible Hadamard test cost function is a stub. "
-            "Use build_cost_function for statevector simulation."
-        )
-
-    return cost_fn
-
-
 # ── Dimensionality Recovery ───────────────────────────────────────────────────
 
 def recover_solution(

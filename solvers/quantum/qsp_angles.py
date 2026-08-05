@@ -229,11 +229,6 @@ def polynomial_degree_estimate(kappa: float, epsilon: float) -> int:
     return d if d % 2 == 1 else d + 1
 
 
-def clear_memory_cache() -> None:
-    """Clear the in-memory phase cache. Disk cache is unaffected."""
-    _PHASE_CACHE.clear()
-
-
 def evaluate_inversion_polynomial(angles: np.ndarray, x: np.ndarray) -> np.ndarray:
     """Evaluate Im(<0|U_Phi(x)|0>) at the given points (verification helper)."""
     x   = np.atleast_1d(x)

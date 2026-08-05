@@ -164,8 +164,3 @@ def E_field_2d_sinusoidal(
     E_x = -np.pi * np.cos(np.pi * X) * np.sin(np.pi * Y) * phi_0 / L_x
     E_y = -np.pi * np.sin(np.pi * X) * np.cos(np.pi * Y) * phi_0 / L_y
     return E_x, E_y
-
-
-EXACT_SOLUTIONS_2D = {
-    "sinusoidal": phi_2d_sinusoidal,
-}
