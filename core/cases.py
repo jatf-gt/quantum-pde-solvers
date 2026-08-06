@@ -940,6 +940,112 @@ register(Case(
 ))
 
 
+# ── 1D Boeuf & Garrigues (1998) Figure 5 axial profile ────────────────────────
+#
+# Boeuf & Garrigues do not solve Poisson's equation for the potential at all:
+# their quasineutral model derives the field from the electron momentum
+# equation instead, stated explicitly in their §III.G ("the electric field in
+# a quasineutral model cannot be obtained from Poisson's equation"). There is
+# therefore no charge-density source term to extract from their model for a
+# Poisson benchmark — every other HET case in this registry (delta_0 sheath
+# models, HETConfig's gaussian/linear/step profiles) is a generic, physically
+# motivated stand-in, not something read off this paper.
+#
+# What the paper does report directly is the computed potential and field
+# profile itself (Fig. 5(a), p. 3547, for their V_a = 200 V, SPT-100
+# operating point): phi sits close to the anode potential across most of the
+# channel (the "conduction zone", where electron conductivity is large
+# because the magnetic field is small), then drops steeply over roughly the
+# last quarter of the channel (the "acceleration region", where the field
+# needed to sustain the current grows because conductivity there is small).
+# The profile below is a smooth logistic fit to that curve, used as a
+# manufactured solution: phi is declared directly, its second derivative is
+# exact and closed-form, and the discrete Poisson solve is expected to
+# reproduce phi to O(h^2).
+#
+# Read directly off Fig. 5(a): the transition centres close to x = 3.5 cm out
+# of d = 4 cm (x-tilde = 0.875), consistent with the independently stated
+# ionisation-zone location, "the maximum ion production occurs at x ~ 3 cm,
+# i.e., the entrance to the acceleration region" (p. 3547) sitting just
+# upstream of it, and the peak field is ~2-2.5e4 V/m. The logistic width
+# below (w = 0.054) is chosen to hit that peak field magnitude; this is not a
+# least-squares fit to pixel data extracted from the scan, since the paper's
+# own authors note that "it is difficult to exhibit meaningful quantitative
+# comparisons" (p. 3547) for exactly this reason — the fit is anchored to the
+# figure's reported shape and the peak-field order of magnitude, not to
+# individually digitised points.
+#
+# One consequence of the fit is not a defect: phi(x-tilde=1) comes out to
+# ~18 V rather than exactly 0. Boeuf & Garrigues' own voltage accounting
+# explains why a nonzero residual here is physically correct rather than a
+# fitting artefact — "the discharge voltage is the sum of the cathode fall
+# voltage (on the order of 10-20 V) and the possible voltage drop in the
+# plasma region... The voltage V which is imposed in the model is the voltage
+# drop along the column, and not the discharge voltage" (p. 3545). 18 V sits
+# inside their own stated 10-20 V cathode-fall range.
+
+_BG1998_VA: float = 200.0     # Column voltage for the Fig. 5 operating point [V]
+_BG1998_XC: float = 0.875     # Non-dimensional transition centre (x = 3.5 cm of 4 cm)
+_BG1998_W:  float = 0.054     # Non-dimensional transition width; sets the peak field
+
+
+def _bg1998_sigmoid(x: np.ndarray) -> np.ndarray:
+    """Logistic weight, 1 near the anode (x=0) and ~0 past the transition."""
+    z = (_BG1998_XC - x) / _BG1998_W
+    return 1.0 / (1.0 + np.exp(-z))
+
+
+def _u_het_bg1998(x: np.ndarray) -> np.ndarray:
+    """
+    Closed-form target potential [V]: a logistic fit to Boeuf & Garrigues
+    (1998) Fig. 5(a). See the module comment above for the fit's provenance.
+    """
+    return _BG1998_VA * _bg1998_sigmoid(x)
+
+
+def _f_het_bg1998(x: np.ndarray) -> np.ndarray:
+    """
+    Closed-form source d^2(phi)/d(x-tilde)^2 [V] for `_u_het_bg1998`, exact
+    (not finite-differenced): with s = sigmoid((x_c-x)/w),
+
+        phi''(x) = (V_a / w^2) * s * (1-s) * (1-2s).
+    """
+    s = _bg1998_sigmoid(x)
+    return (_BG1998_VA / _BG1998_W**2) * s * (1.0 - s) * (1.0 - 2.0 * s)
+
+
+register(Case(
+    name="het_1d_bg1998_fig5_profile",
+    dim=1, family="het",
+    summary="HET axial potential fit to Boeuf-Garrigues (1998) Fig. 5(a), V_a=200V",
+    build=lambda N: _dirichlet_1d(
+        N, source=_f_het_bg1998, exact=_u_het_bg1998,
+        alpha=float(_u_het_bg1998(np.array(0.0))),
+        beta=float(_u_het_bg1998(np.array(1.0))),
+    ),
+    lengths=(geom.L_Z,),
+    reference="manufactured",
+    default_N=(4, 8, 16, 32, 64),
+    notes=(
+        "New in this consolidation, not a prior duplicate. Every other HET\n"
+        "case's charge density is a generic, physically motivated stand-in\n"
+        "(delta_0 sheath models, HETConfig's gaussian/linear/step profiles);\n"
+        "this one is instead anchored to the specific potential/field curve\n"
+        "Boeuf & Garrigues (1998) actually report in Fig. 5(a), because their\n"
+        "quasineutral transport model does not solve Poisson's equation for\n"
+        "the field at all (their Sec. III.G) and so has no charge-density\n"
+        "source term to extract in the first place. See the module comment\n"
+        "above `_BG1998_VA` for the full derivation, including why phi(1) is\n"
+        "~18V rather than exactly 0 (the paper's own unmodelled cathode-fall\n"
+        "voltage, stated as 10-20V) and why this is a shape/order-of-\n"
+        "magnitude fit rather than a pixel-digitised one (the paper's own\n"
+        "authors call meaningful quantitative comparison 'difficult').\n"
+        "V_a = 200V matches the specific Fig. 5 operating point, not the\n"
+        "300V discharge voltage used by this registry's other HET cases."
+    ),
+))
+
+
 # ── 2D Assembly Helpers ───────────────────────────────────────────────────────
 
 def _grid_2d(
@@ -1138,7 +1244,7 @@ def _build_het_2d_mms(N: int) -> BuiltCase:
     BuiltCase
         With the inner-wall boundary data applied as `bc_y0`.
     """
-    Lz, Lr, phi0 = geom.L_Z, geom.L_R_LEGACY_2D, geom.PHI_0
+    Lz, Lr, phi0 = geom.L_Z, geom.L_R, geom.PHI_0
 
     def phi(z, r):
         return phi0 * np.sin(np.pi * z / Lz) * np.cos(np.pi * r / (2 * Lr))
@@ -1288,15 +1394,19 @@ register(Case(
     dim=2, family="het",
     summary="HET axial-radial manufactured solution, φ₀ sin(πz/L_z)cos(πr/2L_r)",
     build=_build_het_2d_mms,
-    lengths=(geom.L_Z, geom.L_R_LEGACY_2D), periodic=(False, False),
+    lengths=(geom.L_Z, geom.L_R), periodic=(False, False),
     reference="manufactured",
     default_N=(4, 8, 16, 32, 64),
     notes=(
-        "USES THE LEGACY RADIAL EXTENT L_r = 20 mm, not the SPT-100 value of\n"
-        "15 mm derived from R_out − R_in in core/het_geometry.py. The 20 mm value\n"
-        "is retained so that results produced with it remain reproducible;\n"
-        "switching to geom.L_R changes every 2D HET number and must be done\n"
-        "together with the regeneration of the 2D results.\n"
+        "Uses the single canonical geometry in core/het_geometry.py, read\n"
+        "directly from Boeuf & Garrigues (1998): L_z = 40 mm, L_r = 20 mm.\n"
+        "This case previously used a legacy L_r = 20 mm whilst the 3D\n"
+        "manufactured solution used a 'corrected' 15 mm derived from a\n"
+        "secondary-source R_in = 35 mm; checking the primary source directly\n"
+        "(2026-08-07) showed the 2D value had been right all along and the 3D\n"
+        "'correction' was itself the error. Both now agree on 20 mm, and L_z\n"
+        "changed from the old 25 mm to the paper's stated 40 mm at the same time\n"
+        "— see core/het_geometry.py's module docstring for the full derivation.\n"
         "The cosine radial profile is non-zero at the inner wall, hence the\n"
         "array-valued bc_y0. This differs from the 3D HET manufactured solution,\n"
         "which uses sin(πr/L_r) and so vanishes at both walls.\n"
@@ -1310,19 +1420,24 @@ register(Case(
     dim=2, family="het",
     summary="HET axial-radial sinusoid, φ₀ = 20 V, both walls grounded",
     build=lambda N: _line_2d(
-        N, 0.025, 0.020,
-        lambda X, Y: (-20.0 * np.pi**2 * (1.0 / 0.025**2 + 1.0 / 0.020**2))
-        * np.sin(np.pi * X / 0.025) * np.sin(np.pi * Y / 0.020),
+        N, geom.L_Z, geom.L_R,
+        lambda X, Y: (-20.0 * np.pi**2 * (1.0 / geom.L_Z**2 + 1.0 / geom.L_R**2))
+        * np.sin(np.pi * X / geom.L_Z) * np.sin(np.pi * Y / geom.L_R),
         lambda X, Y: 20.0
-        * np.sin(np.pi * X / 0.025) * np.sin(np.pi * Y / 0.020),
+        * np.sin(np.pi * X / geom.L_Z) * np.sin(np.pi * Y / geom.L_R),
     ),
-    lengths=(0.025, 0.020), periodic=(False, False),
+    lengths=(geom.L_Z, geom.L_R), periodic=(False, False),
     reference="manufactured",
     default_N=(4, 8, 16, 32, 64),
     notes=(
         "Dimensional, with amplitude φ₀ = 20 V rather than the 300 V discharge\n"
         "scale. Distinct from the non-dimensional unit-square sinusoid built by\n"
         "problems/het_plasma_2d.py:118, which has amplitude 1.\n"
+        "Domain extents now read from core/het_geometry.py (L_z = 40 mm,\n"
+        "L_r = 20 mm) rather than a locally hardcoded (25, 20) mm literal, so\n"
+        "this case tracks the single canonical SPT-100 geometry along with\n"
+        "every other HET case, even though its source term is a generic\n"
+        "sinusoid unrelated to the channel's actual plasma physics.\n"
         "Sole prior definition site: scripts/run_hpc_2Dfull.py:379-385, 720-726.\n"
         "HPC case id '2D_HET_Sin_MeetingReport'."
     ),
@@ -1331,20 +1446,28 @@ register(Case(
 register(Case(
     name="het_2d_boeuf_garrigues",
     dim=2, family="het",
-    summary="HET axial-radial Boeuf-Garrigues charge density, V_d = 300 V",
+    summary="HET axial-radial generic sheath-charge model, V_d = 300 V",
     build=_build_het_2d_bg,
-    lengths=(0.025, 0.020), periodic=(False, False),
+    lengths=(geom.L_Z, geom.L_R), periodic=(False, False),
     reference="fine_mesh", ref_params={"refine": 9},
     default_N=(4, 8, 16),
     notes=(
-        "The only executable 2D Boeuf-Garrigues benchmark. Analytical sheath\n"
-        "charge density from core/het_config.py:HETConfig2D, anode at α_bc,\n"
-        "cathode and BOTH radial walls grounded.\n"
-        "The grounded inner wall is the documented physics. An earlier revision\n"
-        "applied the anode term b −= α_bc at j = 0 whilst scoring the residual\n"
-        "against bc_y0 = 0, so the reported residual described a different system\n"
-        "than the one solved; results predating that correction are not\n"
-        "comparable.\n"
+        "NOT a literal reproduction of Boeuf & Garrigues' computed field: their\n"
+        "quasineutral transport model does not solve Poisson's equation for the\n"
+        "potential at all (explicit in their Sec. III.G), so there is no charge\n"
+        "density in their paper to extract for a 2D Poisson benchmark, and no\n"
+        "2D result in the paper to compare against either — their model is 1D.\n"
+        "This case's source (core/het_config.py:HETConfig2D, an axial bipolar\n"
+        "sheath term times a radial wall-sheath modulation) is a generic,\n"
+        "physically motivated stand-in carrying the paper's scalar parameters\n"
+        "(T_e, n_0, V_discharge) but not its reported profile shape. For an\n"
+        "actual fit to what the paper reports, see the 1D case\n"
+        "het_1d_bg1998_fig5_profile, which is anchored to their Fig. 5(a).\n"
+        "Anode at α_bc, cathode and BOTH radial walls grounded; the grounded\n"
+        "inner wall is the documented physics. An earlier revision applied the\n"
+        "anode term b −= α_bc at j = 0 whilst scoring the residual against\n"
+        "bc_y0 = 0, so the reported residual described a different system than\n"
+        "the one solved; results predating that correction are not comparable.\n"
         "refine_factor = 9 here, against the default 19 used elsewhere.\n"
         "Sole prior definition site: scripts/run_het_2d_benchmark.py:296-340."
     ),

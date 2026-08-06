@@ -37,6 +37,8 @@ from typing import Literal
 
 import numpy as np
 
+from core import het_geometry as geom
+
 
 # ── Physical Constants ────────────────────────────────────────────────────────
 
@@ -97,7 +99,7 @@ class HETConfig:
     """
 
     # Physical parameters
-    L:           float = 0.025          # 2.5 cm channel length
+    L:           float = geom.L_Z       # Axial channel length [m], see core/het_geometry.py
     T_e_eV:      float = 20.0           # 20 eV electron temperature
     n_0:         float = 1e17           # 10^17 m⁻³ reference density
     V_discharge: float = 300.0          # 300 V discharge voltage
@@ -175,7 +177,13 @@ class HETPhysicalConfig:
     The net charge density, δn = n_i - n_e, is prescribed analytically to
     represent the sheath boundaries at the anode and cathode, following the
     quasi-neutral bulk approximation with the sheath corrections of Hagelaar
-    et al. (2002), Phys. Rev. E 62(1).
+    et al. (2002), Phys. Rev. E 62(1). This is a generic, physically motivated
+    stand-in carrying Boeuf & Garrigues' scalar parameters (T_e, n_0,
+    V_discharge, channel geometry) — it is not their reported potential/field
+    profile, because their own quasineutral model does not solve Poisson's
+    equation for the field at all (their Sec. III.G is explicit about this).
+    For a case actually anchored to their reported profile (Fig. 5(a) of the
+    paper), see `core.cases.get("het_1d_bg1998_fig5_profile")`.
 
     Scaling of the charge separation amplitude δ_0 is load-bearing and is
     therefore derived rather than prescribed. In a quasi-neutral HET plasma the
@@ -226,7 +234,7 @@ class HETPhysicalConfig:
             Precision threshold for HHL Trotterisation and VQLS tolerance.
     """
     # Physical parameters — Boeuf & Garrigues (1998) Table 1.
-    L:            float = 0.025          # 25 mm axial channel
+    L:            float = geom.L_Z       # Axial channel length [m], see core/het_geometry.py
     V_discharge:  float = 300.0          # 300 V discharge potential
     T_e_eV:       float = 20.0           # 20 eV uniform electron temperature
     n_0:          float = 5e17           # 5×10¹⁷ m⁻³ reference density
@@ -301,6 +309,12 @@ class HETConfig2D:
     Encapsulates the physical parameterisation of the 2D Hall Effect Thruster
     (HET) discharge channel, resolved in the axial-radial (x, y) plane.
 
+    Boeuf & Garrigues (1998) is a 1D axial model; there is no 2D result in the
+    paper to reproduce. This structure extends their scalar parameters and the
+    axial charge-separation idea of `HETPhysicalConfig` with a second, radial
+    wall-sheath factor that is this codebase's own addition, not the paper's —
+    see `HETPhysicalConfig`'s docstring for the corresponding caveat in 1D.
+
     This structure is the two-dimensional sibling of `HETPhysicalConfig` and
     shares its non-dimensionalisation exactly: lengths are scaled by the axial
     channel length L_x, potentials by the electron thermal voltage φ_0, and the
@@ -326,9 +340,11 @@ class HETConfig2D:
     ----------
     Physical Parameters (SI Units)
         L_x : float
-            Axial channel length [m]. Default 25 mm (Boeuf & Garrigues 1998).
+            Axial channel length [m]. Default 40 mm, from `core.het_geometry`
+            (Boeuf & Garrigues 1998, §II and §IV.A).
         L_y : float
-            Radial channel height [m]. Default 20 mm (typical SPT-100 geometry).
+            Radial channel height [m]. Default 20 mm, from `core.het_geometry`
+            (Boeuf & Garrigues 1998, §II and §IV.A).
         V_discharge : float
             Applied discharge voltage establishing the anode potential [V].
         T_e_eV : float
@@ -384,8 +400,8 @@ class HETConfig2D:
     """
 
     # Physical parameters — Boeuf & Garrigues (1998) Table 1.
-    L_x:            float = 0.025        # 25 mm axial channel
-    L_y:            float = 0.020        # 20 mm radial channel height
+    L_x:            float = geom.L_Z     # Axial channel length [m], see core/het_geometry.py
+    L_y:            float = geom.L_R     # Radial channel width [m], see core/het_geometry.py
     V_discharge:    float = 300.0        # 300 V discharge potential
     T_e_eV:         float = 20.0         # 20 eV uniform electron temperature
     n_0:            float = 5e17         # 5×10¹⁷ m⁻³ reference density

@@ -315,19 +315,23 @@ class TestPreservedNameCollisions:
         assert np.max(np.abs(a.f_values - b.f_values)) > 1.0
         assert np.max(np.abs(a.exact - b.exact)) > 1e-6
 
-    def test_the_het_radial_extents_are_recorded_as_they_stand(self):
+    def test_the_het_radial_and_axial_extents_are_unified(self):
         """
-        2D still carries the legacy 20 mm radial extent whilst 3D uses the
-        SPT-100 value of 15 mm derived from the channel radii. This test records
-        that divergence deliberately: it must be resolved together with the
-        regeneration of the 2D results, not silently.
+        2D and 3D previously disagreed on the radial extent (20 mm vs a
+        'corrected' 15 mm derived from a secondary-source inner radius).
+        Checking the primary source directly (Boeuf & Garrigues 1998, §II and
+        §IV.A) showed the 20 mm value had been right all along, and the 15 mm
+        'correction' was itself the error. Both 2D and 3D now read the same
+        canonical geometry (R_in = 30 mm, L_r = 20 mm, L_z = 40 mm), so this
+        test checks agreement rather than a documented divergence.
         """
         from core import het_geometry as geom
 
-        assert geom.L_R == pytest.approx(0.015)
+        assert geom.L_R == pytest.approx(0.020)
         assert geom.L_R_LEGACY_2D == pytest.approx(0.020)
-        assert cases.get("het_2d_mms_spt100").lengths[1] == pytest.approx(0.020)
-        assert cases.get("het_3d_mms_spt100").lengths[1] == pytest.approx(0.015)
+        assert geom.L_Z == pytest.approx(0.040)
+        assert cases.get("het_2d_mms_spt100").lengths == pytest.approx((0.040, 0.020))
+        assert cases.get("het_3d_mms_spt100").lengths[:2] == pytest.approx((0.040, 0.020))
 
 
 class TestPeriodicity:

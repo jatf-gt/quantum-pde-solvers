@@ -58,7 +58,7 @@ The root of the repository also carries a set of HPC job-submission scripts and 
 poisson_hhl/
 │
 ├── core/                            # Shared infrastructure — PDE-agnostic
-│   ├── cases.py                     # Canonical case registry: 26 cases, 1D/2D/3D
+│   ├── cases.py                     # Canonical case registry: 27 cases, 1D/2D/3D
 │   ├── het_geometry.py              # Single SPT-100 geometry, shared by 1D/2D/3D
 │   ├── config.py                    # SimConfig1D, SimConfig2D
 │   ├── exact_solutions.py           # Analytical solutions: 1D (fS, fL, fH) and 2D sinusoidal
