@@ -427,7 +427,11 @@ The cost profile differs substantially from the 1D driver. A 1D configuration is
 
 Phase-angle precompute for the strip operator is cheap in both dimensions: $\kappa_	ext{row} 	o 3^-$ in 2D and $	o 2^-$ in 3D gives polynomial degrees of 30–85 irrespective of $N$, against the steeply growing 1D degrees. `hpc/submit_precompute_2D.sh` completes the whole set in minutes and needs no staging, unlike its 1D counterpart (§4.4).
 
-Post-processing for all three dimensions lives in `benchmark/hpc_plotting.py`, with `scripts/plot_hpc_{1,2,3}Dfull_results.py` as thin command-line wrappers. The three sweeps share a result schema and therefore share their scalar-metric plots (convergence, accuracy vs $N$, cost vs $N$, quantum overhead, error decomposition); only the field visualisation is dimension-specific — profiles in 1D, fields in 2D, orthogonal slices and polar unwrapping in 3D.
+Post-processing for all three dimensions lives in `benchmark/hpc_plotting.py`, with `scripts/plot_hpc_{1,2,3}Dfull_results.py` as thin command-line wrappers. The on-disk schema itself — the summary format, the archive filename convention and the field-name aliases — is declared once in `benchmark/results_io.py`, which both the readers and (in due course) the runners share.
+
+**2D and 3D share a result schema and therefore share their scalar-metric plots** (convergence, accuracy vs $N$, cost vs $N$, quantum overhead, error decomposition). **1D does not.** Its summary rows carry no `scheme`, `stop_reason`, `linf_err`, `weighted_cost` or `err_vs_thomas` — precisely the fields those plots read — so the 1D entry point calls none of them and has its own parallel implementations in a different visual style. Field visualisation is dimension-specific in all three: profiles in 1D, fields in 2D, orthogonal slices and polar unwrapping in 3D.
+
+`SweepArchive.missing()` reports summary rows whose solution archive is absent, which distinguishes a partial sweep from a broken filename convention; without it both present identically, as a quietly incomplete figure set.
 
 ---
 
