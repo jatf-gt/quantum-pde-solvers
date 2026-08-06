@@ -184,7 +184,11 @@ def plot_convergence_history(
     save_fig: bool = False,
 ) -> None:
     """
-    Visualises the natural logarithmic iteration error decay against step progression.
+    Visualises the natural logarithmic residual decay against step progression.
+
+    The plotted quantity is the relative Euclidean residual ‖b − A·u‖₂/‖b‖₂ of
+    the fully coupled system after each outer iteration, as recorded in
+    `BenchmarkResult2D.iteration_errors`.
 
     This routine facilitates comparative evaluations of algorithmic stability 
     across disparate convergence thresholds or solver typologies (e.g., assessing 
@@ -224,9 +228,9 @@ def plot_convergence_history(
                     linestyle="--", alpha=0.5,
                 )
 
-    ax.set_xlabel("Iteration")
-    ax.set_ylabel("ln(iteration error)")
-    ax.set_title("Line-Jacobi convergence history")
+    ax.set_xlabel("Outer iteration")
+    ax.set_ylabel(r"ln($\|b - Au\|_2 / \|b\|_2$)")
+    ax.set_title("Outer-iteration convergence history")
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
 

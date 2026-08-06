@@ -15,10 +15,7 @@ from core.config import SimConfig1D, SimConfig2D
 from core.source_functions import SOURCE_FUNCTIONS, SOURCE_FUNCTIONS_2D
 from core.exact_solutions import EXACT_SOLUTIONS
 from problems.poisson_1d import PoissonProblem1D, build_grid, build_tst_matrix
-from problems.poisson_2d import (
-    PoissonProblem2D, build_grid_2d, build_row_tst_matrix,
-    condition_number_2d,
-)
+from problems.poisson_line_2d import PoissonLine2D
 
 
 # ── SimConfig validation ──────────────────────────────────────────────────────
@@ -98,23 +95,6 @@ class TestGrid1D:
         assert x[-1] == pytest.approx(N * dx)
 
 
-class TestGrid2D:
-
-    def test_grid_shape(self):
-        X, Y, h = build_grid_2d(8)
-        assert X.shape == (8, 8)
-        assert Y.shape == (8, 8)
-
-    def test_grid_spacing(self):
-        _, _, h = build_grid_2d(8)
-        assert h == pytest.approx(1.0 / 9)
-
-    def test_grid_bounds(self):
-        X, Y, h = build_grid_2d(4)
-        assert np.all(X > 0) and np.all(X < 1)
-        assert np.all(Y > 0) and np.all(Y < 1)
-
-
 # ── TST matrix structure ──────────────────────────────────────────────────────
 
 class TestTSTMatrix1D:
@@ -141,27 +121,6 @@ class TestTSTMatrix1D:
         A = build_tst_matrix(8)
         mask = np.eye(8, k=0) + np.eye(8, k=1) + np.eye(8, k=-1)
         assert np.allclose(A[mask == 0], 0.0)
-
-
-class TestTSTMatrix2D:
-
-    def test_shape(self):
-        A = build_row_tst_matrix(8)
-        assert A.shape == (8, 8)
-
-    def test_main_diagonal_is_minus_4(self):
-        """2D line-Jacobi matrix has a=-4, not a=-2."""
-        A = build_row_tst_matrix(8)
-        assert np.allclose(np.diag(A), -4.0)
-
-    def test_off_diagonals(self):
-        A = build_row_tst_matrix(8)
-        assert np.allclose(np.diag(A, 1),  1.0)
-        assert np.allclose(np.diag(A, -1), 1.0)
-
-    def test_symmetric(self):
-        A = build_row_tst_matrix(8)
-        assert np.allclose(A, A.T)
 
 
 # ── PoissonProblem1D ──────────────────────────────────────────────────────────
@@ -213,43 +172,42 @@ class TestPoissonProblem1D:
         assert "fS" in s
 
 
-# ── PoissonProblem2D ──────────────────────────────────────────────────────────
+# ── PoissonLine2D strip operator ──────────────────────────────────────────────
 
-class TestPoissonProblem2D:
+class TestPoissonLine2D:
+    """
+    Minimal retained coverage of the 2D strip operator.
 
-    def test_grid_shape(self, problem_2d_N4_fS):
-        assert problem_2d_N4_fS.X.shape == (4, 4)
-        assert problem_2d_N4_fS.Y.shape == (4, 4)
+    Comprehensive coverage of the line-decomposed problems and the outer
+    schemes that drive them is outstanding work; the conditioning assertion is
+    kept here because κ(A_row) → 3⁻ is the property that makes the strip
+    decomposition viable for the quantum solvers at all, and it should not go
+    untested in the interim.
+    """
 
-    def test_A_row_shape(self, problem_2d_N4_fS):
-        assert problem_2d_N4_fS.A_row.shape == (4, 4)
+    def test_strip_operator_shape(self):
+        prob = PoissonLine2D(np.zeros((4, 4)))
+        assert prob.row_matrix().shape == (4, 4)
+        assert prob.rhs().shape == (4, 4)
 
     def test_kappa_row_approaches_3(self):
-        """κ(A_row) → 3 as N → ∞ for the 2D line-Jacobi matrix."""
-        kappa_16 = condition_number_2d(16)
-        kappa_32 = condition_number_2d(32)
-        # Both should be between 1 and 3.
+        """κ(A_row) increases towards 3 from below as N → ∞."""
+        kappa_16 = PoissonLine2D(np.zeros((16, 16))).kappa_row()
+        kappa_32 = PoissonLine2D(np.zeros((32, 32))).kappa_row()
         assert 1.0 < kappa_16 < 3.0
         assert 1.0 < kappa_32 < 3.0
-        # And converging towards 3.
         assert kappa_32 > kappa_16
 
-    def test_get_row_system_shape(self, problem_2d_N4_fS):
-        u_prev = np.zeros((4, 4))
-        A_row, b_row = problem_2d_N4_fS.get_row_system(0, u_prev)
-        assert A_row.shape == (4, 4)
-        assert len(b_row) == 4
-
-    def test_coarse_direct_solve_shape(self, problem_2d_N4_fS):
-        u = problem_2d_N4_fS.coarse_direct_solve()
-        assert u.shape == (4, 4)
-
-    def test_coarse_direct_solve_memory_guard(self):
-        """build_full_matrix raises MemoryError when the allocation exceeds max_gb."""
-        cfg  = SimConfig2D(N=16, epsilon=0.01, source_fn="fS")
-        prob = PoissonProblem2D(cfg)
-        with pytest.raises(MemoryError):
-            prob.build_full_matrix(max_gb=1e-6)
+    def test_kappa_invariant_under_h2_rescaling(self):
+        """
+        The physical and h²-scaled conventions differ by a uniform factor, so
+        the condition number — and hence every quantum resource estimate that
+        depends on it — is identical between them.
+        """
+        prob = PoissonLine2D(np.zeros((8, 8)))
+        scaled = -4.0 * np.eye(8) + np.diag(np.ones(7), 1) + np.diag(np.ones(7), -1)
+        eigs = np.abs(np.linalg.eigvalsh(scaled))
+        assert prob.kappa_row() == pytest.approx(eigs.max() / eigs.min(), rel=1e-12)
 
 
 # ── Source functions and exact solutions ──────────────────────────────────────

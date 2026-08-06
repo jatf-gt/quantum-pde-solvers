@@ -132,7 +132,7 @@ def print_convergence_summary(result: BenchmarkResult2D) -> None:
     print(f"  Converged: {result.converged}  |  "
           f"Iterations: {result.iterations}  |  "
           f"Residual: {result.euclidean_residual:.3e}")
-    print(f"\n  {'Iter':>6}  {'Error':>14}  {'ln(Error)':>12}")
+    print(f"\n  {'Iter':>6}  {'Residual':>14}  {'ln(Residual)':>12}")
     print("  " + "-" * 36)
     
     for i, err in enumerate(result.iteration_errors):

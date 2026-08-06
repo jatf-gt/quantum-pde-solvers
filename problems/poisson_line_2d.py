@@ -7,16 +7,10 @@ protocol (defined in ``solvers/outer/core.py``), which is what every outer
 scheme (SOR, multigrid, ...) and every inner solver (Thomas, HHL, VQLS,
 QSVT) is actually written against.
 
-Naming note
------------
-This is deliberately a different class from ``PoissonProblem2D`` in
-``problems/poisson_2d.py``.  That class assembles the full N^2 x N^2 system
-for the original (non-line-decomposed) 2-D quantum solvers and is used
-throughout the legacy stack (``hhl_2d.py``, ``vqls_2d.py``, ``qsvt_2d.py``,
-``het_plasma_2d.py`` and its tests).  ``PoissonLine2D`` instead exposes the
-row (strip) operator and hands strips to ``solvers/outer`` one at a time.
-The two are not interchangeable and intentionally do not share a name -
-keep them in separate files to keep that boundary visible on import.
+This is the sole 2-D Poisson problem type in the repository.  It superseded an
+earlier ``PoissonProblem2D``, which assembled the full N^2 x N^2 system for a
+parallel set of 2-D solvers; that stack was retired once ``solvers/outer`` was
+shown to reproduce its results exactly, and no trace of it remains.
 
 Sign and scaling convention
 ----------------------------
@@ -27,10 +21,13 @@ The *physical* (unscaled) convention is used throughout:
 
 so that A_row . u[:,j] + u[:,j-1]/dy^2 + u[:,j+1]/dy^2 = rhs[:,j].
 
-This differs from ``problems/poisson_2d.py``, which uses the h^2-scaled form
-(diagonal = -4, rhs = h^2 f).  The two are equivalent when dx = dy; the
-physical form is used here because it extends unchanged to non-square cells
-(dz != dr in the HET geometry) and to the 3-D case in ``poisson_line_3d.py``.
+The reference literature instead uses the h^2-scaled form (diagonal = -4,
+rhs = h^2 f).  The two are algebraically identical when dx = dy, and yield
+bit-identical solutions; the physical form is used here because it extends
+unchanged to non-square cells (dz != dr in the HET geometry) and to the 3-D
+case in ``poisson_line_3d.py``.  Quantities invariant under the uniform h^2
+rescaling - the condition number kappa(A_row) above all - therefore agree
+exactly between the two conventions.
 
 Author : Juan Antonio Trobajo Flecha
 """

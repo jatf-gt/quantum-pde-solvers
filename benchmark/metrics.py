@@ -1,9 +1,11 @@
 """
 Calculates error metrics and defines result structures for the Poisson benchmarks.
 
-This module maintains strict independence from quantum circuit and solver 
-libraries, executing purely classical post-processing arithmetic. This 
-isolation ensures computational efficiency and facilitates independent 
+This module maintains strict independence from quantum circuit libraries,
+executing purely classical post-processing arithmetic. Its only solver-layer
+dependencies are the two problem- and result-type declarations of
+`solvers/outer/core.py`, which themselves import nothing beyond NumPy. This
+isolation ensures computational efficiency and facilitates independent
 verification of statistical error metrics for both 1D and 2D domains.
 """
 from __future__ import annotations
@@ -13,11 +15,11 @@ from typing import Optional
 
 import numpy as np
 
-from core.config import SimConfig1D, SimConfig2D
+from core.config import SimConfig1D
 from core.exact_solutions import EXACT_SOLUTIONS
 from problems.poisson_1d import PoissonProblem1D
-from problems.poisson_2d import PoissonProblem2D
-from solvers.quantum.result import SolverResult, SolverResult2D
+from solvers.outer.core import LineProblem2D, OuterResult
+from solvers.quantum.result import SolverResult
 
 
 # ── Tolerance Thresholds ──────────────────────────────────────────────────────
@@ -182,6 +184,49 @@ def compute_errors(
     )
 
 
+# ── 2D Reporting Configuration ────────────────────────────────────────────────
+
+@dataclass
+class Config2D:
+    """
+    Records the parameters of a 2D benchmark instance for reporting purposes.
+
+    This structure exists solely to label a result: it carries the fields that
+    the console tables, figure titles and CSV columns of `benchmark/reporting.py`
+    and `benchmark/plotting.py` consume, and nothing else. It deliberately holds
+    no solver controls (tol, max_iter) and constructs nothing — the discretised
+    problem itself is a `PoissonLine2D`, and the outer-iteration controls are
+    arguments to `solvers.outer.solve`.
+
+    Separating the label from the problem is what allows a single result type to
+    describe runs driven by any outer scheme: a `PoissonLine2D` knows its mesh
+    and its operator but not which source function or precision parameter the
+    sweep intended it to represent.
+
+    Attributes
+    ----------
+    N : int
+        Number of interior nodes per direction; the domain [0,1]² is discretised
+        into (N+1) intervals along each axis, yielding N² interior unknowns.
+    source_fn : str
+        Identifier of the 2D analytical source function ('fS', 'fL', 'fH').
+    epsilon : float
+        Precision parameter of the quantum sub-solve. For HHL this governs the
+        Trotter approximation within each 1D strip resolution; for classical
+        runs it is recorded for tabular parity only.
+    bc_x0, bc_x1, bc_y0, bc_y1 : float
+        Dirichlet boundary values imposed on the edges x=0, x=1, y=0 and y=1
+        respectively.
+    """
+    N:         int
+    source_fn: str
+    epsilon:   float
+    bc_x0:     float = 0.0
+    bc_x1:     float = 0.0
+    bc_y0:     float = 0.0
+    bc_y1:     float = 0.0
+
+
 # ── 2D Result Container ───────────────────────────────────────────────────────
 
 @dataclass
@@ -191,7 +236,7 @@ class BenchmarkResult2D:
 
     Attributes
     ----------
-    config : SimConfig2D
+    config : Config2D
         Configuration parameters governing the 2D simulation instance.
     solver : str
         Identifier for the employed solver algorithm ('Thomas-2D' or 'HHL-2D').
@@ -217,18 +262,20 @@ class BenchmarkResult2D:
     avg_abs_error : float
         Arithmetic mean of the absolute error matrix.
     iterations : int
-        Total number of line-Jacobi iterations executed to achieve convergence.
+        Total number of outer iterations executed (line-relaxation sweeps for a
+        stationary scheme, V-cycles for multigrid).
     converged : bool
-        Boolean indicator designating whether the solver successfully satisfied 
+        Boolean indicator designating whether the solver successfully satisfied
         the iteration tolerance threshold.
     iteration_errors : list[float]
-        Sequential list tracking the supremum norm of the iterative difference 
-        (max|u^{n+1} - u^n|) at each step. Retained explicitly for convergence 
-        profile reconstruction.
+        Sequential list tracking the relative Euclidean residual
+        ‖b − A·u‖₂/‖b‖₂ of the fully coupled system after each outer iteration.
+        Retained explicitly for convergence profile reconstruction.
     euclidean_residual : Optional[float]
-        Relative Euclidean residual evaluated against the fully coupled N²×N² system.
+        Terminal value of the above: the relative Euclidean residual evaluated
+        against the fully coupled N²×N² system.
     """
-    config:             SimConfig2D
+    config:             Config2D
     solver:             str
     X:                  np.ndarray
     Y:                  np.ndarray
@@ -249,39 +296,55 @@ class BenchmarkResult2D:
 # ── 2D Error Computation ──────────────────────────────────────────────────────
 
 def compute_errors_2d(
-    problem:     PoissonProblem2D,
-    result:      SolverResult2D,
+    problem:     LineProblem2D,
+    result:      OuterResult,
+    config:      Config2D,
+    solver:      str,
     u_reference: Optional[np.ndarray] = None,
 ) -> BenchmarkResult2D:
     """
-    Evaluates statistical error metrics for a given 2D line-Jacobi solver execution.
+    Evaluates statistical error metrics for a given 2D outer-iteration execution.
 
-    The high-fidelity reference solution is typically derived via the classical 
-    methodology (`problem.classical_reference_solve()`). It is injected directly 
-    from the execution orchestrator to preclude redundant computational overhead 
-    across successive solver evaluations for identical configurations.
+    The high-fidelity reference solution is derived by
+    `benchmark.reference_2d.fine_mesh_reference`. It is injected directly from
+    the execution orchestrator to preclude redundant computational overhead
+    across successive solver evaluations for identical configurations — the
+    fine-mesh solve is by far the most expensive classical step in a 2D sweep,
+    and it is independent of which solver is being certified.
 
-    In accordance with Section IV F of the primary reference literature, relative 
-    errors are predominantly utilised for homogeneous boundary conditions, whereas 
-    absolute errors are prioritised for non-homogeneous constraints. This routine 
-    computes both metrics simultaneously, deferring the contextual selection to 
+    In accordance with Section IV F of the primary reference literature, relative
+    errors are predominantly utilised for homogeneous boundary conditions, whereas
+    absolute errors are prioritised for non-homogeneous constraints. This routine
+    computes both metrics simultaneously, deferring the contextual selection to
     the downstream reporting layer.
 
     Parameters
     ----------
-    problem : PoissonProblem2D
-        Discretised 2D problem instance defining the linear system.
-    result : SolverResult2D
-        Numerical output yielded by the selected 2D solver algorithm.
+    problem : LineProblem2D
+        Discretised, line-decomposed 2D problem instance (e.g. `PoissonLine2D`),
+        supplying the mesh geometry through `shape`, `dx` and `dy`.
+    result : OuterResult
+        Numerical output yielded by `solvers.outer.solve`.
+    config : Config2D
+        Descriptive parameters of the benchmark instance, propagated verbatim
+        into the console tables, figure titles and CSV rows.
+    solver : str
+        Display label for the solver under evaluation ('Thomas-2D', 'HHL-2D',
+        'VQLS-2D', ...). Supplied explicitly because `OuterResult` records the
+        scheme and the inner solver separately, whereas the reporting layer
+        expects a single identifier.
     u_reference : Optional[np.ndarray], default=None
-        (N, N) reference solution matrix utilised for baseline deviation analysis.
+        (N, N) reference solution matrix utilised for baseline deviation
+        analysis. When omitted, absolute errors are reported as identically zero
+        and relative errors as None.
 
     Returns
     -------
     BenchmarkResult2D
         Populated data structure containing all calculated deviation metrics.
     """
-    u = result.u
+    u    = result.u
+    X, Y = _interior_grid_2d(problem)
 
     # ── Phase 1: Absolute Error Computation ───────────────────────────────────
     if u_reference is not None:
@@ -311,10 +374,10 @@ def compute_errors_2d(
         avg_rel   = None
 
     return BenchmarkResult2D(
-        config=problem.config,
-        solver=result.solver,
-        X=problem.X,
-        Y=problem.Y,
+        config=config,
+        solver=solver,
+        X=X,
+        Y=Y,
         u_solver=u,
         u_reference=u_reference,
         abs_error=abs_error,
@@ -323,8 +386,36 @@ def compute_errors_2d(
         avg_rel_error=avg_rel,
         max_abs_error=max_abs,
         avg_abs_error=avg_abs,
-        iterations=result.iterations,
+        iterations=result.n_outer,
         converged=result.converged,
-        iteration_errors=result.iteration_errors,
-        euclidean_residual=result.euclidean_residual,
+        iteration_errors=list(result.residual_history),
+        euclidean_residual=result.residual,
     )
+
+
+# ── Private Utility Methods ───────────────────────────────────────────────────
+
+def _interior_grid_2d(problem: LineProblem2D) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Recovers the interior coordinate matrices of a line-decomposed 2D problem.
+
+    Derived from the `LineProblem2D` protocol members `shape`, `dx` and `dy`
+    alone, so that any conforming problem can be plotted without exposing an
+    additional mesh accessor. The mesh is vertex-centred with boundary nodes
+    excluded: x_i = i·dx for i = 1 … Nx, and likewise y_j = j·dy.
+
+    Parameters
+    ----------
+    problem : LineProblem2D
+        Discretised problem instance.
+
+    Returns
+    -------
+    X, Y : np.ndarray
+        (Nx, Ny) coordinate matrices in 'ij' indexing order, matching the
+        indexing of the solution field.
+    """
+    Nx, Ny = problem.shape
+    x = np.arange(1, Nx + 1) * problem.dx
+    y = np.arange(1, Ny + 1) * problem.dy
+    return np.meshgrid(x, y, indexing="ij")

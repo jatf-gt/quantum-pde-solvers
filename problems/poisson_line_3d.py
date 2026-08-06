@@ -39,9 +39,7 @@ A plane smoother would instead hand the inner solver an N^2 x N^2 system
 with a 5-point stencil on 2*log2(N) qubits, requiring a block encoding this
 repository does not have.
 
-Naming note: this class deliberately does not live in problems/poisson_2d.py
-or share the PoissonProblem2D name used by the legacy (non-line-decomposed)
-2-D quantum solvers - see problems/poisson_line_2d.py for the full rationale.  Its conditioning is fine (kappa -> 5, bounded by
+Its conditioning is fine (kappa -> 5, bounded by
 the same diagonal shift), so the objection is structural rather than
 numerical, but it is decisive.
 

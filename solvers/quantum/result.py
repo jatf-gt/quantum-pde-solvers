@@ -10,7 +10,12 @@ Result hierarchy
 ────────────────
   SolverResult       : 1-D solver output (HHL, Thomas, NumPy, VQLS base)
   VQLSSolverResult   : SolverResult extended with VQLS-specific diagnostics
-  SolverResult2D     : 2-D line-Jacobi solver output (HHL-2D, Thomas-2D)
+  QSVTSolverResult   : SolverResult extended with QSP/QSVT diagnostics
+
+All containers here describe a *single* linear solve. Multi-dimensional runs
+are outer iterations over many such solves and report their outcome through
+``solvers.outer.core.OuterResult`` instead, which records the scheme, the
+strip-solve work log and the residual history rather than a single solution.
 
 References
 ──────────
@@ -150,50 +155,3 @@ class QSVTSolverResult(SolverResult):
     angles            : Optional[np.ndarray]    = field(
                             default=None, repr=False
                         )
-
-
-# ── 2-D solver result ─────────────────────────────────────────────────────────
-
-@dataclass
-class SolverResult2D:
-    """
-    Output container for a single 2-D line-Jacobi solver run.
-
-    The line-Jacobi scheme decomposes the 2-D Poisson problem into a
-    sequence of 1-D TST sub-problems (one per interior row per iteration),
-    solved iteratively until the update norm falls below the prescribed
-    tolerance. This container records both the converged solution field
-    and the full iteration history for convergence analysis.
-
-    Attributes
-    ----------
-    u : np.ndarray, shape (N, N)
-        Recovered (N, N) solution field in non-dimensional units,
-        indexed as u[i, j] where i is the x-index and j the y-index.
-    solver : str
-        Human-readable solver identifier, e.g. ``'Thomas-2D'`` or
-        ``'HHL-2D'``.
-    iterations : int
-        Number of complete line-Jacobi sweeps performed before
-        convergence or exhaustion of max_iter.
-    converged : bool
-        ``True`` if max|u^{n+1} − u^n| < tol was satisfied;
-        ``False`` if max_iter was reached without convergence.
-    iteration_errors : list of float
-        Sequence of max|u^{n+1} − u^n| values at each iteration.
-        Used to reproduce the convergence history plots of
-        Ghafourpour & Laizet (2025), Fig. 15.
-    euclidean_residual : float or None
-        Relative residual ‖A_full·u_flat − b_full‖ / ‖b_full‖
-        computed via the tridiagonal matvec (no full matrix allocation).
-        Measures proximity to the exact solution of the full coupled
-        system; O(1) values are expected for Jacobi iterates that have
-        not fully converged.
-    """
-
-    u:                  np.ndarray
-    solver:             str
-    iterations:         int
-    converged:          bool
-    iteration_errors:   list
-    euclidean_residual: Optional[float] = None

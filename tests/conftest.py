@@ -8,18 +8,25 @@ test runtime under ~10 seconds.  The N=8 cases are reserved for the
 benchmark scripts which are run separately.
 
 Fixtures are scoped at 'module' level where the setup cost is non-trivial
-(e.g. building a PoissonProblem2D with a refined reference) so they are
-only computed once per test file rather than once per test function.
+so they are only computed once per test file rather than once per test function.
+
+Note on 2D coverage
+-------------------
+The 2D fixtures that formerly lived here constructed the retired
+``PoissonProblem2D``. They were removed alongside it: 2D and 3D solves are now
+driven by ``solvers.outer.solve`` against a ``PoissonLine2D``, which needs no
+shared fixture to build. Replacement fixtures and genuine coverage for
+``solvers/outer`` are outstanding work, tracked as the next phase of the
+repository consolidation.
 """
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from core.config import SimConfig1D, SimConfig2D
+from core.config import SimConfig1D
 from core.het_config import HETConfig, HETPhysicalConfig
 from problems.poisson_1d import PoissonProblem1D
-from problems.poisson_2d import PoissonProblem2D
 from problems.het_plasma_1d import HETPoissonProblem1D, HETPhysicalProblem1D
 from solvers.quantum.vqls_1d import VQLSConfig1D
 
@@ -66,29 +73,6 @@ def problem_1d_N4_fH(cfg_1d_N4_fH):
 @pytest.fixture(scope="module")
 def problem_1d_N4_nonhom(cfg_1d_N4_nonhom):
     return PoissonProblem1D(cfg_1d_N4_nonhom)
-
-
-# ── 2D Poisson fixtures ───────────────────────────────────────────────────────
-
-@pytest.fixture(scope="module")
-def cfg_2d_N4_fS():
-    """N=4 2D config — smallest valid 2D system."""
-    return SimConfig2D(N=4, epsilon=0.01, source_fn="fS", max_iter=200)
-
-
-@pytest.fixture(scope="module")
-def cfg_2d_N4_fL():
-    return SimConfig2D(N=4, epsilon=0.01, source_fn="fL", max_iter=200)
-
-
-@pytest.fixture(scope="module")
-def problem_2d_N4_fS(cfg_2d_N4_fS):
-    return PoissonProblem2D(cfg_2d_N4_fS)
-
-
-@pytest.fixture(scope="module")
-def problem_2d_N4_fL(cfg_2d_N4_fL):
-    return PoissonProblem2D(cfg_2d_N4_fL)
 
 
 # ── VQLS config fixture ───────────────────────────────────────────────────────

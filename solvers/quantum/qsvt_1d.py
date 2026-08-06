@@ -53,14 +53,15 @@ QSVT achieves a quadratic improvement in kappa dependence over HHL,
 at the cost of requiring a block encoding oracle and classical
 preprocessing to compute the QSP phase angles.
 
-2-D extension
--------------
-The 2-D QSVT solver (qsvt_2d.py, to be implemented) will reuse this
-module via the same interface as hhl_2d.py reuses hhl_1d.py:
+2-D and 3-D extension
+---------------------
+Higher-dimensional problems reuse this module unchanged, through the
+inner-solver registry in solvers/outer/inner.py:
 
     qsvt_solve_system(A_row, b_row, config)
 
-is called inside the line-Jacobi loop for each row sub-problem. The
+is called on each 1-D strip sub-problem by whichever outer scheme is
+driving the solve (line-Jacobi, SOR, multigrid). The
 row matrix has a=-4, b=1, kappa_row -> 3, which makes the QSVT
 polynomial degree requirement d = O(3 * log(1/epsilon)) essentially
 constant in N -- a significant advantage over the 1-D case.
@@ -189,9 +190,10 @@ def qsvt_solve_system(
     """
     Solve the linear system Au = b using QSVT on raw NumPy arrays.
 
-    This is the lower-level interface used by the 2-D line-Jacobi solver
-    (qsvt_2d.py) for each row sub-problem, mirroring the interface of
-    hhl_solve_system and vqls_solve_system.
+    This is the lower-level interface registered as the "qsvt" inner solver in
+    solvers/outer/inner.py and invoked on each strip sub-problem of a 2-D or
+    3-D solve, mirroring the interface of hhl_solve_system and
+    vqls_solve_system.
 
     Parameters
     ----------
