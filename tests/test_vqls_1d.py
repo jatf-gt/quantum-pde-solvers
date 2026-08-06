@@ -15,15 +15,11 @@ from solvers.quantum.vqls_1d import (
     vqls_solve, vqls_solve_system, VQLSConfig1D, VQLSSolverResult,
 )
 from solvers.classical.thomas import thomas_solve
-from conftest import VQLS_REL_ERROR_TOL, VQLS_COST_TOL
+from conftest import VQLS_REL_ERROR_TOL, VQLS_COST_TOL, rel_err
 
+# Every test in this module builds and simulates a quantum circuit.
+pytestmark = pytest.mark.quantum
 
-def _rel_err(u: np.ndarray, ref: np.ndarray) -> float:
-    scale = np.max(np.abs(ref))
-    mask  = np.abs(ref) > 1e-6 * scale
-    if not mask.any():
-        return 0.0
-    return float(np.max(np.abs((u - ref)[mask]) / np.abs(ref[mask])))
 
 
 class TestVQLSSolve1D:
@@ -61,7 +57,7 @@ class TestVQLSSolve1D:
         """VQLS solution must agree with Thomas to within VQLS_REL_ERROR_TOL."""
         u_thomas = thomas_solve(problem_1d_N4_fS).u
         u_vqls   = vqls_solve(problem_1d_N4_fS, config=vqls_cfg_fast).u
-        err      = _rel_err(u_vqls, u_thomas)
+        err      = rel_err(u_vqls, u_thomas)
         assert err < VQLS_REL_ERROR_TOL, (
             f"VQLS vs Thomas rel err = {err*100:.2f}% > "
             f"{VQLS_REL_ERROR_TOL*100:.0f}%"

@@ -91,17 +91,15 @@ poisson_hhl/
 │
 ├── tests/                           # Pytest test suite
 │   ├── conftest.py                  # Shared fixtures and tolerance constants
-│   ├── test_problem_setup.py        # Matrix assembly, grid, RHS, condition number
-│   ├── test_classical_solvers.py    # Thomas 1D/2D and NumPy reference solvers
+│   ├── test_problem_setup.py        # 1D matrix assembly, grid, RHS, condition number
+│   ├── test_classical_solvers.py    # Thomas 1D and NumPy reference solvers
+│   ├── test_line_problems.py        # PoissonLine2D/3D operators, BCs, coarsening
+│   ├── test_outer.py                # solvers/outer: schemes, registry, multigrid
 │   ├── test_hhl_1d.py               # HHL 1D solver correctness
-│   ├── test_hhl_2d.py               # HHL 2D line-Jacobi solver correctness
 │   ├── test_vqls_1d.py              # VQLS 1D solver correctness
-│   ├── test_vqls_2d.py              # VQLS 2D line-Jacobi solver correctness
-│   ├── test_het_problem.py          # HET 1D problem assembly and solver compatibility
-│   ├── test_het_2d.py               # HET 2D problem assembly and solver compatibility
 │   ├── test_qsvt_1d.py              # QSVT 1D block encoding, phase angles, solver correctness
-│   ├── test_qsvt_2d.py              # QSVT 2D line-Jacobi solver correctness
-│   └── test_integration.py          # End-to-end pipeline: problem → solver → metrics
+│   ├── test_het_problem.py          # HET 1D problem assembly and solver compatibility
+│   └── test_integration.py          # End-to-end pipelines, 1D and 2D
 │
 ├── results/                         # Auto-generated output artefacts (git-ignored)
 │   ├── sweep_*.csv
@@ -541,23 +539,41 @@ Each row sub-problem has a TST matrix with $a = -4$, $b = 1$ and $\kappa(A_\text
 
 ## 8. Test Suite
 
-The automated test suite is located in `tests/` and is executed via `pytest`. Tests verify structural correctness and solver functionality. All quantum solver tests use $N=4$ (2 qubits) to bound individual test runtime.
+The automated test suite is located in `tests/` and is executed via `pytest`. Tests verify structural correctness and solver functionality rather than publication-grade accuracy. All quantum solver tests use $N=4$ (2 qubits) to bound individual test runtime.
+
+The suite covers the 1D solvers directly and the 2D/3D solvers through `solvers/outer`, the single outer-iteration architecture. Because every multi-dimensional solve is an outer iteration over 1D strip solves, testing the 1D solvers and the outer layer separately covers the 2D and 3D paths without paying for a full quantum line-relaxation run in the test suite.
 
 ### Test file summary
 
-| File                        | Coverage                                                              | Approx. runtime |
-| --------------------------- | ---------------------------------------------------------------------- | ---------------- |
-| `test_problem_setup.py`     | Matrix structure, grid, RHS, config validation, exact solutions       | $<1$ s          |
-| `test_classical_solvers.py` | Thomas 1D/2D accuracy, NumPy agreement, convergence                    | $<5$ s          |
-| `test_hhl_1d.py`            | HHL 1D solution shape, sign, proportionality recovery                  | $\sim 2$ min    |
-| `test_hhl_2d.py`            | HHL 2D structure, sign consistency, iteration history                  | $\sim 3$ min    |
-| `test_vqls_1d.py`           | VQLS cost convergence, parameter shape, reproducibility                | $\sim 2$ min    |
-| `test_vqls_2d.py`           | VQLS 2D structure, warm-start, sign consistency                        | $\sim 3$ min    |
-| `test_qsvt_1d.py`           | Block encoding unitarity, QSP angle shape, QSVT solver correctness     | $\sim 5$ min    |
-| `test_qsvt_2d.py`           | QSVT 2D cache pre-computation, row solve, HET compatibility            | $\sim 3$ min    |
-| `test_het_problem.py`       | HET config derived quantities, matrix structure, solver compatibility  | $\sim 2$ min    |
-| `test_het_2d.py`            | HET 2D assembly, boundary conditions, solver compatibility              | $\sim 3$ min    |
-| `test_integration.py`       | End-to-end pipeline, BenchmarkResult consistency                       | $\sim 2$ min    |
+| File                        | Coverage                                                                       | Tests | Approx. runtime |
+| --------------------------- | ------------------------------------------------------------------------------ | ----- | ---------------- |
+| `test_problem_setup.py`     | 1D matrix structure, grid, RHS, config validation, exact solutions             | 41    | $\sim 1$ s      |
+| `test_classical_solvers.py` | Thomas 1D accuracy, NumPy agreement                                             | 9     | $\sim 1$ s      |
+| `test_line_problems.py`     | `PoissonLine2D`/`PoissonLine3D`: operators, Dirichlet absorption, periodicity, conditioning, coarsening | 36 | $\sim 1$ s |
+| `test_outer.py`             | `solvers/outer`: work accounting, stagnation detection, strip sweep, option registry, stationary schemes, multigrid transfer operators and cycles | 84 | $\sim 8$ s |
+| `test_hhl_1d.py`            | HHL 1D solution shape, sign, proportionality recovery                          | 11    | $\sim 8$ s      |
+| `test_vqls_1d.py`           | VQLS cost convergence, parameter shape, reproducibility                        | 15    | $\sim 5$ s      |
+| `test_qsvt_1d.py`           | Block encoding unitarity, QSP angle shape, QSVT solver correctness             | 24    | $\sim 4$ s      |
+| `test_het_problem.py`       | HET config derived quantities, matrix structure, solver compatibility          | 22    | $\sim 4$ s      |
+| `test_integration.py`       | End-to-end pipelines, 1D and 2D, and `BenchmarkResult` consistency             | 17    | $\sim 5$ s      |
+| **Total**                   |                                                                                | **259** | $\sim 31$ s   |
+
+Two properties receive dedicated tests because a silent regression in either would be hard to attribute:
+
+- **Line-Jacobi reproducibility.** `scheme="jacobi"` with `criterion="delta"` must reproduce the original line-Jacobi loop exactly. `test_outer.py` reconstructs that loop from first principles and asserts agreement in the field, the iteration count and the stopping point.
+- **Option validation.** The inner-solver registry must reject unknown keys rather than absorbing them. A registry that silently ignored `max_degrees=500` would let an HPC run cost an order of magnitude more than intended whilst appearing to honour the setting.
+
+### Markers
+
+One marker is defined, `quantum`, applied to every test that builds and simulates a circuit:
+
+```bash
+pytest -m "not quantum"     # 193 tests, ~11 s, no quantum backend required
+```
+
+This selects the pure-classical subset: problem assembly, the classical solvers, and the whole outer-iteration layer. It is the fastest meaningful check and the one to run when iterating on 2D/3D solver structure.
+
+There is deliberately no `slow` marker. Every test in the suite completes in under four seconds, so a fast/slow split would carry no information; the earlier marker predated the consolidation onto `solvers/outer` and had become mis-applied to tests taking barely a second.
 
 ### Running the tests
 
@@ -565,8 +581,8 @@ The automated test suite is located in `tests/` and is executed via `pytest`. Te
 # Full suite
 pytest
 
-# Fast classical tests only (under 10 seconds)
-pytest tests/test_problem_setup.py tests/test_classical_solvers.py
+# Pure-classical subset — no quantum backend needed (~11 s)
+pytest -m "not quantum"
 
 # Single test file
 pytest tests/test_qsvt_1d.py -v

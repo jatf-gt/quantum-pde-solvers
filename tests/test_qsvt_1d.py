@@ -51,15 +51,11 @@ from solvers.quantum.qsvt_1d import (
 )
 from solvers.quantum.result import QSVTSolverResult
 
+# Every test in this module builds and simulates a quantum circuit.
+pytestmark = pytest.mark.quantum
+
 
 # -- Shared fixtures ----------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def problem_N4_fS():
-    """Minimal 1-D Poisson problem: N=4, fS, homogeneous BCs."""
-    cfg = SimConfig1D(N=4, epsilon=0.01, source_fn="fS")
-    return PoissonProblem1D(cfg)
-
 
 @pytest.fixture(scope="module")
 def qsvt_cfg_fast():
@@ -227,15 +223,13 @@ class TestQSPAngles:
         d3 = polynomial_degree_estimate(10.0, 0.001)
         assert d1 < d2 < d3
 
-    @pytest.mark.slow
     def test_angles_shape(self):
         """
         Phase angle array must have length degree + 1.
         """
-        angles, degree = compute_inversion_angles(5.0, 0.1, method="chebyshev")
+        angles, degree = compute_inversion_angles(5.0, 0.1, method="auto")
         assert len(angles) == degree + 1
 
-    @pytest.mark.slow
     def test_polynomial_approximates_inverse(self):
         """
         The QSP polynomial must be bounded by 1 on [-1, 1] and must
@@ -245,7 +239,7 @@ class TestQSPAngles:
         kappa   = 5.0
         epsilon = 0.1
         angles, degree = compute_inversion_angles(
-            kappa, epsilon, method="chebyshev"
+            kappa, epsilon, method="auto"
         )
 
         # Check boundedness on [-1, 1].
@@ -276,51 +270,49 @@ class TestQSPAngles:
 
 class TestQSVT1D:
 
-    def test_returns_qsvt_solver_result(self, problem_N4_fS, qsvt_cfg_fast):
-        r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
+    def test_returns_qsvt_solver_result(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert isinstance(r, QSVTSolverResult)
 
-    @pytest.mark.slow
-    def test_solution_shape(self, problem_N4_fS, qsvt_cfg_fast):
-        r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
+    def test_solution_shape(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert r.u.shape == (4,)
 
-    @pytest.mark.slow
-    def test_solver_label(self, problem_N4_fS, qsvt_cfg_fast):
-        r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
+    def test_solver_label(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert r.solver == "QSVT"
 
-    def test_solution_finite(self, problem_N4_fS, qsvt_cfg_fast):
+    def test_solution_finite(self, problem_1d_N4_fS, qsvt_cfg_fast):
         """All solution values must be finite."""
-        r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
+        r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert np.all(np.isfinite(r.u)), (
             "QSVT solution contains non-finite values."
         )
 
-    def test_circuit_diagnostics_populated(self, problem_N4_fS, qsvt_cfg_fast):
-        r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
+    def test_circuit_diagnostics_populated(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert r.polynomial_degree > 0
         assert r.circuit_depth     > 0
         # n+2 qubits: n data + 1 BE ancilla + 1 signal qubit.
         assert r.n_qubits == int(np.log2(4)) + 1   # = 4 for N=4
         assert r.n_angles == r.polynomial_degree + 1
 
-    def test_kappa_effective_positive(self, problem_N4_fS, qsvt_cfg_fast):
-        r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
+    def test_kappa_effective_positive(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert r.kappa_effective > 0.0
 
-    def test_residual_finite(self, problem_N4_fS, qsvt_cfg_fast):
-        r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
+    def test_residual_finite(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert np.isfinite(r.euclidean_residual)
 
-    def test_sign_consistent_with_thomas(self, problem_N4_fS, qsvt_cfg_fast):
+    def test_sign_consistent_with_thomas(self, problem_1d_N4_fS, qsvt_cfg_fast):
         """
         The dominant solution component must have the same sign as the
         Thomas reference. A sign flip indicates a proportionality
         recovery failure.
         """
-        u_thomas = thomas_solve(problem_N4_fS).u
-        u_qsvt   = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast).u
+        u_thomas = thomas_solve(problem_1d_N4_fS).u
+        u_qsvt   = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast).u
 
         idx_max      = int(np.argmax(np.abs(u_thomas)))
         sign_thomas  = np.sign(u_thomas[idx_max])
@@ -359,8 +351,8 @@ class TestQSVT1D:
         with pytest.raises(ValueError, match="zero"):
             qsvt_solve_system(A, b, qsvt_cfg_fast)
 
-    def test_angles_stored_in_result(self, problem_N4_fS, qsvt_cfg_fast):
+    def test_angles_stored_in_result(self, problem_1d_N4_fS, qsvt_cfg_fast):
         """Phase angles must be stored in the result for reproducibility."""
-        r = qsvt_solve(problem_N4_fS, config=qsvt_cfg_fast)
+        r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert r.angles is not None
         assert len(r.angles) == r.n_angles

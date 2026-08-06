@@ -16,3 +16,5 @@ results/2Dhpc_run/
 results/3Dhpc_run/
 CLAUDE.md
 context/
+git_*
+*.ps1

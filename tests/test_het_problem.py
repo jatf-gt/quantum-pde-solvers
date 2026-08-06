@@ -166,6 +166,7 @@ class TestHETPhysicalProblem:
         )
 
 
+@pytest.mark.quantum
 class TestHETSolverCompatibility:
     """
     Verify that HHL and VQLS can be called on HET problems and return

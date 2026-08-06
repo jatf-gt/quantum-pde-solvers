@@ -13,16 +13,11 @@ import pytest
 
 from solvers.quantum.hhl_1d import hhl_solve, hhl_solve_system
 from solvers.classical.thomas import thomas_solve
-from conftest import HHL_REL_ERROR_TOL
+from conftest import HHL_REL_ERROR_TOL, rel_err
 
+# Every test in this module builds and simulates a quantum circuit.
+pytestmark = pytest.mark.quantum
 
-def _rel_err(u: np.ndarray, ref: np.ndarray) -> float:
-    """Max relative error excluding near-zero nodes."""
-    scale = np.max(np.abs(ref))
-    mask  = np.abs(ref) > 1e-6 * scale
-    if not mask.any():
-        return 0.0
-    return float(np.max(np.abs((u - ref)[mask]) / np.abs(ref[mask])))
 
 
 class TestHHL1D:
@@ -65,7 +60,7 @@ class TestHHL1D:
         prob     = PoissonProblem1D(cfg)
         u_thomas = thomas_solve(prob).u
         u_hhl    = hhl_solve(prob).u
-        err      = _rel_err(u_hhl, u_thomas)
+        err      = rel_err(u_hhl, u_thomas)
         assert err < HHL_REL_ERROR_TOL, (
             f"HHL vs Thomas rel err = {err*100:.2f}% > "
             f"{HHL_REL_ERROR_TOL*100:.0f}% for {fn_key}"
