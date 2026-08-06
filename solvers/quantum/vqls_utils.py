@@ -244,10 +244,6 @@ def build_cost_function(
         A function mapping a variational parameter array to a scalar cost 
         value bounded within [0, 1].
     """
-    dev = qml.device(device_name, wires=n_qubits + 1)
-    # Ancilla qubit is the last wire (index n_qubits).
-    ancilla = n_qubits
-
     # ── Numerator: <b|A|x(θ)> ────────────────────────────────────────────────
     # We compute this directly using statevector inner products rather than
     # Hadamard tests, which is valid on a statevector simulator and avoids

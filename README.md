@@ -58,7 +58,7 @@ The root of the repository also carries a set of HPC job-submission scripts and 
 poisson_hhl/
 │
 ├── core/                            # Shared infrastructure — PDE-agnostic
-│   ├── config.py                    # SimConfig1D, SimConfig2D, ClassicalConfig2D
+│   ├── config.py                    # SimConfig1D, SimConfig2D
 │   ├── exact_solutions.py           # Analytical solutions: 1D (fS, fL, fH) and 2D sinusoidal
 │   ├── het_config.py                # HETConfig, HETPhysicalConfig, physical constants
 │   └── source_functions.py          # Source functions: fS, fL, fH (1D and 2D); HET profiles

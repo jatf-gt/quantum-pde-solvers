@@ -141,31 +141,3 @@ def print_convergence_summary(result: BenchmarkResult2D) -> None:
             i == result.iterations - 1 and result.converged
         ) else ""
         print(f"  {i+1:>6}  {err:>14.6e}  {ln_err:>12.4f}{marker}")
-
-
-# ── VQLS Console Reporting ────────────────────────────────────────────────────
-
-def print_vqls_summary(vqls_br) -> None:
-    """
-    Outputs a concise diagnostic summary for the Variational Quantum Linear 
-    Solver (VQLS) execution.
-
-    Displays optimisation telemetry alongside spatial accuracy metrics to 
-    facilitate direct comparative analysis against equivalent HHL outcomes.
-    """
-    from solvers.quantum.vqls_1d import VQLSSolverResult
-
-    cfg = vqls_br.config
-    r   = vqls_br   # BenchmarkResult wrapping a VQLSSolverResult
-
-    print(
-        f"\nVQLS summary: N={cfg.N}, f={cfg.source_fn}, "
-        f"ε_tol={cfg.epsilon}"
-    )
-    
-    # Note: VQLSSolverResult attributes are encapsulated within the generic 
-    # BenchmarkResult payload. They are explicitly surfaced here for telemetry.
-    print(f"  Layers:            {r.prop_const}")   # Placeholder — see diagnostic notes
-    print(f"  Euclidean residual: {r.euclidean_residual:.4e}")
-    print(f"  Max relative error: "
-          f"{r.max_rel_error:.3f}%" if r.max_rel_error else "  N/A")

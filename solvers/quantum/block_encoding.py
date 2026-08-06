@@ -60,6 +60,7 @@ from __future__ import annotations
 import numpy as np
 from qiskit import QuantumCircuit, QuantumRegister, AncillaRegister
 from qiskit.circuit.library import UnitaryGate
+from qiskit.quantum_info import Operator
 
 # Number of ancilla qubits for the Sz.-Nagy block encoding.
 _N_ANCILLA_BE = 1
@@ -173,8 +174,6 @@ def block_encoding_matrix(
     block : np.ndarray, shape (N, N)
         The A/alpha block of the unitary matrix.
     """
-    from qiskit.quantum_info import Operator
-
     N     = 2**n
     U     = Operator(circuit).data   # shape (2N, 2N)
 

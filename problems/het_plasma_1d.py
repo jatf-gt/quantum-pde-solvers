@@ -32,6 +32,7 @@ Reference: Laizet (PhD thesis), Hall Effect Thruster plasma modelling.
 """
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -98,9 +99,6 @@ class HETPoissonProblem1D:
         # ── Right-Hand Side Assembly ──────────────────────────────────────────
         self.b      = self._build_rhs()
         self.b_phys = self.b * cfg.phi_0   # Dimensional projection for telemetry
-
-        eigs       = np.abs(np.linalg.eigvalsh(self.A))
-        self.kappa = float(eigs.max() / eigs.min())
 
         # ── Condition Number Evaluation ───────────────────────────────────────
         eigs       = np.abs(np.linalg.eigvalsh(self.A))
@@ -197,7 +195,6 @@ class HETPhysicalProblem1D:
     """
 
     def __init__(self, cfg: "HETPhysicalConfig") -> None:
-        from core.het_config import HETPhysicalConfig
         self.config = cfg
         N           = cfg.N
         self.dx     = 1.0 / (N + 1)
@@ -228,7 +225,6 @@ class HETPhysicalProblem1D:
 
         # Warn if the RHS-implied solution scale is more than 3x the expected.
         if rhs_scale > 3.0 * expected_scale and expected_scale > 0:
-            import warnings
             warnings.warn(
                 f"RHS scale ({rhs_scale:.2f}) is {rhs_scale/expected_scale:.1f}x "
                 f"larger than expected ({expected_scale:.2f}). "
@@ -292,7 +288,10 @@ class HETPhysicalProblem1D:
         b[0]  -= cfg.alpha_bc    # Anode constraint: φ̃(0) = V_d/φ_0
         return b
 
-    def electric_field(self, phi_nondim: np.ndarray) -> np.ndarray:
+    def electric_field(
+        self,
+        phi_nondim: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Computes the macroscopic physical electric field E(x) [V/m] derived from 
         the non-dimensional spatial potential array φ̃.

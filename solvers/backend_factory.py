@@ -33,8 +33,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
-from qiskit_aer import AerSimulator
 
 log = logging.getLogger(__name__)
 

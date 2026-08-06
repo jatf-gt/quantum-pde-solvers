@@ -15,7 +15,6 @@ hhl_solve_system(A, b, eps) :
 from __future__ import annotations
 
 import warnings
-from typing import Optional
 
 import numpy as np
 
