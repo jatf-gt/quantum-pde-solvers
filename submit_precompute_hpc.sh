@@ -120,7 +120,7 @@ echo "Starting precompute at $(date)"
 echo "Arguments: ${EXTRA_ARGS}"
 echo "------------------------------------------------------------"
 
-python3 scripts/precompute_qsvt_phases.py ${EXTRA_ARGS}
+python3 scripts/precompute_qsvt_phases.py --dim 1 ${EXTRA_ARGS}
 EXIT_CODE=$?
 
 echo "------------------------------------------------------------"
