@@ -72,11 +72,12 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+from core import cases
+from core import het_geometry as geom
 from problems.poisson_line_2d import PoissonLine2D
 from solvers.outer import (InnerConfig, available_inner,available_schemes,
                            build_hierarchy, describe_inner, describe_scheme,
@@ -152,9 +153,12 @@ HHL_EPSILON_DEFAULT: float = 0.01
 N_FOURIER_MODES: int = 50
 N_FINE: int = 200
 
-HET_Lz: float = 0.025
-HET_Lr: float = 0.020
-HET_phi0: float = 300.0
+# Kept only for the run-metadata record (_save_metadata); the sections
+# themselves read geometry through the case registry (core/cases.py), which
+# is itself sourced from core/het_geometry.py.
+HET_Lz: float = geom.L_Z
+HET_Lr: float = geom.L_R
+HET_phi0: float = geom.PHI_0
 
 MAX_WORKERS_DEFAULT: int = 4
 
@@ -294,95 +298,10 @@ def _electric_field(phi: np.ndarray, dx: float, dy: float):
 
 
 # ── Problem definitions ───────────────────────────────────────────────────────
-
-def _grid_2d(N: int, Lx: float = 1.0, Ly: float = 1.0):
-    dx, dy = Lx / (N + 1), Ly / (N + 1)
-    x = np.arange(1, N + 1) * dx
-    y = np.arange(1, N + 1) * dy
-    X, Y = np.meshgrid(x, y, indexing="ij")
-    return X, Y, dx, dy
-
-
-# ── Section 1: sinusoidal source on the unit square ───────────────────────────
-
-def _phi_sin2d(x, y):
-    return -np.sin(np.pi * x) * np.sin(np.pi * y) / (2.0 * np.pi**2)
-
-
-def _f_sin2d(x, y):
-    return np.sin(np.pi * x) * np.sin(np.pi * y)
-
-
-# ── Section 2: two-Gaussian charge density (PlasmaNet benchmark) ──────────────
-
-def _f_two_gaussian_at(x, y, Lx=0.01, Ly=0.01):
-    """f = nabla^2(phi) = -rho / eps0."""
-    sigma, n0, e, eps0 = 0.1 * Lx, 1e16, 1.602e-19, 8.854e-12
-    rho = n0 * e * np.exp(-((x - 0.3 * Lx)**2 + (y - 0.3 * Ly)**2) / (2 * sigma**2))
-    rho += n0 * e * np.exp(-((x - 0.7 * Lx)**2 + (y - 0.7 * Ly)**2) / (2 * sigma**2))
-    return -rho / eps0
-
-
-def _phi_two_gaussian_reference(Lx=0.01, Ly=0.01, N_fine=N_FINE,
-                                N_modes=N_FOURIER_MODES):
-    """
-    Fourier-series reference on a fine grid, returned as an interpolator.
-
-    The fine grid is deliberately independent of the solver N.  Computing the
-    coefficients on the solver grid introduces a large quadrature error at
-    small N (~32 % at N=4, where four points per dimension cannot resolve a
-    Gaussian of width sigma = 0.1 Lx).
-    """
-    dx_f, dy_f = Lx / (N_fine + 1), Ly / (N_fine + 1)
-    x_f = np.arange(1, N_fine + 1) * dx_f
-    y_f = np.arange(1, N_fine + 1) * dy_f
-    xf, yf = np.meshgrid(x_f, y_f, indexing="ij")
-    f_fine = _f_two_gaussian_at(xf, yf, Lx, Ly)
-
-    phi_fine = np.zeros((N_fine, N_fine))
-    for n in range(1, N_modes + 1):
-        sin_x = np.sin(n * np.pi * xf / Lx)
-        for m in range(1, N_modes + 1):
-            sin_y = np.sin(m * np.pi * yf / Ly)
-            R_nm = (4.0 / (Lx * Ly)) * np.sum(f_fine * sin_x * sin_y) * dx_f * dy_f
-            denom = -np.pi**2 * (n**2 / Lx**2 + m**2 / Ly**2)
-            phi_fine += (R_nm / denom) * sin_x * sin_y
-
-    return RegularGridInterpolator((x_f, y_f), phi_fine, method="linear",
-                                   bounds_error=False, fill_value=0.0)
-
-
-# ── Section 3: single Fourier mode ────────────────────────────────────────────
-
-def _f_single_mode(x, y, n=1, m=1, Lx=1.0, Ly=1.0, R_nm=1.0):
-    return -R_nm * np.sin(n * np.pi * x / Lx) * np.sin(m * np.pi * y / Ly)
-
-
-def _phi_single_mode(x, y, n=1, m=1, Lx=1.0, Ly=1.0, R_nm=1.0):
-    denom = np.pi**2 * (n**2 / Lx**2 + m**2 / Ly**2)
-    return (R_nm / denom) * np.sin(n * np.pi * x / Lx) * np.sin(m * np.pi * y / Ly)
-
-
-# ── Section 4: HET manufactured solution (SPT-100) ────────────────────────────
-
-def _phi_het_mms(z, r):
-    return HET_phi0 * np.sin(np.pi * z / HET_Lz) * np.cos(np.pi * r / (2 * HET_Lr))
-
-
-def _f_het_mms(z, r):
-    coeff = -HET_phi0 * np.pi**2 * (1.0 / HET_Lz**2 + 1.0 / (4.0 * HET_Lr**2))
-    return coeff * np.sin(np.pi * z / HET_Lz) * np.cos(np.pi * r / (2 * HET_Lr))
-
-
-# ── Section 5: HET sinusoidal source ──────────────────────────────────────────
-
-def _phi_het_sin(x, y, Lx, Ly, phi0):
-    return phi0 * np.sin(np.pi * x / Lx) * np.sin(np.pi * y / Ly)
-
-
-def _f_het_sin(x, y, Lx, Ly, phi0):
-    coeff = -phi0 * np.pi**2 * (1.0 / Lx**2 + 1.0 / Ly**2)
-    return coeff * np.sin(np.pi * x / Lx) * np.sin(np.pi * y / Ly)
+#
+# All five sections' cases (source, exact/reference solution, boundary data,
+# domain extents) now live in core/cases.py, read via cases.get(name).build(N)
+# in each run_sectionN below - not built inline here as they used to be.
 
 
 # ── Sweep settings container ──────────────────────────────────────────────────
@@ -582,11 +501,14 @@ def _estimate_case(case_id, N, problem, cfg: SweepConfig) -> None:
 
 
 def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
-              results: list, bc_x0=0.0, bc_x1=0.0, bc_y0=0.0, bc_y1=0.0) -> None:
-    """Run the Thomas reference and every requested quantum solver on one case."""
-    problem = PoissonLine2D(f_vals,
-                            Lx=float(X[-1, 0] + dx), Ly=float(Y[0, -1] + dy),
-                            bc_x0=bc_x0, bc_x1=bc_x1, bc_y0=bc_y0, bc_y1=bc_y1)
+              results: list, problem: PoissonLine2D) -> None:
+    """
+    Run the Thomas reference and every requested quantum solver on one case.
+
+    `problem` is the already-assembled PoissonLine2D from the case registry
+    (core/cases.py), which has the boundary data baked in - this function no
+    longer reconstructs it from bc_x0/bc_x1/bc_y0/bc_y1 arguments.
+    """
     kappa = problem.kappa_row()
     inner_cfg = cfg.inner_config(N)
     kw = cfg.scheme_kwargs()
@@ -681,49 +603,48 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
 
 def run_section1(N, cfg, results):
     _banner(f"SECTION 1 - Poisson, sinusoidal source, unit square, N={N}")
-    X, Y, dx, dy = _grid_2d(N)
+    built = cases.get("poisson_2d_sin_pi").build(N)
+    X, Y = built.coords
+    dx, dy = built.spacings
     _run_case("2D_Poisson_sin_hom", N, X, Y, dx, dy,
-              _f_sin2d(X, Y), _phi_sin2d(X, Y), cfg, results)
+              built.f_values, built.exact, cfg, results, built.problem)
 
 
 def run_section2(N, cfg, results):
     _banner(f"SECTION 2 - Two-Gaussian PlasmaNet benchmark, N={N}")
-    Lx = Ly = 0.01
-    X, Y, dx, dy = _grid_2d(N, Lx, Ly)
-    f_vals = _f_two_gaussian_at(X, Y, Lx, Ly)
+    built = cases.get("poisson_2d_two_gaussian_plasmanet").build(N)
+    X, Y = built.coords
+    dx, dy = built.spacings
     log.info("    Fourier reference: N_fine=%d, N_modes=%d", N_FINE, N_FOURIER_MODES)
-    interp = _phi_two_gaussian_reference(Lx, Ly, N_FINE, N_FOURIER_MODES)
-    phi_ref = interp(np.stack([X.ravel(), Y.ravel()], axis=-1)).reshape(N, N)
     _run_case("2D_Poisson_TwoGaussian_PlasmaNet", N, X, Y, dx, dy,
-              f_vals, phi_ref, cfg, results)
+              built.f_values, built.exact, cfg, results, built.problem)
 
 
 def run_section3(N, cfg, results):
     _banner(f"SECTION 3 - Single Fourier mode (n=1, m=1), N={N}")
-    X, Y, dx, dy = _grid_2d(N)
+    built = cases.get("poisson_2d_single_mode_n1m1").build(N)
+    X, Y = built.coords
+    dx, dy = built.spacings
     _run_case("2D_Poisson_SingleMode_n1m1", N, X, Y, dx, dy,
-              _f_single_mode(X, Y), _phi_single_mode(X, Y), cfg, results)
+              built.f_values, built.exact, cfg, results, built.problem)
 
 
 def run_section4(N, cfg, results):
     _banner(f"SECTION 4 - HET MMS (SPT-100), N={N}")
-    Z, R, dz, dr = _grid_2d(N, HET_Lz, HET_Lr)
-    z_pts = np.arange(1, N + 1) * dz
-    # The inner wall (r = 0) carries the axial profile; the anode, cathode and
-    # outer wall are all zero for this manufactured solution.
-    bc_inner = HET_phi0 * np.sin(np.pi * z_pts / HET_Lz)
+    built = cases.get("het_2d_mms_spt100").build(N)
+    Z, R = built.coords
+    dz, dr = built.spacings
     _run_case("2D_HET_MMS_SPT100", N, Z, R, dz, dr,
-              _f_het_mms(Z, R), _phi_het_mms(Z, R), cfg, results,
-              bc_y0=bc_inner)
+              built.f_values, built.exact, cfg, results, built.problem)
 
 
 def run_section5(N, cfg, results):
     _banner(f"SECTION 5 - HET sinusoidal source, N={N}")
-    Lx, Ly, phi0 = 0.025, 0.020, 20.0
-    X, Y, dx, dy = _grid_2d(N, Lx, Ly)
+    built = cases.get("het_2d_sin_meeting_report").build(N)
+    X, Y = built.coords
+    dx, dy = built.spacings
     _run_case("2D_HET_Sin_MeetingReport", N, X, Y, dx, dy,
-              _f_het_sin(X, Y, Lx, Ly, phi0),
-              _phi_het_sin(X, Y, Lx, Ly, phi0), cfg, results)
+              built.f_values, built.exact, cfg, results, built.problem)
 
 
 SECTIONS = {"section1": run_section1, "section2": run_section2,

@@ -91,7 +91,9 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from solvers.outer import (InnerConfig, PoissonLine3D, available_inner,
+from core import cases
+from core import het_geometry as geom
+from solvers.outer import (InnerConfig, available_inner,
                            available_schemes, build_hierarchy, describe_inner,
                            describe_scheme, get_inner, resolve_options, solve)
 
@@ -147,33 +149,33 @@ HHL_EPSILON_DEFAULT: float = 0.01
 # ── SPT-100 geometry (the reference Hall thruster in the literature) ──────────
 #  The discharge channel is an annulus.  For the azimuthal-axial studies that
 #  motivate 3-D, it is standard practice to "unwrap" the annulus into a
-#  Cartesian slab: the channel is thin (15 mm wide) compared with its mean
-#  circumference (267 mm), so curvature is a second-order effect and the
+#  Cartesian slab: the channel is thin (20 mm wide) compared with its mean
+#  circumference (251 mm), so curvature is a second-order effect and the
 #  azimuthal direction becomes a straight, periodic coordinate.  This is the
 #  geometry used in axial-azimuthal PIC studies of HET instabilities.
 #
-#      axis 0  z  axial       [0, 25 mm]   Dirichlet: anode / cathode plane
-#      axis 1  r  radial      [0, 15 mm]   Dirichlet: inner / outer wall
-#      axis 2  s  azimuthal   [0, 267 mm]  PERIODIC (s = r_mean * theta)
+#      axis 0  z  axial       [0, 40 mm]   Dirichlet: anode / cathode plane
+#      axis 1  r  radial      [0, 20 mm]   Dirichlet: inner / outer wall
+#      axis 2  s  azimuthal   [0, 251 mm]  PERIODIC (s = r_mean * theta)
 #
 #  Axis 0 is the strip direction and must be Dirichlet: a periodic strip
 #  operator is cyclic-tridiagonal, not TST, which the block encoding assumes.
-HET_LZ: float = 0.025                        # channel length, m
-HET_R_IN, HET_R_OUT = 0.035, 0.050           # channel radii, m
-HET_LR: float = HET_R_OUT - HET_R_IN         # channel width, m
-HET_R_MEAN: float = 0.5 * (HET_R_IN + HET_R_OUT)
-HET_LS: float = 2.0 * np.pi * HET_R_MEAN     # mean circumference, m
+# Kept only for the run-metadata record (_save_metadata); the case functions
+# themselves read geometry and physics constants through the case registry
+# (core/cases.py), which is itself sourced from core/het_geometry.py.
+HET_LZ: float = geom.L_Z
+HET_R_IN, HET_R_OUT = geom.R_IN, geom.R_OUT
+HET_LR: float = geom.L_R
+HET_R_MEAN: float = geom.R_MEAN
+HET_LS: float = geom.L_S
 
-HET_PHI0: float = 300.0        # discharge voltage, V (SPT-100 nominal)
-HET_V_ANODE: float = 300.0     # anode potential, V
-HET_V_CATHODE: float = 0.0     # cathode-plane potential, V
-HET_V_WALL: float = -20.0      # wall potential, V (floating, ~ -few Te)
+HET_PHI0: float = geom.PHI_0
+HET_V_ANODE: float = geom.V_ANODE
+HET_V_CATHODE: float = geom.V_CATHODE
+HET_V_WALL: float = geom.V_WALL
 
-SPOKE_MODE_M: int = 2          # azimuthal mode number of the rotating spoke
-SPOKE_EPSILON: float = 0.30    # relative amplitude of the azimuthal modulation
-
-EPS0: float = 8.854e-12        # F/m
-Q_E: float = 1.602e-19         # C
+SPOKE_MODE_M: int = geom.SPOKE_MODE_M
+SPOKE_EPSILON: float = geom.SPOKE_EPSILON
 
 MAX_WORKERS_DEFAULT: int = 4
 
@@ -322,299 +324,66 @@ def _azimuthal_mode_amplitude(phi: np.ndarray, m: int) -> float:
 
 
 # ── Test cases ────────────────────────────────────────────────────────────────
-
-def _het_grid(N: int):
-    """Unwrapped SPT-100 channel grid.  Azimuthal axis has no boundary node."""
-    dz, dr = HET_LZ / (N + 1), HET_LR / (N + 1)
-    ds = HET_LS / N
-    z = np.arange(1, N + 1) * dz
-    r = np.arange(1, N + 1) * dr
-    s = np.arange(N) * ds
-    return np.meshgrid(z, r, s, indexing="ij"), (dz, dr, ds), (z, r, s)
-
+#
+# Every case's problem, exact/reference solution and source term now live in
+# core/cases.py, read via cases.get(name).build(N) below - not built inline
+# here as they used to be. The (case, N) -> case_id / azimuthal mode number
+# mapping stays here, since that is HPC-sweep bookkeeping, not physics.
 
 # ── Section 1: triple-sin MMS on the unit cube ────────────────────────────────
 
 def case_cube(N: int):
-    """
-    Canonical 3-D Poisson verification case:
-
-        phi = sin(pi x) sin(pi y) sin(pi z)
-        f   = nabla^2 phi = -3 pi^2 sin(pi x) sin(pi y) sin(pi z)
-
-    Homogeneous Dirichlet on all six faces.  Exact solution, so this is what
-    the order-of-accuracy check is run on.
-    """
-    h = 1.0 / (N + 1)
-    p = np.arange(1, N + 1) * h
-    X, Y, Z = np.meshgrid(p, p, p, indexing="ij")
-    phi = np.sin(np.pi * X) * np.sin(np.pi * Y) * np.sin(np.pi * Z)
-    f = -3.0 * np.pi**2 * phi
-    prob = PoissonLine3D(f, lengths=(1.0, 1.0, 1.0))
-    return prob, phi, f, "3D_Poisson_TripleSin_cube", 0
+    """Canonical 3-D Poisson verification case; see poisson_3d_triple_sin_cube."""
+    built = cases.get("poisson_3d_triple_sin_cube").build(N)
+    return built.problem, built.exact, built.f_values, "3D_Poisson_TripleSin_cube", 0
 
 
 # ── Section 2: HET channel MMS, azimuthally periodic ──────────────────────────
 
 def case_het_mms(N: int, m: int = 1):
-    """
-    Manufactured solution on the unwrapped SPT-100 channel:
-
-        phi = phi0 sin(pi z/Lz) sin(pi r/Lr) cos(2 pi m s/Ls)
-        f   = -phi0 pi^2 (1/Lz^2 + 1/Lr^2 + 4 m^2/Ls^2) * (same profile)
-
-    Zero at anode, cathode and both walls; exactly periodic in s, so the
-    periodic stencil and the periodic grid-transfer operators are genuinely
-    exercised rather than merely present.  Verification case with the real
-    channel aspect ratio, which is severely anisotropic
-    (ds/dr ~ 19 at N=16) and therefore the case that actually tests the
-    anisotropic semi-coarsening in the multigrid hierarchy.
-    """
-    (Zg, Rg, Sg), sp, _ = _het_grid(N)
-    profile = (np.sin(np.pi * Zg / HET_LZ) * np.sin(np.pi * Rg / HET_LR)
-               * np.cos(2.0 * np.pi * m * Sg / HET_LS))
-    phi = HET_PHI0 * profile
-    lap = -HET_PHI0 * np.pi**2 * (1.0 / HET_LZ**2 + 1.0 / HET_LR**2
-                                  + 4.0 * m**2 / HET_LS**2)
-    f = lap * profile
-    prob = PoissonLine3D(f, lengths=(HET_LZ, HET_LR, HET_LS),
-                         periodic=(False, False, True))
-    return prob, phi, f, "3D_HET_MMS_SPT100", m
+    """Manufactured solution on the unwrapped SPT-100 channel; see het_3d_mms_spt100."""
+    built = cases.get("het_3d_mms_spt100").build(N)
+    return built.problem, built.exact, built.f_values, "3D_HET_MMS_SPT100", m
 
 
 # ── Section 3: HET rotating spoke ─────────────────────────────────────────────
 
 def case_spoke(N: int, m: int = SPOKE_MODE_M, eps: float = SPOKE_EPSILON):
-    """
-    Rotating-spoke potential structure in the discharge channel.
-
-    The "rotating spoke" is a large-scale, low-mode-number (m = 1..6)
-    coherent azimuthal structure observed in essentially every Hall thruster
-    since Janes & Lowder (1966), and characterised in detail by
-    McDonald & Gallimore (2011) and Sekerak et al. (2015).  It rotates in the
-    E x B direction at a few km/s and carries a substantial fraction of the
-    discharge current, so capturing it is the single strongest physical
-    argument for simulating a HET in three dimensions rather than two.
-
-    Manufactured so an exact solution exists:
-
-        phi = phi0 sin(pi z/Lz) sin(pi r/Lr) [1 + eps cos(2 pi m s/Ls)]
-
-    i.e. an axial-radial potential well modulated azimuthally at relative
-    amplitude eps.  Applying the Laplacian term by term:
-
-        nabla^2 phi = phi0 sin(pi z/Lz) sin(pi r/Lr) *
-                      { -(pi^2/Lz^2 + pi^2/Lr^2) [1 + eps cos(2 pi m s/Ls)]
-                        - eps (2 pi m/Ls)^2 cos(2 pi m s/Ls) }
-
-    The first group is the unmodulated well; the second is the azimuthal
-    curvature of the spoke.  Because the mode amplitude is known exactly,
-    ``azimuthal_mode_rel_err`` measures directly whether a quantum solver
-    reproduces the spoke or merely smears it.
-    """
-    (Zg, Rg, Sg), sp, _ = _het_grid(N)
-    base = np.sin(np.pi * Zg / HET_LZ) * np.sin(np.pi * Rg / HET_LR)
-    azim = np.cos(2.0 * np.pi * m * Sg / HET_LS)
-    phi = HET_PHI0 * base * (1.0 + eps * azim)
-    f = HET_PHI0 * base * (
-        -(np.pi**2 / HET_LZ**2 + np.pi**2 / HET_LR**2) * (1.0 + eps * azim)
-        - eps * (2.0 * np.pi * m / HET_LS) ** 2 * azim)
-    prob = PoissonLine3D(f, lengths=(HET_LZ, HET_LR, HET_LS),
-                         periodic=(False, False, True))
-    return prob, phi, f, "3D_HET_RotatingSpoke_SPT100", m
+    """Rotating-spoke potential structure; see het_3d_rotating_spoke."""
+    built = cases.get("het_3d_rotating_spoke").build(N)
+    return built.problem, built.exact, built.f_values, "3D_HET_RotatingSpoke_SPT100", m
 
 
 # ── Section 4: realistic SPT-100 discharge ────────────────────────────────────
 
 def case_discharge(N: int, m: int = SPOKE_MODE_M):
-    """
-    Realistic SPT-100 discharge Poisson solve - the production case.
-
-    Solves  nabla^2 phi = -rho / eps0  with the actual operating boundary
-    conditions of an SPT-100 at nominal 300 V:
-
-        anode   (z = 0)      phi = +300 V
-        cathode (z = Lz)     phi =    0 V
-        walls   (r = 0, Lr)  phi =  -20 V   (floating, a few Te below plasma)
-        azimuthal            periodic
-
-    The source is the net space charge in the acceleration region.  The bulk
-    plasma is quasi-neutral, but charge separation develops near the exit
-    plane where the ions are accelerated out faster than the electrons can
-    follow; that region is modelled here as a Gaussian in z centred at the
-    exit plane, tapered radially, and modulated azimuthally by the spoke:
-
-        n_diff(z,r,s) = n0 exp(-(z - z_acc)^2 / 2 sigma_z^2)
-                             sin(pi r/Lr) [1 + eps cos(2 pi m s/Ls)]
-        rho = q_e n_diff,     f = -rho / eps0
-
-    with n0 = 1e16 m^-3, about 1 % of the ~1e18 m^-3 bulk density, giving a
-    space-charge potential perturbation of order 10 V on top of the 300 V
-    applied - the correct order of magnitude for a real device.
-
-    There is no closed-form solution, so the Thomas result is the reference.
-    This is the case whose cost actually predicts what a quantum-in-the-loop
-    HET simulation would pay per timestep.
-    """
-    (Zg, Rg, Sg), sp, _ = _het_grid(N)
-    z_acc = 0.8 * HET_LZ          # acceleration region sits near the exit plane
-    sigma_z = 0.12 * HET_LZ
-    n0 = 1.0e16                   # peak net charge-carrier density, m^-3
-
-    n_diff = (n0 * np.exp(-((Zg - z_acc) ** 2) / (2.0 * sigma_z**2))
-              * np.sin(np.pi * Rg / HET_LR)
-              * (1.0 + SPOKE_EPSILON * np.cos(2.0 * np.pi * m * Sg / HET_LS)))
-    f = -(Q_E * n_diff) / EPS0
-
-    Nz = N
-    bc_anode = np.full((N, N), HET_V_ANODE)      # face at z = 0,  shape (r, s)
-    bc_cathode = np.full((N, N), HET_V_CATHODE)  # face at z = Lz
-    bc_wall_in = np.full((N, N), HET_V_WALL)     # face at r = 0,  shape (z, s)
-    bc_wall_out = np.full((N, N), HET_V_WALL)    # face at r = Lr
-
-    prob = PoissonLine3D(
-        f, lengths=(HET_LZ, HET_LR, HET_LS),
-        periodic=(False, False, True),
-        bc_lo=(bc_anode, bc_wall_in, 0.0),
-        bc_hi=(bc_cathode, bc_wall_out, 0.0))
-    return prob, None, f, "3D_HET_Discharge_SPT100", m
+    """Realistic SPT-100 discharge Poisson solve; see het_3d_discharge_spt100."""
+    built = cases.get("het_3d_discharge_spt100").build(N)
+    return built.problem, built.exact, built.f_values, "3D_HET_Discharge_SPT100", m
 
 
 # ── Section 5: Laplace equation, BC-driven ────────────────────────────────────
 
 def case_laplace(N: int):
-    """
-    Laplace equation: homogeneous PDE, NON-homogeneous Dirichlet data.
-
-        nabla^2 phi = 0
-        phi = sin(pi x) sin(pi y) sinh(k z) / sinh(k),   k = sqrt(2) pi
-
-    Harmonic by construction: the two negative curvatures in x and y
-    (-pi^2 each) are exactly cancelled by the positive curvature of sinh in
-    z (+k^2 = +2 pi^2).  Boundary data is zero on five faces and
-    sin(pi x) sin(pi y) on z = Lz.
-
-    This case exists because of a genuine gap in coverage.  Every other
-    section with an exact solution carries *zero* boundary data, and the one
-    section with real boundary data (section 4, the discharge) has no closed
-    form.  So without this case the boundary-absorption path in
-    PoissonLine3D._build_rhs is never checked against a known answer
-    anywhere in 3-D - a bug there would show up only as a plausible-looking
-    wrong field in the production case.
-
-    It is also the closest generic analogue of the physics: a real HET
-    discharge is dominated by the 300 V applied across the channel, not by
-    the space-charge source, so a BC-driven solution is the regime that
-    actually matters.
-    """
-    h = 1.0 / (N + 1)
-    p = np.arange(1, N + 1) * h
-    X, Y, Z = np.meshgrid(p, p, p, indexing="ij")
-    k = np.sqrt(2.0) * np.pi
-    phi = np.sin(np.pi * X) * np.sin(np.pi * Y) * np.sinh(k * Z) / np.sinh(k)
-    f = np.zeros_like(phi)
-    face_xy = np.sin(np.pi * p)[:, None] * np.sin(np.pi * p)[None, :]
-    prob = PoissonLine3D(f, lengths=(1.0, 1.0, 1.0),
-                         bc_hi=(0.0, 0.0, face_xy))
-    return prob, phi, f, "3D_Laplace_BCdriven_cube", 0
+    """Harmonic, BC-driven case; see poisson_3d_laplace_bc_driven."""
+    built = cases.get("poisson_3d_laplace_bc_driven").build(N)
+    return built.problem, built.exact, built.f_values, "3D_Laplace_BCdriven_cube", 0
 
 
 # ── Section 6: localised Gaussian sources ─────────────────────────────────────
 
-_GAUSS_SIGMA = 0.12
-_GAUSS_CENTRES = ((0.3, 0.3, 0.35), (0.7, 0.65, 0.6))
-_GAUSS_AMPS = (1.0, -0.8)
-
-
-def _gauss_phi(X, Y, Z):
-    out = np.zeros_like(X)
-    for A, (cx, cy, cz) in zip(_GAUSS_AMPS, _GAUSS_CENTRES):
-        out += A * np.exp(-((X - cx) ** 2 + (Y - cy) ** 2 + (Z - cz) ** 2)
-                          / (2.0 * _GAUSS_SIGMA**2))
-    return out
-
-
-def _gauss_src(X, Y, Z):
-    """nabla^2 of a Gaussian: exp(-r^2/2s^2) (r^2/s^4 - 3/s^2) in 3-D."""
-    out = np.zeros_like(X)
-    for A, (cx, cy, cz) in zip(_GAUSS_AMPS, _GAUSS_CENTRES):
-        r2 = (X - cx) ** 2 + (Y - cy) ** 2 + (Z - cz) ** 2
-        out += (A * np.exp(-r2 / (2.0 * _GAUSS_SIGMA**2))
-                * (r2 / _GAUSS_SIGMA**4 - 3.0 / _GAUSS_SIGMA**2))
-    return out
-
 def case_gaussian(N: int):
-    """
-    Two localised Gaussian charge blobs of opposite sign, with exact
-    non-homogeneous Dirichlet data on all six faces.
-
-    The 3-D analogue of the two-Gaussian PlasmaNet benchmark used in the 2-D
-    sweep, and the standard shape of a plasma space-charge source: compact,
-    steep, and poorly resolved on coarse grids.  Unlike the 2-D version,
-    which needed a 200x200 Fourier reference, this one is manufactured -
-    phi is the Gaussian sum and f is its analytic Laplacian - so it has an
-    exact solution at no cost.  A 3-D Fourier reference would need
-    O(N_modes^3) terms on a fine grid and is not worth it.
-
-    Two things are tested that no other section covers together: a source
-    with real spatial structure (sigma = 0.12 against h = 1/33 at N=32, so
-    only ~4 cells per standard deviation), and non-homogeneous data on
-    *every* face rather than one.  Its truncation error is correspondingly
-    larger than the smooth sinusoidal cases - that is the point, not a
-    defect.  Boundary values are taken at the true boundary planes
-    (coordinate 0 and L), not at the first interior node; using the latter
-    is an easy mistake that silently destroys second-order convergence.
-    """
-    h = 1.0 / (N + 1)
-    p = np.arange(1, N + 1) * h
-    X, Y, Z = np.meshgrid(p, p, p, indexing="ij")
-    phi = _gauss_phi(X, Y, Z)
-    f = _gauss_src(X, Y, Z)
-
-    A, B = np.meshgrid(p, p, indexing="ij")
-    zeros, ones = np.zeros_like(A), np.ones_like(A)
-    bc_lo = (_gauss_phi(zeros, A, B), _gauss_phi(A, zeros, B),
-             _gauss_phi(A, B, zeros))
-    bc_hi = (_gauss_phi(ones, A, B), _gauss_phi(A, ones, B),
-             _gauss_phi(A, B, ones))
-    prob = PoissonLine3D(f, lengths=(1.0, 1.0, 1.0),
-                         bc_lo=bc_lo, bc_hi=bc_hi)
-    return prob, phi, f, "3D_Poisson_TwoGaussian_cube", 0
+    """Two opposite-sign Gaussian blobs; see poisson_3d_two_gaussian_cube."""
+    built = cases.get("poisson_3d_two_gaussian_cube").build(N)
+    return built.problem, built.exact, built.f_values, "3D_Poisson_TwoGaussian_cube", 0
 
 
 # ── Section 7: high-wavenumber Fourier mode ───────────────────────────────────
 
-MODE_NML: tuple[int, int, int] = (2, 3, 4)
-
-
 def case_highmode(N: int):
-    """
-    A single high-wavenumber Fourier eigenmode:
-
-        phi = sin(n pi x) sin(m pi y) sin(l pi z),   (n, m, l) = (2, 3, 4)
-        f   = -pi^2 (n^2 + m^2 + l^2) phi = -29 pi^2 phi
-
-    Section 1 is the (1,1,1) mode - the smoothest solution the grid can
-    carry, and the one every iterative scheme handles best.  This is the
-    opposite end: at N=8 the l=4 mode has only two cells per half-wavelength,
-    so it sits near the grid's resolution limit.
-
-    Two distinct things are probed.  Discretisation: the h^2 error constant
-    scales with the fourth derivative, so this case shows the true accuracy
-    cost of an under-resolved solution.  And multigrid: high-frequency error
-    components are precisely what the smoother must remove and what the
-    coarse grid cannot represent, so a defective smoother or transfer
-    operator degrades here first, while looking fine on section 1.
-    """
-    n, m, l = MODE_NML
-    h = 1.0 / (N + 1)
-    p = np.arange(1, N + 1) * h
-    X, Y, Z = np.meshgrid(p, p, p, indexing="ij")
-    phi = (np.sin(n * np.pi * X) * np.sin(m * np.pi * Y)
-           * np.sin(l * np.pi * Z))
-    f = -np.pi**2 * (n * n + m * m + l * l) * phi
-    prob = PoissonLine3D(f, lengths=(1.0, 1.0, 1.0))
-    return prob, phi, f, "3D_Poisson_HighMode_n2m3l4", 0
+    """High-wavenumber eigenmode (n,m,l)=(2,3,4); see poisson_3d_high_mode_n2m3l4."""
+    built = cases.get("poisson_3d_high_mode_n2m3l4").build(N)
+    return built.problem, built.exact, built.f_values, "3D_Poisson_HighMode_n2m3l4", 0
 
 
 SECTIONS = {"section1": case_cube, "section2": case_het_mms,
@@ -912,7 +681,7 @@ def run_section(section: str, N: int, cfg: SweepConfig, results: list) -> None:
               "section4": "HET realistic discharge (SPT-100, 300 V)",
               "section5": "Laplace, BC-driven, unit cube",
               "section6": "Two-Gaussian source, non-homogeneous BC, unit cube",
-              "section7": f"High-wavenumber mode {MODE_NML}, unit cube"}
+              "section7": "High-wavenumber mode (2, 3, 4), unit cube"}
     _banner(f"{section.upper()} - {titles[section]}, N={N}")
     _run_case(section, N, cfg, results)
 

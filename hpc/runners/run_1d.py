@@ -52,8 +52,9 @@ apply here. The solver workers execute in spawned subprocesses, which re-import
 the module and must not pay the Qiskit and PennyLane import cost until the
 work is dispatched; and the classical and cost-estimate paths (`--skip-qsvt`,
 Thomas-only runs, the wall-time projection) must remain runnable on a node with
-no quantum backend installed. The same applies to the SciPy quadrature import in
-`_het_neumann_dirichlet_exact`, which is needed by one reference case only.
+no quantum backend installed. Case definitions - including sub-case 3c's SciPy
+quadrature reference - now live in `core/cases.py`, which applies the same
+lazy-import discipline itself.
 
 Date   : August 2026
 """
@@ -82,6 +83,8 @@ import multiprocessing as mp
 # Ensure the repository root is on sys.path regardless of invocation location.
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+
+from core import cases  # noqa: E402
 
 from solvers.backend_factory import get_aer_backend, log_backend_info  # noqa: E402
 
@@ -419,172 +422,6 @@ def _save_all_solutions(all_solutions: dict) -> None:
     np.savez_compressed(path, **flat)
     log.info("Consolidated solutions saved to %s (%d entries)",
              path, len(all_solutions))
-
-
-# ── Problem builders ──────────────────────────────────────────────────────────
-
-def _build_tst(N: int) -> np.ndarray:
-    """N x N Toeplitz symmetric tridiagonal matrix: main diag -2, off-diag +1."""
-    return (-2.0 * np.eye(N)
-            + np.diag(np.ones(N - 1), 1)
-            + np.diag(np.ones(N - 1), -1))
-
-
-def _grid(N: int) -> tuple[np.ndarray, float]:
-    """
-    Interior grid for pure-Dirichlet problems: N unknowns at x = h, 2h, ..., Nh
-    with h = 1/(N+1). The boundaries x=0 and x=1 are NOT unknowns.
-
-    Sub-case 3c does NOT use this grid -- see the comment in its section.
-    """
-    dx = 1.0 / (N + 1)
-    x = np.arange(1, N + 1) * dx
-    return x, dx
-
-
-def _kappa(A: np.ndarray) -> float:
-    """
-    Condition number lambda_max / lambda_min.
-
-    np.linalg.eigvalsh reads only one triangle of its argument, so handing it a
-    non-symmetric matrix silently returns the spectrum of a DIFFERENT operator.
-    The symmetry check and singular-value fallback make that failure loud.
-    """
-    if np.allclose(A, A.T, atol=1e-12):
-        eigs = np.abs(np.linalg.eigvalsh(A))
-    else:
-        log.warning("_kappa: matrix is not symmetric; using singular values.")
-        eigs = np.linalg.svd(A, compute_uv=False)
-    return float(eigs.max() / eigs.min())
-
-
-# ── Generic source functions and their analytical solutions ───────────────────
-
-def f_sin(x): return np.sin(np.pi * x)
-def f_lin(x): return 10.0 * x
-def f_hev(x): return np.where(x >= 0.5, 1.0, -1.0)
-
-
-def u_sin(x): return -np.sin(np.pi * x) / np.pi**2
-def u_lin(x): return 5.0 * x * (x**2 - 1.0) / 3.0
-def u_hev(x):
-    return np.where(x < 0.5, -x**2 / 2.0 + x / 4.0,
-                              x**2 / 2.0 - 3.0 * x / 4.0 + 1.0 / 4.0)
-
-
-# ── HET source functions ──────────────────────────────────────────────────────
-
-def _het_gaussian_source(x: np.ndarray, V_d: float = 300.0,
-                         L: float = 0.025, sigma: float = 0.005) -> np.ndarray:
-    """
-    Sub-case 3b source: Gaussian electron density profile,
-        n_e(x) = n_0 exp(-(xL - x0)^2 / (2 sigma^2))
-        f(x)   = -(e / eps0) n_e
-
-    Ion density is treated as a uniform background (simplified 1-D model).
-
-    NOTE: the returned values are in physical units (order 1e9), NOT normalised.
-    An earlier docstring claimed "normalised so that max|f| = 1", which was
-    simply false; any normalisation required by a quantum solver interface
-    happens inside that solver, not here.
-    """
-    e    = 1.602e-19
-    eps0 = 8.854e-12
-    n0   = 1e17            # m^-3, representative channel density
-    x0   = 0.6 * L         # peak near the exit plane
-    n_e  = n0 * np.exp(-((x * L - x0)**2) / (2 * sigma**2))
-    return -(e / eps0) * n_e
-
-
-def _het_linear_source(x: np.ndarray) -> np.ndarray:
-    """Sub-case 3a source: linear density profile, f(x) = 2x - 1."""
-    return 2.0 * x - 1.0
-
-
-def _het_neumann_dirichlet_source(x: np.ndarray, sigma_norm: float = 0.2,
-                                  x0: float = 0.6) -> np.ndarray:
-    """
-    Sub-case 3c source: normalised Gaussian on the unit interval,
-        f(x) = -exp(-(x - x0)^2 / (2 sigma_norm^2))
-
-    sigma_norm is ALREADY in normalised (unit-interval) units. An earlier
-    version took a physical `sigma` and divided by `L`; called with sigma=0.2
-    and L defaulting to 0.025 that gave an effective width of 8 -- an almost
-    flat source -- while the analytical reference used 0.2. The discrete and
-    exact problems were therefore not the same problem, which was one cause of
-    the anomalous ~60% Thomas error. Signature and defaults now match
-    _het_neumann_dirichlet_exact exactly.
-    """
-    return -np.exp(-((x - x0) ** 2) / (2.0 * sigma_norm ** 2))
-
-
-def _het_neumann_dirichlet_exact(x: np.ndarray, sigma_norm: float = 0.2,
-                                 x0: float = 0.6) -> np.ndarray:
-    """
-    Reference solution for  phi'' = f(x),  phi'(0) = 0,  phi(1) = 0,
-    with f(x) = -exp(-(x - x0)^2 / (2 sigma_norm^2)).
-
-    By direct integration of phi'' = f:
-        phi'(x) = phi'(0) + int_0^x f(t) dt = int_0^x f(t) dt     [Neumann]
-        phi(x)  = phi(0)  + int_0^x phi'(s) ds
-    and the additive constant is fixed by phi(1) = 0.
-
-    NOTE ON SIGNS: an earlier docstring wrote both integrals with a leading
-    minus sign. That was wrong and the CODE below (no minus signs) is correct
-    for phi'' = f -- which is consistent with the discrete system Au = h^2 f.
-    Do not "fix" the code to match the old docstring.
-
-    Quadrature is used because the Gaussian has no closed-form finite-limit
-    integral; the fine grid is far denser than any N in the sweep, so the
-    quadrature error is negligible relative to the discretisation error.
-    """
-    from scipy.integrate import cumulative_trapezoid
-
-    x_fine = np.linspace(0.0, 1.0, 10000)
-    f_fine = -np.exp(-((x_fine - x0)**2) / (2.0 * sigma_norm**2))
-
-    dphi_fine = cumulative_trapezoid(f_fine, x_fine, initial=0.0)   # phi'
-    phi_fine  = cumulative_trapezoid(dphi_fine, x_fine, initial=0.0)  # phi
-    phi_fine -= phi_fine[-1]                                        # phi(1)=0
-
-    return np.interp(x, x_fine, phi_fine)
-
-
-def _build_3c_system(N: int, sigma_norm: float = 0.2
-                     ) -> tuple[np.ndarray, float, np.ndarray, np.ndarray]:
-    """
-    Assemble sub-case 3c: phi'' = f, phi'(0) = 0 (Neumann), phi(1) = 0.
-
-    Returns (x, h, A, b).
-
-    GRID. A Neumann condition at x=0 makes phi(0) an UNKNOWN, so the node set
-    must include it. Unknowns are phi_0..phi_{N-1} at x_i = i*h with h = 1/N;
-    x_N = 1 is the Dirichlet boundary (phi_N = 0, absorbed into the last row).
-    This deliberately differs from _grid(N), the pure-Dirichlet interior grid
-    (h = 1/(N+1), starting at h), which has no node at x=0 -- applying a
-    Neumann row to index 0 of that grid imposes the condition at x=h, not x=0.
-
-    NEUMANN ROW. Ghost point phi_{-1} = phi_1 from the centred difference
-    phi'(0) = (phi_1 - phi_{-1}) / 2h = 0. The node-0 equation
-        phi_{-1} - 2 phi_0 + phi_1 = h^2 f_0
-    becomes  2 phi_1 - 2 phi_0 = h^2 f_0. Halving that row gives
-        -phi_0 + phi_1 = h^2 f_0 / 2
-    i.e. A[0,0] = -1, A[0,1] = +1, b[0] = h^2 f_0 / 2, which is SYMMETRIC
-    (A[0,1] = A[1,0] = 1). The unhalved form (A[0,1]=2, A[1,0]=1) has the same
-    solution but is not Hermitian: HHL and QSVT would not be valid on it, and
-    the eigvalsh-based kappa would silently describe a different matrix.
-    """
-    h = 1.0 / N
-    x = np.arange(N) * h
-
-    A = _build_tst(N).astype(float)
-    A[0, 0] = -1.0
-    A[0, 1] = +1.0
-
-    b = h**2 * _het_neumann_dirichlet_source(x, sigma_norm=sigma_norm)
-    b[0] *= 0.5          # the same halving applied to the RHS
-
-    return x, h, A, b
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -929,20 +766,17 @@ def run_1d_generic_poisson_single_N(
     """Section 1: generic Poisson, homogeneous Dirichlet BCs, three sources."""
     _banner(f"SECTION 1 - Generic Poisson (fS, fL, fH), homogeneous BCs, N={N}")
 
-    source_map = {
-        "fS": (f_sin, u_sin),
-        "fL": (f_lin, u_lin),
-        "fH": (f_hev, u_hev),
+    case_map = {
+        "fS": "poisson_1d_fS_hom",
+        "fL": "poisson_1d_fL_hom",
+        "fH": "poisson_1d_fH_hom",
     }
 
-    for src_key, (src_fn, exact_fn) in source_map.items():
+    for src_key, case_name in case_map.items():
         _section(f"Source: {src_key}  (N={N})")
 
-        x, dx   = _grid(N)
-        A       = _build_tst(N)
-        b       = dx**2 * src_fn(x)
-        kappa   = _kappa(A)
-        u_exact = exact_fn(x)
+        built = cases.get(case_name).build(N)
+        x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
         case_id = f"1D_Poisson_{src_key}_hom"
 
         log.info("  N=%3d  kappa=%.2f  case=%s", N, kappa, case_id)
@@ -962,18 +796,11 @@ def run_1d_generic_poisson_nonhom_single_N(
     """
     _banner(f"SECTION 1b - Generic Poisson (fS), non-homogeneous BCs, N={N}")
 
-    alpha, beta = 1.0, 2.0
-
-    x, dx = _grid(N)
-    A     = _build_tst(N)
-    b     = dx**2 * f_sin(x)
-    b[0]  -= alpha      # u(0) = alpha absorbed into the first row
-    b[-1] -= beta       # u(1) = beta  absorbed into the last row
-    kappa   = _kappa(A)
-    u_exact = -np.sin(np.pi * x) / np.pi**2 + (beta - alpha) * x + alpha
+    built = cases.get("poisson_1d_fS_nonhom").build(N)
+    x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
     case_id = "1D_Poisson_fS_nonhom"
 
-    log.info("  N=%3d  kappa=%.2f  alpha=%.1f  beta=%.1f", N, kappa, alpha, beta)
+    log.info("  N=%3d  kappa=%.2f  case=%s", N, kappa, case_id)
 
     _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
                      skip_qsvt, results, all_solutions)
@@ -988,18 +815,19 @@ def run_1d_het_single_N(
       3a  linear profile, homogeneous Dirichlet, analytical reference
       3b  Gaussian profile, V_d = 300 V anode, Dirichlet, Thomas reference
       3c  Gaussian profile, Neumann(x=0) - Dirichlet(x=1), quadrature reference
+
+    All three cases are read from core.cases (het_1d_3a_linear,
+    het_1d_3b_gaussian_Vd300, het_1d_3c_neumann), rather than built locally,
+    since Phase 1 of the entry-point consolidation proved every one of them
+    bit-identical to what this file used to construct by hand.
     """
     _banner(f"SECTION 2 - HET Axial Poisson, N={N}")
 
     # ── Sub-case 3a: linear profile, homogeneous BCs ──────────────────────────
-    # u'' = 2x - 1, u(0) = u(1) = 0  =>  u(x) = x^3/3 - x^2/2 + x/6
     _section(f"Sub-case 3a: linear profile, homogeneous BCs  (N={N})")
 
-    x, dx   = _grid(N)
-    A       = _build_tst(N)
-    b       = dx**2 * _het_linear_source(x)
-    kappa   = _kappa(A)
-    u_exact = x**3 / 3.0 - x**2 / 2.0 + x / 6.0
+    built = cases.get("het_1d_3a_linear").build(N)
+    x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
     case_id = "HET_1D_3a_linear_hom"
 
     log.info("  N=%3d  kappa=%.2f  sub-case=3a", N, kappa)
@@ -1010,16 +838,11 @@ def run_1d_het_single_N(
     # No closed-form solution, so the Thomas result is the reference.
     _section(f"Sub-case 3b: Gaussian profile, V_d=300V, Dirichlet BCs  (N={N})")
 
-    V_d, L  = 300.0, 0.025
-    x, dx   = _grid(N)
-    A       = _build_tst(N)
-    b       = dx**2 * _het_gaussian_source(x, V_d=V_d, L=L)
-    b[0]   -= V_d       # phi(0) = V_d  (anode)
-    b[-1]  -= 0.0       # phi(1) = 0    (cathode)
-    kappa   = _kappa(A)
+    built = cases.get("het_1d_3b_gaussian_Vd300").build(N)
+    x, A, b, kappa = built.coords[0], built.A, built.b, built.kappa
     case_id = "HET_1D_3b_gaussian_Vd300"
 
-    log.info("  N=%3d  kappa=%.2f  sub-case=3b  V_d=%.0fV", N, kappa, V_d)
+    log.info("  N=%3d  kappa=%.2f  sub-case=3b  V_d=300V", N, kappa)
     _run_all_solvers(case_id, N, x, A, b, None, kappa,
                      skip_qsvt, results, all_solutions, reference="thomas")
 
@@ -1035,13 +858,11 @@ def run_1d_het_single_N(
     log.info("  BCs: phi'(0)=0 (Neumann), phi(1)=0 (Dirichlet)")
     log.info("  Reference: quadrature of the double integral of the source")
 
-    sigma_norm  = 0.2
-    x, h, A, b  = _build_3c_system(N, sigma_norm=sigma_norm)
-    kappa       = _kappa(A)
-    u_exact     = _het_neumann_dirichlet_exact(x, sigma_norm=sigma_norm)
-    case_id     = "HET_1D_3c_gaussian_NeumannDirichlet"
+    built = cases.get("het_1d_3c_neumann").build(N)
+    x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
+    case_id = "HET_1D_3c_gaussian_NeumannDirichlet"
 
-    log.info("  N=%3d  kappa=%.2f  sub-case=3c  h=%.5f", N, kappa, h)
+    log.info("  N=%3d  kappa=%.2f  sub-case=3c  h=%.5f", N, kappa, built.spacings[0])
     _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
                      skip_qsvt, results, all_solutions)
 

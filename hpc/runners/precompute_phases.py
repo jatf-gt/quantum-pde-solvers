@@ -92,16 +92,18 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 import solvers.quantum.qsp_angles as qsp_angles
+from core import het_geometry as geom
 from problems.poisson_1d import build_tst_matrix
 from problems.poisson_line_2d import PoissonLine2D
 
 
 # ── Domain Definitions ────────────────────────────────────────────────────────
 
-# Physical extents of the HET discharge channel [m]. The strip operator depends
-# on the grid through the aspect ratio Lz/Lr alone, so these fix the 2-D HET
-# kappa sequence.
-HET_LZ, HET_LR = 0.025, 0.020
+# Physical extents of the HET discharge channel [m], from core/het_geometry.py.
+# The strip operator depends on the grid through the aspect ratio Lz/Lr alone,
+# so this fixes the 2-D HET kappa sequence: it MUST match what the 2-D/3-D
+# runners actually use, or the cache key computed here misses at runtime.
+HET_LZ, HET_LR = geom.L_Z, geom.L_R
 
 # Default resolutions per dimension. The 1-D default stops at 16 because kappa
 # grows as O(N²) and larger values are not guaranteed to complete; the 2-D
@@ -141,12 +143,12 @@ def kappa_2d(N: int, domain: str) -> float:
         Number of interior nodes per direction.
     domain : {'square', 'het'}
         'square' is the unit square (dx = dy); 'het' is the axial-radial HET
-        channel, whose aspect ratio Lz/Lr = 1.25 gives a distinct κ sequence.
+        channel, whose aspect ratio Lz/Lr = 2.0 gives a distinct κ sequence.
 
     Returns
     -------
     float
-        κ(A_row), bounded above by 3 for the square and approaching ≈2.28 for
+        κ(A_row), bounded above by 3 for the square and approaching ≈1.5 for
         the HET aspect ratio.
 
     Raises
