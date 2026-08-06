@@ -63,6 +63,7 @@ __all__ = [
     "LineProblem2D", "InnerSolver",
     "get_inner", "solve_stationary", "solve_multigrid",
     "optimal_omega", "build_hierarchy", "interpolation_1d", "strip_sweep",
+    "parse_kv", "coerce_scheme_opts",
 ]
 
 
@@ -154,6 +155,90 @@ def describe_scheme(name: str | None = None) -> str:
         for k, h in sorted(SCHEME_OPTIONS.get(n, {}).items()):
             out.append(f"    {k:<14} {h}")
     return "\n".join(out)
+
+
+# ── CLI option parsing ────────────────────────────────────────────────────────
+#
+# Shared by every runner script that exposes -I/-S flags for inner-solver and
+# outer-scheme options. Kept beside the registries they are validated against
+# (available_inner(), SCHEME_OPTIONS above) rather than duplicated per script.
+
+def parse_kv(items: list[str] | None, what: str) -> dict:
+    """
+    Parses ``key=value`` and ``solver.key=value`` CLI pairs into a dict.
+
+    Values are left as strings; the inner-solver option registry
+    (``resolve_options``) performs type coercion and validation, so this
+    parser never has to know what a given solver accepts and cannot drift
+    out of step with it.
+
+    Parameters
+    ----------
+    items : list of str, optional
+        Raw ``--flag`` values, e.g. from ``argparse``'s ``action="append"``.
+    what : str
+        Flag name, used only to phrase the error message.
+
+    Returns
+    -------
+    dict
+        Bare keys map to their string value; namespaced keys
+        (``solver.key``) nest as ``{solver: {key: value}}``.
+
+    Raises
+    ------
+    SystemExit
+        If an item is not of the form ``key=value``.
+    """
+    out: dict = {}
+    for item in items or []:
+        if "=" not in item:
+            raise SystemExit(f"--{what} expects key=value, got {item!r}")
+        key, value = item.split("=", 1)
+        if "." in key:
+            solver, k = key.split(".", 1)
+            out.setdefault(solver, {})[k] = value
+        else:
+            out[key] = value
+    return out
+
+
+def coerce_scheme_opts(d: dict) -> dict:
+    """
+    Type-coerces a parsed outer-scheme option dict.
+
+    Outer-scheme options are plain function keyword arguments (unlike inner
+    solver options, which are validated and coerced by
+    ``resolve_options``), so this coercion happens here instead.
+
+    Parameters
+    ----------
+    d : dict
+        String-valued options, as returned by ``parse_kv``.
+
+    Returns
+    -------
+    dict
+        Same keys, values coerced to ``str`` (``criterion``, ``omega ==
+        "optimal"``), ``bool`` (``symmetric``, ``fmg``), or numeric
+        (``int`` where possible, else ``float``).
+    """
+    out = {}
+    for k, v in d.items():
+        if k == "omega" and v == "optimal":
+            out[k] = v
+        elif k == "criterion":
+            out[k] = v
+        elif k in ("symmetric", "fmg"):
+            out[k] = str(v).lower() in ("true", "1", "yes", "on")
+        elif k in ("tol", "omega"):
+            out[k] = float(v)
+        else:
+            try:
+                out[k] = int(v)
+            except ValueError:
+                out[k] = float(v)
+    return out
 
 
 # ── Public entry points ───────────────────────────────────────────────────────

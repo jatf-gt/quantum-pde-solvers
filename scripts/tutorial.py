@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-explore.py — the single entry point for trying this repository out.
+tutorial.py — the single entry point for trying this repository out.
 
-Solves the Poisson equation in one, two or three dimensions with any
-combination of the classical and quantum solvers, and prints a comparison
-table. If you are new to this codebase, start here.
+Renamed from explore.py. Solves the Poisson equation in one, two or three
+dimensions with any combination of the classical and quantum solvers, and
+prints a comparison table. If you are new to this codebase, start here.
 
-    python scripts/explore.py --dim 1 --N 8
-    python scripts/explore.py --dim 2 --N 16 --inner all
-    python scripts/explore.py --dim 3 --N 8 --scheme fmg
+    python scripts/tutorial.py --dim 1 --N 8
+    python scripts/tutorial.py --dim 2 --N 16 --inner all
+    python scripts/tutorial.py --dim 3 --N 8 --scheme fmg
 
 What the dimensions actually do
 -------------------------------
@@ -34,28 +34,38 @@ iterations and is dramatically cheaper at large N.
 Suggested first commands
 ------------------------
     # Classical, instant. Confirms the installation works.
-    python scripts/explore.py --dim 2 --N 32
+    python scripts/tutorial.py --dim 2 --N 32
 
     # A quantum solver on a small 2-D problem (~1 min).
-    python scripts/explore.py --dim 2 --N 8 --inner qsvt
+    python scripts/tutorial.py --dim 2 --N 8 --inner qsvt
 
     # Why the outer scheme matters: compare iteration counts and cost.
-    python scripts/explore.py --dim 2 --N 64 --scheme all
+    python scripts/tutorial.py --dim 2 --N 64 --scheme all
 
-    # Every tunable parameter of every solver and scheme.
-    python scripts/explore.py --list-options
+    # Every case in the canonical registry, and every tunable parameter.
+    python scripts/tutorial.py --list-cases
+    python scripts/tutorial.py --list-options
 
 Relationship to the other scripts
 ---------------------------------
-For 2-D and 3-D this is a friendly front end onto `debug_outer_2d.py` and
-`debug_outer_3d.py`, which carry the full diagnostic surface — noise studies,
+For 1-D this is a front end onto `debug_1d.py`, which carries the raw-matrix
+sub-cases (3b, 3c), QSVT degree/cache diagnostics and the kappa-scaling
+tables. For 2-D and 3-D it is a front end onto `debug_2d.py` and
+`debug_3d.py`, which carry the full diagnostic surface — noise studies,
 multigrid hierarchy inspection, polish studies. Anything not exposed here is
 available there. For systematic sweeps at many resolutions, use the
-`run_hpc_*full.py` drivers instead; this script is for single configurations.
+`hpc/` drivers instead; this script is for single configurations.
+
+Note on the import below: unlike explore.py, which imported debug_outer_2d /
+debug_outer_3d by bare module name and relied on Python placing a script's own
+directory on sys.path, this module is imported as `scripts.debug_2d` /
+`scripts.debug_3d` via importlib with an explicit path, so it does not depend
+on which directory the interpreter was launched from.
 """
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import sys
 import time
 from pathlib import Path
@@ -65,6 +75,7 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+from core import cases
 from core.config import SimConfig1D
 from core.exact_solutions import EXACT_SOLUTIONS
 from problems.poisson_1d import PoissonProblem1D
@@ -91,6 +102,22 @@ def _colour(pct: float, good: float = 1.0, ok: float = 5.0) -> str:
 def _rel_err(u: np.ndarray, ref: np.ndarray) -> float:
     """Maximum absolute error normalised by the reference amplitude, per cent."""
     return float(np.max(np.abs(u - ref)) / (np.max(np.abs(ref)) + 1e-300) * 100.0)
+
+
+def _load_driver(dim: int):
+    """
+    Imports scripts/debug_2d.py or scripts/debug_3d.py by explicit file path.
+
+    Deliberately not a bare `import debug_2d`: that form only resolves because
+    Python puts a running script's own directory on sys.path first, which is
+    fragile the moment this module is imported rather than run directly (e.g.
+    from a test). Loading by path has no such dependency.
+    """
+    name = "debug_2d" if dim == 2 else "debug_3d"
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).parent / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 # ── One Dimension ─────────────────────────────────────────────────────────────
@@ -121,7 +148,7 @@ def run_1d(
     epsilon : float
         Precision parameter for the quantum solvers.
     plot : bool
-        Write a solution/error figure to results/explore/.
+        Write a solution/error figure to results/tutorial/.
     """
     cfg = SimConfig1D(N=N, epsilon=epsilon, source_fn=source_fn)
     problem = PoissonProblem1D(cfg)
@@ -204,7 +231,7 @@ def _plot_1d(problem, fields: dict, exact, N: int, source_fn: str) -> None:
         print(f"  {_Y}matplotlib unavailable — skipping the plot{_X}")
         return
 
-    out_dir = REPO_ROOT / "results" / "explore"
+    out_dir = REPO_ROOT / "results" / "tutorial"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
@@ -223,7 +250,7 @@ def _plot_1d(problem, fields: dict, exact, N: int, source_fn: str) -> None:
     ax2.set_title("Pointwise error")
 
     plt.tight_layout()
-    out = out_dir / f"explore_1d_N{N}_{source_fn}.png"
+    out = out_dir / f"tutorial_1d_N{N}_{source_fn}.png"
     plt.savefig(out, dpi=130, bbox_inches="tight")
     plt.close(fig)
     print(f"\n  {_G}saved {out}{_X}")
@@ -247,17 +274,14 @@ def run_nd(dim: int, args: argparse.Namespace) -> None:
     args : argparse.Namespace
         Parsed command line.
     """
-    if dim == 2:
-        import debug_outer_2d as driver
-        default_case = "square"
-    else:
-        import debug_outer_3d as driver
-        default_case = "cube"
+    driver = _load_driver(dim)
+    default_case = "square" if dim == 2 else "cube"
 
     case = args.case or default_case
-    if case not in driver.CASES:
+    valid = set(driver.CASE_ALIASES) | set(cases.available(dim=dim))
+    if case not in valid and case != "all":
         raise SystemExit(f"Unknown --case {case!r} for --dim {dim}. "
-                         f"Valid: {', '.join(driver.CASES)}")
+                         f"Valid: {', '.join(sorted(valid))}, or 'all'.")
 
     inners = list(QUANTUM) if args.inner == "all" else [args.inner]
     if "thomas" not in inners:
@@ -265,7 +289,9 @@ def run_nd(dim: int, args: argparse.Namespace) -> None:
 
     schemes = available_schemes() if args.scheme == "all" else [args.scheme]
 
-    inner_opts = driver.parse_kv(args.inner_opt, "inner-opt")
+    from solvers.outer import coerce_scheme_opts, parse_kv
+
+    inner_opts = parse_kv(args.inner_opt, "inner-opt")
     # A bare key=value targets the single requested solver; it must never leak
     # onto the automatically added Thomas reference, which accepts no options.
     flat = {k: v for k, v in inner_opts.items() if not isinstance(v, dict)}
@@ -277,8 +303,7 @@ def run_nd(dim: int, args: argparse.Namespace) -> None:
                 f"Use the namespaced form, e.g. -I qsvt.{list(flat)[0]}=...")
         nested.setdefault(args.inner, {}).update(flat)
 
-    scheme_opts = driver.coerce_scheme_opts(driver.parse_kv(args.scheme_opt,
-                                                            "scheme-opt"))
+    scheme_opts = coerce_scheme_opts(parse_kv(args.scheme_opt, "scheme-opt"))
 
     print(f"\n{_B}{'=' * 78}{_X}")
     print(f"{_B}  {dim}-D POISSON via strip decomposition   case={case}  "
@@ -286,24 +311,20 @@ def run_nd(dim: int, args: argparse.Namespace) -> None:
     print(f"{_B}  inner solvers={inners}   outer schemes={schemes}{_X}")
     print(f"{_B}{'=' * 78}{_X}")
 
-    # The two drivers order run_comparison's tail arguments differently; call
-    # each by keyword so a future signature change fails loudly here rather
-    # than silently swapping the option dictionaries.
-    if dim == 2:
-        rows = driver.run_comparison(case, args.N, inners, schemes, args.tol,
-                                     verbose=args.verbose,
-                                     criterion=args.criterion,
-                                     inner_opts=nested,
-                                     scheme_opts=scheme_opts)
-    else:
-        rows = driver.run_comparison(case, args.N, inners, schemes, args.tol,
-                                     inner_opts=nested,
-                                     scheme_opts=scheme_opts,
-                                     verbose=args.verbose)
+    # Both drivers accept the same keyword names for run_comparison, even
+    # though their positional order differs; calling by keyword makes that
+    # irrelevant rather than something the caller has to track.
+    rows = driver.run_comparison(case=case, N=args.N, inners=inners, schemes=schemes,
+                                 tol=args.tol, verbose=args.verbose,
+                                 criterion=args.criterion,
+                                 inner_opts=nested, scheme_opts=scheme_opts)
 
-    if args.plot and rows and dim == 2:
-        problem, u_exact, _ = driver.CASES[case](args.N)
-        driver.plot_results(rows, problem, u_exact, case, args.N)
+    if args.plot and rows:
+        from benchmark.diagnostics import plot_convergence_and_cost
+        prob, u_exact, tag = driver.build_case(case, args.N)
+        plot_convergence_and_cost(rows, tag, args.N, driver.OUT_DIR)
+        if dim == 2:
+            driver.plot_fields(rows, prob, u_exact, tag, args.N)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -325,7 +346,9 @@ def main() -> None:
                     help=f"Outer iteration for 2-D/3-D: {available_schemes()}, "
                          f"or 'all'. Ignored for --dim 1. (default: fmg)")
     ap.add_argument("--case", default=None,
-                    help="Test case. 2-D: square, het. 3-D: cube, het, slab. "
+                    help="Test case. 2-D: square, het, or any name from "
+                         "core.cases.available(dim=2). 3-D: cube, het, slab, "
+                         "or any name from core.cases.available(dim=3). "
                          "Ignored for --dim 1, which uses --source.")
     ap.add_argument("--source", default="fS", choices=("fS", "fL", "fH"),
                     help="1-D source function (default: fS).")
@@ -336,7 +359,7 @@ def main() -> None:
                          "order below typical discretisation error).")
     ap.add_argument("--criterion", default=None, choices=("residual", "delta"),
                     help="Stopping test for stationary schemes; 'delta' "
-                         "reproduces the originally published check. 2-D only.")
+                         "reproduces the originally published check. 2-D/3-D only.")
     ap.add_argument("-I", "--inner-opt", action="append",
                     metavar="[SOLVER.]KEY=VAL",
                     help="Inner solver option, e.g. -I max_degree=300 or "
@@ -347,9 +370,11 @@ def main() -> None:
     ap.add_argument("--list-options", action="store_true",
                     help="Print every tunable inner and scheme parameter, "
                          "then exit.")
+    ap.add_argument("--list-cases", action="store_true",
+                    help="Print every registered case for --dim, then exit.")
     ap.add_argument("--plot", action="store_true",
-                    help="Write figures to results/explore/ (1-D) or "
-                         "results/debugging/ (2-D).")
+                    help="Write figures to results/tutorial/ (1-D) or "
+                         "results/debugging/ (2-D/3-D).")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -358,6 +383,17 @@ def main() -> None:
         print(describe_inner())
         print("\n=== OUTER SCHEME OPTIONS ===\n")
         print(describe_scheme())
+        return
+
+    if args.list_cases:
+        if args.dim == 1:
+            for name in cases.available(dim=1):
+                print(cases.describe(name))
+                print()
+        else:
+            for name in cases.available(dim=args.dim):
+                print(cases.describe(name))
+                print()
         return
 
     if args.dim == 1:

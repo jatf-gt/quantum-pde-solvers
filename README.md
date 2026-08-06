@@ -10,7 +10,7 @@ The numerical benchmarks systematically replicate and extend those of **Ghafourp
 
 ### Project status
 
-**New here? Run `python scripts/explore.py --dim 2 --N 32`.** It solves a 2D
+**New here? Run `python scripts/tutorial.py --dim 2 --N 32`.** It solves a 2D
 Poisson problem and prints a comparison of the outer schemes in a couple of
 seconds, with no quantum backend required. `--dim 1` and `--dim 3` work the
 same way, and `--inner qsvt` swaps in a quantum solver.
@@ -58,6 +58,8 @@ The root of the repository also carries a set of HPC job-submission scripts and 
 poisson_hhl/
 │
 ├── core/                            # Shared infrastructure — PDE-agnostic
+│   ├── cases.py                     # Canonical case registry: 26 cases, 1D/2D/3D
+│   ├── het_geometry.py              # Single SPT-100 geometry, shared by 1D/2D/3D
 │   ├── config.py                    # SimConfig1D, SimConfig2D
 │   ├── exact_solutions.py           # Analytical solutions: 1D (fS, fL, fH) and 2D sinusoidal
 │   ├── het_config.py                # HETConfig, HETPhysicalConfig, physical constants
@@ -65,42 +67,45 @@ poisson_hhl/
 │
 ├── problems/                        # Domain discretisation and operator assembly
 │   ├── poisson_1d.py                # 1D TST matrix, RHS, PoissonProblem1D container
-│   ├── poisson_2d.py                # 2D line-Jacobi sub-problems, PoissonProblem2D container
+│   ├── poisson_line_2d.py           # 2D line-decomposed problem, PoissonLine2D
+│   ├── poisson_line_3d.py           # 3D line-decomposed problem, PoissonLine3D
 │   ├── het_plasma_1d.py             # HET 1D: HETPoissonProblem1D, HETPhysicalProblem1D
-│   └── het_plasma_2d.py             # HET 2D: HETPoissonProblem2D, HETSinusoidalProblem2D
+│   └── het_plasma_2d.py             # HET 2D: thin PoissonLine2D builders over core/het_config.py
 │
 ├── solvers/                         # Algorithmic resolution implementations
+│   ├── backend_factory.py           # Centralised Aer backend selection (CPU/GPU)
 │   ├── classical/
 │   │   ├── thomas.py                # Thomas algorithm: thomas_solve, thomas_solve_system
-│   │   ├── thomas_2d.py             # Thomas line-Jacobi for 2D: thomas_solve_2d
 │   │   └── numpy_ref.py             # NumPy direct solver (debugging reference)
-│   └── quantum/
-│       ├── result.py                # SolverResult, VQLSSolverResult, QSVTSolverResult, SolverResult2D
-│       ├── hhl_1d.py                # HHL 1D: hhl_solve, hhl_solve_system
-│       ├── hhl_2d.py                # HHL 2D line-Jacobi: hhl_solve_2d
-│       ├── vqls_utils.py            # LCU Pauli decomposition, ansatz, cost function
-│       ├── vqls_1d.py               # VQLS 1D: vqls_solve, vqls_solve_system, VQLSConfig1D
-│       ├── vqls_2d.py               # VQLS 2D line-Jacobi: vqls_solve_2d, VQLSConfig2D
-│       ├── block_encoding.py        # Sz.-Nagy block encoding for TST matrices
-│       ├── qsp_angles.py            # QSP phase angle computation via pyqsp / Chebyshev
-│       ├── qsvt_1d.py               # QSVT 1D: qsvt_solve, qsvt_solve_system, QSVTConfig
-│       └── qsvt_2d.py               # QSVT 2D line-Jacobi: qsvt_solve_2d, QSVTConfig2D
+│   ├── quantum/
+│   │   ├── result.py                # SolverResult, VQLSSolverResult, QSVTSolverResult
+│   │   ├── hhl_1d.py                # HHL 1D: hhl_solve, hhl_solve_system
+│   │   ├── vqls_utils.py            # LCU Pauli decomposition, ansatz, cost function
+│   │   ├── vqls_1d.py               # VQLS 1D: vqls_solve, vqls_solve_system, VQLSConfig1D
+│   │   ├── block_encoding.py        # Sz.-Nagy block encoding for TST matrices
+│   │   ├── qsp_angles.py            # QSP phase angle computation via pyqsp / Chebyshev
+│   │   └── qsvt_1d.py               # QSVT 1D: qsvt_solve, qsvt_solve_system, QSVTConfig1D
+│   └── outer/                       # The single 2D/3D architecture: strip decomposition
+│       ├── core.py                  # LineProblem2D/InnerSolver protocols, strip_sweep
+│       ├── inner.py                 # Validated (A,b)->x registry: thomas/hhl/vqls/qsvt
+│       ├── stationary.py            # jacobi / gauss-seidel / sor
+│       └── multigrid.py             # V-cycle / full multigrid (fmg)
 │
 ├── benchmark/                       # Evaluation orchestration and reporting
+│   ├── results_io.py                # On-disk sweep schema contract (read + write)
+│   ├── diagnostics.py               # Shared comparison-table/study primitives for debug_2d/3d.py
 │   ├── metrics.py                   # BenchmarkResult, BenchmarkResult2D, compute_errors
-│   ├── plotting.py                  # Matplotlib: 1D profiles, 2D contours, convergence history
+│   ├── plotting.py                  # Matplotlib figure primitives: arrays in, Figure out
+│   ├── hpc_plotting.py              # HPC sweep post-processing: load -> reshape -> draw -> save
 │   ├── reporting.py                 # Tabular console output for 1D and 2D results
-│   └── runner.py                    # Sweep drivers A-G; run_pair_1d, run_pair_2d
+│   └── runner.py                    # Sweep drivers A-H4; run_pair_1d, run_pair_2d
 │
 ├── scripts/                         # Top-level execution entry points
-│   ├── run_1d_benchmark.py          # Sweeps A-D: 1D Poisson (Ghafourpour & Laizet 2025)
-│   ├── run_2d_benchmark.py          # Sweeps E-G: 2D Poisson (Ghafourpour & Laizet 2025)
-│   ├── run_het_benchmark.py         # HET 1D plasma benchmark (Boeuf & Garrigues 1998)
-│   ├── run_het_plasma_benchmark.py  # HET 1D physical operating condition benchmark
-│   ├── run_het_2d_benchmark.py      # HET 2D plasma benchmark (Cases A and B)
-│   ├── explore.py                   # ⭐ START HERE — one entry point, --dim {1,2,3}
-│   ├── debug_outer_2d.py            # 2D scheme/solver diagnostics, noise and polish studies
-│   ├── debug_outer_3d.py            # 3D equivalent
+│   ├── tutorial.py                  # ⭐ START HERE — one entry point, --dim {1,2,3}
+│   ├── debug_1d.py                  # 1D solver diagnostics: raw (A,b) cases, QSVT dump, kappa tables
+│   ├── debug_2d.py                  # 2D scheme/solver diagnostics, noise and polish studies
+│   ├── debug_3d.py                  # 3D equivalent
+│   ├── example_report.py            # Copy-me template for a small, laptop-scale report
 │   ├── run_hpc_1Dfull.py            # HPC driver: full 1D sweep N=4..64, all solvers (see §4)
 │   ├── run_hpc_2Dfull.py            # HPC driver: full 2D sweep (see §4.7)
 │   ├── run_hpc_3Dfull.py            # HPC driver: full 3D sweep (see §4.7)
@@ -122,14 +127,10 @@ poisson_hhl/
 │
 ├── results/                         # Auto-generated output artefacts (git-ignored)
 │   ├── sweep_*.csv
-│   ├── het/
-│   ├── het_2d/
-│   ├── verification/
-│   ├── meeting_report/
-│   ├── qsvt_debug/                  # Output of run_qsvt_debug.py
 │   ├── qsvt_phase_cache/            # Cached QSP phase angles (see §4.4)
-│   ├── explore/                     # Output of scripts/explore.py
-│   ├── debugging/                   # Output of debug_outer_2d.py / debug_outer_3d.py
+│   ├── tutorial/                    # Output of scripts/tutorial.py (1D --plot)
+│   ├── debugging/                   # Output of debug_1d.py / debug_2d.py / debug_3d.py
+│   ├── example_report/              # Output of scripts/example_report.py
 │   ├── 1Dhpc_run/                   # Output of the HPC 1D full sweep (see §4)
 │   ├── 2Dhpc_run/                   # Output of the HPC 2D full sweep (see §4.7)
 │   └── 3Dhpc_run/                   # Output of the HPC 3D full sweep (see §4.7)
@@ -209,78 +210,59 @@ pip install -e quantum_linear_solvers/
 
 ## 3. Execution Protocols (Local)
 
-All benchmark scripts are located in `scripts/` and are designed to be executed from the repository root. These are the laptop-scale entry points; for larger-$N$ unattended runs on the cluster, see §4.
+All entry points are located in `scripts/` and are designed to be executed from the repository root. These are the laptop-scale entry points; for larger-$N$ unattended runs on the cluster, see §4. Five files cover the whole local surface — a tutorial, three per-dimension debug drivers, and a copy-me report template — plus `scripts/archive/`, superseded one-off scripts kept for provenance (see its README).
 
-### 3.1 — Supervisor progress report (HHL vs VQLS vs QSVT)
+### 3.1 — `tutorial.py`: start here
 
-Produces the full algorithm comparison report across five sections: 1D algorithm comparison, QSVT circuit complexity analysis, HET 1D plasma application, HET 2D plasma application, and 2D QSVT demonstration. Generates five PDF figures and an Excel workbook.
-
-```bash
-python scripts/explore.py --dim 1 --N 8 --inner all
-```
-
-**Estimated runtime:** 60–120 minutes on a standard laptop. **Output:** `results/meeting_report/`.
-
-### 3.2 — 1D Poisson benchmark (Sections IV A–D of Ghafourpour & Laizet 2025)
-
-Evaluates HHL and VQLS against the Thomas algorithm across all source functions, mesh sizes, and $\varepsilon$ values reported in the paper.
+Solves a Poisson problem in one, two or three dimensions with any combination of solvers and prints a comparison table. For 2D/3D it is a thin front end onto `debug_2d.py`/`debug_3d.py`.
 
 ```bash
-python scripts/run_1d_benchmark.py
+python scripts/tutorial.py --dim 2 --N 32
+python scripts/tutorial.py --dim 1 --N 8 --inner all
+python scripts/tutorial.py --dim 2 --N 8 --inner qsvt
+python scripts/tutorial.py --list-cases        # every registered case for --dim
+python scripts/tutorial.py --list-options      # every tunable inner/scheme parameter
 ```
 
-**Output:** CSV files in `results/`, console tables, and matplotlib figures for each sweep.
+**Runtime:** seconds for the classical solver; under a minute for one quantum solver at $N \le 16$.
 
-### 3.3 — 2D Poisson benchmark (Sections IV E–F of Ghafourpour & Laizet 2025)
+### 3.2 — `debug_1d.py`: 1D solver diagnostics
 
-Evaluates the hybrid quantum-classical line-Jacobi scheme for HHL and VQLS on the 2D Poisson equation.
+Runs any of the 11 registered 1D cases (`core/cases.py`, `available(dim=1)`) — including the raw-matrix sub-cases 3b and 3c, which are not `PoissonProblem1D` instances — through the same `(A, b) -> x` inner-solver registry the outer iteration uses per strip.
 
 ```bash
-python scripts/run_2d_benchmark.py
+python scripts/debug_1d.py --case poisson_1d_fS_hom --N 8
+python scripts/debug_1d.py --case het_1d_3c_neumann --N 16 --inner qsvt
+python scripts/debug_1d.py --dump --case het_1d_3a_linear --N 8 --inner qsvt
+python scripts/debug_1d.py --kappa-table       # kappa(N) vs the O(N^2) theoretical scaling
 ```
 
-> **Runtime note:** A single 2D configuration at $N=8$, $\varepsilon=0.01$ requires 50–100 line-Jacobi iterations, each containing $N$ HHL or VQLS circuit simulations. Expected wall-clock time: 20–60 minutes per configuration on standard hardware. This is exactly the bottleneck that the in-progress 2D HPC runner (§4.7) is intended to remove for production-scale $N$.
+### 3.3 — `debug_2d.py` / `debug_3d.py`: 2D/3D outer-scheme diagnostics
 
-### 3.4 — HET plasma 1D benchmark
-
-Applies HHL and VQLS to the 1D axial Poisson equation for the electrostatic potential in a Hall Effect Thruster discharge channel.
+Compares inner solvers and outer schemes on a line-decomposed problem: scheme comparison table, multigrid hierarchy inspection, inner-solver noise tolerance, and multigrid-then-polish studies. Cases come from `core/cases.py` (`available(dim=2)`/`available(dim=3)`); short aliases (`square`, `het`, `cube`, `slab`) from the original tools still work.
 
 ```bash
-python scripts/run_het_benchmark.py
-python scripts/run_het_plasma_benchmark.py
+python scripts/debug_2d.py --case square --N 64
+python scripts/debug_2d.py --case het --N 8 --inner hhl
+python scripts/debug_2d.py --N 64 --scheme fmg -S nu1=2 -S n_coarse=8
+python scripts/debug_2d.py --noise-study --N 32
+python scripts/debug_3d.py --case cube --N 16
+python scripts/debug_3d.py --convergence-study --case cube
 ```
 
-### 3.5 — HET plasma 2D benchmark
+> **Runtime note:** a single quantum-solver comparison at $N=8$–16 runs in seconds to a couple of minutes on a laptop, because the outer scheme (default `fmg`) needs a grid-independent number of strip solves rather than the $O(N)$ line-Jacobi sweeps of the originally published scheme. Pass `--scheme jacobi` to reproduce that literature baseline, at correspondingly higher cost.
 
-Applies Thomas, HHL, and VQLS to the 2D HET Poisson equation. Case A uses a sinusoidal source with an exact analytical solution; Case B uses the Boeuf-Garrigues Gaussian profile with physical boundary conditions.
+### 3.4 — `example_report.py`: copy-me template
+
+A small, laptop-scale report — one 1D section, one 2D section, one figure each, one CSV — heavily commented to mark exactly which lines to change. Copy it to a new file and edit the `# CHANGE ME` lines to build your own report; see `scripts/archive/run_meeting5.py` for the fuller (but unmaintained) structure this was modelled on.
 
 ```bash
-python scripts/run_het_2d_benchmark.py
+python scripts/example_report.py
 ```
 
-**Output:** Three PDF figures and a CSV metrics file in `results/het_2d/`.
+**Output:** `results/example_report/report_{1d,2d}.png`, `report_metrics.csv`. Runtime: well under a minute at the shipped defaults.
 
-### 3.6 — Cross-dimensional verification study
-
-Produces a structured verification and validation report across all implemented cases.
-
-```bash
-python scripts/explore.py --dim 2 --N 32 --scheme all
-```
-
-**Output:** Four PDF figures and a CSV file in `results/verification/`. Estimated runtime: 15–30 minutes.
-
-### 3.7 — QSVT standalone diagnostics
-
-Isolates the QSVT solver from the rest of the pipeline for debugging block encoding, QSP phase angles, and post-selection recovery. Runs the generic 1D Poisson case and the HET 1D linear profile at $N=4,8,16$; 2D cases are implemented but currently commented out at the bottom of the script pending resolution of the 1D diagnostics.
-
-```bash
-python run_qsvt_debug.py
-```
-
-**Output:** Console diagnostics; figures/CSV in `results/qsvt_debug/`.
-
-### 3.8 — Automated test suite
+### 3.5 — Automated test suite
 
 ```bash
 pytest
@@ -417,7 +399,7 @@ Figures are saved as PNG (always) and PDF (with `--save-pdf`) directly into the 
 
 ### 4.6 — Standalone QSVT diagnostics
 
-`run_qsvt_debug.py` (§3.7) is the debugging counterpart to the HPC sweep: rather than running the full benchmark pipeline, it exercises the QSVT solver directly — block-encoding unitarity, state-preparation isometries, the QSP polynomial evaluated at each eigenvalue, and post-selection recovery — on a small, fast set of cases. Useful for isolating a QSVT regression before committing a multi-hour cluster job to it.
+`scripts/debug_1d.py --dump` (§3.2) is the debugging counterpart to the HPC sweep: rather than running the full benchmark pipeline, it exercises the QSVT solver directly on one case — the proportionality-recovery diagnostics from `qsvt_1d.py::_qsvt_recovery_diagnostics`, the polynomial degree actually solved, and a node-by-node solution/error dump — on a small, fast case. Useful for isolating a QSVT regression before committing a multi-hour cluster job to it. (Superseded `run_qsvt_debug.py` is kept in `scripts/archive/` for provenance.)
 
 ### 4.7 — 2D and 3D HPC runners
 

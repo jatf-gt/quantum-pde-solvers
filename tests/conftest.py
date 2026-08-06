@@ -17,8 +17,8 @@ of manufactured solutions: a solution is chosen first, the corresponding source
 term is derived analytically, and the solver is then required to recover the
 original. This gives an exact target that is independent of any other solver,
 so a failure implicates the code under test rather than a reference
-implementation. The builders mirror those in ``scripts/debug_outer_2d.py`` and
-``scripts/debug_outer_3d.py``, which have been exercised extensively.
+implementation. The builders mirror those in ``scripts/debug_2d.py`` and
+``scripts/debug_3d.py``, which have been exercised extensively.
 
 Note that a discrete solve recovers the chosen solution only to within the
 truncation error of the 5-point (or 7-point) stencil, O(h²). Tests that assert

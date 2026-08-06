@@ -353,6 +353,10 @@ def _vqls(**opts):
     "max_degree_cap": Option(int, help="hard ceiling used during angle finding"),
     "device_name":    Option(str, help="simulator backend"),
     "verbose":        Option(bool, help="per-solve angle-finding logging"),
+    "label":          Option(str, help="diagnostic label identifying this "
+                                       "problem instance in the proportionality-"
+                                       "recovery output, e.g. a case name. Purely "
+                                       "cosmetic - does not affect the solution."),
 })
 def _qsvt(**opts):
     import dataclasses
