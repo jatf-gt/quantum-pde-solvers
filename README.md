@@ -136,13 +136,15 @@ poisson_hhl/
 │
 ├── quantum_linear_solvers/          # Git submodule: TST Hamiltonian simulation (Vázquez et al.)
 │
-├── setup_hpc_env.sh                 # One-time CX3 environment setup (CPU + GPU venvs) — §4.1
-├── submit_hpc_1D.sh                 # PBS job: full 1D sweep, CPU — §4.2
-├── submit_hpc_gpu.sh                # PBS job: full 1D sweep, GPU (L40S / cuStateVec) — §4.3
-├── submit_hpc_2D.sh                 # PBS job: full 2D sweep — §4.7
-├── submit_hpc_3D.sh                 # PBS job: full 3D sweep — §4.7
-├── submit_precompute_hpc.sh         # PBS job: 1D QSVT phase-angle precompute — §4.4
-├── submit_precompute_2D.sh          # PBS job: 2D QSVT phase-angle precompute — §4.4
+├── hpc/                             # PBS deployment for Imperial CX3 — see hpc/README.md
+│   ├── setup_hpc_env.sh             # One-time environment setup (CPU + GPU venvs) — §4.1
+│   ├── submit_hpc_1D.sh             # PBS job: full 1D sweep, CPU — §4.2
+│   ├── submit_hpc_gpu.sh            # PBS job: full 1D sweep, GPU (L40S / cuStateVec) — §4.3
+│   ├── submit_hpc_2D.sh             # PBS job: full 2D sweep — §4.7
+│   ├── submit_hpc_2D_gapfill.sh     # PBS job: fill gaps left by a killed 2D sweep
+│   ├── submit_hpc_3D.sh             # PBS job: full 3D sweep — §4.7
+│   ├── submit_precompute_hpc.sh     # PBS job: 1D QSVT phase-angle precompute — §4.4
+│   └── submit_precompute_2D.sh      # PBS job: 2D QSVT phase-angle precompute — §4.4
 │
 ├── pytest.ini                       # Pytest configuration
 ├── requirements.txt                 # Python environment dependencies
@@ -304,7 +306,7 @@ Run once, from a CX3 login node:
 
 ```bash
 ssh username@login.cx3.hpc.ic.ac.uk
-bash setup_hpc_env.sh
+bash hpc/setup_hpc_env.sh
 ```
 
 This creates **two** separate virtual environments under the RDS home directory (`~/venvs/`, backed by 1 TB permanent quota):
@@ -319,7 +321,7 @@ This creates **two** separate virtual environments under the RDS home directory 
 ### 4.2 — CPU: full 1D sweep submission
 
 ```bash
-qsub submit_hpc_1D.sh
+qsub hpc/submit_hpc_1D.sh
 ```
 
 Runs `scripts/run_hpc_1Dfull.py` across $N=4\ldots64$, all cases, all four solvers (Thomas, HHL, VQLS, QSVT).
@@ -329,10 +331,10 @@ Runs `scripts/run_hpc_1Dfull.py` across $N=4\ldots64$, all cases, all four solve
 **Useful overrides** (fast validation pass, or skipping the most expensive solver):
 ```bash
 export MAX_N=16
-qsub -v MAX_N submit_hpc_1D.sh
+qsub -v MAX_N hpc/submit_hpc_1D.sh
 
 export SKIP_QSVT=1
-qsub -v SKIP_QSVT submit_hpc_1D.sh
+qsub -v SKIP_QSVT hpc/submit_hpc_1D.sh
 ```
 
 **Monitoring:**
@@ -350,7 +352,7 @@ tail -f results/1Dhpc_run/run.log
 ### 4.3 — GPU-accelerated 1D sweep
 
 ```bash
-qsub submit_hpc_gpu.sh
+qsub hpc/submit_hpc_gpu.sh
 ```
 
 Targets the `gpu72` queue with a single **NVIDIA L40S** (48 GB GDDR6, Ada Lovelace, compute capability 8.9), using `qiskit-aer-gpu`'s cuStateVec backend. Also drives `scripts/run_hpc_1Dfull.py`, but forces **serial** execution (`--max-workers 1`) since concurrent worker processes would conflict over the CUDA context.
@@ -363,31 +365,31 @@ Targets the `gpu72` queue with a single **NVIDIA L40S** (48 GB GDDR6, Ada Lovela
 
 ```bash
 export INCLUDE_N64=1
-qsub -v INCLUDE_N64 submit_hpc_gpu.sh
+qsub -v INCLUDE_N64 hpc/submit_hpc_gpu.sh
 ```
 
 Requires the separate `qpde-gpu` venv from §4.1 to be present; the script exits early with setup instructions if it isn't found.
 
 ### 4.4 — QSVT phase-angle precompute
 
-QSP phase-angle generation (`pyqsp.PolyOneOverX.generate`) is by far the most expensive part of setting up a QSVT solve at large $N$/condition number, and its cost doesn't parallelise across cores. `submit_precompute_hpc.sh` runs this as its own single-threaded batch job (`scripts/precompute_qsvt_phases.py`) so it survives disconnects and isn't capped by an interactive session's own wall-clock limit, caching results to `results/qsvt_phase_cache/`.
+QSP phase-angle generation (`pyqsp.PolyOneOverX.generate`) is by far the most expensive part of setting up a QSVT solve at large $N$/condition number, and its cost doesn't parallelise across cores. `hpc/submit_precompute_hpc.sh` runs this as its own single-threaded batch job (`scripts/precompute_qsvt_phases.py`) so it survives disconnects and isn't capped by an interactive session's own wall-clock limit, caching results to `results/qsvt_phase_cache/`.
 
 The intended usage is a **staged rollout** — small, safe $N$ first, then progressively larger and more exploratory:
 
 ```bash
 # Stage 1 — small N, expected safe:
 export N_VALUES="4,8,16"
-qsub -v N_VALUES submit_precompute_hpc.sh
+qsub -v N_VALUES hpc/submit_precompute_hpc.sh
 
 # Stage 2 — N=32, exploratory, degree-capped, separate job/log:
 export N_VALUES="32"
 export MAX_DEGREE="2000"
-qsub -v N_VALUES,MAX_DEGREE submit_precompute_hpc.sh
+qsub -v N_VALUES,MAX_DEGREE hpc/submit_precompute_hpc.sh
 
 # Stage 3 — N=64, only after Stage 2 is confirmed working:
 export N_VALUES="64"
 export MAX_DEGREE="2000"
-qsub -v N_VALUES,MAX_DEGREE submit_precompute_hpc.sh
+qsub -v N_VALUES,MAX_DEGREE hpc/submit_precompute_hpc.sh
 ```
 
 > **PBS quirk:** pass `N_VALUES` / `MAX_DEGREE` via `qsub -v NAME` (bare name, value taken from the shell's exported variable), **not** `qsub -v NAME=value` — PBS's own `-v` parser splits on commas, which breaks a comma-separated list like `"4,8,16"` if it's embedded directly after an `=`.
@@ -419,11 +421,11 @@ Figures are saved as PNG (always) and PDF (with `--save-pdf`) directly into the 
 
 ### 4.7 — 2D and 3D HPC runners
 
-`scripts/run_hpc_2Dfull.py` and `scripts/run_hpc_3Dfull.py` mirror the 1D driver, submitted via `submit_hpc_2D.sh` and `submit_hpc_3D.sh`. Both share the 1D driver's incremental-write behaviour — per-configuration `.npz` output as it is produced — so partial progress survives a walltime kill; only the summary JSON/CSV is lost, and the plotting layer reads the per-solution archives regardless.
+`scripts/run_hpc_2Dfull.py` and `scripts/run_hpc_3Dfull.py` mirror the 1D driver, submitted via `hpc/submit_hpc_2D.sh` and `hpc/submit_hpc_3D.sh`. Both share the 1D driver's incremental-write behaviour — per-configuration `.npz` output as it is produced — so partial progress survives a walltime kill; only the summary JSON/CSV is lost, and the plotting layer reads the per-solution archives regardless.
 
 The cost profile differs substantially from the 1D driver. A 1D configuration is a single solve; a 2D or 3D configuration is an outer iteration over many strip solves, so the resource request and the choice of outer scheme matter more than the solver does. Use `--scheme fmg` unless you are specifically reproducing the originally published line-Jacobi results, for which `--scheme jacobi` exists.
 
-Phase-angle precompute for the strip operator is cheap in both dimensions: $\kappa_	ext{row} 	o 3^-$ in 2D and $	o 2^-$ in 3D gives polynomial degrees of 30–85 irrespective of $N$, against the steeply growing 1D degrees. `submit_precompute_2D.sh` completes the whole set in minutes and needs no staging, unlike its 1D counterpart (§4.4).
+Phase-angle precompute for the strip operator is cheap in both dimensions: $\kappa_	ext{row} 	o 3^-$ in 2D and $	o 2^-$ in 3D gives polynomial degrees of 30–85 irrespective of $N$, against the steeply growing 1D degrees. `hpc/submit_precompute_2D.sh` completes the whole set in minutes and needs no staging, unlike its 1D counterpart (§4.4).
 
 Post-processing for all three dimensions lives in `benchmark/hpc_plotting.py`, with `scripts/plot_hpc_{1,2,3}Dfull_results.py` as thin command-line wrappers. The three sweeps share a result schema and therefore share their scalar-metric plots (convergence, accuracy vs $N$, cost vs $N$, quantum overhead, error decomposition); only the field visualisation is dimension-specific — profiles in 1D, fields in 2D, orthogonal slices and polar unwrapping in 3D.
 

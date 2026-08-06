@@ -47,7 +47,7 @@
 #  hits the cap is recorded with stop_reason="wall_time_exceeded" - a real,
 #  usable, clearly-caveated data point, not a discarded one.
 #
-#  Usage:  qsub submit_hpc_2D_gapfill.sh
+#  Usage:  qsub hpc/submit_hpc_2D_gapfill.sh
 # ============================================================
 
 #PBS -l walltime=72:00:00
@@ -62,7 +62,30 @@ echo "============================================================"
 echo "  2D GAP-FILL JOB START   $(date)   Job ID: $PBS_JOBID"
 echo "============================================================"
 
-cd "${PBS_O_WORKDIR}" || { echo "ERROR: cannot cd to PBS_O_WORKDIR"; exit 1; }
+# ── Repository root resolution ───────────────────────────────
+# PBS copies this script to a spool directory before executing it, so $0 and
+# BASH_SOURCE do NOT point at the original file. PBS_O_WORKDIR -- the directory
+# qsub was invoked from -- is the only reliable anchor. Ascending from it means
+# both `qsub hpc/<script>` (from the repo root) and `cd hpc && qsub <script>`
+# resolve correctly.
+REPO_ROOT="${PBS_O_WORKDIR}"
+while [ ! -f "${REPO_ROOT}/pyproject.toml" ] && [ "${REPO_ROOT}" != "/" ]; do
+    REPO_ROOT="$(dirname "${REPO_ROOT}")"
+done
+if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
+    echo "ERROR: no repository root (pyproject.toml) at or above ${PBS_O_WORKDIR}."
+    echo "       Submit from inside a clone, e.g. qsub hpc/$(basename "$0")"
+    exit 1
+fi
+cd "${REPO_ROOT}" || { echo "ERROR: cannot cd to ${REPO_ROOT}"; exit 1; }
+
+# The #PBS -o/-e paths above are resolved by PBS at submission time, relative to
+# the submission directory; no shell logic here can redirect them. Submitting
+# from the repository root keeps the PBS logs alongside the results.
+if [ "${PBS_O_WORKDIR}" != "${REPO_ROOT}" ]; then
+    echo "NOTE: submitted from ${PBS_O_WORKDIR}, not the repository root"
+    echo "      (${REPO_ROOT}). The PBS stdout/stderr logs are under the former."
+fi
 
 module load tools/prod
 module load Python/3.12.3-GCCcore-13.3.0

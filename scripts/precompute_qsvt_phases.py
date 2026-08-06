@@ -3,8 +3,8 @@
 Offline precompute of QSVT phase angles into the disk cache read by
 solvers/quantum/qsp_angles.py.
 
-Run this on the HPC as a batch job (see submit_precompute_hpc.sh and
-submit_precompute_2D.sh) rather than interactively: a login-node or
+Run this on the HPC as a batch job (see hpc/submit_precompute_hpc.sh
+and hpc/submit_precompute_2D.sh) rather than interactively: a login-node or
 interactive session is killed on disconnect or idle timeout long before the
 larger 1-D cases finish.
 

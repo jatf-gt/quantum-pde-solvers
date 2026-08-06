@@ -7,15 +7,15 @@
 #  all solvers (Thomas, HHL, VQLS, QSVT).
 #
 #  Usage:
-#    qsub submit_hpc_1D.sh
+#    qsub hpc/submit_hpc_1D.sh
 #
 #    # Fast validation pass before committing the full walltime:
 #    export MAX_N=16
-#    qsub -v MAX_N submit_hpc_1D.sh
+#    qsub -v MAX_N hpc/submit_hpc_1D.sh
 #
 #    # Skip QSVT entirely:
 #    export SKIP_QSVT=1
-#    qsub -v SKIP_QSVT submit_hpc_1D.sh
+#    qsub -v SKIP_QSVT hpc/submit_hpc_1D.sh
 #
 #  Monitor:
 #    qstat -u $USER
@@ -63,7 +63,30 @@ echo "  MAX_N     : ${MAX_N:-<not set: full sweep to N=64>}"
 echo "  SKIP_QSVT : ${SKIP_QSVT:-0}"
 echo "============================================================"
 
-cd "${PBS_O_WORKDIR}" || { echo "ERROR: Cannot cd to PBS_O_WORKDIR"; exit 1; }
+# ── Repository root resolution ───────────────────────────────
+# PBS copies this script to a spool directory before executing it, so $0 and
+# BASH_SOURCE do NOT point at the original file. PBS_O_WORKDIR -- the directory
+# qsub was invoked from -- is the only reliable anchor. Ascending from it means
+# both `qsub hpc/<script>` (from the repo root) and `cd hpc && qsub <script>`
+# resolve correctly.
+REPO_ROOT="${PBS_O_WORKDIR}"
+while [ ! -f "${REPO_ROOT}/pyproject.toml" ] && [ "${REPO_ROOT}" != "/" ]; do
+    REPO_ROOT="$(dirname "${REPO_ROOT}")"
+done
+if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
+    echo "ERROR: no repository root (pyproject.toml) at or above ${PBS_O_WORKDIR}."
+    echo "       Submit from inside a clone, e.g. qsub hpc/$(basename "$0")"
+    exit 1
+fi
+cd "${REPO_ROOT}" || { echo "ERROR: cannot cd to ${REPO_ROOT}"; exit 1; }
+
+# The #PBS -o/-e paths above are resolved by PBS at submission time, relative to
+# the submission directory; no shell logic here can redirect them. Submitting
+# from the repository root keeps the PBS logs alongside the results.
+if [ "${PBS_O_WORKDIR}" != "${REPO_ROOT}" ]; then
+    echo "NOTE: submitted from ${PBS_O_WORKDIR}, not the repository root"
+    echo "      (${REPO_ROOT}). The PBS stdout/stderr logs are under the former."
+fi
 
 module load tools/prod
 module load Python/3.12.3-GCCcore-13.3.0
@@ -71,13 +94,13 @@ module load Python/3.12.3-GCCcore-13.3.0
 VENV_PATH="${HOME}/venvs/qpde"
 if [ ! -d "${VENV_PATH}" ]; then
     echo "ERROR: Virtual environment not found at ${VENV_PATH}"
-    echo "       See setup_hpc_env.sh."
+    echo "       See hpc/setup_hpc_env.sh."
     exit 1
 fi
 source "${VENV_PATH}/bin/activate"
 echo "Python: $(which python3) -- $(python3 --version)"
 
-# pyqsp is in requirements.txt but is NOT in setup_hpc_env.sh's explicit
+# pyqsp is in requirements.txt but is NOT in hpc/setup_hpc_env.sh's explicit
 # install list. Guard against that gap here rather than failing on a missing
 # import hours into a queued job.
 python3 -c "import pyqsp" 2>/dev/null || {

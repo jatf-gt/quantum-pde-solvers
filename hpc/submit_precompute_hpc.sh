@@ -19,17 +19,17 @@
 #  -----
 #    # Stage 1 -- small N, expected safe (see precompute script docstring):
 #    export N_VALUES="4,8,16"
-#    qsub -v N_VALUES submit_precompute_hpc.sh
+#    qsub -v N_VALUES hpc/submit_precompute_hpc.sh
 #
 #    # Stage 2 -- N=32, exploratory, capped, separate job/log:
 #    export N_VALUES="32"
 #    export MAX_DEGREE="2000"
-#    qsub -v N_VALUES,MAX_DEGREE submit_precompute_hpc.sh
+#    qsub -v N_VALUES,MAX_DEGREE hpc/submit_precompute_hpc.sh
 #
 #    # Stage 3 -- N=64, same idea, only after stage 2 is confirmed to work:
 #    export N_VALUES="64"
 #    export MAX_DEGREE="2000"
-#    qsub -v N_VALUES,MAX_DEGREE submit_precompute_hpc.sh
+#    qsub -v N_VALUES,MAX_DEGREE hpc/submit_precompute_hpc.sh
 #
 #  Each stage writes into the SAME cache directory
 #  (results/qsvt_phase_cache/), so results accumulate across stages;
@@ -80,7 +80,30 @@ echo "  N_VALUES  : ${N_VALUES:-<not set, script default: 4,8,16>}"
 echo "  MAX_DEGREE: ${MAX_DEGREE:-<not set, uncapped>}"
 echo "============================================================"
 
-cd "${PBS_O_WORKDIR}" || { echo "ERROR: Cannot cd to PBS_O_WORKDIR"; exit 1; }
+# ── Repository root resolution ───────────────────────────────
+# PBS copies this script to a spool directory before executing it, so $0 and
+# BASH_SOURCE do NOT point at the original file. PBS_O_WORKDIR -- the directory
+# qsub was invoked from -- is the only reliable anchor. Ascending from it means
+# both `qsub hpc/<script>` (from the repo root) and `cd hpc && qsub <script>`
+# resolve correctly.
+REPO_ROOT="${PBS_O_WORKDIR}"
+while [ ! -f "${REPO_ROOT}/pyproject.toml" ] && [ "${REPO_ROOT}" != "/" ]; do
+    REPO_ROOT="$(dirname "${REPO_ROOT}")"
+done
+if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
+    echo "ERROR: no repository root (pyproject.toml) at or above ${PBS_O_WORKDIR}."
+    echo "       Submit from inside a clone, e.g. qsub hpc/$(basename "$0")"
+    exit 1
+fi
+cd "${REPO_ROOT}" || { echo "ERROR: cannot cd to ${REPO_ROOT}"; exit 1; }
+
+# The #PBS -o/-e paths above are resolved by PBS at submission time, relative to
+# the submission directory; no shell logic here can redirect them. Submitting
+# from the repository root keeps the PBS logs alongside the results.
+if [ "${PBS_O_WORKDIR}" != "${REPO_ROOT}" ]; then
+    echo "NOTE: submitted from ${PBS_O_WORKDIR}, not the repository root"
+    echo "      (${REPO_ROOT}). The PBS stdout/stderr logs are under the former."
+fi
 
 module load tools/prod
 module load Python/3.12.3-GCCcore-13.3.0
@@ -88,13 +111,13 @@ module load Python/3.12.3-GCCcore-13.3.0
 VENV_PATH="${HOME}/venvs/qpde"
 if [ ! -d "${VENV_PATH}" ]; then
     echo "ERROR: Virtual environment not found at ${VENV_PATH}"
-    echo "       See setup_hpc_env.sh."
+    echo "       See hpc/setup_hpc_env.sh."
     exit 1
 fi
 source "${VENV_PATH}/bin/activate"
 echo "Python: $(which python3) -- $(python3 --version)"
 
-# pyqsp is in requirements.txt but is not installed by setup_hpc_env.sh's
+# pyqsp is in requirements.txt but is not installed by hpc/setup_hpc_env.sh's
 # explicit package list -- guard against that gap rather than fail hours
 # into a job on a missing import.
 python3 -c "import pyqsp" 2>/dev/null || {
@@ -129,7 +152,7 @@ echo "Precompute finished at $(date) with exit code ${EXIT_CODE}"
 # ============================================================
 #  Copy the cache to permanent RDS storage (belt-and-suspenders --
 #  results/ should already be on RDS if PBS_O_WORKDIR is, but this
-#  matches the pattern used in submit_hpc.sh)
+#  matches the pattern used in hpc/submit_hpc.sh)
 # ============================================================
 RDS_CACHE="${HOME}/qpde-results/qsvt_phase_cache_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${RDS_CACHE}"

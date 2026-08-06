@@ -51,22 +51,22 @@
 #  rows are then tagged scheme_crossover and remain identifiable in analysis.
 #
 #  PREREQUISITE: activate the virtualenv, and run the QSVT phase precompute.
-#    qsub submit_precompute_2D.sh     # phase cache is shared with 3-D
+#    qsub hpc/submit_precompute_2D.sh     # phase cache is shared with 3-D
 #
 #  Usage:
-#    qsub submit_hpc_3D.sh                        # full two-phase sweep
+#    qsub hpc/submit_hpc_3D.sh                        # full two-phase sweep
 #
 #    export MAX_N=8; export SKIP_LARGE_N=1        # fast validation pass
-#    qsub -v MAX_N,SKIP_LARGE_N submit_hpc_3D.sh
+#    qsub -v MAX_N,SKIP_LARGE_N hpc/submit_hpc_3D.sh
 #
 #    export SECTIONS="3,4"                        # HET physics cases only
-#    qsub -v SECTIONS submit_hpc_3D.sh
+#    qsub -v SECTIONS hpc/submit_hpc_3D.sh
 #
 #    export SKIP_QSVT=1                           # also skips Phase 2
-#    qsub -v SKIP_QSVT submit_hpc_3D.sh
+#    qsub -v SKIP_QSVT hpc/submit_hpc_3D.sh
 #
 #    export LARGE_N="32"; export QSVT_MAX_DEGREE=300
-#    qsub -v LARGE_N,QSVT_MAX_DEGREE submit_hpc_3D.sh
+#    qsub -v LARGE_N,QSVT_MAX_DEGREE hpc/submit_hpc_3D.sh
 #
 #  Monitor:
 #    qstat -u $USER
@@ -118,7 +118,30 @@ echo "  QSVT_MAX_DEG : ${QSVT_MAX_DEGREE:-500}"
 echo "  CROSSOVER    : ${SCHEME_CROSSOVER:-<off>}"
 echo "============================================================"
 
-cd "${PBS_O_WORKDIR}" || { echo "ERROR: Cannot cd to PBS_O_WORKDIR"; exit 1; }
+# ── Repository root resolution ───────────────────────────────
+# PBS copies this script to a spool directory before executing it, so $0 and
+# BASH_SOURCE do NOT point at the original file. PBS_O_WORKDIR -- the directory
+# qsub was invoked from -- is the only reliable anchor. Ascending from it means
+# both `qsub hpc/<script>` (from the repo root) and `cd hpc && qsub <script>`
+# resolve correctly.
+REPO_ROOT="${PBS_O_WORKDIR}"
+while [ ! -f "${REPO_ROOT}/pyproject.toml" ] && [ "${REPO_ROOT}" != "/" ]; do
+    REPO_ROOT="$(dirname "${REPO_ROOT}")"
+done
+if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
+    echo "ERROR: no repository root (pyproject.toml) at or above ${PBS_O_WORKDIR}."
+    echo "       Submit from inside a clone, e.g. qsub hpc/$(basename "$0")"
+    exit 1
+fi
+cd "${REPO_ROOT}" || { echo "ERROR: cannot cd to ${REPO_ROOT}"; exit 1; }
+
+# The #PBS -o/-e paths above are resolved by PBS at submission time, relative to
+# the submission directory; no shell logic here can redirect them. Submitting
+# from the repository root keeps the PBS logs alongside the results.
+if [ "${PBS_O_WORKDIR}" != "${REPO_ROOT}" ]; then
+    echo "NOTE: submitted from ${PBS_O_WORKDIR}, not the repository root"
+    echo "      (${REPO_ROOT}). The PBS stdout/stderr logs are under the former."
+fi
 
 module load tools/prod
 module load Python/3.12.3-GCCcore-13.3.0
@@ -126,7 +149,7 @@ module load Python/3.12.3-GCCcore-13.3.0
 VENV_PATH="${HOME}/venvs/qpde"
 if [ ! -d "${VENV_PATH}" ]; then
     echo "ERROR: Virtual environment not found at ${VENV_PATH}"
-    echo "       See setup_hpc_env.sh."
+    echo "       See hpc/setup_hpc_env.sh."
     exit 1
 fi
 source "${VENV_PATH}/bin/activate"
@@ -145,7 +168,7 @@ for mod in ("qiskit", "qiskit_algorithms", "pennylane", "scipy"):
         missing.append(mod)
 if missing:
     print(f"ERROR: missing module(s): {', '.join(missing)}")
-    print("       Is the virtualenv active? See setup_hpc_env.sh.")
+    print("       Is the virtualenv active? See hpc/setup_hpc_env.sh.")
     sys.exit(1)
 print("Backend check: OK")
 PYCHECK

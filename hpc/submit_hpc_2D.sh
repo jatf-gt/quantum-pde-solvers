@@ -45,47 +45,47 @@
 #  ceiling here, not an accuracy control, at any N reachable in this sweep.
 #
 #  PREREQUISITE: run the 2D phase precompute before this job.
-#    qsub submit_precompute_2D.sh
+#    qsub hpc/submit_precompute_2D.sh
 #  Wait for it to complete, then:
-#    qsub submit_hpc_2D.sh
+#    qsub hpc/submit_hpc_2D.sh
 #
 #  Usage:
 #    # Full two-phase sweep (default):
-#    qsub submit_hpc_2D.sh
+#    qsub hpc/submit_hpc_2D.sh
 #
 #    # Fast local validation pass (Phase 1 only, N=4, serial):
 #    export MAX_N=4; export SKIP_LARGE_N=1
-#    qsub -v MAX_N,SKIP_LARGE_N submit_hpc_2D.sh
+#    qsub -v MAX_N,SKIP_LARGE_N hpc/submit_hpc_2D.sh
 #
 #    # Phase 1 only, up to N=16, skip Phase 2 entirely:
 #    export MAX_N=16; export SKIP_LARGE_N=1
-#    qsub -v MAX_N,SKIP_LARGE_N submit_hpc_2D.sh
+#    qsub -v MAX_N,SKIP_LARGE_N hpc/submit_hpc_2D.sh
 #
 #    # Skip QSVT everywhere (also skips Phase 2, since it is QSVT-only):
 #    export SKIP_QSVT=1
-#    qsub -v SKIP_QSVT submit_hpc_2D.sh
+#    qsub -v SKIP_QSVT hpc/submit_hpc_2D.sh
 #
 #    # Run specific sections only (e.g. HET cases), both phases:
 #    export SECTIONS="4,5"
-#    qsub -v SECTIONS submit_hpc_2D.sh
+#    qsub -v SECTIONS hpc/submit_hpc_2D.sh
 #
 #    # Override the large-N tier (default "128,256"):
 #    export LARGE_N="128"
-#    qsub -v LARGE_N submit_hpc_2D.sh
+#    qsub -v LARGE_N hpc/submit_hpc_2D.sh
 #
 #    # Use a different outer scheme (default: fmg):
 #    export OUTER_SCHEME=multigrid
-#    qsub -v OUTER_SCHEME submit_hpc_2D.sh
+#    qsub -v OUTER_SCHEME hpc/submit_hpc_2D.sh
 #
 #    # Reproduce the original line-Jacobi results (Phase 1 only makes sense
 #    # here - Jacobi at N=128/256 is not the point of this script):
 #    export OUTER_SCHEME=jacobi; export OUTER_CRITERION=delta
 #    export OUTER_TOL=1e-6; export SKIP_LARGE_N=1
-#    qsub -v OUTER_SCHEME,OUTER_CRITERION,OUTER_TOL,SKIP_LARGE_N submit_hpc_2D.sh
+#    qsub -v OUTER_SCHEME,OUTER_CRITERION,OUTER_TOL,SKIP_LARGE_N hpc/submit_hpc_2D.sh
 #
 #    # Combine options:
 #    export MAX_N=16; export SKIP_QSVT=1; export SECTIONS="1,2,3"
-#    qsub -v MAX_N,SKIP_QSVT,SECTIONS submit_hpc_2D.sh
+#    qsub -v MAX_N,SKIP_QSVT,SECTIONS hpc/submit_hpc_2D.sh
 #
 #  Before submitting a large job, estimate its cost for free:
 #    python3 scripts/run_hpc_2Dfull.py --n-values 128,256 --solvers qsvt \
@@ -154,7 +154,30 @@ echo "  OUTER_SCHEME : ${OUTER_SCHEME:-fmg}"
 echo "  QSVT_MAX_DEG : ${QSVT_MAX_DEGREE:-500}"
 echo "============================================================"
 
-cd "${PBS_O_WORKDIR}" || { echo "ERROR: Cannot cd to PBS_O_WORKDIR"; exit 1; }
+# ── Repository root resolution ───────────────────────────────
+# PBS copies this script to a spool directory before executing it, so $0 and
+# BASH_SOURCE do NOT point at the original file. PBS_O_WORKDIR -- the directory
+# qsub was invoked from -- is the only reliable anchor. Ascending from it means
+# both `qsub hpc/<script>` (from the repo root) and `cd hpc && qsub <script>`
+# resolve correctly.
+REPO_ROOT="${PBS_O_WORKDIR}"
+while [ ! -f "${REPO_ROOT}/pyproject.toml" ] && [ "${REPO_ROOT}" != "/" ]; do
+    REPO_ROOT="$(dirname "${REPO_ROOT}")"
+done
+if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
+    echo "ERROR: no repository root (pyproject.toml) at or above ${PBS_O_WORKDIR}."
+    echo "       Submit from inside a clone, e.g. qsub hpc/$(basename "$0")"
+    exit 1
+fi
+cd "${REPO_ROOT}" || { echo "ERROR: cannot cd to ${REPO_ROOT}"; exit 1; }
+
+# The #PBS -o/-e paths above are resolved by PBS at submission time, relative to
+# the submission directory; no shell logic here can redirect them. Submitting
+# from the repository root keeps the PBS logs alongside the results.
+if [ "${PBS_O_WORKDIR}" != "${REPO_ROOT}" ]; then
+    echo "NOTE: submitted from ${PBS_O_WORKDIR}, not the repository root"
+    echo "      (${REPO_ROOT}). The PBS stdout/stderr logs are under the former."
+fi
 
 module load tools/prod
 module load Python/3.12.3-GCCcore-13.3.0
@@ -162,7 +185,7 @@ module load Python/3.12.3-GCCcore-13.3.0
 VENV_PATH="${HOME}/venvs/qpde"
 if [ ! -d "${VENV_PATH}" ]; then
     echo "ERROR: Virtual environment not found at ${VENV_PATH}"
-    echo "       See setup_hpc_env.sh."
+    echo "       See hpc/setup_hpc_env.sh."
     exit 1
 fi
 source "${VENV_PATH}/bin/activate"

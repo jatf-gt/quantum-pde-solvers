@@ -1180,7 +1180,7 @@ def main() -> None:
     IMPORTANT -- worker count vs requested cores. Aer simulations are already
     OpenMP-threaded internally, so `--max-workers` should not exceed the ncpus
     actually requested in the PBS script. The default here (4) matches
-    `#PBS -l select=1:ncpus=4` in submit_hpc.sh. Raising one without raising
+    `#PBS -l select=1:ncpus=4` in hpc/submit_hpc_1D.sh. Raising one without raising
     the other oversubscribes the node and slows the sweep down.
 
     On a GPU node, use `--max-workers 1` with QUANTUM_PDE_USE_GPU=1 to
