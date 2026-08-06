@@ -56,12 +56,7 @@ from pathlib import Path
 
 import numpy as np
 
-from benchmark.results_io import (
-    SOLVER_ORDER,
-    SweepArchive,
-    field,
-    solver_sort_key,
-)
+from benchmark.results_io import SOLVER_ORDER, SweepArchive, field
 
 # Bound by `_matplotlib()` on first use rather than imported here. Two reasons,
 # both of which have bitten this code before: the Agg backend must be selected
@@ -318,9 +313,7 @@ def plot_accuracy_vs_n(sweep, case: str, by_solver: dict, plt) -> Path | None:
     fig, ax = plt.subplots(figsize=(6.5, 4.8))
     any_line = False
     N_all = []
-    for (c, solver), rs in sorted(by_solver.items()):
-        if c != case:
-            continue
+    for solver, rs in sweep.series(by_solver, case):
         Ns = [r["N"] for r in rs if r.get("linf_err") is not None]
         errs = [r["linf_err"] for r in rs if r.get("linf_err") is not None]
         if not Ns:
@@ -349,9 +342,7 @@ def plot_accuracy_vs_n(sweep, case: str, by_solver: dict, plt) -> Path | None:
 def plot_cost_vs_n(sweep, case: str, by_solver: dict, plt) -> Path | None:
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
     any_line = False
-    for (c, solver), rs in sorted(by_solver.items()):
-        if c != case:
-            continue
+    for solver, rs in sweep.series(by_solver, case):
         Ns = [r["N"] for r in rs]
         wc = [r["weighted_cost"] for r in rs if r.get("weighted_cost") is not None]
         wt = [r["wall_time_s"] for r in rs]
@@ -407,9 +398,7 @@ def plot_error_decomposition(sweep, case: str, by_solver: dict, plt) -> Path | N
     fig, ax = plt.subplots(figsize=(6.5, 4.8))
     any_line = False
     disc_plotted = False
-    for (c, solver), rs in sorted(by_solver.items()):
-        if c != case or solver == "Thomas":
-            continue
+    for solver, rs in sweep.series(by_solver, case, exclude=("Thomas",)):
         Ns = [r["N"] for r in rs if r.get("err_vs_thomas") is not None]
         alg = [r["err_vs_thomas"] for r in rs if r.get("err_vs_thomas") is not None]
         if Ns:
@@ -510,6 +499,72 @@ def plot_solution_profiles(
         save_fig(fig, sweep, stem, save_pdf)
         plt.close(fig)
 
+def _loglog_solver_series(ax, solver_data: dict, metric: str, keep=None) -> bool:
+    """
+    Draws one log-log curve per solver, in canonical order and 1-D styling.
+
+    The four 1-D vs-N figures differ only in which metric they read and which
+    rows they consider valid; the series loop itself was written out four times.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Target axes.
+    solver_data : dict
+        {solver: [row, …]} for one case, sorted by N.
+    metric : str
+        Summary field to plot against N.
+    keep : callable, optional
+        Predicate deciding whether a row is usable. Defaults to "the metric is
+        not None". Passed explicitly where a metric needs more than that — a NaN
+        guard for residuals, a positivity guard for wall times, both of which
+        would otherwise break the logarithmic axis.
+
+    Returns
+    -------
+    bool
+        Whether any curve was drawn, so the caller can discard an empty figure
+        rather than writing a blank one.
+    """
+    if keep is None:
+        def keep(r):
+            return r[metric] is not None
+
+    drew = False
+    for solver in SOLVER_ORDER:
+        if solver not in solver_data:
+            continue
+        rows = [r for r in solver_data[solver] if keep(r)]
+        if not rows:
+            continue
+        st = SOLVER_STYLE[solver]
+        ax.loglog([r["N"] for r in rows], [r[metric] for r in rows],
+                  color=st["color"], marker=st["marker"],
+                  ls=st["ls"], label=st["label"])
+        drew = True
+    return drew
+
+
+def _reference_n_squared(ax) -> None:
+    """
+    Adds the O(N⁻²) guide line, the second-order convergence the five-point
+    stencil should achieve. Its offset is fixed rather than fitted, so the line
+    indicates a slope to compare against and not a fit to the data.
+    """
+    Ns_ref = np.array([4, 8, 16, 32, 64])
+    ax.loglog(Ns_ref, 10.0 / Ns_ref**2, "k:", lw=1.0, label=r"$\mathcal{O}(N^{-2})$")
+
+
+def _format_n_axis(ax, ticks=(4, 8, 16, 32, 64)) -> None:
+    """
+    Labels the resolution axis with the actual N values rather than powers of
+    ten, which is what a logarithmic axis defaults to and what makes these
+    figures hard to read at a glance.
+    """
+    ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+    ax.set_xticks(list(ticks))
+
+
 def plot_error_vs_N(
     grouped: dict,
     sweep: SweepArchive,
@@ -526,32 +581,15 @@ def plot_error_vs_N(
     for case in cases_to_plot:
         if case not in grouped:
             continue
-        solver_data = grouped[case]
 
         fig, ax = plt.subplots(figsize=(7, 5))
-
-        for solver in ["Thomas", "HHL", "VQLS", "QSVT"]:
-            if solver not in solver_data:
-                continue
-            rows = solver_data[solver]
-            Ns    = [r["N"] for r in rows if r["max_rel_err"] is not None]
-            errs  = [r["max_rel_err"] for r in rows if r["max_rel_err"] is not None]
-            if not Ns:
-                continue
-            st = SOLVER_STYLE[solver]
-            ax.loglog(Ns, errs,
-                      color=st["color"], marker=st["marker"],
-                      ls=st["ls"], label=st["label"])
-
-        # Reference O(N^-2) line.
-        Ns_ref = np.array([4, 8, 16, 32, 64])
-        ax.loglog(Ns_ref, 10.0 / Ns_ref**2, "k:", lw=1.0, label=r"$\mathcal{O}(N^{-2})$")
+        _loglog_solver_series(ax, grouped[case], "max_rel_err")
+        _reference_n_squared(ax)
 
         ax.set_xlabel(r"$N$ (system size)")
         ax.set_ylabel(r"Max relative error (\%)")
         ax.set_title(f"Convergence: {CASE_LABELS.get(case, case)}")
-        ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
-        ax.set_xticks([4, 8, 16, 32, 64])
+        _format_n_axis(ax)
         ax.legend()
         fig.tight_layout()
         save_fig(fig, sweep, f"fig_error_vs_N_{case}", save_pdf)
@@ -563,35 +601,21 @@ def plot_residual_vs_N(
     save_pdf: bool,
 ) -> None:
     """Log-log plot of ||Au-b||/||b|| vs N for all solvers and cases."""
+    def usable(r):
+        # A failed solve records NaN, which would silently break a log axis.
+        return r["residual"] is not None and not np.isnan(float(r["residual"]))
+
     for case, solver_data in grouped.items():
         fig, ax = plt.subplots(figsize=(7, 5))
-        any_data = False
 
-        for solver in ["Thomas", "HHL", "VQLS", "QSVT"]:
-            if solver not in solver_data:
-                continue
-            rows = solver_data[solver]
-            Ns   = [r["N"] for r in rows if r["residual"] is not None
-                    and not np.isnan(float(r["residual"]))]
-            res  = [r["residual"] for r in rows if r["residual"] is not None
-                    and not np.isnan(float(r["residual"]))]
-            if not Ns:
-                continue
-            st = SOLVER_STYLE[solver]
-            ax.loglog(Ns, res,
-                      color=st["color"], marker=st["marker"],
-                      ls=st["ls"], label=st["label"])
-            any_data = True
-
-        if not any_data:
+        if not _loglog_solver_series(ax, solver_data, "residual", keep=usable):
             plt.close(fig)
             continue
 
         ax.set_xlabel(r"$N$ (system size)")
         ax.set_ylabel(r"Relative residual $\|Au - b\| / \|b\|$")
         ax.set_title(f"Residual: {CASE_LABELS.get(case, case)}")
-        ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
-        ax.set_xticks([4, 8, 16, 32, 64])
+        _format_n_axis(ax)
         ax.legend()
         fig.tight_layout()
         save_fig(fig, sweep, f"fig_residual_vs_N_{case}", save_pdf)
@@ -612,25 +636,15 @@ def plot_time_vs_N(
         plt.close(fig)
         return
 
-    solver_data = grouped[case]
-    for solver in ["Thomas", "HHL", "VQLS", "QSVT"]:
-        if solver not in solver_data:
-            continue
-        rows = solver_data[solver]
-        Ns   = [r["N"] for r in rows if r["wall_time_s"] > 0]
-        ts   = [r["wall_time_s"] for r in rows if r["wall_time_s"] > 0]
-        if not Ns:
-            continue
-        st = SOLVER_STYLE[solver]
-        ax.loglog(Ns, ts,
-                  color=st["color"], marker=st["marker"],
-                  ls=st["ls"], label=st["label"])
+    # A zero wall time means the solve never ran; it is also inadmissible on a
+    # logarithmic axis.
+    _loglog_solver_series(ax, grouped[case], "wall_time_s",
+                          keep=lambda r: r["wall_time_s"] > 0)
 
     ax.set_xlabel(r"$N$ (system size)")
     ax.set_ylabel("Wall time (s)")
     ax.set_title(r"Computational cost: 1D Poisson, $f_S$, homogeneous BCs")
-    ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
-    ax.set_xticks([4, 8, 16, 32, 64])
+    _format_n_axis(ax)
     ax.legend()
     fig.tight_layout()
     save_fig(fig, sweep, "fig_time_vs_N", save_pdf)
@@ -743,27 +757,16 @@ def plot_summary_table(
         if case not in grouped:
             ax.set_title(CASE_LABELS.get(case, case) + "\n(no data)")
             continue
-        solver_data = grouped[case]
-        for solver in ["Thomas", "HHL", "VQLS", "QSVT"]:
-            if solver not in solver_data:
-                continue
-            rows = solver_data[solver]
-            Ns   = [r["N"] for r in rows if r["max_rel_err"] is not None]
-            errs = [r["max_rel_err"] for r in rows if r["max_rel_err"] is not None]
-            if not Ns:
-                continue
-            st = SOLVER_STYLE[solver]
-            ax.loglog(Ns, errs,
-                      color=st["color"], marker=st["marker"],
-                      ls=st["ls"], label=st["label"])
 
-        Ns_ref = np.array([4, 8, 16, 32, 64])
-        ax.loglog(Ns_ref, 10.0 / Ns_ref**2, "k:", lw=1.0, label=r"$\mathcal{O}(N^{-2})$")
+        _loglog_solver_series(ax, grouped[case], "max_rel_err")
+        _reference_n_squared(ax)
+
         ax.set_xlabel(r"$N$")
         ax.set_ylabel(r"Max rel. error (\%)")
         ax.set_title(CASE_LABELS.get(case, case))
-        ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
-        ax.set_xticks([4, 8, 16, 32])
+        # One tick fewer than the single-case figures: the 2x2 tiling leaves too
+        # little width for five labels without them colliding.
+        _format_n_axis(ax, ticks=(4, 8, 16, 32))
         ax.legend(fontsize=8)
 
     fig.suptitle("1D Poisson: Algorithm Comparison — All Cases", fontsize=13)
@@ -1028,9 +1031,7 @@ def plot_3d_cutaway(sweep, case: str, N: int, rows: list[dict], plt) -> Path | N
 def plot_azimuthal_fidelity(sweep, case: str, by_solver: dict, plt) -> Path | None:
     fig, ax = plt.subplots(figsize=(6.5, 4.8))
     any_line = False
-    for (c, solver), rs in sorted(by_solver.items()):
-        if c != case or solver == "Thomas":
-            continue
+    for solver, rs in sweep.series(by_solver, case, exclude=("Thomas",)):
         Ns = [r["N"] for r in rs if r.get("azimuthal_mode_rel_err") is not None]
         errs = [r["azimuthal_mode_rel_err"] for r in rs
                if r.get("azimuthal_mode_rel_err") is not None]

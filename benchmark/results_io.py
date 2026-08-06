@@ -447,12 +447,21 @@ class SweepArchive:
         self,
         grouped: dict[tuple, list[dict]],
         case:    str,
+        exclude: tuple[str, ...] = (),
     ) -> Iterator[tuple[str, list[dict]]]:
         """
         Iterates (solver, rows) for one case from a case-solver grouping.
 
-        Every vs-N plot previously repeated the same inner filter — loop the
-        whole grouping, skip keys whose case does not match — in four places.
+        Every vs-N plot repeated the same inner filter — loop the whole
+        grouping, skip keys whose case does not match — in four places.
+
+        Solvers are yielded in **lexical** order, not the canonical
+        `SOLVER_ORDER`. That is deliberate: the call sites this replaces
+        iterate `sorted(grouped.items())`, which sorts by the (case, solver)
+        key and therefore alphabetically. Imposing the canonical order here
+        would reorder every legend and line in the existing 2-D and 3-D
+        figures — a restyling, not a refactor. Use `group_by_case_N`, which
+        does sort canonically, where column order matters.
 
         Parameters
         ----------
@@ -460,16 +469,17 @@ class SweepArchive:
             Output of `group_by_case_solver`.
         case : str
             Case to select.
+        exclude : tuple of str
+            Solver labels to skip, e.g. the classical reference in a plot that
+            measures everything relative to it.
 
         Yields
         ------
         tuple
-            (solver, rows) in canonical solver order.
+            (solver, rows), lexically ordered by solver.
         """
-        for (c, solver), rs in sorted(
-            grouped.items(), key=lambda kv: solver_sort_key(kv[0][1])
-        ):
-            if c == case:
+        for (c, solver), rs in sorted(grouped.items()):
+            if c == case and solver not in exclude:
                 yield solver, rs
 
 
