@@ -15,13 +15,13 @@ table of norms hides and a picture does not.
 
 Structure
 ---------
-The three sweeps share their result schema and therefore their scalar-metric
-plots; they differ only in how a solution field is displayed, which is
-irreducibly dimension-specific.
+This module orchestrates: it loads through `benchmark/results_io.py`, reshapes,
+draws and writes. It does not define the on-disk schema, and it no longer spells
+archive field names at the point of use.
 
-    HPCSweep                  reading, grouping and figure output for one
+    results_io.SweepArchive   reading, grouping and figure destination for one
                               sweep directory, in any dimension
-    Shared metric plots       convergence, accuracy vs N, cost vs N, quantum
+    Metric plots              convergence, accuracy vs N, cost vs N, quantum
                               overhead, error decomposition
     Dimension-specific plots  1-D profiles and summary tables; 2-D fields;
                               3-D orthogonal slices, polar unwrapping, cutaways
@@ -29,6 +29,17 @@ irreducibly dimension-specific.
 
 `scripts/plot_hpc_{1,2,3}Dfull_results.py` are thin command-line wrappers over
 the `run_1d`, `run_2d` and `run_3d` entry points at the end of this module.
+
+What the three sweeps do and do not share
+-----------------------------------------
+2-D and 3-D share a result schema and therefore share their scalar-metric plots.
+**1-D does not.** Its summary rows carry no `scheme`, `stop_reason`, `linf_err`,
+`weighted_cost` or `err_vs_thomas`, which are exactly the fields those plots
+read, so `run_1d` calls none of them and has its own parallel implementations in
+a different visual style. Pointing a 2-D/3-D metric plot at a 1-D sweep raises
+`KeyError`. This is a real schema divergence, not an oversight in the plotting
+layer; earlier documentation claimed all three shared these plots, which was
+true only of two.
 
 A note on the two colour schemes
 --------------------------------
@@ -40,24 +51,34 @@ analytical gain. Unify them only as a deliberate, one-off restyling.
 """
 from __future__ import annotations
 
-import json
+import sys
 from pathlib import Path
 
 import numpy as np
+
+from benchmark.results_io import (
+    SOLVER_ORDER,
+    SweepArchive,
+    field,
+    solver_sort_key,
+)
 
 # Bound by `_matplotlib()` on first use rather than imported here. Two reasons,
 # both of which have bitten this code before: the Agg backend must be selected
 # before `pyplot` is first imported, and forcing Agg at import time would break
 # `benchmark/plotting.py`, whose laptop-scale figures call `plt.show()` and need
-# an interactive backend. Importing this module to reach `HPCSweep` alone — to
-# list a sweep's contents, say — therefore requires no plotting stack at all.
+# an interactive backend. Importing this module to reach a sweep's contents — to
+# list them, say — therefore requires no plotting stack at all, and
+# `benchmark/results_io.py` imports none either.
 plt = None
 ticker = None
 
 
 # ── Solver Presentation ───────────────────────────────────────────────────────
 
-SOLVER_ORDER = ["Thomas", "HHL", "VQLS", "QSVT"]
+# SOLVER_ORDER is imported from benchmark.results_io: the canonical ordering is
+# a property of the schema, not of the presentation, and both the grouping and
+# the figure column order must agree on it.
 
 # 2-D and 3-D palette.
 SOLVER_COLOUR = {"Thomas": "#444444", "HHL": "#d62728",
@@ -123,156 +144,14 @@ _PLANES = [
 
 
 # ── Sweep Reader ──────────────────────────────────────────────────────────────
-
-class HPCSweep:
-    """
-    Reader for the output directory of a single HPC sweep.
-
-    Holds the three things that differ between the 1-D, 2-D and 3-D
-    drivers — the results directory, the naming convention of the archived
-    solution files, and where figures are written — so that every plotting
-    function below is written once and works for all three.
-
-    Attributes
-    ----------
-    results_dir : Path
-        Directory containing `results_full.json` and the per-solution `.npz`
-        archives.
-    solution_prefix : str
-        Filename stem of the solution archives: the 1-D and 2-D drivers write
-        `solutions_{case}_{solver}_N{N}.npz`, the 3-D driver writes
-        `solution3d_...`.
-    plots_dir : Path
-        Destination for figures. The 2-D and 3-D drivers use a `plots/`
-        subdirectory; the 1-D driver writes alongside its results.
-    skip_scheme_comparison : bool
-        Whether to exclude rows tagged `scheme_comparison` from the grouped
-        views. Those rows belong to the `--compare-schemes` study and would
-        otherwise appear as spurious duplicate solvers in the vs-N plots.
-    """
-
-    def __init__(
-        self,
-        results_dir:            Path,
-        solution_prefix:        str = "solutions",
-        plots_subdir:           str | None = "plots",
-        skip_scheme_comparison: bool = False,
-    ) -> None:
-        self.results_dir = Path(results_dir)
-        self.solution_prefix = solution_prefix
-        self.plots_dir = (self.results_dir / plots_subdir if plots_subdir
-                          else self.results_dir)
-        self.skip_scheme_comparison = skip_scheme_comparison
-
-    # ── Loading ───────────────────────────────────────────────────────────────
-
-    def rows(self) -> list[dict]:
-        """
-        Reads the sweep summary.
-
-        Returns
-        -------
-        list[dict]
-            One record per (case, solver, N) combination.
-
-        Raises
-        ------
-        SystemExit
-            If the summary is absent. A walltime-killed job writes its
-            per-solution archives but never its summary, so this is a routine
-            outcome rather than an error worth a traceback.
-        """
-        path = self.results_dir / "results_full.json"
-        if not path.exists():
-            raise SystemExit(
-                f"No results found at {path}. Run the corresponding "
-                f"run_hpc_*full.py driver first, or point --results-dir at a "
-                f"completed sweep."
-            )
-        with open(path) as fh:
-            return json.load(fh)
-
-    def solution(self, case: str, solver: str, N: int) -> dict | None:
-        """
-        Loads one archived solution, or None if that combination was not run.
-
-        Parameters
-        ----------
-        case : str
-            Case identifier as recorded in the summary.
-        solver : str
-            Solver label ('Thomas', 'HHL', 'VQLS', 'QSVT').
-        N : int
-            Resolution.
-
-        Returns
-        -------
-        dict | None
-            Every array in the archive, keyed by name, or None if absent.
-        """
-        path = self.results_dir / f"{self.solution_prefix}_{case}_{solver}_N{N}.npz"
-        if not path.exists():
-            return None
-        with np.load(path) as d:
-            return {k: d[k] for k in d.files}
-
-    # ── Grouping ──────────────────────────────────────────────────────────────
-
-    def _keep(self, row: dict) -> bool:
-        """Whether a summary row belongs in the grouped views."""
-        if self.skip_scheme_comparison:
-            return not row.get("notes", "").startswith("scheme_comparison")
-        return True
-
-    def group_by_case_N(self, rows: list[dict]) -> dict[tuple, list[dict]]:
-        """
-        Groups as {(case, N): [row, ...]}, solvers in canonical order.
-
-        The ordering matters for the field plots: it fixes the column order so
-        the same solver occupies the same position in every figure of a sweep.
-        """
-        groups: dict[tuple, list[dict]] = {}
-        for r in rows:
-            if not self._keep(r):
-                continue
-            groups.setdefault((r["case"], r["N"]), []).append(r)
-        for key in groups:
-            groups[key].sort(key=lambda r: _solver_sort_key(r["solver"]))
-        return groups
-
-    def group_by_case_solver(self, rows: list[dict]) -> dict[tuple, list[dict]]:
-        """Groups as {(case, solver): [row, ...]} sorted by N, for vs-N plots."""
-        groups: dict[tuple, list[dict]] = {}
-        for r in rows:
-            if not self._keep(r):
-                continue
-            groups.setdefault((r["case"], r["solver"]), []).append(r)
-        for key in groups:
-            groups[key].sort(key=lambda r: r["N"])
-        return groups
-
-    def group_nested(self, rows: list[dict]) -> dict:
-        """
-        Groups as {case: {solver: [row, ...]}} sorted by N.
-
-        The nested form the 1-D plots are written against, which iterate cases
-        as figures and solvers as curves within them.
-        """
-        grouped: dict = {}
-        for r in rows:
-            grouped.setdefault(r["case"], {}).setdefault(r["solver"], []).append(r)
-        for case in grouped:
-            for solver in grouped[case]:
-                grouped[case][solver].sort(key=lambda x: x["N"])
-        return grouped
+#
+# `SweepArchive` lives in benchmark/results_io.py. It is imported above and
+# used unchanged: loading, grouping and the figure destination are properties
+# of the sweep on disk, not of the plotting layer, and the runners are meant
+# to share that declaration once they adopt it.
 
 
-def _solver_sort_key(s: str) -> tuple:
-    """Orders solvers canonically, with unrecognised labels last."""
-    return (SOLVER_ORDER.index(s) if s in SOLVER_ORDER else 99, s)
-
-
-def save_fig(fig, sweep: HPCSweep, stem: str, save_pdf: bool = False) -> Path:
+def save_fig(fig, sweep: SweepArchive, stem: str, save_pdf: bool = False) -> Path:
     """
     Writes a figure as PNG, and additionally as PDF when requested.
 
@@ -280,7 +159,7 @@ def save_fig(fig, sweep: HPCSweep, stem: str, save_pdf: bool = False) -> Path:
     ----------
     fig : matplotlib.figure.Figure
         Figure to write.
-    sweep : HPCSweep
+    sweep : SweepArchive
         Supplies the destination directory.
     stem : str
         Filename without extension.
@@ -303,13 +182,84 @@ def save_fig(fig, sweep: HPCSweep, stem: str, save_pdf: bool = False) -> Path:
     return png_path
 
 
-def load_solution_1d(sweep: HPCSweep, case: str, solver: str, N: int) -> dict | None:
+def _warn_missing(sweep: SweepArchive, rows: list[dict]) -> None:
     """
-    Loads a 1-D solution, projected onto the keys the 1-D plots expect.
+    Reports summary rows whose solution archive is absent.
+
+    Every plotting function treats a missing archive as "not run" and quietly
+    omits it, which is correct for a partial sweep and badly wrong for a broken
+    filename convention — the two are indistinguishable in the output. Stating
+    the count up front separates them: a handful of gaps matching failed solves
+    is expected, whereas every row missing means the reader is looking in the
+    wrong place or for the wrong stem.
 
     Parameters
     ----------
-    sweep : HPCSweep
+    sweep : SweepArchive
+        Sweep to inspect.
+    rows : list of dict
+        Summary records.
+    """
+    gaps = sweep.missing(rows)
+    if not gaps:
+        return
+    print(f"  {len(gaps)} of {len(rows)} result rows have no solution archive.")
+    if len(gaps) == len(rows):
+        print(f"  ALL archives are missing. Expected stem "
+              f"'{sweep.solution_prefix}_<case>_<solver>_N<N>.npz' in "
+              f"{sweep.results_dir}; check the directory and the dimension.")
+        return
+    shown = ", ".join(f"{c}/{s}/N{n}" for c, s, n in gaps[:4])
+    print(f"  e.g. {shown}{' …' if len(gaps) > 4 else ''}")
+    print("  These are omitted from the figures; check the summary for "
+          "'converged' and 'notes' on those rows.")
+
+
+def _save_and_close(fig, sweep: SweepArchive, filename: str) -> Path:
+    """
+    Writes a 2-D or 3-D figure and releases it.
+
+    The 2-D and 3-D families previously repeated this three-line block at ten
+    separate call sites, with `dpi=130` spelled out each time. The values are
+    kept exactly as they were: these figures are checked by byte comparison
+    against a control run, so a changed `savefig` keyword would register as a
+    regression.
+
+    The 1-D family deliberately does not use this. It goes through `save_fig`,
+    which honours `RC_PARAMS_1D` (300 dpi, tight bounding box, serif) and can
+    additionally emit PDF, and it announces each file as it is written.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        Figure to write.
+    sweep : SweepArchive
+        Supplies the destination directory.
+    filename : str
+        Filename including extension.
+
+    Returns
+    -------
+    Path
+        Path of the written figure.
+    """
+    out = sweep.plots_dir / filename
+    plt.savefig(out, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
+def load_solution_1d(sweep: SweepArchive, case: str, solver: str, N: int) -> dict | None:
+    """
+    Loads a 1-D solution, projected onto the keys the 1-D plots expect.
+
+    Field names are resolved through `results_io.field` rather than spelled
+    here, so this reads a 1-D archive (`u_solver`), a 2-D one (`phi_solver`) or
+    a 3-D one (`phi`) without knowing which it holds.
+
+    Parameters
+    ----------
+    sweep : SweepArchive
         Sweep to read from.
     case, solver : str
         Case and solver identifiers.
@@ -318,20 +268,25 @@ def load_solution_1d(sweep: HPCSweep, case: str, solver: str, N: int) -> dict | 
 
     Returns
     -------
-    dict | None
+    dict or None
         {'x', 'u'} and, when the case admits a closed form, 'u_exact';
         None if the combination was not run.
     """
     data = sweep.solution(case, solver, N)
     if data is None:
         return None
-    out = {"x": data["x"], "u": data["u_solver"]}
-    if "u_exact" in data:
-        out["u_exact"] = data["u_exact"]
+    out = {"x": data["x"], "u": field(data, "solution")}
+    exact = field(data, "exact")
+    if exact is not None:
+        out["u_exact"] = exact
     return out
 
 
-# ── Shared Metric Plots (all dimensions) ──────────────────────────────────────
+# ── Metric Plots (2-D and 3-D) ────────────────────────────────────────────────
+#
+# These read `scheme`, `linf_err`, `weighted_cost` and `err_vs_thomas`, which
+# 1-D result rows do not carry. `run_1d` therefore calls none of them; see the
+# module docstring on the schema divergence.
 
 def plot_convergence(sweep, case: str, N: int, rows: list[dict], plt) -> Path | None:
     fig, ax = plt.subplots(figsize=(6.5, 4.5))
@@ -356,9 +311,7 @@ def plot_convergence(sweep, case: str, N: int, rows: list[dict], plt) -> Path | 
     ax.grid(alpha=0.3)
     ax.legend(fontsize=8)
     plt.tight_layout()
-    out = sweep.plots_dir / f"convergence_{case}_N{N}.png"
-    plt.savefig(out, dpi=130, bbox_inches="tight")
-    plt.close(fig)
+    out = _save_and_close(fig, sweep, f"convergence_{case}_N{N}.png")
     return out
 
 def plot_accuracy_vs_n(sweep, case: str, by_solver: dict, plt) -> Path | None:
@@ -390,9 +343,7 @@ def plot_accuracy_vs_n(sweep, case: str, by_solver: dict, plt) -> Path | None:
     ax.grid(alpha=0.3, which="both")
     ax.legend(fontsize=8)
     plt.tight_layout()
-    out = sweep.plots_dir / f"accuracy_vs_N_{case}.png"
-    plt.savefig(out, dpi=130, bbox_inches="tight")
-    plt.close(fig)
+    out = _save_and_close(fig, sweep, f"accuracy_vs_N_{case}.png")
     return out
 
 def plot_cost_vs_n(sweep, case: str, by_solver: dict, plt) -> Path | None:
@@ -419,9 +370,7 @@ def plot_cost_vs_n(sweep, case: str, by_solver: dict, plt) -> Path | None:
         a.grid(alpha=0.3, which="both"); a.legend(fontsize=8)
     fig.suptitle(f"Cost vs N - {case}", fontweight="bold")
     plt.tight_layout()
-    out = sweep.plots_dir / f"cost_vs_N_{case}.png"
-    plt.savefig(out, dpi=130, bbox_inches="tight")
-    plt.close(fig)
+    out = _save_and_close(fig, sweep, f"cost_vs_N_{case}.png")
     return out
 
 def plot_overhead(sweep, case: str, by_N: dict, plt) -> Path | None:
@@ -451,9 +400,7 @@ def plot_overhead(sweep, case: str, by_N: dict, plt) -> Path | None:
     ax.grid(alpha=0.3, which="both")
     ax.legend(fontsize=8)
     plt.tight_layout()
-    out = sweep.plots_dir / f"overhead_vs_thomas_{case}.png"
-    plt.savefig(out, dpi=130, bbox_inches="tight")
-    plt.close(fig)
+    out = _save_and_close(fig, sweep, f"overhead_vs_thomas_{case}.png")
     return out
 
 def plot_error_decomposition(sweep, case: str, by_solver: dict, plt) -> Path | None:
@@ -486,16 +433,14 @@ def plot_error_decomposition(sweep, case: str, by_solver: dict, plt) -> Path | N
     ax.grid(alpha=0.3, which="both")
     ax.legend(fontsize=8)
     plt.tight_layout()
-    out = sweep.plots_dir / f"error_decomposition_{case}.png"
-    plt.savefig(out, dpi=130, bbox_inches="tight")
-    plt.close(fig)
+    out = _save_and_close(fig, sweep, f"error_decomposition_{case}.png")
     return out
 
 
 # ── One-Dimensional Plots ─────────────────────────────────────────────────────
 
 def plot_solution_profiles(
-    sweep: HPCSweep,
+    sweep: SweepArchive,
     grouped: dict,
     save_pdf: bool,
     N_plot: int = 8,
@@ -567,7 +512,7 @@ def plot_solution_profiles(
 
 def plot_error_vs_N(
     grouped: dict,
-    sweep: HPCSweep,
+    sweep: SweepArchive,
     save_pdf: bool,
     cases_to_plot: list[str] | None = None,
 ) -> None:
@@ -614,7 +559,7 @@ def plot_error_vs_N(
 
 def plot_residual_vs_N(
     grouped: dict,
-    sweep: HPCSweep,
+    sweep: SweepArchive,
     save_pdf: bool,
 ) -> None:
     """Log-log plot of ||Au-b||/||b|| vs N for all solvers and cases."""
@@ -654,7 +599,7 @@ def plot_residual_vs_N(
 
 def plot_time_vs_N(
     grouped: dict,
-    sweep: HPCSweep,
+    sweep: SweepArchive,
     save_pdf: bool,
 ) -> None:
     """Log-log plot of wall time vs N for all solvers."""
@@ -692,7 +637,7 @@ def plot_time_vs_N(
     plt.close(fig)
 
 def plot_het_1d(
-    sweep: HPCSweep,
+    sweep: SweepArchive,
     grouped: dict,
     save_pdf: bool,
     N_plot: int = 8,
@@ -778,7 +723,7 @@ def plot_het_1d(
 
 def plot_summary_table(
     grouped: dict,
-    sweep: HPCSweep,
+    sweep: SweepArchive,
     save_pdf: bool,
 ) -> None:
     """
@@ -886,9 +831,7 @@ def plot_fields(sweep, case: str, N: int, rows: list[dict], plt, TwoSlopeNorm) -
 
     fig.suptitle(f"{case}  N={N}", fontweight="bold")
     plt.tight_layout()
-    out = sweep.plots_dir / f"fields_{case}_N{N}.png"
-    plt.savefig(out, dpi=130, bbox_inches="tight")
-    plt.close(fig)
+    out = _save_and_close(fig, sweep, f"fields_{case}_N{N}.png")
     return out
 
 
@@ -973,9 +916,7 @@ def plot_slices(sweep, case: str, N: int, rows: list[dict], plt, TwoSlopeNorm) -
         fig.suptitle(f"{case}  N={N}  |  {plane_name} slice{tag}", fontweight="bold")
         plt.tight_layout()
         safe_plane = plane_name.replace("-", "_")
-        out = sweep.plots_dir / f"slice_{safe_plane}_{case}_N{N}.png"
-        plt.savefig(out, dpi=130, bbox_inches="tight")
-        plt.close(fig)
+        out = _save_and_close(fig, sweep, f"slice_{safe_plane}_{case}_N{N}.png")
         out_paths.append(out)
     return out_paths
 
@@ -1024,9 +965,7 @@ def plot_polar_unwrap(sweep, case: str, N: int, rows: list[dict], plt) -> Path |
     ax.set_xlabel("(schematic x)"); ax.set_ylabel("(schematic y)")
     plt.colorbar(im, ax=ax, shrink=0.8, label="phi")
     plt.tight_layout()
-    out = sweep.plots_dir / f"polar_spoke_{case}_N{N}_{solver_name}.png"
-    plt.savefig(out, dpi=130, bbox_inches="tight")
-    plt.close(fig)
+    out = _save_and_close(fig, sweep, f"polar_spoke_{case}_N{N}_{solver_name}.png")
     return out
 
 def plot_3d_cutaway(sweep, case: str, N: int, rows: list[dict], plt) -> Path | None:
@@ -1083,9 +1022,7 @@ def plot_3d_cutaway(sweep, case: str, N: int, rows: list[dict], plt) -> Path | N
     ax.set_title(f"{case}  N={N}  ({sol.get('_solver_name', 'field')})\n"
                  "3-D cutaway (orientation only - see slice PNGs for values)")
     plt.tight_layout()
-    out = sweep.plots_dir / f"cutaway3d_{case}_N{N}.png"
-    plt.savefig(out, dpi=130, bbox_inches="tight")
-    plt.close(fig)
+    out = _save_and_close(fig, sweep, f"cutaway3d_{case}_N{N}.png")
     return out
 
 def plot_azimuthal_fidelity(sweep, case: str, by_solver: dict, plt) -> Path | None:
@@ -1110,9 +1047,7 @@ def plot_azimuthal_fidelity(sweep, case: str, by_solver: dict, plt) -> Path | No
                 "(does the solver reproduce the mode, not just the field norm)")
     ax.grid(alpha=0.3, which="both"); ax.legend(fontsize=8)
     plt.tight_layout()
-    out = sweep.plots_dir / f"azimuthal_fidelity_{case}.png"
-    plt.savefig(out, dpi=130, bbox_inches="tight")
-    plt.close(fig)
+    out = _save_and_close(fig, sweep, f"azimuthal_fidelity_{case}.png")
     return out
 
 
@@ -1127,6 +1062,14 @@ def _matplotlib():
     and `ticker` as module globals rather than taking them as arguments, so
     those names are bound here on first use.
 
+    The headless backend is selected only if nothing has imported `pyplot`
+    yet. Selecting it unconditionally is process-global and one-way: a caller
+    that already has an interactive session — a notebook, or anything that
+    imported `benchmark/plotting.py` first — would find every subsequent
+    `plt.show()` silently doing nothing. Deferring the import protects against
+    Agg being forced at *import* time; this check protects against it being
+    forced at *call* time, which is the same hazard one step later.
+
     Returns
     -------
     tuple
@@ -1135,17 +1078,21 @@ def _matplotlib():
     Raises
     ------
     SystemExit
-        If Matplotlib is unavailable.
+        If Matplotlib is unavailable or its backend cannot be initialised.
     """
     global plt, ticker
     try:
         import matplotlib
-        matplotlib.use("Agg")
+        if "matplotlib.pyplot" not in sys.modules:
+            matplotlib.use("Agg")
         import matplotlib.pyplot as _plt
         import matplotlib.ticker as _ticker
         from matplotlib.colors import TwoSlopeNorm
-    except ImportError:
-        raise SystemExit("matplotlib is required to produce these figures.")
+    except (ImportError, ValueError) as exc:
+        # `matplotlib.use` raises ValueError, not ImportError, when a backend
+        # exists but cannot be initialised, so catching ImportError alone lets
+        # a broken Agg build escape as a raw traceback.
+        raise SystemExit(f"matplotlib is required to produce these figures: {exc}")
     plt, ticker = _plt, _ticker
     return plt, TwoSlopeNorm
 
@@ -1190,7 +1137,7 @@ def print_listing(rows: list[dict], case_width: int = 38) -> None:
               f"scheme={r['scheme']:<10} {r['stop_reason']}")
 
 
-def _report(made: list, sweep: HPCSweep) -> None:
+def _report(made: list, sweep: SweepArchive) -> None:
     """Summarises what was written."""
     print(f"Wrote {len(made)} plot(s) to {sweep.plots_dir}")
     for p in made:
@@ -1218,22 +1165,26 @@ def run_1d(
         cover the latter.
     """
     plt, _ = _matplotlib()
-    plt.rcParams.update(RC_PARAMS_1D)
-
-    sweep = HPCSweep(results_dir, solution_prefix="solutions", plots_subdir=None)
+    sweep = SweepArchive(results_dir, dim=1, plots_subdir=None)
 
     print(f"Loading results from: {sweep.results_dir}")
     rows = sweep.rows()
     grouped = sweep.group_nested(rows)
     print(f"Found {len(rows)} result rows across {len(grouped)} cases.")
+    _warn_missing(sweep, rows)
     print("Generating plots...")
 
-    plot_solution_profiles(sweep, grouped, save_pdf, N_plot=N_profile)
-    plot_error_vs_N(grouped, sweep, save_pdf)
-    plot_residual_vs_N(grouped, sweep, save_pdf)
-    plot_time_vs_N(grouped, sweep, save_pdf)
-    plot_het_1d(sweep, grouped, save_pdf, N_plot=N_profile)
-    plot_summary_table(grouped, sweep, save_pdf)
+    # Scoped rather than applied globally. `plt.rcParams.update` leaves the
+    # publication style in force for the rest of the process, so a caller that
+    # ran run_1d and then run_2d would get serif, 300-dpi 2-D figures, which the
+    # 2-D family is explicitly documented not to use.
+    with plt.rc_context(RC_PARAMS_1D):
+        plot_solution_profiles(sweep, grouped, save_pdf, N_plot=N_profile)
+        plot_error_vs_N(grouped, sweep, save_pdf)
+        plot_residual_vs_N(grouped, sweep, save_pdf)
+        plot_time_vs_N(grouped, sweep, save_pdf)
+        plot_het_1d(sweep, grouped, save_pdf, N_plot=N_profile)
+        plot_summary_table(grouped, sweep, save_pdf)
 
     print(f"\nAll figures saved to: {sweep.plots_dir.resolve()}")
 
@@ -1258,9 +1209,9 @@ def run_2d(
     listing : bool, default=False
         Print the available combinations and return without plotting.
     """
-    sweep = HPCSweep(results_dir, solution_prefix="solutions",
-                     skip_scheme_comparison=True)
+    sweep = SweepArchive(results_dir, dim=2, skip_scheme_comparison=True)
     rows = filter_rows(sweep.rows(), case, N)
+    _warn_missing(sweep, rows)
 
     if listing:
         print_listing(rows)
@@ -1316,8 +1267,9 @@ def run_3d(
         Include the mplot3d cutaway orientation figure, the slowest and least
         essential of the set.
     """
-    sweep = HPCSweep(results_dir, solution_prefix="solution3d")
+    sweep = SweepArchive(results_dir, dim=3)
     rows = filter_rows(sweep.rows(), case, N)
+    _warn_missing(sweep, rows)
 
     if listing:
         print_listing(rows, case_width=34)

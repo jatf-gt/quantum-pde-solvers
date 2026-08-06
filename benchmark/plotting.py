@@ -251,24 +251,6 @@ def plot_convergence_history(
     plt.show()
 
 
-def plot_sweep_pairs_1d(
-    results: list[BenchmarkResult],
-    save_fig: bool = False,
-) -> None:
-    """
-    Sequentially visualises a collection of paired 1D benchmark results.
-
-    Iterates through a flat array of `BenchmarkResult` objects, presupposing
-    a strict alternating architecture of [Thomas, HHL, Thomas, ...].
-    """
-    for i in range(0, len(results), 2):
-        thomas_br = results[i]
-        hhl_br    = results[i + 1]
-
-        if hhl_br.u_exact is not None or hhl_br.u_thomas is not None:
-            plot_solution_comparison_1d(thomas_br, hhl_br, save_fig=save_fig)
-
-
 # ── Private Utility Methods ───────────────────────────────────────────────────
 
 def _contour_panel(ax, X, Y, Z, levels, title, fig) -> None:

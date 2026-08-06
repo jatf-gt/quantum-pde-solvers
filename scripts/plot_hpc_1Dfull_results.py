@@ -43,7 +43,7 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     ap.add_argument("--results-dir", type=Path,
-                    default=Path("results_hpc/results/1Dhpc_run"),
+                    default=REPO_ROOT / "results" / "1Dhpc_run",
                     help="Directory holding results_full.json and the NPZ files.")
     ap.add_argument("--save-pdf", action="store_true",
                     help="Also save vector PDFs, for inclusion in the thesis.")
