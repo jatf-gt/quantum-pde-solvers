@@ -40,7 +40,7 @@
 #PBS -e results/1Dhpc_run/pbs_gpu_stderr.log
 
 # --- Email notifications ---
-#PBS -M j.trobajo-flecha24@imperial.ac.uk
+#PBS -M juan.trobajo-flecha25@imperial.ac.uk
 #PBS -m abe
 
 # ============================================================

@@ -30,7 +30,7 @@
 #PBS -l select=1:ncpus=1:mem=4gb
 #PBS -o results/2Dhpc_run/precompute_2D_stdout.log
 #PBS -e results/2Dhpc_run/precompute_2D_stderr.log
-#PBS -M j.trobajo-flecha24@imperial.ac.uk
+#PBS -M juan.trobajo-flecha25@imperial.ac.uk
 #PBS -m abe
 
 echo "============================================================"

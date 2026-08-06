@@ -63,7 +63,7 @@
 #PBS -e results/qsvt_phase_precompute_pbs.err
 
 # --- Email notifications (replace with your Imperial email if different) ---
-#PBS -M j.trobajo-flecha24@imperial.ac.uk
+#PBS -M juan.trobajo-flecha25@imperial.ac.uk
 #PBS -m abe
 
 # ============================================================

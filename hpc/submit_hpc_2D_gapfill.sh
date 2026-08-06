@@ -55,7 +55,7 @@
 #PBS -N quantum_pde_2D_gapfill
 #PBS -o results/2Dhpc_run/pbs_stdout_gapfill.log
 #PBS -e results/2Dhpc_run/pbs_stderr_gapfill.log
-#PBS -M j.trobajo-flecha24@imperial.ac.uk
+#PBS -M juan.trobajo-flecha25@imperial.ac.uk
 #PBS -m abe
 
 echo "============================================================"
