@@ -40,8 +40,6 @@ error exceeds the iterate difference by a factor 1/(1 - rho) = O(N), so a run
 reporting delta = 1e-6 at N=64 may still carry ~1e-4 relative error.  It is
 retained for backward comparability; ``criterion="residual"`` is the honest
 default and is what multigrid uses.
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 

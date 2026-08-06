@@ -1,9 +1,11 @@
 """
-Implements a direct numerical solver utilising the NumPy linear algebra backend.
+Direct dense solver built on the NumPy linear algebra backend.
 
-This module provides a robust computational baseline, retained primarily to 
-validate matrix construction and right-hand side vector assembly prior to 
-quantum circuit evaluation.
+Provides a reference baseline independent of the Thomas implementation, retained
+to validate matrix construction and right-hand side assembly before any quantum
+circuit is evaluated. Where Thomas exploits the tridiagonal structure at O(N)
+cost, this routine performs a general LAPACK dense solve at O(N³); agreement
+between the two is therefore a check on the assembly, not on either algorithm.
 """
 from __future__ import annotations
 
@@ -17,7 +19,18 @@ from solvers.quantum.result import SolverResult
 
 def numpy_solve(problem: PoissonProblem1D) -> SolverResult:
     """
-    Resolves the linear system Au = b employing NumPy's native direct solver.
+    Solves the linear system Au = b using NumPy's direct dense solver.
+
+    Parameters
+    ----------
+    problem : PoissonProblem1D
+        Discretised 1D problem supplying the N×N operator and length-N
+        right-hand side.
+
+    Returns
+    -------
+    result : SolverResult
+        Solution vector, solver label and relative Euclidean residual.
     """
     u = np.linalg.solve(problem.A, problem.b)
     return SolverResult(
@@ -30,5 +43,5 @@ def numpy_solve(problem: PoissonProblem1D) -> SolverResult:
 # ── Private Utility Methods ───────────────────────────────────────────────────
 
 def _relative_residual(A: np.ndarray, u: np.ndarray, b: np.ndarray) -> float:
-    """Computes the relative Euclidean residual ||Au - b||_2 / ||b||_2."""
+    """Computes the relative Euclidean residual ‖Au - b‖₂ / ‖b‖₂."""
     return float(np.linalg.norm(A @ u - b) / np.linalg.norm(b))

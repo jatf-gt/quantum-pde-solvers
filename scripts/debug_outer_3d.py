@@ -41,8 +41,6 @@ Usage
     python scripts/debug_outer_3d.py --hierarchy --case het --N 32
     python scripts/debug_outer_3d.py --convergence-study --case cube
     python scripts/debug_outer_3d.py --N 16 --inner qsvt -I max_degree=300
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 
@@ -57,7 +55,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from problems.poisson_line_3d import PoissonLine3D
-from solvers.outer import (available_inner, available_schemes, build_hierarchy, 
+from solvers.outer import (available_inner, available_schemes, build_hierarchy,
                            describe_inner, describe_scheme, solve)
 
 OUT_DIR = REPO_ROOT / "results" / "debugging"
@@ -79,9 +77,7 @@ HET_LS = 2.0 * np.pi * HET_R_MEAN    # mean circumference, m
 HET_PHI0 = 300.0                     # discharge voltage scale, V
 
 
-# =============================================================================
-#  Cases
-# =============================================================================
+# ── Cases ─────────────────────────────────────────────────────────────────────
 
 def case_cube(N: int):
     """Triple-sin MMS on the unit cube, all Dirichlet."""
@@ -123,9 +119,7 @@ def case_slab(N: int):
 CASES = {"cube": case_cube, "het": case_het, "slab": case_slab}
 
 
-# =============================================================================
-#  Helpers
-# =============================================================================
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def rel_err(u, ref) -> float:
     """Max absolute error normalised by the reference amplitude, per cent."""
@@ -179,9 +173,7 @@ def coerce_scheme_opts(d: dict) -> dict:
     return out
 
 
-# =============================================================================
-#  Hierarchy inspection
-# =============================================================================
+# ── Hierarchy inspection ──────────────────────────────────────────────────────
 
 def show_hierarchy(case: str, N: int) -> None:
     prob, _, tag = CASES[case](N)
@@ -213,9 +205,7 @@ def show_hierarchy(case: str, N: int) -> None:
         print(f"  coarsening them would degrade the coarse-grid correction.{_X}")
 
 
-# =============================================================================
-#  Scheme / solver comparison
-# =============================================================================
+# ── Scheme / solver comparison ────────────────────────────────────────────────
 
 def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
                    tol: float, inner_opts: dict, scheme_opts: dict,
@@ -291,9 +281,7 @@ def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
     return rows
 
 
-# =============================================================================
-#  Grid-independence / discretisation study
-# =============================================================================
+# ── Grid-independence / discretisation study ──────────────────────────────────
 
 def run_convergence_study(case: str, tol: float) -> None:
     """
@@ -327,9 +315,7 @@ def run_convergence_study(case: str, tol: float) -> None:
     print(f"  anisotropy forces a shallower hierarchy).")
 
 
-# =============================================================================
-#  Main
-# =============================================================================
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     ap = argparse.ArgumentParser(

@@ -67,8 +67,6 @@ Usage
     python scripts/run_hpc_3Dfull.py --max-n 32 --estimate     # cost first!
     python scripts/run_hpc_3Dfull.py --n-values 32 --solvers qsvt --append
     python scripts/run_hpc_3Dfull.py --list-options
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 
@@ -97,9 +95,7 @@ from solvers.outer import (InnerConfig, PoissonLine3D, available_inner,
                            available_schemes, build_hierarchy, describe_inner,
                            describe_scheme, get_inner, resolve_options, solve)
 
-# ============================================================================
-#  Output directory and logging
-# ============================================================================
+# ── Output directory and logging ──────────────────────────────────────────────
 
 RESULTS_DIR = Path("results") / "3Dhpc_run"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -121,9 +117,7 @@ for _noisy in ("qiskit.transpiler", "qiskit_aer", "qiskit_ibm_runtime",
     logging.getLogger(_noisy).setLevel(logging.CRITICAL)
 
 
-# ============================================================================
-#  Sweep configuration
-# ============================================================================
+# ── Sweep configuration ───────────────────────────────────────────────────────
 
 # 64 is included so --max-n 64 resolves correctly, but 64^3 = 262144 unknowns
 # with N^2 = 4096 strip solves per sweep is a serious job.  Always --estimate.
@@ -150,9 +144,7 @@ QSVT_MAX_DEGREE_3D: dict[int, Optional[int]] = {
 
 HHL_EPSILON_DEFAULT: float = 0.01
 
-# ---------------------------------------------------------------------------
-#  SPT-100 geometry (the reference Hall thruster in the literature)
-# ---------------------------------------------------------------------------
+# ── SPT-100 geometry (the reference Hall thruster in the literature) ──────────
 #  The discharge channel is an annulus.  For the azimuthal-axial studies that
 #  motivate 3-D, it is standard practice to "unwrap" the annulus into a
 #  Cartesian slab: the channel is thin (15 mm wide) compared with its mean
@@ -186,14 +178,12 @@ Q_E: float = 1.602e-19         # C
 MAX_WORKERS_DEFAULT: int = 4
 
 
-# ============================================================================
-#  Result dataclass
-# ============================================================================
+# ── Result dataclass ──────────────────────────────────────────────────────────
 
 @dataclass
 class RunResult3D:
     """One (case, solver, N) benchmark record.  Schema mirrors RunResult2D."""
-    # ---- identity ----------------------------------------------------------
+    # ── identity ──────────────────────────────────────────────────────────────
     case:            str
     solver:          str
     N:               int
@@ -201,7 +191,7 @@ class RunResult3D:
     n_unknowns:      int
     kappa_row:       float
 
-    # ---- accuracy ----------------------------------------------------------
+    # ── accuracy ──────────────────────────────────────────────────────────────
     max_rel_err:     Optional[float]
     max_abs_err:     Optional[float]
     residual:        Optional[float]
@@ -214,13 +204,13 @@ class RunResult3D:
     linf_err:        Optional[float] = None
     stop_reason:     str = ""
 
-    # ---- quantum diagnostics -----------------------------------------------
+    # ── quantum diagnostics ───────────────────────────────────────────────────
     vqls_final_cost: Optional[float] = None
     qsvt_degree:     Optional[int]   = None
     qsvt_depth:      Optional[int]   = None
     hhl_scale_c:     Optional[float] = None
 
-    # ---- outer scheme ------------------------------------------------------
+    # ── outer scheme ──────────────────────────────────────────────────────────
     scheme:             str = ""
     convergence_factor: Optional[float] = None
     n_levels:           Optional[int] = None
@@ -228,13 +218,13 @@ class RunResult3D:
     level_kappas:       str = ""
     anisotropy:         Optional[float] = None   # h_max / h_min, finest level
 
-    # ---- work accounting ---------------------------------------------------
+    # ── work accounting ───────────────────────────────────────────────────────
     strip_solves:         int = 0
     strip_solves_by_size: str = ""
     weighted_cost:        Optional[float] = None
     mean_strip_size:      Optional[float] = None
 
-    # ---- inner solver telemetry --------------------------------------------
+    # ── inner solver diagnostics ──────────────────────────────────────────────
     inner_calls:     int = 0
     inner_total_s:   Optional[float] = None
     inner_mean_s:    Optional[float] = None
@@ -243,11 +233,11 @@ class RunResult3D:
     inner_options:   str = ""
     n_circuit_evals: Optional[float] = None
 
-    # ---- error decomposition -----------------------------------------------
+    # ── error decomposition ───────────────────────────────────────────────────
     err_vs_thomas:       Optional[float] = None
     err_thomas_vs_exact: Optional[float] = None
 
-    # ---- derived physics ---------------------------------------------------
+    # ── derived physics ───────────────────────────────────────────────────────
     peak_E_field:      Optional[float] = None   # V/m, |grad phi|
     peak_E_rel_err:    Optional[float] = None   # %
     peak_E_axial:      Optional[float] = None   # V/m, the thrust-relevant one
@@ -257,14 +247,12 @@ class RunResult3D:
     azimuthal_mode_amp:     Optional[float] = None
     azimuthal_mode_rel_err: Optional[float] = None
 
-    # ---- efficiency --------------------------------------------------------
+    # ── efficiency ────────────────────────────────────────────────────────────
     s_per_strip_solve: Optional[float] = None
     solves_per_digit:  Optional[float] = None
 
 
-# ============================================================================
-#  Logging helpers
-# ============================================================================
+# ── Logging helpers ───────────────────────────────────────────────────────────
 
 def _banner(msg: str) -> None:
     sep = "=" * 78
@@ -275,9 +263,7 @@ def _section(msg: str) -> None:
     log.info("-" * 78); log.info("  %s", msg); log.info("-" * 78)
 
 
-# ============================================================================
-#  Metrics
-# ============================================================================
+# ── Metrics ───────────────────────────────────────────────────────────────────
 
 def _max_rel(u, ref, tol=1e-10) -> float:
     mask = np.abs(ref) > tol
@@ -335,9 +321,7 @@ def _azimuthal_mode_amplitude(phi: np.ndarray, m: int) -> float:
     return float(np.mean(np.abs(spectrum[:, :, m])) * 2.0 / phi.shape[2])
 
 
-# ============================================================================
-#  Test cases
-# ============================================================================
+# ── Test cases ────────────────────────────────────────────────────────────────
 
 def _het_grid(N: int):
     """Unwrapped SPT-100 channel grid.  Azimuthal axis has no boundary node."""
@@ -349,7 +333,7 @@ def _het_grid(N: int):
     return np.meshgrid(z, r, s, indexing="ij"), (dz, dr, ds), (z, r, s)
 
 
-# ---- Section 1: triple-sin MMS on the unit cube -----------------------------
+# ── Section 1: triple-sin MMS on the unit cube ────────────────────────────────
 
 def case_cube(N: int):
     """
@@ -370,7 +354,7 @@ def case_cube(N: int):
     return prob, phi, f, "3D_Poisson_TripleSin_cube", 0
 
 
-# ---- Section 2: HET channel MMS, azimuthally periodic -----------------------
+# ── Section 2: HET channel MMS, azimuthally periodic ──────────────────────────
 
 def case_het_mms(N: int, m: int = 1):
     """
@@ -398,7 +382,7 @@ def case_het_mms(N: int, m: int = 1):
     return prob, phi, f, "3D_HET_MMS_SPT100", m
 
 
-# ---- Section 3: HET rotating spoke ------------------------------------------
+# ── Section 3: HET rotating spoke ─────────────────────────────────────────────
 
 def case_spoke(N: int, m: int = SPOKE_MODE_M, eps: float = SPOKE_EPSILON):
     """
@@ -440,7 +424,7 @@ def case_spoke(N: int, m: int = SPOKE_MODE_M, eps: float = SPOKE_EPSILON):
     return prob, phi, f, "3D_HET_RotatingSpoke_SPT100", m
 
 
-# ---- Section 4: realistic SPT-100 discharge ---------------------------------
+# ── Section 4: realistic SPT-100 discharge ────────────────────────────────────
 
 def case_discharge(N: int, m: int = SPOKE_MODE_M):
     """
@@ -496,7 +480,7 @@ def case_discharge(N: int, m: int = SPOKE_MODE_M):
     return prob, None, f, "3D_HET_Discharge_SPT100", m
 
 
-# ---- Section 5: Laplace equation, BC-driven ---------------------------------
+# ── Section 5: Laplace equation, BC-driven ────────────────────────────────────
 
 def case_laplace(N: int):
     """
@@ -535,7 +519,7 @@ def case_laplace(N: int):
     return prob, phi, f, "3D_Laplace_BCdriven_cube", 0
 
 
-# ---- Section 6: localised Gaussian sources ----------------------------------
+# ── Section 6: localised Gaussian sources ─────────────────────────────────────
 
 _GAUSS_SIGMA = 0.12
 _GAUSS_CENTRES = ((0.3, 0.3, 0.35), (0.7, 0.65, 0.6))
@@ -598,7 +582,7 @@ def case_gaussian(N: int):
     return prob, phi, f, "3D_Poisson_TwoGaussian_cube", 0
 
 
-# ---- Section 7: high-wavenumber Fourier mode --------------------------------
+# ── Section 7: high-wavenumber Fourier mode ───────────────────────────────────
 
 MODE_NML: tuple[int, int, int] = (2, 3, 4)
 
@@ -639,9 +623,7 @@ SECTIONS = {"section1": case_cube, "section2": case_het_mms,
             "section7": case_highmode}
 
 
-# ============================================================================
-#  Sweep settings
-# ============================================================================
+# ── Sweep settings ────────────────────────────────────────────────────────────
 
 @dataclass
 class SweepConfig:
@@ -690,9 +672,7 @@ class SweepConfig:
         return kw
 
 
-# ============================================================================
-#  Result recording
-# ============================================================================
+# ── Result recording ──────────────────────────────────────────────────────────
 
 def _save_solution_3d(case, solver, N, prob, phi, phi_ref, f_vals,
                       residual_history=None) -> None:
@@ -821,9 +801,7 @@ def _record(results, case_id, solver_name, N, prob, res, phi_ref, f_vals,
                           res.residual_history if cfg.save_history else None)
 
 
-# ============================================================================
-#  Per-case driver
-# ============================================================================
+# ── Per-case driver ───────────────────────────────────────────────────────────
 
 def _estimate_case(case_id, N, prob, cfg: SweepConfig) -> None:
     scheme = cfg.scheme_for(N)
@@ -872,7 +850,7 @@ def _run_case(section: str, N: int, cfg: SweepConfig, results: list) -> None:
     log.info("    hierarchy: %s", " -> ".join(
         "x".join(map(str, lv.problem.shape)) for lv in levels))
 
-    # ---- classical reference -------------------------------------------------
+    # ── classical reference ───────────────────────────────────────────────────
     res_T = solve(prob, inner="thomas", scheme=scheme,
                   inner_options=inner_cfg, **kw)
     phi_T = res_T.u
@@ -905,7 +883,7 @@ def _run_case(section: str, N: int, cfg: SweepConfig, results: list) -> None:
             phi_T, mode_m, cfg,
             notes=fallback_note or ("" if phi_ref is not None else "reference"))
 
-    # ---- quantum solvers -----------------------------------------------------
+    # ── quantum solvers ───────────────────────────────────────────────────────
     for solver_name in cfg.solvers:
         try:
             res_q = solve(prob, inner=solver_name, scheme=scheme,
@@ -939,9 +917,7 @@ def run_section(section: str, N: int, cfg: SweepConfig, results: list) -> None:
     _run_case(section, N, cfg, results)
 
 
-# ============================================================================
-#  Serialisation
-# ============================================================================
+# ── Serialisation ─────────────────────────────────────────────────────────────
 
 def _load_existing_results(path: Path) -> list:
     if not path.exists():
@@ -1013,9 +989,7 @@ def _save_metadata(N_values, cfg, sections, max_workers, tag=None) -> None:
     log.info("Metadata written -> %s", fname)
 
 
-# ============================================================================
-#  Summary
-# ============================================================================
+# ── Summary ───────────────────────────────────────────────────────────────────
 
 def _print_summary(results) -> None:
     if not results:
@@ -1069,9 +1043,7 @@ def _print_summary(results) -> None:
                      r.inner_calls, 100.0 * r.inner_failures / max(r.inner_calls, 1))
 
 
-# ============================================================================
-#  CLI plumbing
-# ============================================================================
+# ── CLI plumbing ──────────────────────────────────────────────────────────────
 
 def parse_kv(items, flag: str) -> dict:
     out: dict = {}
@@ -1118,9 +1090,7 @@ def _execute_work_unit(section: str, N: int, cfg: SweepConfig) -> list:
     return results
 
 
-# ============================================================================
-#  Main
-# ============================================================================
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     ap = argparse.ArgumentParser(

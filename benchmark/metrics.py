@@ -25,9 +25,9 @@ from solvers.quantum.result import SolverResult
 # ── Tolerance Thresholds ──────────────────────────────────────────────────────
 
 # Threshold below which an analytical value is classified as effectively zero.
-# Nodes satisfying |u_exact| < _NEAR_ZERO_TOL are systematically excluded from 
-# relative error calculations to prevent artificial divergence. This approach 
-# implicitly reflects the methodology applied to the central nodes of the f_H 
+# Nodes satisfying |u_exact| < _NEAR_ZERO_TOL are systematically excluded from
+# relative error calculations to prevent artificial divergence. This approach
+# implicitly reflects the methodology applied to the central nodes of the f_H
 # source function within Section IV A of the reference literature.
 _NEAR_ZERO_TOL = 1e-10
 
@@ -37,27 +37,27 @@ _NEAR_ZERO_TOL = 1e-10
 @dataclass
 class BenchmarkResult:
     """
-    Encapsulates the comprehensive error metrics for a single 1D solver execution.
+    Error metrics for a single 1D solver run.
 
     Attributes
     ----------
     config : SimConfig1D
         Configuration parameters governing the simulation instance.
     solver : str
-        Identifier for the employed solver algorithm ('Thomas' or 'HHL').
+        Identifier for the solver algorithm used ('Thomas' or 'HHL').
     x : np.ndarray
         Spatial coordinates of the interior grid nodes.
     u_solver : np.ndarray
         Numerical solution vector extracted from the applied solver.
     u_exact : Optional[np.ndarray]
-        Analytical solution evaluated at interior nodes. Assumes a value of 
-        None when closed-form solutions are unavailable (e.g., non-homogeneous 
+        Analytical solution evaluated at interior nodes. Assumes a value of
+        None when closed-form solutions are unavailable (e.g., non-homogeneous
         boundary conditions lacking defined antiderivatives).
     u_thomas : Optional[np.ndarray]
-        Classical Thomas solution vector. Retained alongside HHL outputs to 
+        Classical Thomas solution vector. Retained alongside HHL outputs to
         enable direct node-by-node comparative benchmarking.
     rel_error : Optional[np.ndarray]
-        Pointwise relative error vector, formatted as percentages. Nodes where 
+        Pointwise relative error vector, formatted as percentages. Nodes where
         |u_exact| < _NEAR_ZERO_TOL are assigned NaN values.
     abs_error : np.ndarray
         Pointwise absolute error vector.
@@ -72,7 +72,7 @@ class BenchmarkResult:
     euclidean_residual : Optional[float]
         Relative Euclidean residual computed as ||Au - b||_2 / ||b||_2.
     prop_const : Optional[float]
-        Proportionality constant extracted during HHL post-selection. Assigned 
+        Proportionality constant extracted during HHL post-selection. Assigned
         None for classical solvers.
     """
     config:             SimConfig1D
@@ -101,11 +101,11 @@ def compute_errors(
     """
     Evaluates statistical error metrics for a given 1D solver execution.
 
-    For systems constrained by homogeneous Dirichlet boundary conditions 
-    (alpha = beta = 0.0), the analytical solution is retrieved from 
-    EXACT_SOLUTIONS to compute relative errors. Conversely, systems subject 
-    to non-homogeneous boundary conditions default to absolute error evaluation 
-    against the classical Thomas reference, as the primary literature omits 
+    For systems constrained by homogeneous Dirichlet boundary conditions
+    (alpha = beta = 0.0), the analytical solution is retrieved from
+    EXACT_SOLUTIONS to compute relative errors. Conversely, systems subject
+    to non-homogeneous boundary conditions default to absolute error evaluation
+    against the classical Thomas reference, as the primary literature omits
     closed-form solutions for these configurations.
 
     Parameters
@@ -115,9 +115,9 @@ def compute_errors(
     result : SolverResult
         Numerical output yielded by the selected solver algorithm.
     u_thomas : Optional[np.ndarray], default=None
-        Reference solution vector derived via the Thomas algorithm. Provided 
+        Reference solution vector derived via the Thomas algorithm. Provided
         during HHL evaluation to facilitate comparative error assessment.
-        
+
     Returns
     -------
     BenchmarkResult
@@ -129,7 +129,7 @@ def compute_errors(
 
     # ── Phase 1: Analytical Solution Formulation ──────────────────────────────
     has_exact = (
-        cfg.alpha == 0.0 and 
+        cfg.alpha == 0.0 and
         cfg.beta == 0.0 and
         cfg.source_fn in EXACT_SOLUTIONS
     )
@@ -232,26 +232,26 @@ class Config2D:
 @dataclass
 class BenchmarkResult2D:
     """
-    Encapsulates the comprehensive error metrics for a single 2D solver execution.
+    Error metrics for a single 2D solver run.
 
     Attributes
     ----------
     config : Config2D
         Configuration parameters governing the 2D simulation instance.
     solver : str
-        Identifier for the employed solver algorithm ('Thomas-2D' or 'HHL-2D').
+        Identifier for the solver algorithm used ('Thomas-2D' or 'HHL-2D').
     X : np.ndarray
     Y : np.ndarray
         (N, N) spatial coordinate matrices corresponding to interior grid nodes.
     u_solver : np.ndarray
         (N, N) numerical solution field extracted from the applied iterative solver.
     u_reference : Optional[np.ndarray]
-        (N, N) high-fidelity reference solution derived via classical direct 
+        (N, N) high-fidelity reference solution derived via classical direct
         resolution or refined Thomas methodologies. Assumes None if unavailable.
     abs_error : np.ndarray
         (N, N) pointwise absolute error matrix.
     rel_error : Optional[np.ndarray]
-        (N, N) pointwise relative error matrix, formatted as percentages. Nodes 
+        (N, N) pointwise relative error matrix, formatted as percentages. Nodes
         satisfying |u_reference| < _NEAR_ZERO_TOL are systematically assigned NaN values.
     max_rel_error : Optional[float]
         Supremum of the relative error matrix, excluding near-zero nodes.
@@ -312,11 +312,10 @@ def compute_errors_2d(
     fine-mesh solve is by far the most expensive classical step in a 2D sweep,
     and it is independent of which solver is being certified.
 
-    In accordance with Section IV F of the primary reference literature, relative
-    errors are predominantly utilised for homogeneous boundary conditions, whereas
-    absolute errors are prioritised for non-homogeneous constraints. This routine
-    computes both metrics simultaneously, deferring the contextual selection to
-    the downstream reporting layer.
+    Following Section IV F of the primary reference, relative errors are used for
+    homogeneous boundary conditions and absolute errors for non-homogeneous ones.
+    This routine computes both, leaving the choice between them to the reporting
+    layer.
 
     Parameters
     ----------
@@ -334,9 +333,9 @@ def compute_errors_2d(
         scheme and the inner solver separately, whereas the reporting layer
         expects a single identifier.
     u_reference : Optional[np.ndarray], default=None
-        (N, N) reference solution matrix utilised for baseline deviation
-        analysis. When omitted, absolute errors are reported as identically zero
-        and relative errors as None.
+        (N, N) reference solution field against which deviations are measured.
+        When omitted, absolute errors are reported as identically zero and
+        relative errors as None.
 
     Returns
     -------
@@ -356,7 +355,7 @@ def compute_errors_2d(
     avg_abs = float(np.mean(abs_error))
 
     # ── Phase 2: Relative Error Computation ───────────────────────────────────
-    # Masked where |u_reference| approaches zero to prevent artificial division 
+    # Masked where |u_reference| approaches zero to prevent artificial division
     # singularities, mirroring the primary reference's protocol for near-zero nodes.
     if u_reference is not None:
         with np.errstate(divide="ignore", invalid="ignore"):

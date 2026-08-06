@@ -5,26 +5,26 @@ run_hpc_2Dfull.py
 Full 2-D HPC benchmark sweep for the quantum linear solvers (HHL, VQLS, QSVT)
 against the classical Thomas reference.
 
-What changed relative to the previous version
----------------------------------------------
-The outer iteration is no longer implemented here.  It lives in
-``solvers.outer``, and this script now does what a benchmark runner should do:
-declare cases, drive the sweep, collect metrics and write results.  The
-practical consequences are:
+Design
+------
+The outer iteration is not implemented here.  It lives in ``solvers.outer``, so
+that this script does only what a benchmark runner should: declare cases, drive
+the sweep, collect metrics and write results.  Three consequences follow, each
+deliberate:
 
 *   **One scheme for the whole sweep**, so the solvers are compared on equal
     terms.  The default is full multigrid (``--scheme fmg``), which needs O(1)
     outer iterations rather than the O(N) of line-SOR or line-Jacobi.
-    ``--scheme jacobi --criterion delta`` reproduces the original behaviour
-    exactly if a previously published result has to be regenerated.
+    ``--scheme jacobi --criterion delta`` reproduces the original line-Jacobi
+    behaviour exactly, for regenerating a previously published result.
 
 *   **The work unit reported is the strip solve**, not the outer iteration.
     That is what a quantum solver actually pays for, and it is the only
     quantity that compares fairly across schemes.  Measured statevector cost
-    per strip solve scales as n^alpha with alpha ~ 2.4 (HHL), ~1.3 (VQLS),
-    ~0.6 (QSVT), so a scheme doing much of its work on short strips is cheaper
-    than a raw solve count suggests; both the raw count and the alpha-weighted
-    cost are recorded.
+    per strip solve scales as n^α with α ~ 2.4 (HHL), ~1.3 (VQLS), ~0.6 (QSVT),
+    so a scheme doing much of its work on short strips is cheaper than a raw
+    solve count suggests; both the raw count and the α-weighted cost are
+    recorded.
 
 *   **Solver parameters come from the command line and are recorded in the run
     metadata**, so a sweep is reproducible from its own output.
@@ -52,8 +52,6 @@ Usage
     python scripts/run_hpc_2Dfull.py --max-n 64 --compare-schemes
 
     python scripts/run_hpc_2Dfull.py --list-options
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 
@@ -80,13 +78,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from problems.poisson_line_2d import PoissonLine2D
-from solvers.outer import (InnerConfig, available_inner,available_schemes, 
-                           build_hierarchy, describe_inner, describe_scheme, 
+from solvers.outer import (InnerConfig, available_inner,available_schemes,
+                           build_hierarchy, describe_inner, describe_scheme,
                            get_inner, resolve_options, solve)
 
-# ============================================================================
-#  Output directory and logging
-# ============================================================================
+# ── Output directory and logging ──────────────────────────────────────────────
 
 RESULTS_DIR = Path("results") / "2Dhpc_run"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -110,9 +106,7 @@ for _noisy in ("qiskit.transpiler", "qiskit_aer", "qiskit_ibm_runtime",
     logging.getLogger(_noisy).setLevel(logging.CRITICAL)
 
 
-# ============================================================================
-#  Sweep configuration
-# ============================================================================
+# ── Sweep configuration ───────────────────────────────────────────────────────
 
 # NOTE: 128 and 256 are included so --max-n 128 / --max-n 256 behave as
 # expected. They are still expensive; a two-phase submission script that
@@ -165,9 +159,7 @@ HET_phi0: float = 300.0
 MAX_WORKERS_DEFAULT: int = 4
 
 
-# ============================================================================
-#  Result dataclass
-# ============================================================================
+# ── Result dataclass ──────────────────────────────────────────────────────────
 
 @dataclass
 class RunResult2D:
@@ -178,13 +170,13 @@ class RunResult2D:
     ``plot_hpc_results.py`` and any existing analysis notebooks continue to
     work; everything new is appended after them.
     """
-    # ---- identity ----------------------------------------------------------
+    # ── identity ──────────────────────────────────────────────────────────────
     case:            str
     solver:          str
     N:               int
     kappa_row:       float
 
-    # ---- accuracy (legacy field names) -------------------------------------
+    # ── accuracy (legacy field names) ─────────────────────────────────────────
     max_rel_err:     Optional[float]
     max_abs_err:     Optional[float]
     residual:        Optional[float]
@@ -200,7 +192,7 @@ class RunResult2D:
     hhl_scale_c:     Optional[float] = None
     stop_reason:     str = ""
 
-    # ---- outer scheme ------------------------------------------------------
+    # ── outer scheme ──────────────────────────────────────────────────────────
     scheme:             str = ""
     n_outer:            int = 0
     convergence_factor: Optional[float] = None   # geometric mean residual ratio
@@ -208,13 +200,13 @@ class RunResult2D:
     level_shapes:       str = ""                 # JSON
     level_kappas:       str = ""                 # JSON
 
-    # ---- work accounting ---------------------------------------------------
+    # ── work accounting ───────────────────────────────────────────────────────
     strip_solves:         int = 0
     strip_solves_by_size: str = ""               # JSON, {strip length: count}
     weighted_cost:        Optional[float] = None # finest-strip-solve units
     mean_strip_size:      Optional[float] = None
 
-    # ---- inner solver telemetry --------------------------------------------
+    # ── inner solver diagnostics ──────────────────────────────────────────────
     inner_calls:     int = 0
     inner_total_s:   Optional[float] = None
     inner_mean_s:    Optional[float] = None
@@ -223,24 +215,22 @@ class RunResult2D:
     inner_options:   str = ""                    # JSON, as resolved
     n_circuit_evals: Optional[float] = None
 
-    # ---- error decomposition -----------------------------------------------
+    # ── error decomposition ───────────────────────────────────────────────────
     err_vs_thomas:       Optional[float] = None  # quantum algorithmic error, %
     err_thomas_vs_exact: Optional[float] = None  # discretisation error, %
     linf_err:            Optional[float] = None  # amplitude-normalised Linf, %
 
-    # ---- derived physics ---------------------------------------------------
+    # ── derived physics ───────────────────────────────────────────────────────
     peak_E_field:   Optional[float] = None       # V/m
     peak_E_rel_err: Optional[float] = None       # % against the reference
 
-    # ---- efficiency --------------------------------------------------------
+    # ── efficiency ────────────────────────────────────────────────────────────
     s_per_strip_solve: Optional[float] = None
     solves_per_digit:  Optional[float] = None    # strip solves per decade of
                                                  # residual reduction
 
 
-# ============================================================================
-#  Logging helpers
-# ============================================================================
+# ── Logging helpers ───────────────────────────────────────────────────────────
 
 def _banner(msg: str) -> None:
     sep = "=" * 78
@@ -251,9 +241,7 @@ def _section(msg: str) -> None:
     log.info("-" * 78); log.info("  %s", msg); log.info("-" * 78)
 
 
-# ============================================================================
-#  Error metrics
-# ============================================================================
+# ── Error metrics ─────────────────────────────────────────────────────────────
 
 def _max_rel(u: np.ndarray, ref: np.ndarray, tol: float = 1e-10) -> float:
     """
@@ -305,9 +293,7 @@ def _electric_field(phi: np.ndarray, dx: float, dy: float):
     return Ex, Ey, float(np.max(np.sqrt(Ex**2 + Ey**2)))
 
 
-# ============================================================================
-#  Problem definitions
-# ============================================================================
+# ── Problem definitions ───────────────────────────────────────────────────────
 
 def _grid_2d(N: int, Lx: float = 1.0, Ly: float = 1.0):
     dx, dy = Lx / (N + 1), Ly / (N + 1)
@@ -317,7 +303,7 @@ def _grid_2d(N: int, Lx: float = 1.0, Ly: float = 1.0):
     return X, Y, dx, dy
 
 
-# ---- Section 1: sinusoidal source on the unit square ------------------------
+# ── Section 1: sinusoidal source on the unit square ───────────────────────────
 
 def _phi_sin2d(x, y):
     return -np.sin(np.pi * x) * np.sin(np.pi * y) / (2.0 * np.pi**2)
@@ -327,7 +313,7 @@ def _f_sin2d(x, y):
     return np.sin(np.pi * x) * np.sin(np.pi * y)
 
 
-# ---- Section 2: two-Gaussian charge density (PlasmaNet benchmark) -----------
+# ── Section 2: two-Gaussian charge density (PlasmaNet benchmark) ──────────────
 
 def _f_two_gaussian_at(x, y, Lx=0.01, Ly=0.01):
     """f = nabla^2(phi) = -rho / eps0."""
@@ -366,7 +352,7 @@ def _phi_two_gaussian_reference(Lx=0.01, Ly=0.01, N_fine=N_FINE,
                                    bounds_error=False, fill_value=0.0)
 
 
-# ---- Section 3: single Fourier mode -----------------------------------------
+# ── Section 3: single Fourier mode ────────────────────────────────────────────
 
 def _f_single_mode(x, y, n=1, m=1, Lx=1.0, Ly=1.0, R_nm=1.0):
     return -R_nm * np.sin(n * np.pi * x / Lx) * np.sin(m * np.pi * y / Ly)
@@ -377,7 +363,7 @@ def _phi_single_mode(x, y, n=1, m=1, Lx=1.0, Ly=1.0, R_nm=1.0):
     return (R_nm / denom) * np.sin(n * np.pi * x / Lx) * np.sin(m * np.pi * y / Ly)
 
 
-# ---- Section 4: HET manufactured solution (SPT-100) -------------------------
+# ── Section 4: HET manufactured solution (SPT-100) ────────────────────────────
 
 def _phi_het_mms(z, r):
     return HET_phi0 * np.sin(np.pi * z / HET_Lz) * np.cos(np.pi * r / (2 * HET_Lr))
@@ -388,7 +374,7 @@ def _f_het_mms(z, r):
     return coeff * np.sin(np.pi * z / HET_Lz) * np.cos(np.pi * r / (2 * HET_Lr))
 
 
-# ---- Section 5: HET sinusoidal source ---------------------------------------
+# ── Section 5: HET sinusoidal source ──────────────────────────────────────────
 
 def _phi_het_sin(x, y, Lx, Ly, phi0):
     return phi0 * np.sin(np.pi * x / Lx) * np.sin(np.pi * y / Ly)
@@ -399,9 +385,7 @@ def _f_het_sin(x, y, Lx, Ly, phi0):
     return coeff * np.sin(np.pi * x / Lx) * np.sin(np.pi * y / Ly)
 
 
-# ============================================================================
-#  Sweep settings container
-# ============================================================================
+# ── Sweep settings container ──────────────────────────────────────────────────
 
 @dataclass
 class SweepConfig:
@@ -455,9 +439,7 @@ class SweepConfig:
         return kw
 
 
-# ============================================================================
-#  Result recording
-# ============================================================================
+# ── Result recording ──────────────────────────────────────────────────────────
 
 def _save_solution_2d(case, solver, N, x, y, phi, phi_ref, f_vals,
                       residual_history=None) -> None:
@@ -492,20 +474,20 @@ def _record(results, case_id, solver_name, N, kappa, x, y, dx, dy,
     d = res.diagnostics
     acc = _accuracy(phi, phi_ref)
 
-    # ---- work accounting ----------------------------------------------------
+    # ── work accounting ───────────────────────────────────────────────────────
     by_size = res.work.solves_by_size
     total = res.work.total
     alpha = COST_ALPHA.get(solver_name, 1.0)
     mean_size = (sum(n * k for n, k in by_size.items()) / total) if total else None
 
-    # ---- efficiency ---------------------------------------------------------
+    # ── efficiency ────────────────────────────────────────────────────────────
     hist = res.residual_history
     decades = None
     if len(hist) > 1 and hist[0] > 0.0 and hist[-1] > 0.0:
         decades = float(np.log10(hist[0] / hist[-1]))
     per_digit = (total / decades) if (decades and decades > 0.0) else None
 
-    # ---- physics ------------------------------------------------------------
+    # ── physics ───────────────────────────────────────────────────────────────
     _, _, peak_E = _electric_field(phi, dx, dy)
     peak_E_err = None
     if phi_ref is not None:
@@ -513,7 +495,7 @@ def _record(results, case_id, solver_name, N, kappa, x, y, dx, dy,
         if peak_E_ref > 0.0:
             peak_E_err = float(abs(peak_E - peak_E_ref) / peak_E_ref * 100.0)
 
-    # ---- error decomposition -------------------------------------------------
+    # ── error decomposition ───────────────────────────────────────────────────
     if solver_name == "thomas":
         err_vs_thomas = 0.0
     elif phi_thomas is not None:
@@ -574,9 +556,7 @@ def _record(results, case_id, solver_name, N, kappa, x, y, dx, dy,
                           res.residual_history if cfg.save_history else None)
 
 
-# ============================================================================
-#  Per-case driver
-# ============================================================================
+# ── Per-case driver ───────────────────────────────────────────────────────────
 
 def _estimate_case(case_id, N, problem, cfg: SweepConfig) -> None:
     """
@@ -637,7 +617,7 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
                    "falling back to scheme=%r for this case only.",
                    N, N, effective_scheme)
 
-    # ---- classical reference -------------------------------------------------
+    # ── classical reference ───────────────────────────────────────────────────
     res_T = solve(problem, inner="thomas", scheme=effective_scheme,
                   inner_options=inner_cfg, **scheme_kw)
     phi_T = res_T.u
@@ -654,7 +634,7 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
     reference = phi_ref if phi_ref is not None else phi_T
     ref_note = "" if phi_ref is not None else "rel_vs_thomas"
 
-    # ---- optional outer-scheme comparison, classical inner solver only ------
+    # ── optional outer-scheme comparison, classical inner solver only ─────────
     if cfg.compare_schemes:
         for alt in available_schemes():
             if alt == cfg.scheme:
@@ -672,7 +652,7 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
                     dataclasses.replace(cfg, save_solutions=False),
                     notes=f"scheme_comparison:{alt}")
 
-    # ---- quantum solvers -----------------------------------------------------
+    # ── quantum solvers ───────────────────────────────────────────────────────
     for solver_name in cfg.solvers:
         try:
             res_q = solve(problem, inner=solver_name, scheme=effective_scheme,
@@ -697,9 +677,7 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
                 notes=(fallback_note or ref_note))
 
 
-# ============================================================================
-#  Sections
-# ============================================================================
+# ── Sections ──────────────────────────────────────────────────────────────────
 
 def run_section1(N, cfg, results):
     _banner(f"SECTION 1 - Poisson, sinusoidal source, unit square, N={N}")
@@ -753,9 +731,7 @@ SECTIONS = {"section1": run_section1, "section2": run_section2,
             "section5": run_section5}
 
 
-# ============================================================================
-#  Serialisation
-# ============================================================================
+# ── Serialisation ─────────────────────────────────────────────────────────────
 
 def _load_existing_results(path: Path) -> list[RunResult2D]:
     """
@@ -840,9 +816,7 @@ def _save_metadata(N_values, cfg: SweepConfig, sections, max_workers,
     log.info("Metadata written -> %s", fname)
 
 
-# ============================================================================
-#  Final summary
-# ============================================================================
+# ── Final summary ─────────────────────────────────────────────────────────────
 
 def _print_summary(results) -> None:
     rows = [r for r in results if not r.notes.startswith("scheme_comparison")]
@@ -902,9 +876,7 @@ def _print_summary(results) -> None:
                      r.inner_calls, pct)
 
 
-# ============================================================================
-#  CLI plumbing
-# ============================================================================
+# ── CLI plumbing ──────────────────────────────────────────────────────────────
 
 def parse_kv(items, flag: str) -> dict:
     """Parse ``key=value`` and ``solver.key=value`` pairs from the CLI."""
@@ -947,9 +919,7 @@ def coerce_scheme_opts(d: dict) -> dict:
     return out
 
 
-# ============================================================================
-#  Work unit dispatch
-# ============================================================================
+# ── Work unit dispatch ────────────────────────────────────────────────────────
 
 def _execute_work_unit(work_type: str, N: int, cfg: SweepConfig) -> list:
     """One (section, N) unit.  Must stay picklable for ProcessPoolExecutor."""
@@ -966,9 +936,7 @@ def _execute_work_unit(work_type: str, N: int, cfg: SweepConfig) -> list:
     return results
 
 
-# ============================================================================
-#  Main
-# ============================================================================
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     ap = argparse.ArgumentParser(
@@ -1035,7 +1003,7 @@ def main() -> None:
         print(describe_scheme())
         return
 
-    # ---- resolve and validate the sweep -------------------------------------
+    # ── resolve and validate the sweep ────────────────────────────────────────
     if args.n_values:
         N_values = [int(v) for v in args.n_values.split(",") if v.strip()]
     else:
@@ -1127,7 +1095,7 @@ def main() -> None:
         _save_metadata(N_values, cfg, sections, args.max_workers,
                        tag=args.phase_tag)
 
-    # ---- execute -------------------------------------------------------------
+    # ── execute ───────────────────────────────────────────────────────────────
     t0 = time.perf_counter()
     results: list = []
     if args.append:

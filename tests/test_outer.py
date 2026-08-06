@@ -394,7 +394,7 @@ class TestSolveStationary:
         prob, _ = build_square_2d(8)
         tol, max_iter = 1e-8, 500
 
-        # -- Reference: an explicit line-Jacobi loop over the strip systems. ----
+        # ── Reference: an explicit line-Jacobi loop over the strip systems. ───
         A = prob.row_matrix()
         rhs = prob.rhs()
         Nx, Ny = prob.shape
@@ -417,7 +417,7 @@ class TestSolveStationary:
             if delta < tol:
                 break
 
-        # -- The package, driven in its reproducibility mode. ------------------
+        # ── The package, driven in its reproducibility mode. ──────────────────
         res = solve(prob, inner="thomas", scheme="jacobi",
                     tol=tol, max_iter=max_iter, patience=max_iter + 1)
 

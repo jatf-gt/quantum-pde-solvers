@@ -1,11 +1,11 @@
 """
 Constructs the discretised 1D Poisson boundary value problem.
 
-This module generates the Toeplitz Symmetric Tridiagonal (TST) system matrix 
-and the right-hand side vector for the one-dimensional Poisson equation, 
-adhering strictly to the formulation provided in Equation (5) of the primary 
-reference. It encapsulates the grid generation and system assembly into a 
-unified data structure required by subsequent classical and quantum solvers.
+Generates the Toeplitz Symmetric Tridiagonal (TST) system matrix and the
+right-hand side vector for the one-dimensional Poisson equation, following the
+formulation of Equation (5) of the primary reference. Grid generation and system
+assembly are packaged into the single data structure required by the classical
+and quantum solvers.
 """
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ def build_grid(N: int) -> tuple[np.ndarray, float]:
     """
     Computes the interior node coordinates and the spatial mesh spacing, Δx.
 
-    The continuous domain spans [0, 1]. Boundary nodes at x=0 and x=1 are 
-    excluded, as their contributions are assimilated into the right-hand side 
-    vector via Dirichlet boundary conditions.
+    The continuous domain spans [0, 1]. Boundary nodes at x=0 and x=1 are
+    excluded, their contributions being absorbed into the right-hand side vector
+    via the Dirichlet boundary conditions.
 
     Parameters
     ----------
@@ -32,9 +32,9 @@ def build_grid(N: int) -> tuple[np.ndarray, float]:
     Returns
     -------
     x : np.ndarray
-        Interior node coordinates x_i = i·Δx, for i = 1, …, N.
+        Length-N vector of interior node coordinates x_i = i·Δx, for i = 1, …, N.
     dx : float
-        Mesh spacing, defined as Δx = 1 / (N + 1).
+        Mesh spacing, Δx = 1 / (N + 1).
     """
     dx = 1.0 / (N + 1)
     x = np.arange(1, N + 1) * dx
@@ -45,16 +45,28 @@ def build_grid(N: int) -> tuple[np.ndarray, float]:
 
 def build_tst_matrix(N: int) -> np.ndarray:
     """
-    Constructs the N×N Toeplitz Symmetric Tridiagonal (TST) matrix for the
-    1D Poisson operator utilising second-order centred finite differences.
+    Constructs the N×N Toeplitz Symmetric Tridiagonal (TST) matrix for the 1D
+    Poisson operator, using second-order centred finite differences.
 
-    The matrix possesses a main diagonal of -2 and off-diagonals of +1 
-    (a = -2, b = 1 in the reference notation). The 1/Δx² scaling factor is 
-    omitted from the matrix and instead integrated into the right-hand side.
+    The matrix has a main diagonal of -2 and off-diagonals of +1 (a = -2, b = 1
+    in the reference notation). The 1/Δx² scaling factor is omitted here and
+    folded into the right-hand side instead.
 
-    The output is a dense array. System dimensions are sufficiently constrained 
-    (N <= 32) to render sparse matrices unnecessary, precluding the need for 
-    subsequent sparse-to-dense data conversions.
+    Parameters
+    ----------
+    N : int
+        System dimension (number of interior nodes).
+
+    Returns
+    -------
+    A : np.ndarray
+        N×N dense TST matrix.
+
+    Notes
+    -----
+    The output is deliberately dense. The benchmark sweeps reach N = 64, at
+    which the matrix occupies 32 kB, so sparse storage would buy nothing and
+    would force sparse-to-dense conversions at every quantum solver interface.
     """
     diag_main = -2.0 * np.ones(N)
     diag_off  =  1.0 * np.ones(N - 1)
@@ -78,27 +90,34 @@ def build_rhs(
     """
     Assembles the right-hand side vector b corresponding to Equation (5).
 
-    The interior equations are given by:
+    The interior equations are
+
         u_{i+1} - 2u_i + u_{i-1} = Δx² f(x_i)
 
-    Following the incorporation of Dirichlet boundary conditions u(0) = α 
-    and u(1) = β, the boundary-adjacent nodes necessitate a correction term:
-        b_1   = Δx² f(x_1) - α
-        b_N   = Δx² f(x_N) - β
-        b_i   = Δx² f(x_i)   for 2 <= i <= N-1
+    and, once the Dirichlet conditions u(0) = α and u(1) = β are incorporated,
+    the boundary-adjacent nodes carry a correction term:
+
+        b_1 = Δx² f(x_1) - α
+        b_N = Δx² f(x_N) - β
+        b_i = Δx² f(x_i)        for 2 ≤ i ≤ N-1
 
     Parameters
     ----------
     x : np.ndarray
-        Interior node coordinates derived from build_grid.
+        Length-N vector of interior node coordinates, from build_grid.
     dx : float
-        Mesh spacing derived from build_grid.
+        Mesh spacing, from build_grid.
     source_fn_key : str
-        Dictionary key specifying the analytical forcing function.
+        Registry key selecting the analytical forcing function.
     alpha : float
-        Dirichlet boundary condition evaluated at x = 0.
+        Dirichlet boundary condition at x = 0.
     beta : float
-        Dirichlet boundary condition evaluated at x = 1.
+        Dirichlet boundary condition at x = 1.
+
+    Returns
+    -------
+    b : np.ndarray
+        Length-N right-hand side vector with boundary data absorbed.
     """
     f = SOURCE_FUNCTIONS[source_fn_key]
     b = dx**2 * f(x)
@@ -116,9 +135,23 @@ def condition_number(A: np.ndarray) -> float:
     """
     Computes the 2-norm condition number, κ(A) = |λ_max| / |λ_min|.
 
-    For the 1D Poisson TST matrix, this parameter scales asymptotically as 
-    O(N²). It represents the primary metric dictating the requisite depth 
-    of the HHL quantum circuit (l-register width).
+    Parameters
+    ----------
+    A : np.ndarray
+        N×N symmetric matrix.
+
+    Returns
+    -------
+    kappa : float
+        Spectral condition number.
+
+    Notes
+    -----
+    For the 1D Poisson TST matrix κ scales as O(N²), and it is the primary
+    quantity dictating the required depth of the HHL quantum circuit (the width
+    of the l-register). This unfavourable growth is what motivates the
+    line-decomposed 2D/3D formulation, where the strip operator instead has
+    κ → 3⁻ (2D) or κ → 2⁻ (3D) as N → ∞.
     """
     eigenvalues = np.linalg.eigvalsh(A)
     abs_eigs = np.abs(eigenvalues)
@@ -129,26 +162,33 @@ def condition_number(A: np.ndarray) -> float:
 
 class PoissonProblem1D:
     """
-    Data structure encapsulating all discretised parameters for a singular 
-    benchmark execution.
+    Bundles the discretised system for a single 1D benchmark instance.
 
     Attributes
     ----------
     config : SimConfig1D
-        Base configuration parameters defining the problem instance.
+        Configuration parameters defining the problem instance.
     x : np.ndarray
-        Interior node spatial coordinates.
+        Length-N vector of interior node coordinates.
     dx : float
-        Uniform mesh spacing.
+        Uniform mesh spacing, Δx = 1/(N+1).
     A : np.ndarray
-        TST system matrix structured as an N×N dense array.
+        N×N dense TST system matrix.
     b : np.ndarray
-        Assembled right-hand side vector of length N.
+        Length-N assembled right-hand side vector.
     kappa : float
-        Calculated 2-norm condition number of matrix A.
+        2-norm condition number of A.
     """
 
     def __init__(self, cfg: SimConfig1D) -> None:
+        """
+        Assembles the grid, system matrix and right-hand side from a config.
+
+        Parameters
+        ----------
+        cfg : SimConfig1D
+            Validated configuration for this benchmark instance.
+        """
         self.config = cfg
         self.x, self.dx = build_grid(cfg.N)
         self.A = build_tst_matrix(cfg.N)
@@ -158,9 +198,8 @@ class PoissonProblem1D:
         )
         self.kappa = condition_number(self.A)
 
-    # ------------------------------------------------------------------
     def summary(self) -> str:
-        """Generates a concise summary string detailing the system configuration."""
+        """Returns a one-line summary of the discretised system."""
         return (
             f"N={self.config.N}, f={self.config.source_fn}, "
             f"α={self.config.alpha}, β={self.config.beta}, "

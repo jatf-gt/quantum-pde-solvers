@@ -29,8 +29,6 @@ Usage
     python scripts/plot_hpc_2Dfull_results.py
     python scripts/plot_hpc_2Dfull_results.py --case 2D_HET_MMS_SPT100
     python scripts/plot_hpc_2Dfull_results.py --list
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 

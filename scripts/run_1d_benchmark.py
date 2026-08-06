@@ -1,10 +1,10 @@
 """
 Execution entry point for the 1D Poisson quantum linear solver benchmark.
 
-This script orchestrates the systematic execution of the 1D simulated sweeps 
-(Sections IV A-D), ensuring appropriate system path resolution prior to 
-invoking the primary benchmark modules. It automates algorithmic data generation, 
-CSV serialisation, and Matplotlib visualisations without exposing the internal 
+This script orchestrates the systematic execution of the 1D simulated sweeps
+(Sections IV A-D), ensuring appropriate system path resolution prior to
+invoking the primary benchmark modules. It automates algorithmic data generation,
+CSV serialisation, and Matplotlib visualisations without exposing the internal
 module architecture.
 """
 import sys
@@ -29,7 +29,7 @@ from benchmark.reporting import print_result_table
 # ── Primary Execution Sequence ────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    
+
     sweep_d()
 
     results_a = sweep_a()

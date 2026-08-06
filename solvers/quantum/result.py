@@ -110,7 +110,7 @@ class VQLSSolverResult(SolverResult):
     n_parameters:      int                      = 0
 
 
-# ── QSVT result container ────────────────────────────────────────────────────
+# ── QSVT result container ─────────────────────────────────────────────────────
 
 @dataclass
 class QSVTSolverResult(SolverResult):
@@ -134,13 +134,15 @@ class QSVTSolverResult(SolverResult):
         Total qubit count: n (data) + n_a (block encoding ancilla)
         + 1 (QSVT signal qubit).
     alpha : float
-        Block encoding subnormalisation factor: alpha = |a| + 2|b|
-        for a TST matrix with main diagonal a and off-diagonal b.
+        Block encoding subnormalisation factor, the spectral norm ‖A‖₂ of the
+        TST matrix, obtained by eigendecomposition in
+        ``block_encoding.build_tst_block_encoding``. This is the tightest
+        valid choice, not the looser row-sum bound |a| + 2|b|.
     kappa_effective : float
-        Effective condition number after subnormalisation:
-        kappa_eff = alpha * kappa(A) / ||A||_2.
-        This is the condition number seen by the QSVT polynomial and
-        determines the polynomial degree requirement.
+        Effective condition number after subnormalisation,
+        κ_eff = α·κ(A)/‖A‖₂. This is the condition number seen by the QSVT
+        polynomial, and it determines the polynomial degree requirement. Since
+        α = ‖A‖₂ exactly, it reduces to κ(A).
     angles : np.ndarray or None, shape (d+1,)
         QSP phase angles phi_0, ..., phi_d. Stored for reproducibility
         and for circuit reconstruction without recomputation.

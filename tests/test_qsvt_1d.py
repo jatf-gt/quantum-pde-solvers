@@ -55,7 +55,7 @@ from solvers.quantum.result import QSVTSolverResult
 pytestmark = pytest.mark.quantum
 
 
-# -- Shared fixtures ----------------------------------------------------------
+# ── Shared fixtures ───────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
 def qsvt_cfg_fast():
@@ -75,7 +75,7 @@ def qsvt_cfg_fast():
     )
 
 
-# -- Block encoding tests -----------------------------------------------------
+# ── Block encoding tests ──────────────────────────────────────────────────────
 
 class TestBlockEncoding:
 
@@ -201,7 +201,7 @@ class TestBlockEncoding:
             build_tst_block_encoding(6, -2.0, 1.0)
 
 
-# -- QSP angle tests ----------------------------------------------------------
+# ── QSP angle tests ───────────────────────────────────────────────────────────
 
 class TestQSPAngles:
 
@@ -266,7 +266,7 @@ class TestQSPAngles:
             compute_inversion_angles(5.0, -0.01)
 
 
-# -- QSVT solver tests --------------------------------------------------------
+# ── QSVT solver tests ─────────────────────────────────────────────────────────
 
 class TestQSVT1D:
 

@@ -18,8 +18,6 @@ physics, and no Poisson-specific code.  Concrete problems that satisfy
 ``problems/poisson_line_2d.py`` (PoissonLine2D) and
 ``problems/poisson_line_3d.py`` (PoissonLine3D) - which is also where the
 sign and scaling convention used throughout this package is documented.
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 
@@ -29,9 +27,7 @@ from typing import Callable, Optional, Protocol, runtime_checkable
 import numpy as np
 
 
-# =============================================================================
-#  Work accounting
-# =============================================================================
+# ── Work accounting ───────────────────────────────────────────────────────────
 
 @dataclass
 class WorkLog:
@@ -74,9 +70,7 @@ class WorkLog:
         return f"{self.total} solves ({', '.join(parts)})"
 
 
-# =============================================================================
-#  Result container
-# =============================================================================
+# ── Result container ──────────────────────────────────────────────────────────
 
 @dataclass
 class OuterResult:
@@ -112,9 +106,7 @@ class OuterResult:
                 f"{self.work.summary()}, {self.wall_time_s:.2f}s")
 
 
-# =============================================================================
-#  Inner solver protocol
-# =============================================================================
+# ── Inner solver protocol ─────────────────────────────────────────────────────
 
 @runtime_checkable
 class InnerSolver(Protocol):
@@ -130,9 +122,7 @@ class InnerSolver(Protocol):
     def __call__(self, A: np.ndarray, b: np.ndarray) -> np.ndarray: ...
 
 
-# =============================================================================
-#  Problem protocol
-# =============================================================================
+# ── Problem protocol ──────────────────────────────────────────────────────────
 
 @runtime_checkable
 class LineProblem2D(Protocol):
@@ -177,9 +167,7 @@ class LineProblem2D(Protocol):
         ...
 
 
-# =============================================================================
-#  Stagnation detection
-# =============================================================================
+# ── Stagnation detection ──────────────────────────────────────────────────────
 
 class StagnationMonitor:
     """
@@ -238,9 +226,7 @@ class StagnationMonitor:
         return (prior - recent) / prior < self.min_improvement
 
 
-# =============================================================================
-#  Strip sweep - the primitive every scheme is built from
-# =============================================================================
+# ── Strip sweep - the primitive every scheme is built from ────────────────────
 
 def strip_sweep(
     problem,

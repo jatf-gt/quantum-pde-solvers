@@ -36,8 +36,6 @@ Registering a new solver:
             ...
             return x, {}          # (solution, diagnostics)
         return solve
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 
@@ -49,9 +47,7 @@ from typing import Any, Callable, Optional
 import numpy as np
 
 
-# =============================================================================
-#  Option declaration
-# =============================================================================
+# ── Option declaration ────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class Option:
@@ -175,9 +171,7 @@ class InnerConfig(dict):
         return dict(self.get(name, {}))
 
 
-# =============================================================================
-#  Wrapper: timing, diagnostics, failure fallback
-# =============================================================================
+# ── Wrapper: timing, diagnostics, failure fallback ────────────────────────────
 
 class InnerSolverWrapper:
     """
@@ -245,9 +239,7 @@ class InnerSolverWrapper:
         return d
 
 
-# =============================================================================
-#  Built-in solvers
-# =============================================================================
+# ── Built-in solvers ──────────────────────────────────────────────────────────
 
 @register("thomas")
 def _thomas(**_):
@@ -383,9 +375,7 @@ def _qsvt(**opts):
     return solve
 
 
-# =============================================================================
-#  Factory
-# =============================================================================
+# ── Factory ───────────────────────────────────────────────────────────────────
 
 def get_inner(name: str, fallback_to_thomas: bool = True,
               **options) -> InnerSolverWrapper:

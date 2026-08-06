@@ -25,8 +25,6 @@ Usage
     python scripts/plot_hpc_3Dfull_results.py
     python scripts/plot_hpc_3Dfull_results.py --case 3D_HET_MMS --no-cutaway
     python scripts/plot_hpc_3Dfull_results.py --list
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """
-Implements the Variational Quantum Linear Solver (VQLS) for 1D Poisson systems 
-characterised by a Toeplitz Symmetric Tridiagonal (TST) matrix structure.
+Variational Quantum Linear Solver (VQLS) for 1D Poisson systems with a
+Toeplitz Symmetric Tridiagonal (TST) matrix structure.
 
 Mathematical formulation
 ------------------------
@@ -20,24 +20,29 @@ cost function on a statevector simulator.
 
 Public Interface
 ----------------
-vqls_solve(problem) : 
-    High-level wrapper accepting a `PoissonProblem1D` object, returning a 
-    standardised `VQLSSolverResult`.
-vqls_solve_system(A, b, config) : 
-    Low-level core routine accepting raw numerical arrays. Architected to 
-    allow the 2D line-Jacobi solver (Phase 3) to bypass problem container 
-    instantiation, significantly reducing computational overhead.
+vqls_solve(problem) :
+    High-level wrapper accepting a `PoissonProblem1D`, returning a standardised
+    `VQLSSolverResult`.
+vqls_solve_system(A, b, config) :
+    Low-level routine accepting raw NumPy arrays. Kept separate so that the
+    outer iteration in `solvers/outer` can solve each strip without
+    constructing a problem container per sub-problem.
 
 Methodology
 -----------
-The solver methodology adheres strictly to the formulation detailed by 
-Bravo-Prieto et al. (2023):
-  1. Decompose the system matrix A into a sum of Pauli unitaries (LCU).
-  2. Prepare a hardware-efficient parameterised ansatz |x(θ)>.
-  3. Minimise the globally normalised cost function: C(θ) = 1 - |<b|A|x>|² / <x|A†A|x>.
-  4. Recover the physical solution dimensionality via proportionality constant projection.
+Following Bravo-Prieto et al. (2023):
 
-Framework: PennyLane
+  1. Decompose the system matrix A into a sum of Pauli unitaries (LCU).
+  2. Prepare a hardware-efficient parameterised ansatz |x(θ)⟩.
+  3. Minimise the globally normalised cost function
+     C(θ) = 1 - |⟨b|A|x⟩|² / ⟨x|A†A|x⟩.
+  4. Recover the physical solution scale by proportionality constant
+     projection.
+
+The ansatz circuit and its statevector are provided by PennyLane
+(`vqls_utils.py`); the cost function itself is then evaluated by direct
+statevector arithmetic over the Pauli LCU terms rather than by executing a
+Hadamard test, which is exact and considerably cheaper at these system sizes.
 
 References
 ----------
@@ -68,33 +73,38 @@ from solvers.quantum.vqls_utils import (
 @dataclass
 class VQLSConfig1D:
     """
-    Encapsulates the hyperparameters governing the VQLS variational optimisation.
+    Hyperparameters governing the VQLS variational optimisation.
 
     Attributes
     ----------
     n_layers : int
-        Total number of entangling layers comprising the ansatz. Increased depth 
-        enhances expressivity at the cost of optimisation complexity. Empirical 
-        baselines suggest 3-5 layers for N=8 (3 qubits) and 5-8 layers for N=16 (4 qubits).
+        Number of entangling layers in the ansatz. Greater depth increases
+        expressivity at the cost of a harder optimisation landscape. Empirical
+        baselines are 3–5 layers for N=8 (3 qubits) and 5–8 for N=16 (4 qubits).
     optimiser : str
-        Identifier for the SciPy optimisation algorithm. 'COBYLA' provides a 
-        gradient-free, robust approach for constrained system dimensions. 
-        'L-BFGS-B' accelerates convergence for larger parameter spaces but 
-        necessitates gradient evaluations.
+        SciPy optimisation algorithm. 'COBYLA' is gradient-free and robust at
+        these system dimensions; 'L-BFGS-B' converges faster over larger
+        parameter spaces but requires gradient evaluations.
     max_iter : int
-        Absolute ceiling on the optimiser iteration count.
+        Ceiling on the optimiser iteration count, applied per restart.
     tol : float
-        Convergence tolerance threshold applied to the objective cost function.
-    init_params : Optional[np.ndarray], default=None
-        Initial variational parameter vector. If None, parameters are randomly 
-        initialised within [0, 2π] constrained by `random_seed`.
+        Convergence tolerance on the cost function.
+    init_params : np.ndarray or None
+        Initial variational parameter vector of length n_qubits·(n_layers+1).
+        If None, parameters are drawn uniformly from [0, 2π] under
+        `random_seed`.
     random_seed : int
-        Seed value ensuring reproducible pseudo-random initialisation.
+        Seed giving reproducible pseudo-random initialisation.
     device_name : str
-        Designated PennyLane simulation device (e.g., 'default.qubit' for exact 
-        statevector simulation).
+        PennyLane simulation device for the ansatz statevector, e.g.
+        'default.qubit' for exact simulation.
     verbose : bool
-        Boolean flag dictating the standard output of iterative cost trajectory diagnostics.
+        If True, print the iterative cost trajectory.
+    n_restarts : int
+        Number of independent optimisation runs; the lowest final cost is
+        retained. Each run performs one exploration pass at rhobeg = 0.5
+        followed by two polishing passes at rhobeg = 0.1 and 0.01, this
+        three-stage schedule being what makes COBYLA reliable here.
     """
     n_layers:    int   = 4
     optimiser:   str   = "COBYLA"
@@ -126,8 +136,8 @@ def vqls_solve(
     """
     Resolves the 1D Poisson system Au = b utilising the VQLS algorithm.
 
-    Operates as a procedural wrapper around the core `vqls_solve_system` 
-    sub-routine, unpacking the `PoissonProblem1D` data structure and 
+    Operates as a procedural wrapper around the core `vqls_solve_system`
+    sub-routine, unpacking the `PoissonProblem1D` data structure and
     packaging the numerical outputs into a unified `VQLSSolverResult`.
 
     Parameters
@@ -140,7 +150,7 @@ def vqls_solve(
     Returns
     -------
     VQLSSolverResult
-        Standardised result object containing the physical solution and 
+        Standardised result object containing the physical solution and
         associated optimisation diagnostics.
     """
     return vqls_solve_system(
@@ -535,7 +545,7 @@ def vqls_solve_system(
 
 def _validate_system(A: np.ndarray, b: np.ndarray) -> None:
     """
-    Validates the algebraic integrity of the specified linear system prior 
+    Validates the algebraic integrity of the specified linear system prior
     to VQLS execution.
 
     Validation Criteria:

@@ -52,8 +52,6 @@ For 2-D and 3-D this is a friendly front end onto `debug_outer_2d.py` and
 multigrid hierarchy inspection, polish studies. Anything not exposed here is
 available there. For systematic sweeps at many resolutions, use the
 `run_hpc_*full.py` drivers instead; this script is for single configurations.
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
 """
 Orchestrates the sequential execution sweeps for both the 1D and 2D Poisson benchmarks.
 
-This module acts as the primary driver for replicating the numerical experiments 
+This module acts as the primary driver for replicating the numerical experiments
 detailed in the primary reference literature.
 
 1D Sweeps (Sections IV A–D)
@@ -302,9 +302,9 @@ def sweep_e() -> list[BenchmarkResult2D]:
     """
     Executes Sweep E: 2D Homogeneous boundary conditions (Reference Section IV E).
 
-    Evaluates baseline parameters (ε = 0.01) across all source functions. 
-    Maintains strict methodological parity with the literature by simulating 
-    a relaxed precision (ε = 0.5) specifically for fS at N=16 to ensure 
+    Evaluates baseline parameters (ε = 0.01) across all source functions.
+    Maintains strict methodological parity with the literature by simulating
+    a relaxed precision (ε = 0.5) specifically for fS at N=16 to ensure
     convergence consistency (Reference Figure 12).
     """
     print("\n" + "=" * 70)
@@ -330,9 +330,9 @@ def sweep_f() -> list[BenchmarkResult2D]:
     """
     Executes Sweep F: 2D Non-homogeneous boundary conditions (Reference Section IV F).
 
-    Investigates algorithmic stability and iterative divergence under specific 
-    asymmetric boundary constraints at N=8. The second configuration explicitly 
-    imposes an iteration ceiling (max_iter=200) to replicate the non-converging 
+    Investigates algorithmic stability and iterative divergence under specific
+    asymmetric boundary constraints at N=8. The second configuration explicitly
+    imposes an iteration ceiling (max_iter=200) to replicate the non-converging
     residuals visualised in Figure 15.
     """
     print("\n" + "=" * 70)
@@ -367,8 +367,8 @@ def sweep_g() -> None:
     """
     Executes Sweep G: Condition number scaling verification for the 2D operator.
 
-    Validates the analytical derivation (Appendix B.1) demonstrating that the 
-    condition number of the 2D line-Jacobi sub-matrix (a=-4, b=1) approaches 
+    Validates the analytical derivation (Appendix B.1) demonstrating that the
+    condition number of the 2D line-Jacobi sub-matrix (a=-4, b=1) approaches
     a limit of 3 as N → ∞, contrasting the O(N²) divergence of the 1D system.
     """
     print("\n" + "=" * 70)
@@ -520,7 +520,8 @@ def _solver_plan_2d(
 
 def _run_2d_sweep(configs: list[SimConfig2D]) -> list[BenchmarkResult2D]:
     """
-    Evaluates sequential configurations via 2D Thomas and HHL line-Jacobi loops.
+    Evaluates configurations in sequence with the Thomas and HHL inner solvers
+    under the line-Jacobi outer scheme.
 
     VQLS is deliberately excluded from the sweeps. The 2D reporting and plotting
     layers consume a flat list of alternating (Thomas, HHL) pairs — see
@@ -550,19 +551,19 @@ def _plot_2d_pairs(
     save_fig:           bool = False,
 ) -> None:
     """
-    Iterates through alternating (Thomas, HHL) pairs to trigger 2D contour 
+    Iterates through alternating (Thomas, HHL) pairs to trigger 2D contour
     mapping and iterative convergence rendering.
     """
     for i in range(0, len(results), 2):
         thomas_br = results[i]
         hhl_br    = results[i + 1]
-        
+
         plot_solution_contours_2d(
             thomas_br, hhl_br,
             use_relative_error=use_relative_error,
             save_fig=save_fig,
         )
-        
+
         plot_convergence_history(
             [thomas_br, hhl_br],
             save_fig=save_fig,
@@ -577,10 +578,10 @@ def run_pair_1d(
     vqls_config: "VQLSConfig1D" = None,
 ) -> tuple:
     """
-    Instantiates the 1D problem and sequentially executes classical Thomas, 
+    Instantiates the 1D problem and sequentially executes classical Thomas,
     quantum HHL, and optionally VQLS resolutions, aggregating the resultant metrics.
 
-    Returns a dynamically sized tuple containing the benchmark data structures 
+    Returns a dynamically sized tuple containing the benchmark data structures
     contingent upon the `run_vqls` execution flag.
 
     Parameters
@@ -590,7 +591,7 @@ def run_pair_1d(
     run_vqls : bool, default=True
         Boolean flag dictating the execution of the Variational Quantum Linear Solver.
     vqls_config : VQLSConfig1D, optional
-        Hyperparameter structure governing the variational optimisation. 
+        Hyperparameter structure governing the variational optimisation.
         Defaults to DEFAULT_VQLS_CONFIG if omitted.
     """
     from solvers.quantum.vqls_1d import vqls_solve, VQLSConfig1D, DEFAULT_VQLS_CONFIG

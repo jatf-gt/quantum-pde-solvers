@@ -1,9 +1,14 @@
 """
-Provides graphical visualisation utilities for the 1D and 2D Poisson benchmarks.
+Visualisation utilities for the 1D and 2D Poisson benchmarks.
 
-This module leverages Matplotlib to generate comparative visualisations of 
-spatial solution curves, contour mappings, and convergence histories, structurally 
-mirroring the figures presented in the primary reference literature.
+Generates comparative Matplotlib figures of spatial solution curves, contour
+maps and convergence histories, mirroring the figures of the primary reference
+literature.
+
+These are the laptop-scale, interactive figures: several routines here call
+`plt.show()`. The cluster-scale post-processing lives in
+`benchmark/hpc_plotting.py`, which must not force the Agg backend at import
+time precisely so that the interactive path here keeps working.
 """
 from __future__ import annotations
 
@@ -28,8 +33,8 @@ def plot_solution_comparison_1d(
     """
     Generates a two-panel comparative visualisation of the 1D benchmark outcomes.
 
-    The left panel displays the spatial solution curves (Analytical, Thomas, 
-    and HHL algorithms). The right panel delineates the corresponding error 
+    The left panel displays the spatial solution curves (Analytical, Thomas,
+    and HHL algorithms). The right panel delineates the corresponding error
     profile.
 
     Parameters
@@ -49,7 +54,7 @@ def plot_solution_comparison_1d(
     # ── Left Panel: Solution Curves ───────────────────────────────────────────
     if hhl_br.u_exact is not None:
         ax1.plot(x, hhl_br.u_exact, "k-", lw=2, label="Analytical")
-        
+
     ax1.plot(x, thomas_br.u_solver, "g-o", lw=1.5, ms=5, label="Thomas")
     ax1.plot(x, hhl_br.u_solver, "r--*", lw=1.5, ms=5, label="HHL")
     ax1.set_xlabel("x")
@@ -96,7 +101,7 @@ def plot_solution_contours_2d(
     """
     Generates a four-panel contour mapping to evaluate 2D benchmark outcomes.
 
-    Replicates the structural layout of Figures 10, 12, and 14 from the primary 
+    Replicates the structural layout of Figures 10, 12, and 14 from the primary
     reference:
         (a) Top-Left: Thomas solution contour mapping.
         (b) Top-Right: HHL solution contour mapping.
@@ -110,8 +115,8 @@ def plot_solution_contours_2d(
     hhl_br : BenchmarkResult2D
         Data structure containing quantum metrics.
     use_relative_error : bool, default=True
-        Dictates error topography. If False, absolute deviation is plotted. This 
-        is explicitly required for non-homogeneous constraints where artificial 
+        Dictates error topography. If False, absolute deviation is plotted. This
+        is explicitly required for non-homogeneous constraints where artificial
         near-zero evaluations inflate relative metrics.
     save_fig : bool, default=False
         If True, exports the generated figure to the local results directory.
@@ -190,8 +195,8 @@ def plot_convergence_history(
     the fully coupled system after each outer iteration, as recorded in
     `BenchmarkResult2D.iteration_errors`.
 
-    This routine facilitates comparative evaluations of algorithmic stability 
-    across disparate convergence thresholds or solver typologies (e.g., assessing 
+    This routine facilitates comparative evaluations of algorithmic stability
+    across disparate convergence thresholds or solver typologies (e.g., assessing
     the impact of Trotterisation noise on line-Jacobi execution).
 
     Parameters
@@ -253,13 +258,13 @@ def plot_sweep_pairs_1d(
     """
     Sequentially visualises a collection of paired 1D benchmark results.
 
-    Iterates through a flat array of `BenchmarkResult` objects, presupposing 
+    Iterates through a flat array of `BenchmarkResult` objects, presupposing
     a strict alternating architecture of [Thomas, HHL, Thomas, ...].
     """
     for i in range(0, len(results), 2):
         thomas_br = results[i]
         hhl_br    = results[i + 1]
-        
+
         if hhl_br.u_exact is not None or hhl_br.u_thomas is not None:
             plot_solution_comparison_1d(thomas_br, hhl_br, save_fig=save_fig)
 

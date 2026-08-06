@@ -1,17 +1,17 @@
 """
-Executes the HHL and VQLS quantum solvers against the 1D Hall Effect 
+Executes the HHL and VQLS quantum solvers against the 1D Hall Effect
 Thruster (HET) plasma Poisson benchmark.
 
 Sweep Structure
 ---------------
-Sweep H1 : Gaussian profile, homogeneous boundary conditions (V_d=0), 
-           N ∈ {4, 8, 16}. Verifies fundamental solver fidelity against 
+Sweep H1 : Gaussian profile, homogeneous boundary conditions (V_d=0),
+           N ∈ {4, 8, 16}. Verifies fundamental solver fidelity against
            refined classical baselines.
-Sweep H2 : Physical boundary conditions (V_d=300V), Gaussian profile, 
+Sweep H2 : Physical boundary conditions (V_d=300V), Gaussian profile,
            N ∈ {4, 8}. Evaluates algorithmic stability under non-homogeneous constraints.
-Sweep H3 : Comparative accuracy evaluation across all three charge density 
+Sweep H3 : Comparative accuracy evaluation across all three charge density
            profiles at N=8 under physical boundary conditions.
-Sweep H4 : Pure diagnostic analysis of condition number and scaling parameter 
+Sweep H4 : Pure diagnostic analysis of condition number and scaling parameter
            (α) behaviour, entirely bypassing quantum solver execution.
 """
 from __future__ import annotations
@@ -48,11 +48,14 @@ def run_het_trio(
     verbose:     bool       = False,
 ) -> dict:
     """
-    Evaluates a singular HET configuration sequentially utilising the classical 
-    Thomas, quantum HHL, and Variational Quantum Linear Solver (VQLS) algorithms.
+    Evaluates a single HET configuration with the classical Thomas, quantum HHL
+    and Variational Quantum Linear Solver (VQLS) algorithms in sequence.
 
-    Returns a structured dictionary comprising the aggregated statistical 
-    metrics and spatial solution fields for subsequent serialisation and plotting.
+    Returns
+    -------
+    dict
+        Aggregated metrics and spatial solution fields, for serialisation and
+        plotting downstream.
     """
     from solvers.quantum.vqls_1d import DEFAULT_VQLS_CONFIG
     vc = vqls_config or DEFAULT_VQLS_CONFIG
@@ -169,8 +172,8 @@ def sweep_h1(verbose: bool = True) -> list[dict]:
     """
     Executes Sweep H1: Gaussian profile under homogeneous boundaries (V_d=0).
 
-    Evaluates fundamental algorithmic fidelity independent of non-homogeneous 
-    boundary complexities. Spatial resolution is constrained to N ∈ {4, 8} 
+    Evaluates fundamental algorithmic fidelity independent of non-homogeneous
+    boundary complexities. Spatial resolution is constrained to N ∈ {4, 8}
     to preserve computational tractability.
     """
     print("\n" + "=" * 70)
@@ -197,8 +200,8 @@ def sweep_h2(verbose: bool = True) -> list[dict]:
     """
     Executes Sweep H2: Gaussian profile under physical boundaries (V_d=300V).
 
-    Constitutes the primary stability assessment for the HHL algorithm under 
-    physical, non-homogeneous constraints, directly addressing supervisory 
+    Constitutes the primary stability assessment for the HHL algorithm under
+    physical, non-homogeneous constraints, directly addressing supervisory
     diagnostic directives.
     """
     print("\n" + "=" * 70)
@@ -225,8 +228,8 @@ def sweep_h3(verbose: bool = True) -> list[dict]:
     """
     Executes Sweep H3: Physical boundaries across all charge density profiles.
 
-    Facilitates a comprehensive comparative accuracy evaluation across disparate 
-    source term topologies at a constant resolution (N=8).
+    Compares solver accuracy across the different source term profiles at a
+    fixed resolution (N=8).
     """
     print("\n" + "=" * 70)
     print("SWEEP H3 — HET All profiles, N=8, physical BCs")
@@ -252,8 +255,8 @@ def sweep_h4() -> None:
     """
     Executes Sweep H4: Pure condition number and α scaling analytics.
 
-    Characterises the asymptotic trajectory of κ(A) and α relative to N and 
-    associated physical parameters. This diagnostic data directly informs 
+    Characterises the asymptotic trajectory of κ(A) and α relative to N and
+    associated physical parameters. This diagnostic data directly informs
     the requisite preconditioning analysis specified for Phase 6.
     """
     print("\n" + "=" * 70)
@@ -280,7 +283,7 @@ def sweep_h4() -> None:
 
 def save_het_results(results: list[dict], filename: str) -> None:
     """
-    Serialises aggregated HET benchmark scalar metrics to a CSV format, 
+    Serialises aggregated HET benchmark scalar metrics to a CSV format,
     systematically excluding high-dimensional spatial arrays to preserve readability.
     """
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -304,12 +307,11 @@ def save_het_results(results: list[dict], filename: str) -> None:
 
 def plot_het_solutions(results: list[dict], save_fig: bool = False) -> None:
     """
-    Generates a comparative spatial visualisation of the potential profile φ̃(x̃) 
-    utilising the Thomas, HHL, and VQLS algorithms.
+    Plots a comparison of the potential profile φ̃(x̃) obtained by the Thomas,
+    HHL and VQLS algorithms.
 
-    Constructs individual subplots per execution configuration, dynamically 
-    overlaying the analytical resolution exclusively when a mathematically 
-    derived closed-form solution exists.
+    One subplot is produced per configuration, with the analytical solution
+    overlaid only where a closed form exists.
     """
     try:
         import matplotlib.pyplot as plt
@@ -327,7 +329,7 @@ def plot_het_solutions(results: list[dict], save_fig: bool = False) -> None:
         ax.plot(x, r["u_thomas"], "g-o",  ms=4, lw=1.5, label="Thomas")
         ax.plot(x, r["u_hhl"],    "b--s", ms=4, lw=1.5, label="HHL")
         ax.plot(x, r["u_vqls"],   "r--^", ms=4, lw=1.5, label="VQLS")
-        
+
         if r["u_exact"] is not None:
             ax.plot(x, r["u_exact"], "k-", lw=2, label="Analytical")
 
@@ -375,7 +377,7 @@ def main() -> None:
     save_het_results(results_h2, "sweep_h2_physical_bcs.csv")
     plot_het_solutions(results_h2, save_fig=True)
 
-    # Comprehensive profile topology analysis.
+    # Charge density profile comparison.
     results_h3 = sweep_h3(verbose=True)
     save_het_results(results_h3, "sweep_h3_all_profiles.csv")
     plot_het_solutions(results_h3, save_fig=True)

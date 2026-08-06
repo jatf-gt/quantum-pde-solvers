@@ -1,75 +1,70 @@
 """
-Quantum Signal Processing (QSP) phase angle computation for the
-matrix inversion polynomial used in QSVT.
+Quantum Signal Processing (QSP) phase angle computation for the matrix
+inversion polynomial used in QSVT.
 
 Mathematical foundation
 -----------------------
-QSP realises a degree-d polynomial p(x) of definite parity (even or odd)
-with |p(x)| <= 1 on [-1, 1] as a sequence of d+1 phase angles interleaved
-with the signal unitary. For matrix inversion we target
+QSP realises a degree-d polynomial p(x) of definite parity (even or odd) with
+|p(x)| ≤ 1 on [-1, 1] as a sequence of d+1 phase angles interleaved with the
+signal unitary. For matrix inversion the target is
 
-    p(x) approx 1/x    for x in [1/kappa, 1]
+    p(x) ≈ 1/x    for x ∈ [1/κ, 1]
 
 Phase computation uses pyqsp's `sym_qsp` method (Dong, Lin, Ni & Wang,
-arXiv:2307.12468), which finds the *reduced* (parity-folded) phase
-sequence via Newton iteration and reconstructs the full phase sequence
-via `SymmetricQSPProtocol.full_phases`.
+arXiv:2307.12468), which finds the *reduced* (parity-folded) phase sequence via
+Newton iteration and reconstructs the full phase sequence via
+`SymmetricQSPProtocol.full_phases`.
 
 Why this module does NOT hand-roll the phase reconstruction
--------------------------------------------------------------
-An earlier version of this module reconstructed the full phase sequence
-manually from the reduced (half) sequence returned by the Newton solver,
-using formulas such as `concatenate([reduced, reduced[::-1]])`. This is
-the *mirror image* of pyqsp's own convention. Inspecting
-`pyqsp.sym_qsp_opt.SymmetricQSPProtocol.__init__`, the correct
-reconstruction for odd parity is:
+-----------------------------------------------------------
+An earlier version of this module reconstructed the full phase sequence manually
+from the reduced (half) sequence returned by the Newton solver, using formulas
+such as `concatenate([reduced, reduced[::-1]])`. This is the *mirror image* of
+pyqsp's own convention. Inspecting
+`pyqsp.sym_qsp_opt.SymmetricQSPProtocol.__init__`, the correct reconstruction
+for odd parity is
 
     full_phases = concatenate([flip(reduced), reduced])   # reversed FIRST
 
-not `concatenate([reduced, flip(reduced)])`. Getting this backwards
-still produces the right *length*, which is why it was so easy to
-mistake for a different bug (a length mismatch) -- but it swaps which
-end of the polynomial domain corresponds to which index, which is
-exactly the "reflected about the midpoint" symptom seen in the HET
-solutions. This module therefore never concatenates reduced phases by
-hand: both the direct and warm-started code paths obtain the full
-phase sequence from `SymmetricQSPProtocol.full_phases` /
-`update_reduced_phases`, which do this reconstruction internally and
+not `concatenate([reduced, flip(reduced)])`. Getting this backwards still
+produces the right *length*, which is why it was so easily mistaken for a
+different bug (a length mismatch) — but it swaps which end of the polynomial
+domain corresponds to which index, which is exactly the "reflected about the
+midpoint" symptom observed in the HET solutions. This module therefore never
+concatenates reduced phases by hand: both the direct and warm-started code paths
+obtain the full phase sequence from `SymmetricQSPProtocol.full_phases` /
+`update_reduced_phases`, which perform this reconstruction internally and
 correctly.
 
-Warm start -- tried, and deliberately NOT included
------------------------------------------------------
-An earlier version of this module (and the debugging session that
-preceded it) explored warm-starting the Newton solve from a cheap
-low-degree "pilot" solution, interpolated up to the target degree, to
-cut the number of iterations for large kappa. I re-tested this
-directly: for kappa=9.47, epsilon=0.01 (degree=1181), pyqsp's own
-default initial guess (`reduced_phases = coef/2`) converges cleanly in
-6 iterations to a residual of 1e-14. Seeding the same solver from a
-degree-63 pilot's phases, linearly interpolated up to the target's
-591 reduced phases, does NOT converge in 15 iterations -- the residual
-grows (3.2 -> 8.7 -> oscillates around 4-5) instead of shrinking. The
-naive interpolated guess actively knocks the iteration out of the
+Warm start — tried, and deliberately NOT included
+-------------------------------------------------
+An earlier version of this module explored warm-starting the Newton solve from a
+cheap low-degree "pilot" solution, interpolated up to the target degree, to cut
+the iteration count at large κ. This was re-tested directly: for κ = 9.47,
+ε = 0.01 (degree 1181), pyqsp's own default initial guess
+(`reduced_phases = coef/2`) converges cleanly in 6 iterations to a residual of
+1e-14. Seeding the same solver from a degree-63 pilot's phases, linearly
+interpolated up to the target's 591 reduced phases, does NOT converge within 15
+iterations — the residual grows (3.2 → 8.7, then oscillates around 4–5) instead
+of shrinking. The naive interpolated guess knocks the iteration out of the
 solver's basin of attraction; it is worse than doing nothing.
-Iteration count is essentially degree-independent for this problem
-(5-6 iterations from degree ~500 to ~4000 in the logged runs, and the
-same 6 here at degree 1181) -- there is no iteration count left to
-save. The cost that actually grows with degree is per-iteration cost
-(`gen_jacobian`, ~O(degree^2.5) empirically) and memory (O(degree^2)),
-neither of which warm start addresses. `max_degree` capping is the
-only lever that helps for large kappa; see below.
+
+Iteration count is essentially degree-independent for this problem (5–6
+iterations from degree ~500 to ~4000 in the logged runs, and the same 6 at
+degree 1181), so there is no iteration count left to save. What does grow with
+degree is the per-iteration cost (`gen_jacobian`, ~O(d^2.5) empirically) and the
+memory (O(d²)), neither of which a warm start addresses. Capping `max_degree` is
+the only lever that helps at large κ; see below.
 
 Degree capping
 --------------
-For kappa large enough (roughly N >= 32 for the 1-D Poisson TST matrix),
-the *uncapped* polynomial degree makes both runtime (Newton iteration
-cost is  ~O(degree^2.5) empirically) and memory (the Newton Jacobian
-working array is O(degree^2)) impractical -- days of walltime and tens
-to hundreds of GB of RAM. If `max_degree` is supplied, the target
-Chebyshev polynomial is truncated to that degree before solving. Unlike
-the previous version of this module, this cap is actually applied to
-the polynomial that gets solved (previously it was computed as a
-warning and then silently ignored).
+For κ large enough (roughly N ≥ 32 for the 1D Poisson TST matrix), the
+*uncapped* polynomial degree makes both runtime (Newton iteration cost
+~O(d^2.5) empirically) and memory (the Newton Jacobian working array is O(d²))
+impractical — days of walltime and tens to hundreds of GB of RAM. If
+`max_degree` is supplied, the target Chebyshev polynomial is truncated to that
+degree before solving. This cap is applied to the polynomial actually solved;
+in an earlier version it was computed as a warning and then silently ignored.
 
 If `compute_inversion_angles` is called with `method='auto'` and no
 `max_degree`, and the estimated degree exceeds `_DEGREE_SANITY_LIMIT`,
@@ -79,15 +74,18 @@ proceed anyway.
 
 Caching
 -------
-Three levels: in-memory dict -> on-disk .npz cache -> compute.
-Reading from disk is enabled by default (so a run automatically picks
-up anything precomputed offline via `scripts/precompute_qsvt_phases.py`).
-Writing to disk is OFF by default, so ad-hoc/interactive runs don't
-silently populate the cache directory; the precompute script turns
-writing on explicitly. The cache key is built from a *canonical* method
-name, so 'auto', 'sym_qsp_wrapper', and 'sym_qsp_direct' -- which all
-now compute the identical thing -- can never disagree about a cache
-key/miss each other.
+Three levels: in-memory dict → on-disk .npz cache → compute. Reading from disk
+is enabled by default, so a run automatically picks up anything precomputed
+offline via `scripts/precompute_qsvt_phases.py`. Writing to disk is off by
+default, so that ad hoc and interactive runs do not silently populate the cache
+directory; the precompute script enables writing explicitly.
+
+The cache key is built from a *canonical* method name, so that 'auto',
+'sym_qsp_wrapper' and 'sym_qsp_direct' — which now all compute the identical
+thing — cannot disagree about a key and miss each other. The key is
+(round(κ,4), round(ε,8), method, max_degree): note that a κ differing in the
+fourth decimal is a silent cache miss, which is why κ is always derived from the
+same problem classes the solvers use rather than from a table.
 
 References
 ----------
@@ -96,8 +94,8 @@ Dong, Y., Lin, L., Ni, H. & Wang, J. (2023). Robust iterative method for
     arXiv:2307.12468.
 Martyn, J. M., Rossi, Z. M., Tan, A. K. & Chuang, I. L. (2021). Grand
     unification of quantum algorithms. PRX Quantum, 2, 040203.
-Gilyen, A., Su, Y., Low, G. H. & Wiebe, N. (2019). Quantum singular
-    value transformation. STOC 2019, pp. 193-204.
+Gilyén, A., Su, Y., Low, G. H. & Wiebe, N. (2019). Quantum singular value
+    transformation. STOC 2019, pp. 193-204.
 """
 from __future__ import annotations
 
@@ -107,7 +105,7 @@ from typing import Optional
 
 import numpy as np
 
-# -- Cache ---------------------------------------------------------------
+# ── Cache ─────────────────────────────────────────────────────────────────────
 
 _PHASE_CACHE: dict[tuple, tuple[np.ndarray, int]] = {}
 
@@ -135,7 +133,7 @@ _ENABLE_DISK_WRITE: bool = False
 _DEGREE_SANITY_LIMIT = 15_000
 
 
-# -- Public interface ------------------------------------------------------
+# ── Public interface ──────────────────────────────────────────────────────────
 
 def compute_inversion_angles(
     kappa      : float,
@@ -240,7 +238,7 @@ def evaluate_inversion_polynomial(angles: np.ndarray, x: np.ndarray) -> np.ndarr
     return out
 
 
-# -- Private: method canonicalisation ---------------------------------------
+# ── Private: method canonicalisation ──────────────────────────────────────────
 
 def _canonicalise_method(method: str) -> str:
     """
@@ -262,7 +260,7 @@ def _canonicalise_method(method: str) -> str:
     )
 
 
-# -- Private: computation -----------------------------------------------------
+# ── Private: computation ──────────────────────────────────────────────────────
 
 def _fit_capped_reduced_coefs(
     kappa: float, epsilon: float, degree: int,
@@ -445,7 +443,7 @@ def _compute(
     return angles, degree
 
 
-# -- Private: disk cache ------------------------------------------------------
+# ── Private: disk cache ───────────────────────────────────────────────────────
 
 def _cache_key_to_filename(key: tuple) -> Path:
     kappa, epsilon, method, max_deg = key
@@ -480,7 +478,7 @@ def _save_disk(key: tuple, result: tuple[np.ndarray, int]) -> None:
     )
 
 
-# -- Private: circuit-convention unitary (verification only) -----------------
+# ── Private: circuit-convention unitary (verification only) ───────────────────
 
 def _qsp_unitary(angles: np.ndarray, x: float) -> np.ndarray:
     """2x2 QSP unitary matching Qiskit's Rz convention (verification helper)."""

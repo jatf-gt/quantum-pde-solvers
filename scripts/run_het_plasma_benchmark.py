@@ -1,10 +1,9 @@
 """
-Executes a high-fidelity 1D Hall Effect Thruster (HET) plasma Poisson benchmark.
+1D Hall Effect Thruster (HET) plasma Poisson benchmark.
 
-Resolves the electrostatic potential within a Hall Effect Thruster discharge 
-channel utilising classical (Thomas), quantum (HHL), and variational quantum 
-(VQLS) solvers. Concludes by performing a comparative analysis of the derived 
-macroscopic electric field profiles.
+Solves for the electrostatic potential within a Hall Effect Thruster discharge
+channel using the classical (Thomas), quantum (HHL) and variational quantum
+(VQLS) solvers, then compares the recovered macroscopic electric field profiles.
 
 Physical Model
 --------------
@@ -13,26 +12,26 @@ Reference: Boeuf & Garrigues (1998), J. Appl. Phys. 84(7), 3541-3554.
   - Discharge voltage V_d = 300 V.
   - Xenon propellant, n_0 = 5×10¹⁷ m⁻³, T_e = 20 eV.
 
-The spatial plasma density profile and net charge separation are prescribed 
-analytically to approximate the Boeuf-Garrigues steady-state topological solution. 
-The Poisson equation is evaluated for the electrostatic potential, and the 
-physical electric field is subsequently recovered via finite-difference differentiation.
+The plasma density profile and net charge separation are prescribed analytically
+to approximate the Boeuf-Garrigues steady state. The Poisson equation is solved
+for the electrostatic potential, and the physical electric field is then
+recovered by finite-difference differentiation.
 
 Benchmarking Strategy
 ---------------------
-Given that the comprehensive Boeuf-Garrigues model constitutes a coupled fluid 
-system, this script isolates and benchmarks the Poisson solver exclusively:
+The full Boeuf-Garrigues model is a coupled fluid system; this script isolates
+and benchmarks the Poisson solve alone:
   1. The classical Thomas solution serves as the high-accuracy baseline reference.
   2. Quantum HHL and VQLS solutions are quantitatively benchmarked against the Thomas baseline.
-  3. The derived electric field profile is evaluated qualitatively against Figure 3 
-     of Boeuf & Garrigues (1998), which demonstrates an electric field peak of 
+  3. The derived electric field profile is evaluated qualitatively against Figure 3
+     of Boeuf & Garrigues (1998), which demonstrates an electric field peak of
      ~2×10⁴ V/m in proximity to the exit plane (x/L ≈ 0.8).
 
 Output Specifications
 ---------------------
-  - Console: Structured telemetry table incorporating defined pass/fail thresholds.
-  - Figures: Graphical subplots detailing the potential profile, electric field 
-             profile, spatial error topography, VQLS convergence history, and 
+  - Console: Structured diagnostic table with the pass/fail thresholds applied.
+  - Figures: Graphical subplots detailing the potential profile, electric field
+             profile, spatial error topography, VQLS convergence history, and
              prescribed plasma density/charge distributions.
   - CSV:     Serialisation of all scalar metrics for formal thesis documentation.
 """
@@ -64,9 +63,9 @@ RESULTS_DIR = Path("results/het_plasma")
 # ── Pass/Fail Thresholds ──────────────────────────────────────────────────────
 # Derived from the anticipated algorithmic precision bounds at epsilon=0.01:
 #   Thomas : Machine precision (exact analytical tridiagonal resolution).
-#   HHL    : Trotterisation error scales as ~ ε ~ 1%; a 5% threshold is 
+#   HHL    : Trotterisation error scales as ~ ε ~ 1%; a 5% threshold is
 #            allocated to establish a robust safety margin.
-#   VQLS   : Variational divergence scales as ~ cost^0.5; a 2% threshold is 
+#   VQLS   : Variational divergence scales as ~ cost^0.5; a 2% threshold is
 #            enforced contingent upon the cost function converging below 1e-4.
 THRESHOLD_HHL_REL  = 5.0    # % relative error
 THRESHOLD_VQLS_REL = 2.0    # % relative error
@@ -90,8 +89,23 @@ def run_benchmark(
     verbose: bool = True,
 ) -> dict:
     """
-    Executes the classical Thomas, quantum HHL, and variational VQLS algorithms 
-    on the physical HET Poisson topology, aggregating comprehensive output telemetry.
+    Runs the classical Thomas, quantum HHL and variational VQLS algorithms on
+    the physical HET Poisson problem.
+
+    Parameters
+    ----------
+    cfg : HETPhysicalConfig
+        Boeuf-Garrigues physical configuration.
+    vc : VQLSConfig1D
+        Hyperparameters for the variational solve.
+    verbose : bool
+        If True, print the structured console report.
+
+    Returns
+    -------
+    dict
+        Solutions, recovered electric fields, error metrics, timings and VQLS
+        optimisation diagnostics for the configuration.
     """
     problem = HETPhysicalProblem1D(cfg)
 
@@ -189,7 +203,7 @@ def _print_report(
     hhl_rel_phi, vqls_rel_phi, hhl_rel_E, vqls_rel_E,
     t_thomas, t_hhl, t_vqls, vqls_r, hhl_ok, vqls_ok,
 ) -> None:
-    """Outputs a structured, formal console report detailing benchmark telemetry."""
+    """Prints the structured console report of metrics and pass/fail flags."""
 
     def _flag(val, threshold):
         if np.isnan(val):

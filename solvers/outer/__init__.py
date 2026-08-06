@@ -36,8 +36,6 @@ Schemes
 
 Nothing here imports Qiskit unless a quantum inner solver is requested, so
 the classical path stays fast to import and the tests run without a backend.
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 
@@ -68,9 +66,7 @@ __all__ = [
 ]
 
 
-# =============================================================================
-#  Scheme registry
-# =============================================================================
+# ── Scheme registry ───────────────────────────────────────────────────────────
 
 def _jacobi(problem, inner, **kw):
     """The original scheme: simultaneous strip update, delta stopping test."""
@@ -160,9 +156,7 @@ def describe_scheme(name: str | None = None) -> str:
     return "\n".join(out)
 
 
-# =============================================================================
-#  Public entry points
-# =============================================================================
+# ── Public entry points ───────────────────────────────────────────────────────
 
 def solve(
     problem: LineProblem2D,

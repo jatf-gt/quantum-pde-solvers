@@ -1,10 +1,15 @@
 """
 Implements the classical Thomas algorithm for tridiagonal linear systems.
 
-This module provides the exact classical resolution technique utilised as the 
-primary baseline reference. It is employed both as a standalone direct solver 
-for 1D configurations and as the core sub-routine within the 2D line-Jacobi 
-iterative loop.
+The exact classical solution method used as the primary baseline reference. It
+serves both as a standalone direct solver for 1D configurations and, through the
+inner-solver registry in `solvers/outer/inner.py`, as the per-strip sub-routine
+of every 2D and 3D outer iteration.
+
+The algorithm is Gaussian elimination specialised to a tridiagonal matrix,
+costing O(N) operations and O(N) memory — against O(N³) and O(N²) for a general
+dense solve. It is unconditionally stable for the diagonally dominant operators
+assembled here.
 """
 from __future__ import annotations
 
@@ -18,11 +23,22 @@ from solvers.quantum.result import SolverResult
 
 def thomas_solve(problem: PoissonProblem1D) -> SolverResult:
     """
-    Resolves the 1D Poisson system Au = b utilising the Thomas algorithm.
-    
-    Serves as a procedural wrapper around the core `thomas_solve_system` routine, 
-    packaging the numerical array output into a standardised `SolverResult` object 
-    for the 1D benchmark suite.
+    Solves the 1D Poisson system Au = b by the Thomas algorithm.
+
+    A wrapper around `thomas_solve_system` that packages the solution vector
+    into the standardised `SolverResult` used by the 1D benchmark suite,
+    including the relative Euclidean residual ‖Au - b‖₂ / ‖b‖₂.
+
+    Parameters
+    ----------
+    problem : PoissonProblem1D
+        Discretised 1D problem supplying the N×N operator and length-N
+        right-hand side.
+
+    Returns
+    -------
+    result : SolverResult
+        Solution vector, solver label and relative Euclidean residual.
     """
     u = thomas_solve_system(problem.A, problem.b)
     residual = float(
@@ -40,32 +56,40 @@ def thomas_solve(problem: PoissonProblem1D) -> SolverResult:
 
 def thomas_solve_system(A: np.ndarray, b: np.ndarray) -> np.ndarray:
     """
-    Resolves an arbitrary tridiagonal system Au = b employing the Thomas algorithm.
+    Solves an arbitrary tridiagonal system Au = b by the Thomas algorithm.
 
-    This routine processes any tridiagonal matrix passed as a dense N×N array. 
-    By extracting the principal and sub/super-diagonals dynamically, the function 
-    maintains strict compatibility with both the 1D Poisson operator (main diagonal a=-2) 
-    and the 2D line-Jacobi operator (main diagonal a=-4).
+    Accepts any tridiagonal matrix supplied as a dense N×N array. The three
+    diagonals are extracted at call time rather than assumed, so the routine
+    applies unchanged to the 1D Poisson operator (main diagonal -2) and to the
+    line-decomposed strip operator of `PoissonLine2D`/`PoissonLine3D` (main
+    diagonal -2(1/dx² + 1/dy²), or its h²-scaled equivalent -4 on a square mesh).
 
-    This core function acts as the classical analog to the `hhl_solve_system` 
-    sub-routine, and is sequentially invoked by the 2D Thomas line-Jacobi solver 
-    for each interior spatial row.
+    This is the classical counterpart to `hhl_solve_system`, `vqls_solve_system`
+    and `qsvt_solve_system`, and is the default inner solver of the outer
+    iteration, invoked once per strip per sweep.
 
     Parameters
     ----------
     A : np.ndarray
         Dense N×N tridiagonal system matrix.
     b : np.ndarray
-        Right-hand side vector of length N.
+        Length-N right-hand side vector.
 
     Returns
     -------
     u : np.ndarray
-        Numerical solution vector of length N.
+        Length-N solution vector.
+
+    Notes
+    -----
+    Cost is O(N) time and O(N) memory: one forward elimination sweep followed by
+    one back substitution, with no pivoting. Inputs are copied, so neither A nor
+    b is modified in place.
     """
     N = len(b)
 
-    # Dynamic diagonal extraction ensures compatibility across arbitrary tridiagonal inputs.
+    # Diagonals are extracted at call time, for compatibility with any
+    # tridiagonal operator rather than one specific discretisation.
     b_diag = A.diagonal(0).copy()       # Principal diagonal
     c_diag = A.diagonal(1).copy()       # Super-diagonal (length N-1)
     a_diag = A.diagonal(-1).copy()      # Sub-diagonal (length N-1)

@@ -43,8 +43,6 @@ Usage
 
     # check the hierarchy that would be built
     python scripts/debug_outer_2d.py --hierarchy --N 64
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 
@@ -59,7 +57,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from problems.poisson_line_2d import PoissonLine2D
-from solvers.outer import (available_inner, available_schemes, build_hierarchy, 
+from solvers.outer import (available_inner, available_schemes, build_hierarchy,
                            describe_inner, describe_scheme, solve, solve_staged)
 
 OUT_DIR = REPO_ROOT / "results" / "debugging"
@@ -76,9 +74,7 @@ ALPHA = {"hhl": 2.35, "vqls": 1.29, "qsvt": 0.60, "thomas": 1.0, "perturbed": 1.
 HET_Lz, HET_Lr, HET_phi0 = 0.025, 0.020, 300.0
 
 
-# =============================================================================
-#  Cases
-# =============================================================================
+# ── Cases ─────────────────────────────────────────────────────────────────────
 
 def case_square(N: int):
     """nabla^2 u = sin(pi x) sin(pi y) on [0,1]^2, u = 0 on the boundary."""
@@ -111,9 +107,7 @@ def case_het(Nz: int, Nr: int | None = None):
 CASES = {"square": lambda N: case_square(N), "het": lambda N: case_het(N)}
 
 
-# =============================================================================
-#  Helpers
-# =============================================================================
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def rel_err(u, ref):
     return float(np.max(np.abs(u - ref)) / (np.max(np.abs(ref)) + 1e-300) * 100.0)
@@ -180,9 +174,7 @@ def _kw_for(scheme: str, tol: float, criterion: str | None) -> dict:
     return kw
 
 
-# =============================================================================
-#  Polish study - does a stationary finish improve a multigrid solution?
-# =============================================================================
+# ── Polish study - does a stationary finish improve a multigrid solution? ─────
 
 def run_polish_study(case: str, N: int):
     """
@@ -235,9 +227,7 @@ def run_polish_study(case: str, N: int):
     print(f"  the lever is the inner solver's per-strip error, not the outer loop.")
 
 
-# =============================================================================
-#  Scheme comparison
-# =============================================================================
+# ── Scheme comparison ─────────────────────────────────────────────────────────
 
 def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
                    tol: float, verbose: bool, criterion: str | None = None,
@@ -283,7 +273,7 @@ def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
             if verbose:
                 print(f"    {inner}/{scheme}: {res}")
 
-    # ---- table ---------------------------------------------------------------
+    # ── table ─────────────────────────────────────────────────────────────────
     print(f"\n  {'inner':<9} {'scheme':<13} {'outer':>6} {'solves':>8} "
           f"{'w.cost':>8} {'rho':>6} {'vs exact%':>10} {'vs Thomas%':>11} "
           f"{'time s':>8} {'stop':>16}")
@@ -300,7 +290,7 @@ def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
               f"{colour(e_ref, 0.5, 2.0)}{e_ref:>10.3f}%{_X} "
               f"{wall:>8.2f} {res.stop_reason:>16}")
 
-    # ---- speed-up summary ----------------------------------------------------
+    # ── speed-up summary ──────────────────────────────────────────────────────
     by_inner: dict[str, dict] = {}
     for inner, scheme, res, *_ in rows:
         by_inner.setdefault(inner, {})[scheme] = res
@@ -320,9 +310,7 @@ def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
     return rows
 
 
-# =============================================================================
-#  Inner-solver error tolerance study
-# =============================================================================
+# ── Inner-solver error tolerance study ────────────────────────────────────────
 
 def run_noise_study(case: str, N: int, tol: float):
     """
@@ -366,9 +354,7 @@ def run_noise_study(case: str, N: int, tol: float):
     print(f"  used in the current architecture at this N, at any iteration count.")
 
 
-# =============================================================================
-#  Hierarchy inspection
-# =============================================================================
+# ── Hierarchy inspection ──────────────────────────────────────────────────────
 
 def show_hierarchy(case: str, N: int):
     prob, _, tag = CASES[case](N)
@@ -388,9 +374,7 @@ def show_hierarchy(case: str, N: int):
     print(f"  keep Nx/Ny close to Lx/Ly.")
 
 
-# =============================================================================
-#  Plotting
-# =============================================================================
+# ── Plotting ──────────────────────────────────────────────────────────────────
 
 def plot_results(rows, prob, u_exact, case, N):
     try:
@@ -402,7 +386,7 @@ def plot_results(rows, prob, u_exact, case, N):
         print(f"  {_Y}matplotlib unavailable - skipping plots{_X}")
         return
 
-    # ---- convergence + quantum cost (unchanged) ------------------------------
+    # ── convergence + quantum cost (unchanged) ────────────────────────────────
     fig, ax = plt.subplots(1, 2, figsize=(12, 4.5))
     for inner, scheme, res, *_ in rows:
         h = res.residual_history
@@ -426,7 +410,7 @@ def plot_results(rows, prob, u_exact, case, N):
     plt.close(fig)
     print(f"  {_G}saved {out}{_X}")
 
-    # ---- solution fields -------------------------------------------------------
+    # ── solution fields ───────────────────────────────────────────────────────
     if u_exact is None or not rows:
         return
 
@@ -469,9 +453,7 @@ def plot_results(rows, prob, u_exact, case, N):
     print(f"  {_G}saved {out}{_X}")
 
 
-# =============================================================================
-#  Main
-# =============================================================================
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,

@@ -36,7 +36,7 @@ import os
 
 log = logging.getLogger(__name__)
 
-# -- Public Interface ---------------------------------------------------------
+# ── Public Interface ──────────────────────────────────────────────────────────
 
 
 def get_aer_backend(
@@ -44,7 +44,7 @@ def get_aer_backend(
     custatevec: bool = True,
     precision: str = "double",
     max_parallel_threads: int = 0,
-) -> "AerSimulator":  # noqa: F821  (type hint only; import deferred below)
+) -> "AerSimulator":  # noqa: F821  (string annotation; import deferred below)
     """
     Construct and return an ``AerSimulator`` statevector backend, selecting
     GPU acceleration when available and requested.
@@ -97,13 +97,15 @@ def get_aer_backend(
     ImportError
         If ``qiskit_aer`` is not installed in the active environment.
     """
-    # Deferred import: qiskit_aer is a heavy dependency not required at
-    # module import time; deferring avoids circular dependency issues in
-    # test environments that mock the backend.
+    # Deferred import, deliberately: qiskit_aer is a heavy dependency, and
+    # importing it at module scope would pull Qiskit into the purely classical
+    # code path — every consumer of this module would then require a quantum
+    # backend merely to resolve the import. The annotations above are strings
+    # for the same reason, so the name is never needed until this line runs.
     from qiskit_aer import AerSimulator
     from qiskit_aer.backends.aerbackend import AerError
 
-    # -- GPU path -------------------------------------------------------------
+    # ── GPU path ──────────────────────────────────────────────────────────────
     if prefer_gpu:
         cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
         if not cuda_visible:
@@ -143,7 +145,7 @@ def get_aer_backend(
                     exc,
                 )
 
-    # -- CPU fallback ---------------------------------------------------------
+    # ── CPU fallback ──────────────────────────────────────────────────────────
     backend = AerSimulator(
         method="statevector",
         device="CPU",

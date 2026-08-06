@@ -25,8 +25,6 @@ Usage
     python scripts/plot_hpc_1Dfull_results.py --results-dir results/1Dhpc_run
     python scripts/plot_hpc_1Dfull_results.py --results-dir results/1Dhpc_run --save-pdf
     python scripts/plot_hpc_1Dfull_results.py --N-profile 64
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 

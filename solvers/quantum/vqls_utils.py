@@ -1,14 +1,18 @@
 """
-Provides utility functions for the Variational Quantum Linear Solver (VQLS).
+Utility functions for the Variational Quantum Linear Solver (VQLS).
 
-This module implements the foundational components required for VQLS execution, 
-including the Pauli decomposition of the Toeplitz Symmetric Tridiagonal (TST) 
-operator (Linear Combination of Unitaries representation), hardware-efficient 
-ansatz construction, cost function evaluation via Hadamard test equivalents, 
-and the final physical dimensionality recovery.
+Implements the components required for a VQLS solve: the Pauli decomposition of
+the Toeplitz Symmetric Tridiagonal (TST) operator into a Linear Combination of
+Unitaries, hardware-efficient ansatz construction, cost function evaluation, and
+recovery of the physical solution scale.
 
-Circuit construction is entirely delegated to PennyLane, whereas classical 
-linear algebraic operations rely on NumPy.
+The cost function is evaluated by exact statevector algebra over the LCU terms,
+not by Hadamard tests. This is valid because every circuit here is simulated
+deterministically, and it avoids constructing O(L) separate circuits per cost
+evaluation. On physical hardware the Hadamard tests would be required.
+
+Ansatz circuit construction is delegated to PennyLane; the classical linear
+algebra is NumPy.
 
 Reference: Bravo-Prieto et al., "Variational Quantum Linear Solver",
            Quantum 7, 1188 (2023).
@@ -29,20 +33,20 @@ def pauli_decompose_tst(
     off_diag:  float,
 ) -> List[Tuple[complex, str]]:
     """
-    Computes the decomposition of the N×N TST matrix into a Linear Combination 
+    Computes the decomposition of the N×N TST matrix into a Linear Combination
     of Unitaries (LCU) via Pauli strings.
 
     The system matrix is represented as:
         A = sum_l c_l * P_l
 
-    where each P_l constitutes a tensor product of single-qubit Pauli operators 
+    where each P_l constitutes a tensor product of single-qubit Pauli operators
     {I, X, Y, Z} acting across n = log2(N) qubits.
 
     The decomposition coefficients are analytically derived via the projection:
         c_l = (1/N) * Tr(A · P_l)
 
-    For the TST matrix characterised by `main_diag` and `off_diag`, only O(n) 
-    Pauli strings possess non-zero coefficients, rendering this an efficient 
+    For the TST matrix characterised by `main_diag` and `off_diag`, only O(n)
+    Pauli strings possess non-zero coefficients, rendering this an efficient
     representational schema.
 
     Parameters
@@ -57,8 +61,8 @@ def pauli_decompose_tst(
     Returns
     -------
     List[Tuple[complex, str]]
-        A collection of (coefficient, pauli_string) pairs, omitting elements 
-        with zero coefficients. Strings adhere to the PennyLane convention: 
+        A collection of (coefficient, pauli_string) pairs, omitting elements
+        with zero coefficients. Strings adhere to the PennyLane convention:
         the rightmost character acts upon qubit 0 (Least Significant Bit).
     """
     n = int(np.log2(N))
@@ -113,8 +117,8 @@ def pauli_decompose_normalised(
     """
     Decomposes the spectrally normalised TST matrix, A / ||A||_2, into Pauli strings.
 
-    Returns both the decomposition coefficients and the spectral normalisation 
-    factor, ensuring the physical solution dimensionality can be accurately 
+    Returns both the decomposition coefficients and the spectral normalisation
+    factor, ensuring the physical solution dimensionality can be accurately
     recovered following the variational optimisation.
 
     Parameters
@@ -157,17 +161,17 @@ def build_ansatz(
     n_layers: int,
 ) -> None:
     """
-    Constructs and applies a hardware-efficient layered ansatz to the active 
+    Constructs and applies a hardware-efficient layered ansatz to the active
     PennyLane quantum circuit.
 
     Structural topology per layer:
         1. Unparameterised RY(θ_{d,i}) rotations acting on each qubit i.
         2. A linear CNOT entangling chain: qubit 0 → 1 → 2 → … → n-1.
 
-    The terminal layer applies final RY rotations devoid of a subsequent 
+    The terminal layer applies final RY rotations devoid of a subsequent
     CNOT chain. The aggregate parameter count equates to n_qubits * (n_layers + 1).
 
-    Note: This routine is strictly invoked within a PennyLane QNode context. 
+    Note: This routine is strictly invoked within a PennyLane QNode context.
     It sequentially applies quantum operations and yields no return variables.
 
     Parameters
@@ -215,13 +219,13 @@ def build_cost_function(
 
         C(θ) = 1 - |<b|A|x(θ)>|² / <x(θ)|A†A|x(θ)>
 
-    utilising a mathematical equivalent of the Hadamard test decomposition 
+    utilising a mathematical equivalent of the Hadamard test decomposition
     over the specified LCU terms.
 
-    Within this specific implementation, both the numerator and denominator 
-    are computed strictly via statevector arithmetic rather than explicit 
-    circuit-level Hadamard tests. This ensures exact analytical evaluation 
-    on classical simulators while circumventing the profound computational 
+    Within this specific implementation, both the numerator and denominator
+    are computed strictly via statevector arithmetic rather than explicit
+    circuit-level Hadamard tests. This ensures exact analytical evaluation
+    on classical simulators while circumventing the profound computational
     overhead associated with constructing O(L) distinct circuits per evaluation.
     (On physical hardware, explicit Hadamard tests would be necessitated).
 
@@ -241,10 +245,10 @@ def build_cost_function(
     Returns
     -------
     Callable[[np.ndarray], float]
-        A function mapping a variational parameter array to a scalar cost 
+        A function mapping a variational parameter array to a scalar cost
         value bounded within [0, 1].
     """
-    # ── Numerator: <b|A|x(θ)> ────────────────────────────────────────────────
+    # ── Numerator: <b|A|x(θ)> ─────────────────────────────────────────────────
     # We compute this directly using statevector inner products rather than
     # Hadamard tests, which is valid on a statevector simulator and avoids
     # the overhead of constructing O(L) separate circuits.
@@ -260,7 +264,7 @@ def build_cost_function(
         """
         Evaluates the objective C(θ) = 1 - |<b|A|x(θ)>|² / <x(θ)|A†A|x(θ)>.
 
-        Both components are computed via exact statevector algebra, constituting 
+        Both components are computed via exact statevector algebra, constituting
         an idealised execution environment exclusive to classical simulation.
         """
         # Get the current ansatz state as a complex vector.
@@ -298,7 +302,7 @@ def recover_solution(
     device_name:  str = "default.qubit",
 ) -> Tuple[np.ndarray, float]:
     """
-    Extracts the physically dimensioned solution vector from the optimally 
+    Extracts the physically dimensioned solution vector from the optimally
     trained ansatz parameters.
 
     The converged ansatz state |x(θ*)> satisfies the proportional relation:
@@ -306,15 +310,15 @@ def recover_solution(
 
     where A_norm = A / ||A||_2 and b_norm = b / ||b||_2.
 
-    The proportionality constant is recovered against the normalised system 
-    to constrain all numerical quantities to O(1), followed by a rescaling 
+    The proportionality constant is recovered against the normalised system
+    to constrain all numerical quantities to O(1), followed by a rescaling
     projection to the physical domain:
 
         u = c_norm * x_raw * (||b||_2 / ||A||_2)
 
-    This methodology explicitly mitigates the amplification of quantum noise 
-    driven by the scaling factor ||b||_2 / ||A||_2. Such regularisation is 
-    critical for physically scaled domains (e.g., the Heterogeneous Poisson 
+    This methodology explicitly mitigates the amplification of quantum noise
+    driven by the scaling factor ||b||_2 / ||A||_2. Such regularisation is
+    critical for physically scaled domains (e.g., the Heterogeneous Poisson
     equation) where ||b|| ~ α·h² ≫ 1.
 
     Parameters
@@ -384,11 +388,11 @@ def recover_solution(
 
 def _pauli_string_to_matrix(pauli_str: str) -> np.ndarray:
     """
-    Translates a sequential Pauli string (e.g., 'XZI') into its explicit 
+    Translates a sequential Pauli string (e.g., 'XZI') into its explicit
     dense matrix representation.
 
-    The input string adheres to a big-endian structural convention (the 
-    leftmost character operates upon the highest index qubit), preserving 
+    The input string adheres to a big-endian structural convention (the
+    leftmost character operates upon the highest index qubit), preserving
     parity with the output geometry of `pauli_decompose_tst`.
     """
     pauli_matrices = {

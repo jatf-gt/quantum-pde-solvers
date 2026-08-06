@@ -3,9 +3,9 @@ conftest.py
 -----------
 Shared pytest fixtures for the entire test suite.
 
-All quantum solver fixtures use N=4 (2 qubits) to keep individual
-test runtime under ~10 seconds.  The N=8 cases are reserved for the
-benchmark scripts which are run separately.
+All quantum solver fixtures use N=4 (2 qubits) to keep the suite fast: the
+slowest single test is ~6 s and the whole suite ~26 s.  The N=8 cases are
+reserved for the benchmark scripts, which are run separately.
 
 Fixtures are scoped at 'module' level where the setup cost is non-trivial
 so they are only computed once per test file rather than once per test function.

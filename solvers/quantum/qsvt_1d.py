@@ -4,71 +4,77 @@ equation with a Toeplitz Symmetric Tridiagonal (TST) system matrix.
 
 Algorithm overview
 ------------------
-QSVT solves A|x> = |b> by implementing a polynomial approximation to
-the matrix inverse A^{-1} via the singular value transformation:
+QSVT solves A|x⟩ = |b⟩ by implementing a polynomial approximation to the matrix
+inverse A⁻¹ via the singular value transformation:
 
-    |x> proportional to p(A/alpha)|b>
+    |x⟩ ∝ p(A/α)|b⟩
 
-where p(x) approx 1/x on the singular value range [1/kappa, 1] of
-A/alpha, and alpha is the block encoding subnormalisation factor.
+where p(x) ≈ 1/x on the singular value range [1/κ, 1] of A/α, and α is the block
+encoding subnormalisation factor.
 
 The implementation proceeds in five stages:
 
-Stage 1 -- Block encoding construction.
-    Build the (alpha, n_a, 0)-block encoding U_A of A/alpha using the
-    LCU decomposition of the TST matrix (block_encoding.py).
+Stage 1 — Block encoding construction.
+    Build the (α, n_a, 0)-block encoding U_A of A/α by Sz.-Nagy unitary
+    dilation of the TST matrix, using a single ancilla qubit
+    (block_encoding.py).
 
-Stage 2 -- QSP phase angle computation.
-    Compute the degree-d polynomial approximation to 1/x on [1/kappa, 1]
-    and find the corresponding QSP phase angles phi_0, ..., phi_d
-    (qsp_angles.py).
+Stage 2 — QSP phase angle computation.
+    Compute the degree-d polynomial approximation to 1/x on [1/κ, 1] and find
+    the corresponding QSP phase angles φ_0, …, φ_d (qsp_angles.py).
 
-Stage 3 -- QSVT circuit construction.
-    Assemble the QSVT circuit as a sequence of d alternating applications
-    of U_A and U_A^dagger interleaved with controlled phase rotations
-    parametrised by the QSP angles.
+Stage 3 — QSVT circuit construction.
+    Assemble the QSVT circuit as a sequence of d alternating applications of
+    U_A and U_A† interleaved with controlled phase rotations parametrised by
+    the QSP angles.
 
-Stage 4 -- State preparation and circuit execution.
-    Prepare the state |b> via amplitude encoding (isometry) and execute
-    the QSVT circuit on the statevector simulator.
+Stage 4 — State preparation and circuit execution.
+    Prepare the state |b⟩ by amplitude encoding (isometry) and execute the QSVT
+    circuit on the statevector simulator.
 
-Stage 5 -- Solution extraction and proportionality recovery.
-    Post-select on the ancilla register and extract the solution
-    amplitudes. Recover the physical solution via proportionality
-    constant estimation against the original system.
+Stage 5 — Solution extraction and proportionality recovery.
+    Post-select on the ancilla register and extract the solution amplitudes,
+    then recover the physical solution by proportionality constant estimation
+    against the original system.
 
 Complexity comparison
 ---------------------
-For the 1-D Poisson matrix with N interior nodes:
+For the 1D Poisson matrix with N interior nodes:
 
-    kappa(A)  ~ (4/pi^2)(N+1)^2  = O(N^2)
-    alpha     = |a| + 2|b| = 4   (for a=-2, b=1)
-    kappa_eff = alpha * kappa / ||A||_2 ~ 4 * kappa
+    κ(A)  ~ (4/π²)(N+1)²  = O(N²)
+    α     = ‖A‖₂ = 2 + 2cos(π/(N+1)) < 4      (for a = -2, b = 1)
+    κ_eff = α·κ/‖A‖₂ = κ
 
-    HHL:  circuit depth O(kappa^2 / epsilon)  = O(N^4 / epsilon)
-    VQLS: circuit depth O(n_layers * n_qubits) (variational, no guarantee)
-    QSVT: circuit depth O(kappa * log(1/epsilon)) = O(N^2 * log(1/epsilon))
+Note that α is the *spectral norm*, computed by eigendecomposition rather than
+bounded by the row sum |a| + 2|b|. Taking the tightest valid subnormalisation is
+what makes κ_eff collapse to κ exactly, rather than inflating it by the ratio
+(|a| + 2|b|)/‖A‖₂.
 
-QSVT achieves a quadratic improvement in kappa dependence over HHL,
-at the cost of requiring a block encoding oracle and classical
-preprocessing to compute the QSP phase angles.
+    HHL:  circuit depth O(κ²/ε)              = O(N⁴/ε)
+    VQLS: circuit depth O(n_layers·n_qubits)   (variational, no guarantee)
+    QSVT: circuit depth O(κ·log(1/ε))        = O(N²·log(1/ε))
 
-2-D and 3-D extension
----------------------
+QSVT achieves a quadratic improvement in the κ dependence over HHL, at the cost
+of requiring a block encoding oracle and classical preprocessing to compute the
+QSP phase angles. That preprocessing is the expensive, non-parallelisable step
+at large κ, which is why the phase cache exists.
+
+2D and 3D extension
+-------------------
 Higher-dimensional problems reuse this module unchanged, through the
 inner-solver registry in solvers/outer/inner.py:
 
     qsvt_solve_system(A_row, b_row, config)
 
-is called on each 1-D strip sub-problem by whichever outer scheme is
-driving the solve (line-Jacobi, SOR, multigrid). The
-row matrix has a=-4, b=1, kappa_row -> 3, which makes the QSVT
-polynomial degree requirement d = O(3 * log(1/epsilon)) essentially
-constant in N -- a significant advantage over the 1-D case.
+is called on each 1D strip sub-problem by whichever outer scheme is driving the
+solve (Jacobi, SOR, multigrid). The strip matrix has κ_row → 3⁻ in 2D (2⁻ in
+3D), which makes the QSVT polynomial degree requirement d = O(κ_row·log(1/ε))
+essentially constant in N — a decisive advantage over the 1D case, where the
+degree reaches ~939 at N=4 against ~33 for the 2D strip operator.
 
 References
 ----------
-Gilyen, A., Su, Y., Low, G. H. & Wiebe, N. (2019). Quantum singular
+Gilyén, A., Su, Y., Low, G. H. & Wiebe, N. (2019). Quantum singular
     value transformation and beyond. STOC 2019, pp. 193-204.
 Martyn, J. M., Rossi, Z. M., Tan, A. K. & Chuang, I. L. (2021). Grand
     unification of quantum algorithms. PRX Quantum, 2, 040203.
@@ -97,7 +103,7 @@ from solvers.quantum.qsp_angles import (
 from solvers.quantum.result import SolverResult, QSVTSolverResult
 
 
-# -- QSVT configuration -------------------------------------------------------
+# ── QSVT configuration ────────────────────────────────────────────────────────
 
 @dataclass
 class QSVTConfig1D:
@@ -108,36 +114,41 @@ class QSVTConfig1D:
     ----------
     epsilon : float
         Target approximation error for the matrix inversion polynomial.
-        Controls polynomial degree d = O(kappa * log(kappa/epsilon)).
-        Default 0.01.
+        Controls the polynomial degree, d = O(κ·log(κ/ε)). Default 0.01.
     angle_method : str
-        Phase computation method. One of:
+        Phase computation method, one of:
             'sym_qsp_direct'  : direct Newton solver (default, fastest)
             'sym_qsp_wrapper' : via QuantumSignalProcessingPhases wrapper
-            'reduced_degree'  : degree capped at max_degree (fast, approx)
+            'reduced_degree'  : degree capped at max_degree (fast, approximate)
             'precomputed'     : load from disk cache only
             'auto'            : try sym_qsp_direct, fall back to wrapper
-        Default 'sym_qsp_direct'.
+        Default 'sym_qsp_direct'. Note that all of 'auto', 'sym_qsp_direct' and
+        'sym_qsp_wrapper' canonicalise to the same cache key, since they now
+        compute the identical result.
     max_degree : int or None
-        Maximum polynomial degree. Only used when angle_method='reduced_degree'.
-        Recommended values:
-            N=4  (kappa~9):    max_degree=63  (fast, <1s, ~10% poly error)
-            N=8  (kappa~32):   max_degree=127 (fast, <5s, ~5% poly error)
-            N=16 (kappa~117):  max_degree=255 (moderate, ~30s, ~3% poly error)
-            N=32 (kappa~441):  max_degree=511 (moderate, ~120s, ~2% poly error)
-            N=64 (kappa~1700): max_degree=511 (moderate, ~120s, ~2% poly error)
-        The polynomial approximation error is much smaller than the FD
-        discretisation error (O(h²)) for all these choices.
-        Default None (use full degree from epsilon).
+        Maximum polynomial degree, used only when
+        angle_method='reduced_degree'. Recommended values:
+            N=4  (κ~9):    max_degree=63  (<1 s,   ~10% polynomial error)
+            N=8  (κ~32):   max_degree=127 (<5 s,   ~5%  polynomial error)
+            N=16 (κ~117):  max_degree=255 (~30 s,  ~3%  polynomial error)
+            N=32 (κ~441):  max_degree=511 (~120 s, ~2%  polynomial error)
+            N=64 (κ~1700): max_degree=511 (~120 s, ~2%  polynomial error)
+        For all of these the polynomial approximation error remains far below
+        the O(h²) finite-difference discretisation error, so the cap costs no
+        accuracy that the discretisation does not already forfeit.
+        Default None, i.e. the full degree implied by ε.
     device_name : str
         Qiskit backend. Default 'statevector'.
     max_degree_cap : int
-        Hard cap on polynomial degree regardless of method. Prevents
-        intractably deep circuits. Default 5000.
+        Hard cap on the polynomial degree irrespective of method, guarding
+        against intractably deep circuits. Default 15000.
     verbose : bool
-        Print circuit depth and phase angle diagnostics. Default False.
+        If True, print circuit depth and phase angle diagnostics. Recovery
+        diagnostics are additionally printed on failure regardless of this
+        setting. Default False.
     label : str
-        Diagnostic label for targeted output. Default ''.
+        Diagnostic label identifying the problem instance in printed output,
+        e.g. 'HET-3a' or '2D-row-2-iter-5'. Default ''.
     """
     epsilon       : float          = 0.01
     angle_method  : str            = "sym_qsp_direct"
@@ -151,7 +162,7 @@ class QSVTConfig1D:
 DEFAULT_QSVT_CONFIG = QSVTConfig1D()
 
 
-# -- Public interface ---------------------------------------------------------
+# ── Public interface ──────────────────────────────────────────────────────────
 
 def qsvt_solve(
     problem : PoissonProblem1D,
@@ -232,8 +243,8 @@ def qsvt_solve_system(
     b_norm = float(np.linalg.norm(b))
     if b_norm < 1e-14:
         raise ValueError("RHS vector b is numerically zero.")
-    
-    # -- Stage 0: sign normalisation for negative definite matrices -----------
+
+    # ── Stage 0: sign normalisation for negative definite matrices ────────────
     # The QSVT polynomial p(x) approximates 1/x for x in [1/kappa, 1].
     # This requires the matrix to be positive semidefinite after normalisation.
     # The 1-D and 2-D Poisson TST matrices are negative definite (all
@@ -253,7 +264,7 @@ def qsvt_solve_system(
         )
     # A is now positive definite; proceed with standard QSVT.
 
-    # -- Stage 1: block encoding ----------------------------------------------
+    # ── Stage 1: block encoding ───────────────────────────────────────────────
     main_diag = float(A[0, 0])
     off_diag  = float(A[0, 1])
     # Use the spectral norm (largest eigenvalue) as the subnormalisation
@@ -280,7 +291,7 @@ def qsvt_solve_system(
             f"kappa(A)={kappa_A:.2f}, kappa_eff={kappa_eff:.2f}"
         )
 
-    # -- Stage 2: QSP phase angles --------------------------------------------
+    # ── Stage 2: QSP phase angles ─────────────────────────────────────────────
     if (
         hasattr(config, "_precomputed_angles")
         and config._precomputed_angles is not None
@@ -302,10 +313,10 @@ def qsvt_solve_system(
             kappa      = kappa_eff,
             epsilon    = config.epsilon,
             method     = config.angle_method,
-            max_degree = config.max_degree,   
+            max_degree = config.max_degree,
         )
 
-    # -- Stage 3: QSVT circuit construction -----------------------------------
+    # ── Stage 3: QSVT circuit construction ────────────────────────────────────
     qsvt_circuit = _build_qsvt_circuit(
         be_circuit = be_circuit,
         angles     = angles,
@@ -322,10 +333,10 @@ def qsvt_solve_system(
             f"circuit depth={circuit_depth}"
         )
 
-    # -- Stage 4: statevector simulation --------------------------------------
+    # ── Stage 4: statevector simulation ───────────────────────────────────────
     sv = Statevector(qsvt_circuit).data
 
-    # -- Stage 5: solution extraction and proportionality recovery ------------
+    # ── Stage 5: solution extraction and proportionality recovery ─────────────
     x_raw = _extract_solution(sv, n, _N_ANCILLA_BE, degree)  # n_a=2: BE ancilla + signal qubit ??
     # x_raw = Im(post-selected state), shape (N,), real-valued.
     # Under sym_qsp Wx convention: Im(P(A/alpha))|b_norm> approx (1/kappa_eff) A^{-1}|b_norm>
@@ -432,12 +443,12 @@ def _qsvt_recovery_diagnostics(
     )
     if is_failure:
         print(
-            f"    *** FAILURE: cos={cos_angle:.4f} < 0.5.\n"
-            f"    *** x_raw is not proportional to A^{{-1}}b_norm."
+            f"    FAILURE: cos(Ax, b_norm) = {cos_angle:.4f} < 0.5 —\n"
+            f"    x_raw is not proportional to A⁻¹·b_norm."
         )
 
 
-# -- Private circuit builders -------------------------------------------------
+# ── Private circuit builders ──────────────────────────────────────────────────
 
 def _build_qsvt_circuit(
     be_circuit : QuantumCircuit,

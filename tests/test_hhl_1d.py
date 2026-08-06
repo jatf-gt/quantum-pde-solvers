@@ -3,8 +3,8 @@ test_hhl_1d.py
 --------------
 Tests for the HHL 1D solver.
 
-All tests use N=4 (2 qubits) to keep runtime under ~30 seconds per test.
-Tolerances are loose (20%) — we are checking correctness, not accuracy.
+All tests use N=4 (2 qubits); each runs in ~1.5 s. Tolerances are loose (20%)
+because these check structural correctness, not publication-grade accuracy.
 """
 from __future__ import annotations
 

@@ -1,49 +1,44 @@
 """
-3-D line-decomposed problems.
+3D line-decomposed problems.
 
-Adding 3-D required *no* changes to any quantum solver, and no new
-``hhl_3d.py`` / ``vqls_3d.py`` / ``qsvt_3d.py`` modules.  That is a direct
-consequence of the outer/inner split: the quantum solvers were never 2-D to
-begin with, they solve one tridiagonal strip, and a 3-D problem decomposes
-into exactly the same strips.  What is new here is one problem class and one
-grid-transfer form; the schemes, the work accounting and the inner-solver
-registry are reused verbatim.
+Adding 3D required *no* changes to any quantum solver, and no new ``hhl_3d.py``
+/ ``vqls_3d.py`` / ``qsvt_3d.py`` modules. That is a direct consequence of the
+outer/inner split: the quantum solvers were never 2D to begin with, they solve
+one tridiagonal strip, and a 3D problem decomposes into exactly the same strips.
+What is new here is one problem class and one grid-transfer form; the schemes,
+the work accounting and the inner-solver registry are reused verbatim.
 
 Discretisation
 --------------
-Standard 7-point stencil on a structured grid.  Axis 0 is the strip
-direction and must be non-periodic; axes 1 and 2 may be periodic.
+Standard 7-point stencil on a structured grid. Axis 0 is the strip direction and
+must be non-periodic; axes 1 and 2 may be periodic.
 
     Dirichlet axis d:  N_d interior nodes, h_d = L_d/(N_d+1),
                        x_i = (i+1) h_d          (boundary nodes excluded)
     Periodic axis d:   N_d nodes,          h_d = L_d/N_d,
                        x_i = i h_d              (no boundary nodes)
 
-The two conventions differ because a periodic axis has no boundary to
-exclude.  This also makes a periodic axis *exactly* nested under coarsening
-(coarse node I coincides with fine node 2I), which a Dirichlet axis is not -
-see the transfer-operator discussion in multigrid.py.
+The two conventions differ because a periodic axis has no boundary to exclude.
+This also makes a periodic axis *exactly* nested under coarsening (coarse node I
+coincides with fine node 2I), which a Dirichlet axis is not — see the
+transfer-operator discussion in multigrid.py.
 
 Why line and not plane relaxation
 ---------------------------------
 The strip operator is
 
-    A_line = tridiag( 1/h0^2,  -2(1/h0^2 + 1/h1^2 + 1/h2^2),  1/h0^2 )
+    A_line = tridiag( 1/h0²,  -2(1/h0² + 1/h1² + 1/h2²),  1/h0² )
 
-which is TST, of size N0, and needs log2(N0) qubits - identical in form to
-the 1-D and 2-D cases, so ``build_tst_block_encoding`` applies unchanged.
-Its condition number tends to 2 on an isotropic grid, *better* than the 2-D
-value of 3, because both transverse directions add to the diagonal.
+which is TST, of size N0, and needs log₂(N0) qubits — identical in form to the
+1D and 2D cases, so ``build_tst_block_encoding`` applies unchanged. Its
+condition number tends to 2 on an isotropic grid, *better* than the 2D value of
+3, because both transverse directions add to the diagonal.
 
-A plane smoother would instead hand the inner solver an N^2 x N^2 system
-with a 5-point stencil on 2*log2(N) qubits, requiring a block encoding this
-repository does not have.
-
-Its conditioning is fine (kappa -> 5, bounded by
-the same diagonal shift), so the objection is structural rather than
-numerical, but it is decisive.
-
-Author : Juan Antonio Trobajo Flecha
+A plane smoother would instead hand the inner solver an N²×N² system with a
+5-point stencil on 2·log₂(N) qubits, requiring a block encoding this repository
+does not have. Its conditioning would be fine (κ → 5, bounded by the same
+diagonal shift), so the objection is structural rather than numerical — but it
+is decisive.
 """
 from __future__ import annotations
 
@@ -54,17 +49,25 @@ import numpy as np
 
 class PoissonLine3D:
     """
-    nabla^2 u = f on a box, decomposed into strips along axis 0.
+    ∇²u = f on a box, decomposed into strips along axis 0.
 
-    Parameters
+    Attributes
     ----------
-    f_values : (N0, N1, N2) source term.
-    lengths : physical extent of each axis.
-    periodic : per-axis periodicity.  Axis 0 must be False - it is the strip
-        direction, and a periodic strip operator is not tridiagonal (it
-        carries corner entries), which would break the TST block encoding.
-    bc_lo, bc_hi : per-axis boundary data, each entry a scalar or an array
-        over the remaining two axes.  Ignored for periodic axes.
+    shape : tuple[int, int, int]
+        (N0, N1, N2) node counts. Dirichlet axes count interior nodes only.
+    lengths : tuple[float, float, float]
+        Physical extent of each axis.
+    periodic : tuple[bool, bool, bool]
+        Per-axis periodicity. Axis 0 is always False.
+    spacings : tuple[float, float, float]
+        Mesh spacing per axis: L/N on a periodic axis, L/(N+1) on a Dirichlet
+        axis, reflecting whether boundary nodes are excluded.
+    level : int
+        Multigrid level index; 0 is the finest grid.
+    f : np.ndarray
+        (N0, N1, N2) source field.
+    bc_lo, bc_hi : list
+        Per-axis boundary data. Unused entries correspond to periodic axes.
 
     Examples
     --------
@@ -93,6 +96,30 @@ class PoissonLine3D:
         bc_hi: Sequence = (0.0, 0.0, 0.0),
         _level: int = 0,
     ) -> None:
+        """
+        Assembles the strip operator and the boundary-absorbed right-hand side.
+
+        Parameters
+        ----------
+        f_values : np.ndarray
+            (N0, N1, N2) source term.
+        lengths : Sequence[float]
+            Physical extent of each axis.
+        periodic : Sequence[bool]
+            Per-axis periodicity. Axis 0 must be False — it is the strip
+            direction, and a periodic strip operator is not tridiagonal (it
+            carries corner entries), which would break the TST block encoding.
+        bc_lo, bc_hi : Sequence
+            Per-axis boundary data, each entry a scalar or an array over the
+            remaining two axes. Ignored for periodic axes.
+        _level : int
+            Multigrid level index, set internally by ``coarsen``.
+
+        Raises
+        ------
+        ValueError
+            If ``f_values`` is not 3-D, or if axis 0 is marked periodic.
+        """
         f_values = np.asarray(f_values, dtype=float)
         if f_values.ndim != 3:
             raise ValueError(f"f_values must be 3-D, got shape {f_values.shape}")
@@ -119,22 +146,31 @@ class PoissonLine3D:
         self._A = self._build_row_matrix()
         self._rhs = self._build_rhs()
 
-    # ---- convenience aliases matching the 2-D class -------------------------
-    @property
-    def dx(self) -> float: return self.spacings[0]
+    # ── Convenience Aliases Matching the 2D Class ─────────────────────────────
 
     @property
-    def dy(self) -> float: return self.spacings[1]
+    def dx(self) -> float:
+        """Spacing along axis 0, the strip direction."""
+        return self.spacings[0]
 
     @property
-    def dz(self) -> float: return self.spacings[2]
+    def dy(self) -> float:
+        """Spacing along axis 1."""
+        return self.spacings[1]
 
-    # ---- operator -----------------------------------------------------------
+    @property
+    def dz(self) -> float:
+        """Spacing along axis 2."""
+        return self.spacings[2]
+
+    # ── Operator ──────────────────────────────────────────────────────────────
 
     def _diag(self) -> float:
+        """Diagonal entry of the 7-point stencil, -2·Σ_d 1/h_d²."""
         return -2.0 * sum(1.0 / h**2 for h in self.spacings)
 
     def _build_row_matrix(self) -> np.ndarray:
+        """Assembles the (N0, N0) TST strip operator along axis 0."""
         n = self.shape[0]
         a, b = self._diag(), 1.0 / self.spacings[0] ** 2
         return (a * np.eye(n)
@@ -157,13 +193,27 @@ class PoissonLine3D:
         return r
 
     def row_matrix(self) -> np.ndarray:
+        """The N0 × N0 tridiagonal strip operator, satisfying the protocol."""
         return self._A
 
     def rhs(self) -> np.ndarray:
+        """(N0, N1, N2) right-hand side with Dirichlet data already absorbed."""
         return self._rhs
 
     def apply(self, u: np.ndarray) -> np.ndarray:
-        """7-point Laplacian with homogeneous exterior / periodic wrap."""
+        """
+        7-point Laplacian with homogeneous exterior / periodic wrap.
+
+        Parameters
+        ----------
+        u : np.ndarray
+            (N0, N1, N2) field.
+
+        Returns
+        -------
+        np.ndarray
+            (N0, N1, N2) result of applying the discrete Laplacian to u.
+        """
         out = self._diag() * u
         for ax in range(3):
             inv_h2 = 1.0 / self.spacings[ax] ** 2
@@ -176,7 +226,7 @@ class PoissonLine3D:
                 out[tuple(hi)] += u[tuple(lo)] * inv_h2
         return out
 
-    # ---- coarsening ---------------------------------------------------------
+    # ── Coarsening ────────────────────────────────────────────────────────────
 
     def coarsen(self) -> Optional["PoissonLine3D"]:
         """
@@ -185,24 +235,29 @@ class PoissonLine3D:
 
         On an isotropic grid every axis qualifies and this reduces to
         standard full coarsening: all axes stay powers of two, the strip
-        operator stays TST, and kappa(A_line) stays ~2 at every level
+        operator stays TST, and κ(A_line) stays ~2 at every level
         because the spacing ratios are preserved.
 
         On an anisotropic grid, coarsening every axis regardless is not a
         mild inefficiency, it breaks the method.  The HET channel unwrapped
         to a slab has h = (2.78, 1.67, 33.4) mm at N=8: the azimuthal
-        spacing is twenty times the radial, so azimuthal coupling (~1/h^2)
+        spacing is twenty times the radial, so azimuthal coupling (~1/h²)
         is some four hundred times weaker and the problem is very nearly a
         stack of decoupled (axial, radial) planes.  Coarsening that
         near-decoupled direction produces a coarse operator that does not
-        represent the fine one, and the V-cycle degrades from rho ~ 0.17 to
-        rho ~ 0.94 - measurably *worse* than plain SOR.  Restricting
-        coarsening to the strongly-coupled axes restores rho ~ 0.2 and
+        represent the fine one, and the V-cycle degrades from ρ ~ 0.17 to
+        ρ ~ 0.94 — measurably *worse* than plain SOR.  Restricting
+        coarsening to the strongly-coupled axes restores ρ ~ 0.2 and
         additionally equalises the spacings as the hierarchy descends, so
         the weak axis becomes eligible once the others have caught up.
 
         Coarse levels carry the error equation, hence zero source and
         homogeneous boundaries.
+
+        Returns
+        -------
+        PoissonLine3D or None
+            The next coarser level, or None once no axis can be halved.
         """
         h_min = min(self.spacings)
         do = [h <= self.COARSEN_RATIO * h_min for h in self.spacings]
@@ -217,19 +272,33 @@ class PoissonLine3D:
             lengths=self.lengths, periodic=self.periodic,
             _level=self.level + 1)
 
-    # ---- utilities ----------------------------------------------------------
+    # ── Utilities ─────────────────────────────────────────────────────────────
 
     def grid(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Returns the (N0, N1, N2) coordinate matrices in 'ij' index order.
+
+        Periodic axes start at 0; Dirichlet axes start at one spacing in,
+        their boundary nodes being excluded from the unknowns.
+        """
         axes = []
         for n, h, per in zip(self.shape, self.spacings, self.periodic):
             axes.append(np.arange(n) * h if per else np.arange(1, n + 1) * h)
         return np.meshgrid(*axes, indexing="ij")
 
     def kappa_row(self) -> float:
+        """
+        Spectral condition number κ(A_line) of the strip operator.
+
+        Tends to 2⁻ as N → ∞ on an isotropic grid — better conditioned than
+        the 2D strip operator, since both transverse directions contribute to
+        the diagonal.
+        """
         e = np.abs(np.linalg.eigvalsh(self._A))
         return float(e.max() / e.min())
 
     def residual(self, u: np.ndarray) -> float:
+        """Relative 2-norm residual of the full coupled system."""
         b = self.rhs()
         bn = np.linalg.norm(b)
         r = np.linalg.norm(b - self.apply(u))

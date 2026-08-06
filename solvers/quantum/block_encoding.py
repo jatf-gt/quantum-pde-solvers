@@ -1,59 +1,62 @@
 """
-Block encoding circuits for Hermitian matrices arising from
-finite-difference discretisation of the Poisson equation.
+Block encoding circuits for Hermitian matrices arising from finite-difference
+discretisation of the Poisson equation.
 
 Mathematical foundation
 -----------------------
-A (alpha, n_a, 0)-block encoding of a matrix A in C^{N x N} is a
-unitary U_A acting on (n_a + n) qubits such that:
+An (α, n_a, 0)-block encoding of a matrix A ∈ ℂ^{N×N} is a unitary U_A acting on
+(n_a + n) qubits such that
 
-    (<0^{n_a}| x I_n) U_A (|0^{n_a}> x I_n) = A / alpha
+    (⟨0^{n_a}| ⊗ I_n) U_A (|0^{n_a}⟩ ⊗ I_n) = A / α
 
-where alpha >= ||A||_2 is the subnormalisation factor and n_a is the
-number of ancilla qubits.
+where α ≥ ‖A‖₂ is the subnormalisation factor and n_a the number of ancilla
+qubits.
 
 Implementation: Sz.-Nagy unitary dilation
-------------------------------------------
-For small N (as encountered in this project with N in {4, 8, 16}), the
-most reliable and numerically exact block encoding is the Sz.-Nagy
-dilation. Given a matrix M = A/alpha satisfying ||M||_2 <= 1, the
-2N x 2N unitary:
+-----------------------------------------
+For the small N encountered in this project (N ∈ {4, 8, 16}), the most reliable
+and numerically exact block encoding is the Sz.-Nagy dilation. Given a matrix
+M = A/α satisfying ‖M‖₂ ≤ 1, the 2N × 2N unitary
 
-    U = [[M,          sqrt(I - M^2)],
-         [sqrt(I - M^2), -M        ]]
+    U = [[M,        √(I - M²)],
+         [√(I - M²),       -M]]
 
-satisfies (<0|_anc x I_n) U (|0>_anc x I_n) = M = A/alpha exactly,
-using a single ancilla qubit (n_a = 1).
+satisfies (⟨0|_anc ⊗ I_n) U (|0⟩_anc ⊗ I_n) = M = A/α exactly, using a single
+ancilla qubit (n_a = 1).
 
-The matrix square root sqrt(I - M^2) is computed via eigendecomposition:
-    I - M^2 = V diag(1 - lambda_k^2) V^dagger
-    sqrt(I - M^2) = V diag(sqrt(1 - lambda_k^2)) V^dagger
+The matrix square root √(I - M²) is computed via eigendecomposition:
 
-This approach is:
-  - Exact to numerical precision (no Trotter approximation)
-  - Requires only n + 1 total qubits (one ancilla)
-  - Valid for any Hermitian matrix with ||A||_2 <= alpha
-  - Straightforwardly extensible to the 2-D row matrix (a=-4, b=1)
+    I - M²   = V diag(1 - λ_k²) V†
+    √(I - M²) = V diag(√(1 - λ_k²)) V†
+
+This approach is exact to numerical precision (no Trotter approximation),
+requires only n + 1 qubits in total, is valid for any Hermitian matrix with
+‖A‖₂ ≤ α, and extends unchanged to the line-decomposed strip operator.
+
+Note that the circuit actually built here uses the *Wx* convention rather than
+the dilation shown above — see `_sznagy_dilation`, where the distinction is
+documented in full and is load-bearing.
 
 Subnormalisation factor
 -----------------------
-For the 1-D Poisson TST matrix (a=-2, b=1):
-    alpha = ||A||_2 = |lambda_max| = 2 + 2*cos(pi/(N+1)) < 4
+For the 1D Poisson TST matrix (a = -2, b = 1):
 
-For the 2-D line-Jacobi row matrix (a=-4, b=1):
-    alpha = ||A||_2 = |lambda_max| = 4 + 2*cos(pi/(N+1)) < 6
+    α = ‖A‖₂ = |λ_max| = 2 + 2cos(π/(N+1)) < 4
 
-Using alpha = spectral norm ensures the tightest valid subnormalisation,
-minimising the effective condition number kappa_eff = alpha * kappa / ||A||_2
-= kappa exactly (since alpha = ||A||_2).
+For the h²-scaled 2D strip matrix (a = -4, b = 1):
+
+    α = ‖A‖₂ = |λ_max| = 4 + 2cos(π/(N+1)) < 6
+
+Taking α to be the spectral norm gives the tightest valid subnormalisation, so
+the effective condition number κ_eff = α·κ/‖A‖₂ reduces to κ exactly.
 
 References
 ----------
-Gilyen, A., Su, Y., Low, G. H. & Wiebe, N. (2019). Quantum singular
-    value transformation and beyond. STOC 2019, pp. 193-204.
-Camps, D., Lin, L., Van Beeumen, R. & Yang, C. (2022). Explicit
-    quantum circuits for block encodings of certain sparse matrices.
-    SIAM J. Matrix Anal. Appl., 43(3), 1183-1207.
+Gilyén, A., Su, Y., Low, G. H. & Wiebe, N. (2019). Quantum singular value
+    transformation and beyond. STOC 2019, pp. 193-204.
+Camps, D., Lin, L., Van Beeumen, R. & Yang, C. (2022). Explicit quantum circuits
+    for block encodings of certain sparse matrices. SIAM J. Matrix Anal. Appl.,
+    43(3), 1183-1207.
 """
 from __future__ import annotations
 
@@ -66,7 +69,7 @@ from qiskit.quantum_info import Operator
 _N_ANCILLA_BE = 1
 
 
-# -- Public interface ---------------------------------------------------------
+# ── Public Interface ──────────────────────────────────────────────────────────
 
 def build_tst_block_encoding(
     N         : int,
@@ -74,33 +77,33 @@ def build_tst_block_encoding(
     off_diag  : float,
 ) -> tuple[QuantumCircuit, float]:
     """
-    Construct a block encoding circuit for the N x N TST Poisson matrix
-    via the Sz.-Nagy unitary dilation.
+    Constructs a block encoding circuit for the N×N TST Poisson matrix via the
+    Sz.-Nagy unitary dilation.
 
-    The circuit implements:
+    The circuit implements
 
-        (<0_anc| x I_n) U_A (|0_anc> x I_n) = A / alpha
+        (⟨0_anc| ⊗ I_n) U_A (|0_anc⟩ ⊗ I_n) = A / α
 
-    where alpha = ||A||_2 (spectral norm) is the subnormalisation factor.
+    where α = ‖A‖₂ is the subnormalisation factor.
 
     Parameters
     ----------
     N : int
         System size; must be a power of 2.
     main_diag : float
-        Main diagonal value (e.g. -2 for 1-D Poisson, -4 for 2-D row).
+        Main diagonal value (e.g. -2 for 1D Poisson, -4 for the h²-scaled 2D
+        strip operator).
     off_diag : float
-        Off-diagonal value (e.g. +1 for both Poisson formulations).
+        Off-diagonal value (+1 for both Poisson formulations).
 
     Returns
     -------
     circuit : QuantumCircuit
-        Block encoding circuit on n_a + n qubits.
-        Register layout (Qiskit little-endian):
-            qubits 0..n-1  : data register
-            qubit  n       : ancilla register
+        Block encoding circuit on n_a + n qubits, with register layout
+        (Qiskit little-endian): qubits 0…n-1 the data register, qubit n the
+        ancilla register.
     alpha : float
-        Subnormalisation factor (spectral norm of A).
+        Subnormalisation factor, the spectral norm of A.
 
     Raises
     ------
@@ -154,25 +157,23 @@ def block_encoding_matrix(
     n       : int,
 ) -> np.ndarray:
     """
-    Extract the top-left N x N block of the block encoding unitary.
+    Extracts the top-left N×N block of the block encoding unitary.
 
-    This block should equal A / alpha to within numerical precision.
-    Used for verification of the block encoding construction.
-
-    The extraction post-selects on the ancilla qubit (qubit index n,
-    the MSB in Qiskit's little-endian convention) being in state |0>.
+    This block equals A/α to within numerical precision, and the function exists
+    to verify that. The extraction post-selects on the ancilla qubit (index n,
+    the MSB in Qiskit's little-endian convention) being in state |0⟩.
 
     Parameters
     ----------
     circuit : QuantumCircuit
         Block encoding circuit with n data qubits and 1 ancilla qubit.
     n : int
-        Number of data qubits; N = 2^n.
+        Number of data qubits; N = 2ⁿ.
 
     Returns
     -------
     block : np.ndarray, shape (N, N)
-        The A/alpha block of the unitary matrix.
+        The A/α block of the unitary matrix.
     """
     N     = 2**n
     U     = Operator(circuit).data   # shape (2N, 2N)
@@ -197,25 +198,26 @@ def subnormalisation_factor(
     N         : int = 4,
 ) -> float:
     """
-    Return the spectral norm of the TST matrix as the subnormalisation
-    factor alpha for the Sz.-Nagy block encoding.
+    Returns the spectral norm of the TST matrix, used as the subnormalisation
+    factor α for the Sz.-Nagy block encoding.
 
-    For large N, the spectral norm approaches:
-        1-D Poisson (a=-2, b=1): alpha -> 4
-        2-D row matrix (a=-4, b=1): alpha -> 6
+    For large N the spectral norm approaches 4 for the 1D Poisson operator
+    (a = -2, b = 1) and 6 for the h²-scaled 2D strip operator (a = -4, b = 1).
 
     Parameters
     ----------
     main_diag : float
-    off_diag  : float
+        Main diagonal value of the TST matrix.
+    off_diag : float
+        Off-diagonal value of the TST matrix.
     N : int
-        System size used to compute the exact spectral norm.
-        Default 4 (smallest non-trivial case).
+        System size at which the exact spectral norm is evaluated. Default 4,
+        the smallest non-trivial case.
 
     Returns
     -------
     alpha : float
-        Spectral norm ||A||_2.
+        Spectral norm ‖A‖₂.
     """
     A    = (
         main_diag * np.eye(N)
@@ -226,38 +228,37 @@ def subnormalisation_factor(
     return float(np.max(np.abs(eigs)))
 
 
-# -- Private helpers ----------------------------------------------------------
+# ── Private Helpers ───────────────────────────────────────────────────────────
 
 def _sznagy_dilation(M: np.ndarray) -> np.ndarray:
     """
-    Construct the Sz.-Nagy unitary dilation of a Hermitian matrix M
-    satisfying ||M||_2 <= 1, using the Wx signal convention.
+    Constructs the Sz.-Nagy unitary dilation of a Hermitian matrix M satisfying
+    ‖M‖₂ ≤ 1, using the Wx signal convention.
 
-    The Wx convention dilation is the 2N x 2N unitary:
+    The Wx convention dilation is the 2N × 2N unitary
 
-        U = [[M,               i * sqrt(I - M^2)],
-             [i * sqrt(I - M^2), M              ]]
+        U = [[M,           i√(I - M²)],
+             [i√(I - M²),           M]]
 
-    This matches the Wx signal processing unitary used by pyqsp sym_qsp:
+    which matches the Wx signal processing unitary used by pyqsp sym_qsp,
 
-        W_x = [[x,          i * sqrt(1 - x^2)],
-               [i * sqrt(1 - x^2), x         ]]
+        W_x = [[x,          i√(1 - x²)],
+               [i√(1 - x²),          x]]
 
-    at the scalar level, ensuring that the QSP phase angles computed by
-    pyqsp for the Wx convention are correctly applied by the circuit.
+    at the scalar level, ensuring that the QSP phase angles computed by pyqsp
+    for the Wx convention are correctly applied by the circuit.
 
-    The original Sz.-Nagy dilation uses -M in the bottom-right block
-    (the Rx convention). This causes sign alternations in the garbage
-    space that interfere destructively for multi-eigenvector inputs,
-    causing QSVT to fail for asymmetric RHS vectors (e.g. the HET
-    linear profile) while accidentally working for symmetric inputs
-    (e.g. the generic Poisson fS source, which is approximately a
-    single eigenvector).
+    The original Sz.-Nagy dilation uses -M in the bottom-right block (the Rx
+    convention). This causes sign alternations in the garbage space that
+    interfere destructively for multi-eigenvector inputs, making QSVT fail for
+    asymmetric right-hand sides (e.g. the HET linear profile) whilst
+    accidentally succeeding for symmetric ones (e.g. the generic Poisson fS
+    source, which is approximately a single eigenvector).
 
     Parameters
     ----------
     M : np.ndarray, shape (N, N)
-        Hermitian matrix with ||M||_2 <= 1.
+        Hermitian matrix with ‖M‖₂ ≤ 1.
 
     Returns
     -------

@@ -1,16 +1,20 @@
 """
-Implements the Harrow-Hassidim-Lloyd (HHL) quantum solver for 1D Poisson systems 
-characterised by a Toeplitz Symmetric Tridiagonal (TST) matrix structure.
+Harrow-Hassidim-Lloyd (HHL) quantum solver for 1D Poisson systems with a
+Toeplitz Symmetric Tridiagonal (TST) matrix structure.
 
 Public Interface
 ----------------
-hhl_solve(problem) : 
-    High-level wrapper accepting a `PoissonProblem1D` object, returning a 
-    standardised `SolverResult`.
-hhl_solve_system(A, b, eps) : 
-    Low-level core routine accepting raw numerical arrays. Architected to 
-    allow the 2D line-Jacobi solver to bypass problem container instantiation 
-    for every row sub-problem, significantly reducing computational overhead.
+hhl_solve(problem) :
+    High-level wrapper accepting a `PoissonProblem1D`, returning a standardised
+    `SolverResult`.
+hhl_solve_system(A, b, eps) :
+    Low-level routine accepting raw NumPy arrays. Kept separate so that the
+    outer iteration in `solvers/outer` can solve each strip without
+    constructing a problem container per sub-problem.
+
+Hamiltonian simulation is provided by the vendored `quantum_linear_solvers`
+implementation of the TST evolution operator (Vázquez et al.), and all circuits
+are evaluated by deterministic statevector simulation — there is no shot noise.
 """
 from __future__ import annotations
 
@@ -32,11 +36,22 @@ from solvers.quantum.result import SolverResult
 
 def hhl_solve(problem: PoissonProblem1D) -> SolverResult:
     """
-    Resolves the 1D Poisson system Au = b utilising the HHL algorithm.
+    Solves the 1D Poisson system Au = b by the HHL algorithm.
 
-    Operates as a procedural wrapper around the core `hhl_solve_system` 
-    sub-routine, unpacking the `PoissonProblem1D` data structure and 
-    packaging the numerical outputs into a unified `SolverResult`.
+    A wrapper around `hhl_solve_system` that unpacks the `PoissonProblem1D`
+    container and packages the outputs into a `SolverResult`.
+
+    Parameters
+    ----------
+    problem : PoissonProblem1D
+        Discretised 1D problem supplying the N×N operator, the length-N
+        right-hand side and the precision parameter ε.
+
+    Returns
+    -------
+    result : SolverResult
+        Solution vector, raw b-register amplitudes, proportionality constant
+        and relative Euclidean residual.
     """
     u, x_raw, c = hhl_solve_system(
         problem.A,
@@ -60,41 +75,42 @@ def hhl_solve_system(
     epsilon: float,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """
-    Resolves the linear system Au = b employing the HHL algorithm directly 
-    on raw NumPy arrays.
+    Solves the linear system Au = b by the HHL algorithm, operating directly on
+    raw NumPy arrays.
 
-    This decoupled function serves as the primary quantum execution engine. 
-    It is invoked iteratively by the 2D line-Jacobi loop for each row sub-problem, 
-    maintaining strict independence from any problem container classes.
+    This is the primary quantum execution routine. It is invoked once per strip
+    per sweep by the outer iteration in `solvers/outer`, and holds no dependency
+    on any problem container class.
 
     Parameters
     ----------
     A : np.ndarray
-        N×N TST system matrix. Assumed to be Hermitian. Will be spectrally 
-        normalised internally such that eigenvalues reside within (-1, 1].
+        N×N TST system matrix, assumed Hermitian. Spectrally normalised
+        internally so that its eigenvalues lie within (-1, 1].
     b : np.ndarray
-        Right-hand side vector of length N.
+        Length-N right-hand side vector.
     epsilon : float
-        Precision parameter governing the Trotter approximation. Determines 
-        the internal `trotter_steps` allocation via ceil(1/epsilon).
+        Precision parameter governing the Trotter approximation. Sets the
+        internal `trotter_steps` allocation as ceil(1/ε).
 
     Returns
     -------
     u : np.ndarray
-        Recovered physical solution vector.
+        Length-N recovered physical solution vector.
     x_raw : np.ndarray
-        Raw quantum state amplitudes extracted directly from the b-register.
+        Length-N raw quantum state amplitudes extracted from the b-register.
     c : float
-        Proportionality constant satisfying the relation c * A * x_raw ≈ b.
+        Proportionality constant satisfying c·A·x_raw ≈ b.
 
     Raises
     ------
     ValueError
-        Triggered if the RHS vector `b` evaluates to a numerical zero, precluding 
-        state normalisation. (Downstream 2D algorithms must handle this edge case).
+        If the right-hand side b is numerically zero, precluding state
+        normalisation. Callers in the outer layer must detect this and assign a
+        zero-vector solution directly.
     RuntimeError
-        Triggered if statevector extraction yields a null vector under strict 
-        post-selection criteria.
+        If statevector extraction yields a null vector under the strict
+        post-selection criteria, or if proportionality recovery degenerates.
     """
     N = len(b)
 
@@ -134,18 +150,17 @@ def hhl_solve_system(
     # ── Phase 4: Statevector Extraction ───────────────────────────────────────
     x_raw = _extract_solution_statevector(solution.state, num_qubits)
 
-# ── Phase 5: Dimensionality Recovery ──────────────────────────────────────
-    # Recover the scaling constant against the normalised system to mitigate 
-    # the amplification of quantum noise by the geometric factor ||b||_2 / ||A||_2. 
-    # This regularisation is critical for physically scaled domains (e.g., 
-    # Heterogeneous configurations) where ||b|| ≫ 1 due to the α = L²/λ_D² prefactor.
+    # ── Phase 5: Dimensionality Recovery ──────────────────────────────────────
+    # The scaling constant is recovered against the *normalised* system, so that
+    # quantum error is not amplified by the geometric factor ||b||_2 / ||A||_2.
+    # This matters for physically scaled domains — notably the HET case, where
+    # ||b|| >> 1 owing to the alpha = L^2 / lambda_D^2 prefactor.
     #
-    # The normalised geometric relation is formulated as: 
-    #   A_norm · x_raw ≈ c_norm · b_norm
-    # where A_norm = A / ||A||_2, and b_norm = b / ||b||_2.
-    #
-    # The physical solution dimensionality is subsequently recovered via: 
-    #   u = c_norm · x_raw · (||b||_2 / ||A||_2)
+    # The normalised geometric relation is
+    #   A_norm . x_raw ~ c_norm . b_norm
+    # with A_norm = A / ||A||_2 and b_norm = b / ||b||_2, from which the
+    # physical solution is recovered as
+    #   u = c_norm . x_raw . (||b||_2 / ||A||_2)
 
     A_norm = A / A_norm_factor
     b_norm_vec = b / b_norm_factor
@@ -174,7 +189,7 @@ def _relative_residual(
     u: np.ndarray,
     b: np.ndarray,
 ) -> float:
-    """Computes the relative Euclidean residual ||Au - b||_2 / ||b||_2."""
+    """Computes the relative Euclidean residual ‖Au - b‖₂ / ‖b‖₂."""
     return float(np.linalg.norm(A @ u - b) / np.linalg.norm(b))
 
 
@@ -185,16 +200,37 @@ def _extract_solution_statevector(
     """
     Extracts the solution vector from the HHL output quantum circuit.
 
-    Register Layout (Derived from circuit.qregs, Qiskit little-endian ordering):
-        qregs[0] : b-register (solution), n_b qubits, indices [0, n_b - 1]
-        qregs[1] : l-register (clock), n_l qubits, indices [n_b, n_b + n_l - 1]
-        qregs[2] : MCMT ancilla, n_a qubits
-        qregs[3] : Flag qubit (ancilla), index [n_total - 1]
+    Register layout (from circuit.qregs, Qiskit little-endian ordering):
 
-    Strict Post-Selection Criteria:
-        - Flag qubit evaluates to |1⟩.
-        - Clock (l-register) is cleared to |0...0⟩.
-        - MCMT ancillary hardware is returned to |0...0⟩.
+        qregs[0] : b-register (solution), n_b qubits, indices [0, n_b - 1]
+        qregs[1] : l-register (clock),    n_l qubits, indices [n_b, n_b+n_l-1]
+        qregs[2] : MCMT ancilla,          n_a qubits
+        qregs[3] : flag qubit (ancilla),  index [n_total - 1]
+
+    Strict post-selection criteria:
+
+        - flag qubit evaluates to |1⟩
+        - clock (l-register) is cleared to |0…0⟩
+        - MCMT ancillae are returned to |0…0⟩
+
+    Parameters
+    ----------
+    circuit : QuantumCircuit
+        HHL output circuit carrying the solution register.
+    num_qubits : int
+        Number of b-register qubits; N = 2^num_qubits.
+
+    Returns
+    -------
+    x_raw : np.ndarray
+        Length-N real part of the post-selected b-register amplitudes.
+
+    Raises
+    ------
+    RuntimeError
+        If post-selection yields a null vector. A diagnostic table of the ten
+        dominant statevector amplitudes is emitted first, to identify which
+        register failed to clear.
     """
     N       = 2 ** num_qubits
     n_total = circuit.num_qubits
@@ -217,7 +253,7 @@ def _extract_solution_statevector(
         flag_bit    = (idx >> flag_bit_pos) & 1
         middle_bits = idx & non_b_non_flag_mask
         b_reg_idx   = idx & (N - 1)
-        
+
         if flag_bit == 1 and middle_bits == 0:
             x_raw[b_reg_idx] = sv[idx]
 
@@ -225,12 +261,13 @@ def _extract_solution_statevector(
 
     if np.allclose(x_raw_real, 0.0, atol=1e-12):
         reg_info = [(r.name, r.size) for r in circuit.qregs]
-        print("\nDEBUG — Dominant statevector amplitudes by magnitude:")
+        print("\n  HHL post-selection diagnostics — "
+              "dominant statevector amplitudes by magnitude:")
         magnitudes  = np.abs(sv)
         top_indices = np.argsort(magnitudes)[::-1][:10]
         for idx in top_indices:
             print(
-                f"  idx={idx:5d}  "
+                f"    idx={idx:5d}  "
                 f"|amp|={magnitudes[idx]:.6f}  "
                 f"flag={(idx >> flag_bit_pos) & 1}  "
                 f"clock={(idx & (((1 << n_l) - 1) << n_b)) >> n_b:0{n_l}b}  "

@@ -37,8 +37,6 @@ the same solvers. They are deliberately not unified: figures generated from both
 already appear in the project record, and silently recolouring one family would
 make previously produced figures disagree with newly produced ones for no
 analytical gain. Unify them only as a deliberate, one-off restyling.
-
-Author : Juan Antonio Trobajo Flecha
 """
 from __future__ import annotations
 
@@ -130,7 +128,7 @@ class HPCSweep:
     """
     Reader for the output directory of a single HPC sweep.
 
-    Encapsulates the three things that differ between the 1-D, 2-D and 3-D
+    Holds the three things that differ between the 1-D, 2-D and 3-D
     drivers — the results directory, the naming convention of the archived
     solution files, and where figures are written — so that every plotting
     function below is written once and works for all three.

@@ -1,15 +1,19 @@
 """
-Defines the physical configuration parameters for the 1D and 2D Hall Effect
-Thruster (HET) plasma Poisson benchmarks.
+Physical configuration parameters for the 1D and 2D Hall Effect Thruster (HET)
+plasma Poisson benchmarks.
 
-This system is non-dimensionalised utilising the Debye length λ_D and the
-electron thermal voltage φ_0 = k_B T_e / e prior to discretisation. This
-analytical scaling guarantees that the quantum solver processes a well-conditioned
-operator matrix irrespective of the specific physical parameter regime.
+The system is non-dimensionalised by the Debye length λ_D and the electron
+thermal voltage φ_0 = k_B T_e / e prior to discretisation, which reduces the
+governing equation to a single dimensionless group α = (L/λ_D)² and renders the
+operator independent of the physical parameter regime. Note that this does not
+by itself improve the conditioning of the discretised operator, whose condition
+number remains O(N²) for the 1D Poisson matrix; what it removes is the
+dependence of the *matrix* on the device parameters, which instead enter
+through α on the right-hand side.
 
-Physical parameters are instantiated in standard SI units; the non-dimensional
-scaling transformations are explicitly applied within the corresponding problem
-assembly modules, `problems/het_plasma_1d.py` and `problems/het_plasma_2d.py`.
+Physical parameters are declared in SI units; the non-dimensional scaling
+transformations are applied in the corresponding problem assembly modules,
+`problems/het_plasma_1d.py` and `problems/het_plasma_2d.py`.
 
 Three configuration structures are provided:
 
@@ -46,7 +50,7 @@ EV_TO_J     = E_CHARGE          # Conversion factor: 1 eV in Joules
 @dataclass
 class HETConfig:
     """
-    Encapsulates the parameters governing a 1D HET plasma Poisson benchmark execution.
+    Parameters governing a 1D HET plasma Poisson benchmark.
 
     Physical Parameters
     -------------------
@@ -57,37 +61,39 @@ class HETConfig:
     n_0 : float
         Reference plasma density [m⁻³].
     V_discharge : float
-        Discharge voltage [V] applied to the system, establishing the anode 
+        Discharge voltage [V] applied to the system, establishing the anode
         boundary condition.
     rho_profile : Literal["gaussian", "linear", "step"]
-        Identifier dictating the analytical charge density distribution.
+        Identifier selecting the analytical charge density distribution.
     rho_0 : float
         Peak non-dimensional charge density amplitude.
     x_ion : float
-        Spatial centre of the ionisation zone, mapped to the non-dimensional 
-        domain [0, 1]. Exclusively utilised by 'step' and 'gaussian' profiles.
+        Spatial centre of the ionisation zone, mapped to the non-dimensional
+        domain [0, 1]. Used only by the 'step' and 'gaussian' profiles.
     sigma : float
         Non-dimensional distribution width for the 'gaussian' profile.
 
     Numerical Parameters
     --------------------
     N : int
-        System matrix dimension (number of interior spatial nodes). Must be a 
-        strict power of two to accommodate quantum amplitude encoding.
+        System matrix dimension (number of interior spatial nodes). Must be a
+        power of two to accommodate quantum amplitude encoding.
     epsilon : float
-        Precision parameter governing the Trotterisation or VQLS tolerance thresholds.
+        Precision parameter governing the Trotterisation step count and the
+        VQLS convergence tolerance.
 
     Derived Quantities (Computed upon instantiation)
     ------------------------------------------------
     lambda_D : float
-        System Debye length [m].
+        Debye length [m]: λ_D = sqrt(ε_0 k_B T_e / (e² n_0)).
     phi_0 : float
-        Thermal voltage corresponding to the electron temperature, k_B T_e / e [V].
+        Electron thermal voltage [V]: φ_0 = k_B T_e / e = T_e [eV].
     alpha : float
-        Dimensionless scaling ratio (L² / λ_D²), functioning as the primary 
-        source scaling parameter in the Poisson equation.
+        Dimensionless scaling ratio α = L² / λ_D², the primary source scaling
+        parameter of the Poisson equation. Evaluates to α ≈ 5.65×10⁴ for the
+        defaults below.
     alpha_bc : float
-        Non-dimensional anode potential, V_discharge / phi_0.
+        Non-dimensional anode potential, α_bc = V_discharge / φ_0.
     """
 
     # Physical parameters
@@ -111,7 +117,15 @@ class HETConfig:
     alpha_bc:  float = field(init=False, repr=True)
 
     def __post_init__(self) -> None:
-        """Validates parameter constraints and populates derived physical constants."""
+        """
+        Validates parameter constraints and populates the derived quantities.
+
+        Raises
+        ------
+        ValueError
+            If N is not a positive power of two, or if T_e_eV or n_0 is
+            non-positive.
+        """
         if self.N <= 0 or (self.N & (self.N - 1)) != 0:
             raise ValueError(
                 f"System dimension N must be a positive power of 2, received N={self.N}."
@@ -137,44 +151,45 @@ class HETConfig:
         self.alpha_bc = float(self.V_discharge / self.phi_0)
 
     def summary(self) -> str:
-        """Generates a concise execution summary detailing core physical scalings."""
+        """Returns a one-line summary of the physical and derived scalings."""
         return (
             f"HET: L={self.L*100:.1f}cm, T_e={self.T_e_eV}eV, "
             f"n_0={self.n_0:.1e}m⁻³, V_d={self.V_discharge}V | "
             f"λ_D={self.lambda_D*1e6:.2f}μm, α={self.alpha:.1f}, "
             f"φ_0={self.phi_0:.1f}V, N={self.N}, ε={self.epsilon}"
         )
-    
+
 
 # ── Physical Configuration (Boeuf-Garrigues) ──────────────────────────────────
 
 @dataclass
 class HETPhysicalConfig:
     """
-    Encapsulates the physical configuration parameters for the Boeuf-Garrigues 
+    Encapsulates the physical configuration parameters for the Boeuf-Garrigues
     1D Hall Effect Thruster (HET) benchmark.
 
-    The parameters strictly align with Table 1 of Boeuf & Garrigues (1998), 
-    J. Appl. Phys. 84(7), 3541-3554. The spatial plasma density profile is 
-    approximated by a Gaussian distribution centred in proximity to the exit plane.
+    The parameters follow Table 1 of Boeuf & Garrigues (1998), J. Appl. Phys.
+    84(7), 3541-3554. The spatial plasma density profile is approximated by a
+    Gaussian distribution centred near the exit plane.
 
-    The net charge density, δn = n_i - n_e, is prescribed analytically to 
-    represent the distinct sheath boundaries at the anode and cathode. This 
-    formulation adheres to the quasi-neutral bulk approximation incorporating 
-    sheath corrections derived from Hagelaar et al. (2002), Phys. Rev. E 62(1).
+    The net charge density, δn = n_i - n_e, is prescribed analytically to
+    represent the sheath boundaries at the anode and cathode, following the
+    quasi-neutral bulk approximation with the sheath corrections of Hagelaar
+    et al. (2002), Phys. Rev. E 62(1).
 
-    Key correction: delta_0 must be of order 1/alpha ~ (lambda_D/L)^2
-    to ensure the space charge term is a physically realistic small
-    perturbation on the applied voltage.  The value delta_0 = 0.02 (2%)
-    was unphysically large, driving the solution 10x above the correct
-    scale.
+    Scaling of the charge separation amplitude δ_0 is load-bearing and is
+    therefore derived rather than prescribed. In a quasi-neutral HET plasma the
+    departure from charge neutrality satisfies
 
-    In a quasi-neutral HET plasma, the departure from charge neutrality
-    satisfies:
-        (n_i - n_e)/n_0 ~ (lambda_D/L)^2 = 1/alpha ~ 2.65e-5
+        (n_i - n_e)/n_0 ~ (λ_D/L)² = 1/α ≈ 3.54×10⁻⁶
 
-    delta_0 = 5/alpha is used as a physically motivated amplitude that
-    produces a visible but realistic space charge effect.
+    for the default parameters below, so δ_0 must be of order 1/α if the space
+    charge term is to remain a physically realistic small perturbation on the
+    applied voltage. δ_0 is accordingly set as δ_0 = δ_0_factor / α with
+    δ_0_factor = 5, an amplitude that produces a visible but realistic space
+    charge effect. A fixed δ_0 of order 10⁻² — that is, O(10⁴) times too large —
+    drives the solution an order of magnitude above the correct scale, which is
+    why the factor is applied to 1/α rather than chosen directly.
 
     Attributes
     ----------
@@ -187,7 +202,7 @@ class HETPhysicalConfig:
             Uniform electron temperature approximation [eV].
         n_0 : float
             Reference bulk plasma density [m⁻³].
-    
+
     Density Profile Parameters
         x_peak : float
             Non-dimensional spatial location of the density peak, mapped to [0,1].
@@ -195,7 +210,7 @@ class HETPhysicalConfig:
             Non-dimensional Gaussian distribution width.
         n_min : float
             Minimum boundary density expressed as a fractional scalar of n_0.
-            
+
     Charge Separation Parameters (Sheath Modelling)
         delta_0 : float
             Non-dimensional peak charge separation amplitude.
@@ -203,7 +218,7 @@ class HETPhysicalConfig:
             Non-dimensional characteristic thickness of the anode sheath.
         sigma_cath : float
             Non-dimensional characteristic thickness of the cathode sheath.
-            
+
     Numerical Parameters
         N : int
             System matrix dimension (interior nodes, must be a power of 2).
@@ -223,7 +238,7 @@ class HETPhysicalConfig:
 
     # Charge separation parameters (Analytical sheath model).
     # Set delta_0_factor to control the amplitude: delta_0 = factor/alpha.
-    delta_0_factor: float = 5.0          # dimensionless, O(1)    
+    delta_0_factor: float = 5.0          # dimensionless, O(1)
     sigma_anode:  float = 0.08           # Anode sheath exponential thickness
     sigma_cath:   float = 0.06           # Cathode sheath exponential thickness
 
@@ -239,7 +254,14 @@ class HETPhysicalConfig:
     delta_0:      float = field(init=False, repr=True)
 
     def __post_init__(self) -> None:
-        """Validates numerical constraints and computes physical dimensionless scalings."""
+        """
+        Validates numerical constraints and computes the dimensionless scalings.
+
+        Raises
+        ------
+        ValueError
+            If N is not a positive power of two.
+        """
         if self.N <= 0 or (self.N & (self.N - 1)) != 0:
             raise ValueError(
                 f"System dimension N must be a positive power of 2, received {self.N}."
@@ -260,7 +282,7 @@ class HETPhysicalConfig:
         self.delta_0 = self.delta_0_factor / self.alpha
 
     def summary(self) -> str:
-        """Generates a concise execution string detailing core physical configurations."""
+        """Returns a one-line summary of the physical and derived scalings."""
         return (
             f"HET (Boeuf-Garrigues 1998): "
             f"L={self.L*1e3:.1f}mm, V_d={self.V_discharge}V, "
@@ -536,7 +558,7 @@ class HETConfig2D:
         return -self.alpha * self.charge_density_at(X, Y)
 
     def summary(self) -> str:
-        """Generates a concise execution string detailing core physical configurations."""
+        """Returns a one-line summary of the physical and derived scalings."""
         return (
             f"HET-2D (Boeuf-Garrigues 1998): "
             f"L_x={self.L_x*1e3:.1f}mm, L_y={self.L_y*1e3:.1f}mm, "
