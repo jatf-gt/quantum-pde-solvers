@@ -55,7 +55,7 @@ echo "Test with:     python3 -c 'import qiskit; print(qiskit.__version__)'"
 #  GPU virtual environment (separate from CPU venv)
 #  qiskit-aer-gpu REPLACES qiskit-aer; they cannot coexist
 #  in the same environment. The GPU venv is used exclusively
-#  with hpc/submit_hpc_gpu.sh.
+#  with hpc/jobs/submit_hpc_gpu.sh.
 # ============================================================
 
 VENV_GPU_PATH="${HOME}/venvs/qpde-gpu"

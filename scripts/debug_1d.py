@@ -38,7 +38,7 @@ QSVT phase cache
 ----------------
 QSVT phase angles are looked up from a disk cache keyed on
 ``(kappa, epsilon, angle_method, max_degree)`` - see
-scripts/precompute_qsvt_phases.py. Unlike scripts/run_hpc_1Dfull.py, this
+hpc/runners/precompute_phases.py. Unlike hpc/runners/run_1d.py, this
 tool does not proactively cap the degree on a cache miss; it warns and lets
 you supply ``-I max_degree=<n>`` yourself. An unattended HPC sweep needs a
 silent, proactive cap; an interactive debug session run at the keyboard is
@@ -112,7 +112,7 @@ def _warn_if_qsvt_cache_miss(kappa: float, opts: dict) -> None:
               f"(kappa={kappa:.4f}); live angle-finding may take minutes to "
               f"hours at this kappa. Pass -I max_degree=1000 for a cheap "
               f"capped run, or precompute via "
-              f"scripts/precompute_qsvt_phases.py.{RESET}")
+              f"hpc/runners/precompute_phases.py.{RESET}")
 
 
 def _rel_err_pct_pointwise(u: np.ndarray, ref: np.ndarray) -> np.ndarray:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-run_hpc_2Dfull.py
-=================
+run_2d.py
+=========
 Full 2-D HPC benchmark sweep for the quantum linear solvers (HHL, VQLS, QSVT)
 against the classical Thomas reference.
 
@@ -32,26 +32,26 @@ deliberate:
 Usage
 -----
     # default sweep: five sections, three quantum solvers, FMG
-    python scripts/run_hpc_2Dfull.py --max-n 32
+    python hpc/runners/run_2d.py --max-n 32
 
     # tune the solvers
-    python scripts/run_hpc_2Dfull.py --max-n 64 \
+    python hpc/runners/run_2d.py --max-n 64 \
         -I qsvt.max_degree=300 -I hhl.epsilon=0.02 -I vqls.n_restarts=2
 
     # tune the outer scheme
-    python scripts/run_hpc_2Dfull.py --max-n 64 -S nu1=2 -S n_coarse=8
+    python hpc/runners/run_2d.py --max-n 64 -S nu1=2 -S n_coarse=8
 
     # reproduce the original line-Jacobi results
-    python scripts/run_hpc_2Dfull.py --max-n 8 --scheme jacobi \
+    python hpc/runners/run_2d.py --max-n 8 --scheme jacobi \
         --criterion delta --tol 1e-6
 
     # cost estimate only: no quantum, projects wall time from strip counts
-    python scripts/run_hpc_2Dfull.py --max-n 64 --estimate
+    python hpc/runners/run_2d.py --max-n 64 --estimate
 
     # additionally record how the outer schemes compare (classical inner only)
-    python scripts/run_hpc_2Dfull.py --max-n 64 --compare-schemes
+    python hpc/runners/run_2d.py --max-n 64 --compare-schemes
 
-    python scripts/run_hpc_2Dfull.py --list-options
+    python hpc/runners/run_2d.py --list-options
 """
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ from typing import Optional
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from problems.poisson_line_2d import PoissonLine2D

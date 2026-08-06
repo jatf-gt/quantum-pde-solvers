@@ -28,7 +28,7 @@
 #  exponent is ~0.6 against ~2.35 (HHL) and ~1.29 (VQLS).
 #
 #  ALWAYS run --estimate before changing MAX_N or the walltime:
-#      python3 scripts/run_hpc_3Dfull.py --max-n 32 --estimate
+#      python3 hpc/runners/run_3d.py --max-n 32 --estimate
 #  It costs seconds and prints a per-section, per-solver projection.
 #
 #  OUTER SCHEME
@@ -51,22 +51,22 @@
 #  rows are then tagged scheme_crossover and remain identifiable in analysis.
 #
 #  PREREQUISITE: activate the virtualenv, and run the QSVT phase precompute.
-#    qsub hpc/submit_precompute_2D.sh     # phase cache is shared with 3-D
+#    qsub hpc/jobs/submit_precompute_2D.sh     # phase cache is shared with 3-D
 #
 #  Usage:
-#    qsub hpc/submit_hpc_3D.sh                        # full two-phase sweep
+#    qsub hpc/jobs/submit_hpc_3D.sh                        # full two-phase sweep
 #
 #    export MAX_N=8; export SKIP_LARGE_N=1        # fast validation pass
-#    qsub -v MAX_N,SKIP_LARGE_N hpc/submit_hpc_3D.sh
+#    qsub -v MAX_N,SKIP_LARGE_N hpc/jobs/submit_hpc_3D.sh
 #
 #    export SECTIONS="3,4"                        # HET physics cases only
-#    qsub -v SECTIONS hpc/submit_hpc_3D.sh
+#    qsub -v SECTIONS hpc/jobs/submit_hpc_3D.sh
 #
 #    export SKIP_QSVT=1                           # also skips Phase 2
-#    qsub -v SKIP_QSVT hpc/submit_hpc_3D.sh
+#    qsub -v SKIP_QSVT hpc/jobs/submit_hpc_3D.sh
 #
 #    export LARGE_N="32"; export QSVT_MAX_DEGREE=300
-#    qsub -v LARGE_N,QSVT_MAX_DEGREE hpc/submit_hpc_3D.sh
+#    qsub -v LARGE_N,QSVT_MAX_DEGREE hpc/jobs/submit_hpc_3D.sh
 #
 #  Monitor:
 #    qstat -u $USER
@@ -174,7 +174,7 @@ print("Backend check: OK")
 PYCHECK
 if [ $? -ne 0 ]; then exit 1; fi
 
-# Must match RESULTS_DIR in scripts/run_hpc_3Dfull.py.
+# Must match RESULTS_DIR in hpc/runners/run_3d.py.
 RESULTS_SUBDIR="results/3Dhpc_run"
 mkdir -p "${RESULTS_SUBDIR}"
 
@@ -223,7 +223,7 @@ echo "Starting at $(date)"
 echo "Arguments: ${PHASE1_ARGS}"
 echo "------------------------------------------------------------"
 
-python3 scripts/run_hpc_3Dfull.py ${PHASE1_ARGS}
+python3 hpc/runners/run_3d.py ${PHASE1_ARGS}
 PHASE1_EXIT=$?
 echo "Phase 1 finished at $(date) with exit code ${PHASE1_EXIT}"
 
@@ -258,7 +258,7 @@ if [ "${RUN_PHASE2}" = "1" ]; then
     echo "Arguments: ${PHASE2_ARGS}"
     echo "------------------------------------------------------------"
 
-    python3 scripts/run_hpc_3Dfull.py ${PHASE2_ARGS}
+    python3 hpc/runners/run_3d.py ${PHASE2_ARGS}
     PHASE2_EXIT=$?
     echo "Phase 2 finished at $(date) with exit code ${PHASE2_EXIT}"
 fi

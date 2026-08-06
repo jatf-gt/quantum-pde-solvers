@@ -7,15 +7,15 @@
 #  all solvers (Thomas, HHL, VQLS, QSVT).
 #
 #  Usage:
-#    qsub hpc/submit_hpc_1D.sh
+#    qsub hpc/jobs/submit_hpc_1D.sh
 #
 #    # Fast validation pass before committing the full walltime:
 #    export MAX_N=16
-#    qsub -v MAX_N hpc/submit_hpc_1D.sh
+#    qsub -v MAX_N hpc/jobs/submit_hpc_1D.sh
 #
 #    # Skip QSVT entirely:
 #    export SKIP_QSVT=1
-#    qsub -v SKIP_QSVT hpc/submit_hpc_1D.sh
+#    qsub -v SKIP_QSVT hpc/jobs/submit_hpc_1D.sh
 #
 #  Monitor:
 #    qstat -u $USER
@@ -108,7 +108,7 @@ python3 -c "import pyqsp" 2>/dev/null || {
     pip install pyqsp==0.2.0
 }
 
-# IMPORTANT: this must match RESULTS_DIR in scripts/run_hpc_1Dfull.py.
+# IMPORTANT: this must match RESULTS_DIR in hpc/runners/run_1d.py.
 # The previous version created and archived results/hpc_run/ while the runner
 # wrote to results/1Dhpc_run/, so the RDS copy at the end contained only the
 # PBS logs and none of the actual benchmark output.
@@ -141,7 +141,7 @@ echo "Starting benchmark at $(date)"
 echo "Arguments: ${EXTRA_ARGS}"
 echo "------------------------------------------------------------"
 
-python3 scripts/run_hpc_1Dfull.py ${EXTRA_ARGS}
+python3 hpc/runners/run_1d.py ${EXTRA_ARGS}
 EXIT_CODE=$?
 
 echo "------------------------------------------------------------"

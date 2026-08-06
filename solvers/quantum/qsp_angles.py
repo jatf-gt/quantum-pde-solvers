@@ -76,7 +76,7 @@ Caching
 -------
 Three levels: in-memory dict → on-disk .npz cache → compute. Reading from disk
 is enabled by default, so a run automatically picks up anything precomputed
-offline via `scripts/precompute_qsvt_phases.py`. Writing to disk is off by
+offline via `hpc/runners/precompute_phases.py`. Writing to disk is off by
 default, so that ad hoc and interactive runs do not silently populate the cache
 directory; the precompute script enables writing explicitly.
 
@@ -116,7 +116,7 @@ _PHASE_CACHE: dict[tuple, tuple[np.ndarray, int]] = {}
 _DISK_CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "results" / "qsvt_phase_cache"
 
 # Reading precomputed results is always on: a plain benchmark run should
-# transparently pick up anything scripts/precompute_qsvt_phases.py has
+# transparently pick up anything hpc/runners/precompute_phases.py has
 # already computed, with zero code changes at the call site.
 _ENABLE_DISK_READ: bool = True
 
@@ -193,7 +193,7 @@ def compute_inversion_angles(
         raise RuntimeError(
             f"method='precomputed' but no cached phases found for "
             f"kappa={kappa:.4f}, epsilon={epsilon:.4e}, max_degree={max_degree}. "
-            f"Run scripts/precompute_qsvt_phases.py first."
+            f"Run hpc/runners/precompute_phases.py first."
         )
 
     if max_degree is None:
@@ -206,7 +206,7 @@ def compute_inversion_angles(
                 f"expected to take from hours to months and may need tens to "
                 f"hundreds of GB of RAM (the Newton Jacobian array is "
                 f"O(degree^2)). Pass max_degree explicitly to proceed anyway, "
-                f"or run scripts/precompute_qsvt_phases.py --max-degree ..."
+                f"or run hpc/runners/precompute_phases.py --max-degree ..."
             )
 
     result = _compute(kappa, epsilon, max_degree)

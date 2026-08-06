@@ -47,7 +47,7 @@
 #  hits the cap is recorded with stop_reason="wall_time_exceeded" - a real,
 #  usable, clearly-caveated data point, not a discarded one.
 #
-#  Usage:  qsub hpc/submit_hpc_2D_gapfill.sh
+#  Usage:  qsub hpc/jobs/submit_hpc_2D_gapfill.sh
 # ============================================================
 
 #PBS -l walltime=72:00:00
@@ -107,7 +107,7 @@ run_step () {
     echo "------------------------------------------------------------"
     echo "STEP ${n}: $* -- starting $(date)"
     echo "------------------------------------------------------------"
-    python3 scripts/run_hpc_2Dfull.py --append --phase-tag "gapfill_${n}" "$@"
+    python3 hpc/runners/run_2d.py --append --phase-tag "gapfill_${n}" "$@"
     STEP_EXIT[$((n-1))]=$?
     echo "Step ${n} finished $(date) exit=${STEP_EXIT[$((n-1))]}"
 }

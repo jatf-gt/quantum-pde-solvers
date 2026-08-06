@@ -131,7 +131,7 @@ echo "Starting GPU benchmark at $(date)"
 echo "Arguments: ${EXTRA_ARGS}"
 echo "------------------------------------------------------------"
 
-python3 scripts/run_hpc_1Dfull.py ${EXTRA_ARGS}
+python3 hpc/runners/run_1d.py ${EXTRA_ARGS}
 EXIT_CODE=$?
 
 echo "------------------------------------------------------------"

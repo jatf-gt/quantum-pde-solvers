@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-run_hpc_3Dfull.py
-=================
+run_3d.py
+=========
 Full 3-D HPC benchmark sweep for the quantum linear solvers (HHL, VQLS, QSVT)
 against the classical Thomas reference, on the line-decomposed 3-D Poisson
 problem.
@@ -62,11 +62,11 @@ Sections
 
 Usage
 -----
-    python scripts/run_hpc_3Dfull.py --max-n 16
-    python scripts/run_hpc_3Dfull.py --max-n 32 -I qsvt.max_degree=300
-    python scripts/run_hpc_3Dfull.py --max-n 32 --estimate     # cost first!
-    python scripts/run_hpc_3Dfull.py --n-values 32 --solvers qsvt --append
-    python scripts/run_hpc_3Dfull.py --list-options
+    python hpc/runners/run_3d.py --max-n 16
+    python hpc/runners/run_3d.py --max-n 32 -I qsvt.max_degree=300
+    python hpc/runners/run_3d.py --max-n 32 --estimate     # cost first!
+    python hpc/runners/run_3d.py --n-values 32 --solvers qsvt --append
+    python hpc/runners/run_3d.py --list-options
 """
 from __future__ import annotations
 
@@ -88,7 +88,7 @@ from typing import Optional
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from solvers.outer import (InnerConfig, PoissonLine3D, available_inner,

@@ -45,50 +45,50 @@
 #  ceiling here, not an accuracy control, at any N reachable in this sweep.
 #
 #  PREREQUISITE: run the 2D phase precompute before this job.
-#    qsub hpc/submit_precompute_2D.sh
+#    qsub hpc/jobs/submit_precompute_2D.sh
 #  Wait for it to complete, then:
-#    qsub hpc/submit_hpc_2D.sh
+#    qsub hpc/jobs/submit_hpc_2D.sh
 #
 #  Usage:
 #    # Full two-phase sweep (default):
-#    qsub hpc/submit_hpc_2D.sh
+#    qsub hpc/jobs/submit_hpc_2D.sh
 #
 #    # Fast local validation pass (Phase 1 only, N=4, serial):
 #    export MAX_N=4; export SKIP_LARGE_N=1
-#    qsub -v MAX_N,SKIP_LARGE_N hpc/submit_hpc_2D.sh
+#    qsub -v MAX_N,SKIP_LARGE_N hpc/jobs/submit_hpc_2D.sh
 #
 #    # Phase 1 only, up to N=16, skip Phase 2 entirely:
 #    export MAX_N=16; export SKIP_LARGE_N=1
-#    qsub -v MAX_N,SKIP_LARGE_N hpc/submit_hpc_2D.sh
+#    qsub -v MAX_N,SKIP_LARGE_N hpc/jobs/submit_hpc_2D.sh
 #
 #    # Skip QSVT everywhere (also skips Phase 2, since it is QSVT-only):
 #    export SKIP_QSVT=1
-#    qsub -v SKIP_QSVT hpc/submit_hpc_2D.sh
+#    qsub -v SKIP_QSVT hpc/jobs/submit_hpc_2D.sh
 #
 #    # Run specific sections only (e.g. HET cases), both phases:
 #    export SECTIONS="4,5"
-#    qsub -v SECTIONS hpc/submit_hpc_2D.sh
+#    qsub -v SECTIONS hpc/jobs/submit_hpc_2D.sh
 #
 #    # Override the large-N tier (default "128,256"):
 #    export LARGE_N="128"
-#    qsub -v LARGE_N hpc/submit_hpc_2D.sh
+#    qsub -v LARGE_N hpc/jobs/submit_hpc_2D.sh
 #
 #    # Use a different outer scheme (default: fmg):
 #    export OUTER_SCHEME=multigrid
-#    qsub -v OUTER_SCHEME hpc/submit_hpc_2D.sh
+#    qsub -v OUTER_SCHEME hpc/jobs/submit_hpc_2D.sh
 #
 #    # Reproduce the original line-Jacobi results (Phase 1 only makes sense
 #    # here - Jacobi at N=128/256 is not the point of this script):
 #    export OUTER_SCHEME=jacobi; export OUTER_CRITERION=delta
 #    export OUTER_TOL=1e-6; export SKIP_LARGE_N=1
-#    qsub -v OUTER_SCHEME,OUTER_CRITERION,OUTER_TOL,SKIP_LARGE_N hpc/submit_hpc_2D.sh
+#    qsub -v OUTER_SCHEME,OUTER_CRITERION,OUTER_TOL,SKIP_LARGE_N hpc/jobs/submit_hpc_2D.sh
 #
 #    # Combine options:
 #    export MAX_N=16; export SKIP_QSVT=1; export SECTIONS="1,2,3"
-#    qsub -v MAX_N,SKIP_QSVT,SECTIONS hpc/submit_hpc_2D.sh
+#    qsub -v MAX_N,SKIP_QSVT,SECTIONS hpc/jobs/submit_hpc_2D.sh
 #
 #  Before submitting a large job, estimate its cost for free:
-#    python3 scripts/run_hpc_2Dfull.py --n-values 128,256 --solvers qsvt \
+#    python3 hpc/runners/run_2d.py --n-values 128,256 --solvers qsvt \
 #            --estimate
 #
 #  Monitor:
@@ -105,7 +105,7 @@
 # estimates in this file no longer apply and are not repeated here - they
 # would just be wrong in a new, non-obvious way. Get a real number instead:
 #
-#     python3 scripts/run_hpc_2Dfull.py --n-values <N> --solvers <solver> \
+#     python3 hpc/runners/run_2d.py --n-values <N> --solvers <solver> \
 #             --estimate
 #
 # costs seconds (it runs only the classical reference and projects quantum
@@ -203,7 +203,7 @@ python3 -c "import scipy" 2>/dev/null || {
     pip install scipy
 }
 
-# IMPORTANT: must match RESULTS_DIR in scripts/run_hpc_2Dfull.py.
+# IMPORTANT: must match RESULTS_DIR in hpc/runners/run_2d.py.
 # Both phases below write into this same directory; Phase 2 uses --append
 # so Phase 1's results are merged rather than overwritten.
 RESULTS_SUBDIR="results/2Dhpc_run"
@@ -274,7 +274,7 @@ echo "Starting at $(date)"
 echo "Arguments: ${PHASE1_ARGS}"
 echo "------------------------------------------------------------"
 
-python3 scripts/run_hpc_2Dfull.py ${PHASE1_ARGS}
+python3 hpc/runners/run_2d.py ${PHASE1_ARGS}
 PHASE1_EXIT=$?
 
 echo "Phase 1 finished at $(date) with exit code ${PHASE1_EXIT}"
@@ -314,7 +314,7 @@ if [ "${RUN_PHASE2}" = "1" ]; then
     echo "Arguments: ${PHASE2_ARGS}"
     echo "------------------------------------------------------------"
 
-    python3 scripts/run_hpc_2Dfull.py ${PHASE2_ARGS}
+    python3 hpc/runners/run_2d.py ${PHASE2_ARGS}
     PHASE2_EXIT=$?
 
     echo "Phase 2 finished at $(date) with exit code ${PHASE2_EXIT}"

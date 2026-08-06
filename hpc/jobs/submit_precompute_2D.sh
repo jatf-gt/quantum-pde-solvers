@@ -18,11 +18,11 @@
 #  exported in the shell -- `-v NAME=a,b` breaks on PBS's comma splitting.
 #
 #  Usage:
-#    qsub hpc/submit_precompute_2D.sh
-#    export N_VALUES="4,8,16"; qsub -v N_VALUES hpc/submit_precompute_2D.sh
-#    qsub -v DOMAIN=het hpc/submit_precompute_2D.sh
-#    qsub -v MAX_DEGREE=200 hpc/submit_precompute_2D.sh
-#    qsub -v LIST_KAPPAS=1 hpc/submit_precompute_2D.sh   # print keys, compute nothing
+#    qsub hpc/jobs/submit_precompute_2D.sh
+#    export N_VALUES="4,8,16"; qsub -v N_VALUES hpc/jobs/submit_precompute_2D.sh
+#    qsub -v DOMAIN=het hpc/jobs/submit_precompute_2D.sh
+#    qsub -v MAX_DEGREE=200 hpc/jobs/submit_precompute_2D.sh
+#    qsub -v LIST_KAPPAS=1 hpc/jobs/submit_precompute_2D.sh   # print keys, compute nothing
 # ============================================================
 
 #PBS -N qsvt_precompute_2D
@@ -122,7 +122,7 @@ echo "Starting precompute at $(date)"
 echo "Arguments: ${EXTRA_ARGS}"
 echo "------------------------------------------------------------"
 
-python3 scripts/precompute_qsvt_phases.py --dim 2 ${EXTRA_ARGS}
+python3 hpc/runners/precompute_phases.py --dim 2 ${EXTRA_ARGS}
 EXIT_CODE=$?
 
 echo "------------------------------------------------------------"

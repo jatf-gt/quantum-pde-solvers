@@ -2,7 +2,7 @@
 # ============================================================
 #  submit_precompute_hpc.sh
 #  PBS Pro job submission script for Imperial College CX3 HPC.
-#  Runs scripts/precompute_qsvt_phases.py as a batch job instead
+#  Runs hpc/runners/precompute_phases.py as a batch job instead
 #  of interactively, so it survives disconnects/idle timeouts and
 #  isn't limited by an interactive session's own wall-clock cap.
 #
@@ -19,17 +19,17 @@
 #  -----
 #    # Stage 1 -- small N, expected safe (see precompute script docstring):
 #    export N_VALUES="4,8,16"
-#    qsub -v N_VALUES hpc/submit_precompute_hpc.sh
+#    qsub -v N_VALUES hpc/jobs/submit_precompute_hpc.sh
 #
 #    # Stage 2 -- N=32, exploratory, capped, separate job/log:
 #    export N_VALUES="32"
 #    export MAX_DEGREE="2000"
-#    qsub -v N_VALUES,MAX_DEGREE hpc/submit_precompute_hpc.sh
+#    qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_hpc.sh
 #
 #    # Stage 3 -- N=64, same idea, only after stage 2 is confirmed to work:
 #    export N_VALUES="64"
 #    export MAX_DEGREE="2000"
-#    qsub -v N_VALUES,MAX_DEGREE hpc/submit_precompute_hpc.sh
+#    qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_hpc.sh
 #
 #  Each stage writes into the SAME cache directory
 #  (results/qsvt_phase_cache/), so results accumulate across stages;
@@ -143,7 +143,7 @@ echo "Starting precompute at $(date)"
 echo "Arguments: ${EXTRA_ARGS}"
 echo "------------------------------------------------------------"
 
-python3 scripts/precompute_qsvt_phases.py --dim 1 ${EXTRA_ARGS}
+python3 hpc/runners/precompute_phases.py --dim 1 ${EXTRA_ARGS}
 EXIT_CODE=$?
 
 echo "------------------------------------------------------------"
@@ -152,7 +152,7 @@ echo "Precompute finished at $(date) with exit code ${EXIT_CODE}"
 # ============================================================
 #  Copy the cache to permanent RDS storage (belt-and-suspenders --
 #  results/ should already be on RDS if PBS_O_WORKDIR is, but this
-#  matches the pattern used in hpc/submit_hpc.sh)
+#  matches the pattern used in hpc/jobs/submit_hpc.sh)
 # ============================================================
 RDS_CACHE="${HOME}/qpde-results/qsvt_phase_cache_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${RDS_CACHE}"

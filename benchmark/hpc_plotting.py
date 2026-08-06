@@ -1,8 +1,8 @@
 """
 Post-processing and visualisation of HPC sweep output.
 
-Consolidates the plotting layer for all three sweep drivers — `run_hpc_1Dfull.py`,
-`run_hpc_2Dfull.py` and `run_hpc_3Dfull.py`. Nothing here re-runs a solve: it
+Consolidates the plotting layer for all three sweep drivers — `hpc/runners/run_1d.py`,
+`run_2d.py` and `run_3d.py`. Nothing here re-runs a solve: it
 reads only what a runner already wrote (`results_full.json` plus the archived
 per-solution `.npz` files), so it is cheap and safe to re-run at any time, and
 in particular after a walltime-killed job that lost its summary but not its
@@ -27,8 +27,8 @@ archive field names at the point of use.
                               3-D orthogonal slices, polar unwrapping, cutaways
                               and azimuthal fidelity
 
-`scripts/plot_hpc_{1,2,3}Dfull_results.py` are thin command-line wrappers over
-the `run_1d`, `run_2d` and `run_3d` entry points at the end of this module.
+`hpc/runners/plot_results.py --dim {1,2,3}` is the thin command-line wrapper
+over the `run_1d`, `run_2d` and `run_3d` entry points at the end of this module.
 
 What the three sweeps do and do not share
 -----------------------------------------

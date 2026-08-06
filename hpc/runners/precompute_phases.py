@@ -3,8 +3,8 @@
 Offline precompute of QSVT phase angles into the disk cache read by
 solvers/quantum/qsp_angles.py.
 
-Run this on the HPC as a batch job (see hpc/submit_precompute_hpc.sh
-and hpc/submit_precompute_2D.sh) rather than interactively: a login-node or
+Run this on the HPC as a batch job (see hpc/jobs/submit_precompute_hpc.sh
+and hpc/jobs/submit_precompute_2D.sh) rather than interactively: a login-node or
 interactive session is killed on disconnect or idle timeout long before the
 larger 1-D cases finish.
 
@@ -60,19 +60,19 @@ precomputed by default.
 Usage
 -----
     # 1-D, small N (expected safe)
-    python scripts/precompute_qsvt_phases.py --dim 1 --n-values 4,8,16
+    python hpc/runners/precompute_phases.py --dim 1 --n-values 4,8,16
 
     # 1-D, larger N with a degree cap
-    python scripts/precompute_qsvt_phases.py --dim 1 --n-values 32 --max-degree 2000
+    python hpc/runners/precompute_phases.py --dim 1 --n-values 32 --max-degree 2000
 
     # 2-D, both domains, all N (under two minutes)
-    python scripts/precompute_qsvt_phases.py --dim 2
+    python hpc/runners/precompute_phases.py --dim 2
 
     # 2-D, one domain only
-    python scripts/precompute_qsvt_phases.py --dim 2 --domain het --n-values 8,16
+    python hpc/runners/precompute_phases.py --dim 2 --domain het --n-values 8,16
 
     # Show the kappa each case will use, without computing anything
-    python scripts/precompute_qsvt_phases.py --dim 2 --list-kappas
+    python hpc/runners/precompute_phases.py --dim 2 --list-kappas
 
 `--max-degree` caps the degree solved for, trading approximation error for a
 tractable Newton solve. Note that it does not bound the whole cost:
@@ -88,7 +88,7 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 import solvers.quantum.qsp_angles as qsp_angles

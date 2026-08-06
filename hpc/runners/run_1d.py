@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-run_hpc_1Dfull.py
-=================
+run_1d.py
+=========
 Full 1-D benchmark sweep for Imperial College HPC (CX3, PBS Pro).
 
 Cases
@@ -39,10 +39,10 @@ Outputs (all under results/1Dhpc_run/)
 
 Usage on HPC (after activating the quantum-pde-solvers venv)
 ------------------------------------------------------------
-  python scripts/run_hpc_1Dfull.py                    # full sweep, N = 4..64
-  python scripts/run_hpc_1Dfull.py --max-n 16         # quick validation pass
-  python scripts/run_hpc_1Dfull.py --skip-qsvt        # omit QSVT entirely
-  python scripts/run_hpc_1Dfull.py --max-workers 1    # serial (required on GPU)
+  python hpc/runners/run_1d.py                    # full sweep, N = 4..64
+  python hpc/runners/run_1d.py --max-n 16         # quick validation pass
+  python hpc/runners/run_1d.py --skip-qsvt        # omit QSVT entirely
+  python hpc/runners/run_1d.py --max-workers 1    # serial (required on GPU)
 
 Note on imports
 ---------------
@@ -80,7 +80,7 @@ import multiprocessing as mp
 
 # ── Local ─────────────────────────────────────────────────────────────────────
 # Ensure the repository root is on sys.path regardless of invocation location.
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from solvers.backend_factory import get_aer_backend, log_backend_info  # noqa: E402
@@ -140,7 +140,7 @@ QSVT_TIME_LIMIT_S: Optional[float] = 1800.0   # 30 minutes per QSVT call
 
 # ── QSVT: polynomial degree cap, per N ────────────────────────────────────────
 # The QSVT phase cache is keyed on (kappa, epsilon, method, max_degree), so
-# these values MUST match what scripts/precompute_qsvt_phases.py was run with,
+# these values MUST match what hpc/runners/precompute_phases.py was run with,
 # or the lookup misses and a from-scratch solve is attempted at runtime (hours
 # to days for large kappa, and it will hit the sanity guard in qsp_angles.py).
 #
@@ -1166,7 +1166,7 @@ def main() -> None:
     IMPORTANT -- worker count vs requested cores. Aer simulations are already
     OpenMP-threaded internally, so `--max-workers` should not exceed the ncpus
     actually requested in the PBS script. The default here (4) matches
-    `#PBS -l select=1:ncpus=4` in hpc/submit_hpc_1D.sh. Raising one without raising
+    `#PBS -l select=1:ncpus=4` in hpc/jobs/submit_hpc_1D.sh. Raising one without raising
     the other oversubscribes the node and slows the sweep down.
 
     On a GPU node, use `--max-workers 1` with QUANTUM_PDE_USE_GPU=1 to
