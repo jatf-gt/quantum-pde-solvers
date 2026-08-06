@@ -54,7 +54,7 @@ identical −2/+1/+1 TST matrix for a given N, so one set of phases per
 (N, epsilon) serves both and there is no separate HET kappa.
 
 In 2-D the strip operator depends on the grid aspect ratio, so the unit square
-and the HET channel (Lz/Lr = 25/20) give genuinely different kappas and both are
+and the HET channel (Lz/Lr = 40/20) give genuinely different kappas and both are
 precomputed by default.
 
 Usage
