@@ -203,8 +203,31 @@ def build_hierarchy(problem, max_levels: int = 10) -> list[Level]:
 
 # ── Cycles ────────────────────────────────────────────────────────────────────
 
-def _v_cycle(levels, l, u, rhs, inner, work, nu1, nu2, n_coarse):
-    """Recursive V-cycle. ``u`` is modified in place and returned."""
+class _WallTimeExceeded(Exception):
+    """Internal signal only - unwinds a _v_cycle recursion cleanly on a
+    deadline, without ever interrupting a strip_sweep in progress."""
+
+
+def _v_cycle(levels, l, u, rhs, inner, work, nu1, nu2, n_coarse, deadline=None):
+    """
+    Recursive V-cycle. ``u`` is modified in place and returned.
+
+    ``deadline`` (a perf_counter() timestamp, not a duration) is checked
+    before every strip_sweep call and before recursing to the next level -
+    never inside strip_sweep itself, so a quantum circuit already in flight
+    always runs to completion. This granularity matters: checking only
+    *around* a whole _v_cycle call, as an earlier version of this function
+    did, is not fine enough. One _v_cycle(levels, 0, ...) call recurses
+    through every level of the hierarchy, and at N=64 with HHL a single such
+    call was measured to run for 139,125s against an intended ~21,600s
+    budget - a 6x overshoot from one uninterruptible recursion, not a wrong
+    budget. Checking before each sweep and each recursive step bounds the
+    overshoot to at most one sweep's worth of strip solves at whichever
+    level the deadline lands on, typically minutes, not tens of hours.
+    """
+    if deadline is not None and time.perf_counter() > deadline:
+        raise _WallTimeExceeded()
+
     lev = levels[l]
     prob = lev.problem
 
@@ -212,19 +235,26 @@ def _v_cycle(levels, l, u, rhs, inner, work, nu1, nu2, n_coarse):
         # Coarsest level: relax to (near) convergence.  This is still done
         # with the inner solver, so a quantum run exercises it everywhere.
         for _ in range(n_coarse):
+            if deadline is not None and time.perf_counter() > deadline:
+                raise _WallTimeExceeded()
             strip_sweep(prob, u, rhs, inner, work, omega=1.0)
         return u
 
     for _ in range(nu1):
+        if deadline is not None and time.perf_counter() > deadline:
+            raise _WallTimeExceeded()
         strip_sweep(prob, u, rhs, inner, work, omega=1.0)
 
     r = rhs - prob.apply(u)
     r_c = lev.restrict(r)
     e_c = np.zeros(tuple(levels[l + 1].problem.shape))
-    e_c = _v_cycle(levels, l + 1, e_c, r_c, inner, work, nu1, nu2, n_coarse)
+    e_c = _v_cycle(levels, l + 1, e_c, r_c, inner, work, nu1, nu2, n_coarse,
+                   deadline=deadline)
     u += lev.prolong(e_c)
 
     for _ in range(nu2):
+        if deadline is not None and time.perf_counter() > deadline:
+            raise _WallTimeExceeded()
         strip_sweep(prob, u, rhs, inner, work, omega=1.0)
     return u
 
@@ -256,14 +286,20 @@ def solve_multigrid(
         iteration).  Reaches discretisation accuracy in roughly 3 fine-level
         cycles instead of 5, at no extra fine-level cost.
     tol : relative residual ||b - A u|| / ||b||.
-    max_wall_s : hard wall-clock budget in seconds, checked once per V-cycle
-        (never mid-strip-solve).  See the identical parameter on
-        ``solve_stationary`` for the rationale: stagnation detection bounds
-        cycle *count*, not cost *per cycle*, and a solver with a large
-        per-strip cost (HHL, VQLS at N >~ 32) can still run for hours before
-        reaching its own stagnation point.  On timeout the current iterate is
-        returned with stop_reason="wall_time_exceeded".  Also checked once
-        after the FMG start, in case that alone exceeds the budget.
+    max_wall_s : hard wall-clock budget in seconds, checked before every
+        sweep and every recursive step inside a V-cycle - never mid-sweep
+        (a strip solve, and by extension a quantum circuit, is never
+        interrupted). This granularity is deliberate: an earlier version
+        checked only once per whole V-cycle, and a single V-cycle recurses
+        through every level of the hierarchy, so at N=64 with HHL one such
+        call was measured to run 139,125s against an intended ~21,600s
+        budget - a ~6x overshoot from one uninterruptible recursion. See the
+        identical parameter on ``solve_stationary`` for the broader
+        rationale: stagnation detection bounds cycle *count*, not cost *per
+        cycle*, and a solver with a large per-strip cost (HHL, VQLS at
+        N >~ 32) can still run for hours before reaching its own stagnation
+        point. On timeout the current iterate is returned with
+        stop_reason="wall_time_exceeded".
 
     Falls back to a clear error if the problem admits no coarse level; use
     ``solve_stationary`` in that case.
@@ -290,6 +326,13 @@ def solve_multigrid(
     def _over_budget() -> bool:
         return max_wall_s is not None and (time.perf_counter() - t0) > max_wall_s
 
+    # Absolute perf_counter() deadline, threaded into every _v_cycle call so
+    # the check happens before each sweep and each recursive step, not just
+    # once per (potentially very long) whole V-cycle. See _v_cycle's
+    # docstring for why the coarser granularity used previously let a single
+    # N=64 HHL V-cycle overrun its budget by ~6x.
+    deadline = (t0 + max_wall_s) if max_wall_s is not None else None
+
     fmg_timed_out = False
     if fmg:
         rhs_levels = [rhs]
@@ -297,27 +340,34 @@ def solve_multigrid(
             rhs_levels.append(levels[l].restrict(rhs_levels[-1]))
 
         u = np.zeros(tuple(levels[-1].problem.shape))
-        for _ in range(n_coarse):
-            strip_sweep(levels[-1].problem, u, rhs_levels[-1], inner, work, 1.0)
-        # Checked once per ascending level, not only once after the whole FMG
-        # start: each level's V-cycle recurses through every coarser level
-        # beneath it, so a single check point at the very end of the FMG
-        # start can let the budget overrun substantially on a deep hierarchy
-        # before the very first check fires.
-        for l in range(len(levels) - 2, -1, -1):
-            if _over_budget():
-                fmg_timed_out = True
-                # u is still shaped for level l+1. Prolong the rest of the way
-                # to the fine grid (cheap - interpolation only, no further
-                # strip solves) so the field returned has the right shape and
-                # is at least the FMG-interpolated guess, rather than an
-                # arbitrary coarse-level array the caller cannot use.
-                for l2 in range(l, -1, -1):
-                    u = levels[l2].prolong(u)
-                break
-            u = levels[l].prolong(u)
-            u = _v_cycle(levels, l, u, rhs_levels[l], inner, work,
-                         nu1, nu2, n_coarse)
+        reached_level = len(levels) - 1   # tracks u's current level exactly,
+                                          # rather than inferring it from
+                                          # shape after the fact
+        try:
+            for _ in range(n_coarse):
+                if deadline is not None and time.perf_counter() > deadline:
+                    raise _WallTimeExceeded()
+                strip_sweep(levels[-1].problem, u, rhs_levels[-1], inner, work, 1.0)
+            # Checked once per ascending level in addition to the fine-grained
+            # checks inside _v_cycle itself, so a level that is skipped
+            # entirely (deadline already passed before it starts) is caught
+            # here rather than only inside the call.
+            for l in range(len(levels) - 2, -1, -1):
+                if deadline is not None and time.perf_counter() > deadline:
+                    raise _WallTimeExceeded()
+                u = levels[l].prolong(u)
+                reached_level = l
+                u = _v_cycle(levels, l, u, rhs_levels[l], inner, work,
+                             nu1, nu2, n_coarse, deadline=deadline)
+        except _WallTimeExceeded:
+            fmg_timed_out = True
+            # u is valid at `reached_level` (a partial sweep from inside
+            # _v_cycle does not change its shape). Prolong the rest of the
+            # way to the fine grid - cheap interpolation only, no further
+            # strip solves - so the field returned always has the right
+            # shape regardless of exactly where the deadline landed.
+            for l2 in range(reached_level - 1, -1, -1):
+                u = levels[l2].prolong(u)
     else:
         u = np.zeros(tuple(problem.shape))
 
@@ -344,7 +394,13 @@ def solve_multigrid(
             if _over_budget():
                 stop = "wall_time_exceeded"
                 break
-            u = _v_cycle(levels, 0, u, rhs, inner, work, nu1, nu2, n_coarse)
+            try:
+                u = _v_cycle(levels, 0, u, rhs, inner, work, nu1, nu2,
+                             n_coarse, deadline=deadline)
+            except _WallTimeExceeded:
+                stop = "wall_time_exceeded"
+                history.append(float(np.linalg.norm(rhs - problem.apply(u)) / b_norm))
+                break
         else:
             history.append(float(np.linalg.norm(rhs - problem.apply(u)) / b_norm))
 
