@@ -27,53 +27,15 @@ import pennylane as qml
 
 # ── Pauli Decomposition ───────────────────────────────────────────────────────
 
-def pauli_decompose_tst(
-    N:         int,
-    main_diag: float,
-    off_diag:  float,
+def pauli_decompose_matrix(
+    A: np.ndarray,
 ) -> List[Tuple[complex, str]]:
     """
-    Computes the decomposition of the N×N TST matrix into a Linear Combination
+    Computes the decomposition of a matrix A into a Linear Combination
     of Unitaries (LCU) via Pauli strings.
-
-    The system matrix is represented as:
-        A = sum_l c_l * P_l
-
-    where each P_l constitutes a tensor product of single-qubit Pauli operators
-    {I, X, Y, Z} acting across n = log2(N) qubits.
-
-    The decomposition coefficients are analytically derived via the projection:
-        c_l = (1/N) * Tr(A · P_l)
-
-    For the TST matrix characterised by `main_diag` and `off_diag`, only O(n)
-    Pauli strings possess non-zero coefficients, rendering this an efficient
-    representational schema.
-
-    Parameters
-    ----------
-    N : int
-        System dimension (must be a positive power of 2).
-    main_diag : float
-        Magnitude of the principal diagonal elements (e.g., -2.0 for 1D Poisson).
-    off_diag : float
-        Magnitude of the adjacent off-diagonal elements (e.g., 1.0 for 1D Poisson).
-
-    Returns
-    -------
-    List[Tuple[complex, str]]
-        A collection of (coefficient, pauli_string) pairs, omitting elements
-        with zero coefficients. Strings adhere to the PennyLane convention:
-        the rightmost character acts upon qubit 0 (Least Significant Bit).
     """
+    N = A.shape[0]
     n = int(np.log2(N))
-
-    # Build the full TST matrix explicitly for the decomposition.
-    # N is small (≤ 32) so this is fine.
-    A = (
-        main_diag * np.eye(N)
-        + off_diag  * np.diag(np.ones(N - 1), k=1)
-        + off_diag  * np.diag(np.ones(N - 1), k=-1)
-    )
 
     # Generate all n-qubit Pauli strings and compute their coefficients.
     pauli_labels = ["I", "X", "Y", "Z"]
@@ -110,46 +72,16 @@ def pauli_decompose_tst(
 
 
 def pauli_decompose_normalised(
-    N:         int,
-    main_diag: float,
-    off_diag:  float,
+    A: np.ndarray,
 ) -> Tuple[List[Tuple[complex, str]], float]:
     """
-    Decomposes the spectrally normalised TST matrix, A / ||A||_2, into Pauli strings.
+    Decomposes the spectrally normalised matrix, A / ||A||_2, into Pauli strings.
 
     Returns both the decomposition coefficients and the spectral normalisation
-    factor, ensuring the physical solution dimensionality can be accurately
-    recovered following the variational optimisation.
-
-    Parameters
-    ----------
-    N : int
-        System dimension.
-    main_diag : float
-        Magnitude of the principal diagonal elements.
-    off_diag : float
-        Magnitude of the adjacent off-diagonal elements.
-
-    Returns
-    -------
-    terms : List[Tuple[complex, str]]
-        The Pauli decomposition of the normalised operator, A_norm.
-    norm_factor : float
-        The spectral norm of the original matrix A, ||A||_2.
+    factor.
     """
-    # Build A to compute its spectral norm.
-    A = (
-        main_diag * np.eye(N)
-        + off_diag  * np.diag(np.ones(N - 1), k=1)
-        + off_diag  * np.diag(np.ones(N - 1), k=-1)
-    )
     norm_factor = float(np.linalg.norm(A, ord=2))
-
-    terms = pauli_decompose_tst(
-        N,
-        main_diag / norm_factor,
-        off_diag  / norm_factor,
-    )
+    terms = pauli_decompose_matrix(A / norm_factor)
     return terms, norm_factor
 
 

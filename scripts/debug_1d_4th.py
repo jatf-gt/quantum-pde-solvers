@@ -427,8 +427,15 @@ def run_single(
 
     # ── VQLS ─────────────────────────────────────────────────────────────────
     if inner in ("vqls", "all"):
+        if n_layers == -1:
+            # Adapt to N
+            num_qubits = int(np.log2(N))
+            n_layers_actual = max(4, num_qubits * 2)
+        else:
+            n_layers_actual = n_layers
+
         try:
-            u_vqls, t_vqls, vqls_result = run_vqls(prob.A, prob.b, n_layers)
+            u_vqls, t_vqls, vqls_result = run_vqls(prob.A, prob.b, n_layers_actual)
             solutions["VQLS"] = u_vqls
             final_cost = (
                 vqls_result.cost_history[-1]
@@ -548,8 +555,8 @@ def main() -> None:
 
     # VQLS options
     parser.add_argument(
-        "--n-layers", type=int, default=3,
-        help="VQLS ansatz depth. Default: 3.",
+        "--n-layers", type=int, default=-1,
+        help="VQLS ansatz depth. Default: -1 (auto-scale with N).",
     )
 
     # QSVT options

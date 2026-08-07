@@ -244,56 +244,63 @@ def _vqls_single_run(
         device_name  = config.device_name,
     )
 
-    # ── Exploration Pass ──────────────────────────────────────────────────────
-    # Large rhobeg (0.5) allows COBYLA to take large steps and escape shallow
-    # local minima. This pass identifies the basin of attraction for this seed.
-    opt_result = minimize(
-        fun     = cost_fn,
-        x0      = theta_init,
-        method  = "COBYLA",
-        tol     = config.tol,
-        options = {
-            "maxiter": config.max_iter,
-            "rhobeg":  0.5,
-        },
-    )
-
-    best_params  = opt_result.x.copy()
-    best_cost    = float(opt_result.fun)
-    cost_history = [best_cost]
-    total_evals  = int(opt_result.nfev)
-
-    # Early exit if the exploration pass already satisfies the tolerance.
-    if best_cost <= config.tol:
-        return best_params, best_cost, cost_history, total_evals
-
-    # ── Refinement Cascade ────────────────────────────────────────────────────
-    # Two refinement passes with progressively reduced rhobeg polish the
-    # local minimum found during exploration. Starting from best_params
-    # (not theta_init) ensures we refine within the basin already identified.
-    for rhobeg in (0.1, 0.01):
+    # ── Exploration / Optimisation Pass ───────────────────────────────────────
+    if config.optimiser == "COBYLA":
+        # COBYLA Cascade
         opt_result = minimize(
             fun     = cost_fn,
-            x0      = best_params,
+            x0      = theta_init,
             method  = "COBYLA",
             tol     = config.tol,
             options = {
                 "maxiter": config.max_iter,
-                "rhobeg":  rhobeg,
+                "rhobeg":  0.5,
             },
         )
+        best_params  = opt_result.x.copy()
+        best_cost    = float(opt_result.fun)
+        cost_history = [best_cost]
+        total_evals  = int(opt_result.nfev)
 
-        total_evals  += int(opt_result.nfev)
-        current_cost  = float(opt_result.fun)
-        cost_history.append(current_cost)
-
-        if current_cost < best_cost:
-            best_cost   = current_cost
-            best_params = opt_result.x.copy()
-
-        # Terminate refinement early if tolerance is satisfied.
         if best_cost <= config.tol:
-            break
+            return best_params, best_cost, cost_history, total_evals
+
+        for rhobeg in (0.1, 0.01):
+            opt_result = minimize(
+                fun     = cost_fn,
+                x0      = best_params,
+                method  = "COBYLA",
+                tol     = config.tol,
+                options = {
+                    "maxiter": config.max_iter,
+                    "rhobeg":  rhobeg,
+                },
+            )
+            total_evals  += int(opt_result.nfev)
+            current_cost  = float(opt_result.fun)
+            cost_history.append(current_cost)
+
+            if current_cost < best_cost:
+                best_cost   = current_cost
+                best_params = opt_result.x.copy()
+
+            if best_cost <= config.tol:
+                break
+    else:
+        # e.g., L-BFGS-B or others
+        opt_result = minimize(
+            fun     = cost_fn,
+            x0      = theta_init,
+            method  = config.optimiser,
+            tol     = config.tol,
+            options = {
+                "maxiter": config.max_iter,
+            },
+        )
+        best_params  = opt_result.x.copy()
+        best_cost    = float(opt_result.fun)
+        cost_history = [best_cost]
+        total_evals  = int(opt_result.nfev)
 
     return best_params, best_cost, cost_history, total_evals
 
@@ -370,11 +377,7 @@ def vqls_solve_system(
     # ── Pauli Decomposition ───────────────────────────────────────────────────
     # Computed once and shared across all restarts to avoid redundant work.
     # The decomposition depends only on A, not on the parameter vector.
-    pauli_terms, A_norm_factor = pauli_decompose_normalised(
-        N         = N,
-        main_diag = A[0, 0],
-        off_diag  = A[0, 1],
-    )
+    pauli_terms, A_norm_factor = pauli_decompose_normalised(A)
 
     n_p = n_params(n_qubits, config.n_layers)
 

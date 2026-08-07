@@ -191,9 +191,10 @@ def hhl_solve_4th(
     # print(f"    u_thomas                   = {np.linalg.solve(A, b)}")
 
     # Recover physical scale: find c such that c * A @ x_raw_unit ≈ b
+    # We project using b instead of Ax to avoid amplifying high-frequency QPE noise
     Ax = A @ x_raw_unit
-    denom = float(np.dot(Ax, Ax))
-    numer = float(np.dot(b, Ax))
+    denom = float(np.dot(b, Ax))
+    numer = float(np.dot(b, b))
     # print(f"    denom_phys = {denom:.6e}")
     # print(f"    numer_phys = {numer:.6e}")
     # print(f"    c_phys     = {numer / denom:.6e}")
