@@ -108,7 +108,7 @@ class VQLSConfig1D:
     """
     n_layers:    int   = 4
     optimiser:   str   = "COBYLA"
-    max_iter:    int   = 500
+    max_iter:    int   = 1000
     tol:         float = 1e-6
     init_params: Optional[np.ndarray] = field(default=None, repr=False)
     random_seed: int   = 42

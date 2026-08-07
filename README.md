@@ -1,6 +1,6 @@
 # Quantum Linear System Solvers for the Poisson Equation: HHL, VQLS, and QSVT Applied to Hall Effect Thruster Plasma Modelling
 
-This repository contains the computational framework developed for the MSc thesis *"Quantum Algorithms for Coupled Fluid-Thermal Partial Differential Equations: Application to Regenerative Cooling in Rocket Nozzles"*, Department of Aeronautics, Imperial College London (2026).
+This repository contains the computational framework developed for the MSc thesis *"A Comparative Study of HHL, VQLS, and QSVT Algorithms for Solving Poisson-Type PDEs with Application to Hall-Effect Thruster Plasma Modelling"*, Department of Aeronautics, Imperial College London (2026).
 
 The codebase implements and benchmarks three quantum linear system algorithms — the Harrow-Hassidim-Lloyd (HHL) algorithm, the Variational Quantum Linear Solver (VQLS), and the Quantum Singular Value Transformation (QSVT) — applied to the Poisson boundary value problem in one and two spatial dimensions. A physically motivated application to the electrostatic Poisson equation in Hall Effect Thruster (HET) plasma modelling is included as a proof-of-concept demonstration.
 
