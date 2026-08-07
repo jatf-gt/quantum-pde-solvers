@@ -91,6 +91,8 @@ from qiskit import QuantumCircuit, QuantumRegister, AncillaRegister
 from qiskit.circuit.library import Isometry
 from qiskit.quantum_info import Statevector
 
+from core.execution import default_executor, qsvt_spec
+
 from problems.poisson_1d import PoissonProblem1D
 from solvers.quantum.block_encoding import (
     build_tst_block_encoding,
@@ -333,11 +335,15 @@ def qsvt_solve_system(
             f"circuit depth={circuit_depth}"
         )
 
-    # ── Stage 4: statevector simulation ───────────────────────────────────────
-    sv = Statevector(qsvt_circuit).data
-
-    # ── Stage 5: solution extraction and proportionality recovery ─────────────
-    x_raw = _extract_solution(sv, n, _N_ANCILLA_BE, degree)  # n_a=2: BE ancilla + signal qubit ??
+    # ── Stage 4/5: execution and post-selected solution extraction ────────────
+    # Routed through core.execution so that the same solver body runs under
+    # exact statevector evolution (the default and the thesis baseline), under
+    # a shot-based noisy simulator, or on hardware. The default executor
+    # reproduces the previous inline extraction bit-for-bit.
+    x_raw, exec_record = default_executor().extract(
+        qsvt_circuit,
+        qsvt_spec(n, _N_ANCILLA_BE, label=getattr(config, "label", "") or "QSVT"),
+    )
     # x_raw = Im(post-selected state), shape (N,), real-valued.
     # Under sym_qsp Wx convention: Im(P(A/alpha))|b_norm> approx (1/kappa_eff) A^{-1}|b_norm>
 

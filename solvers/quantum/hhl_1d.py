@@ -28,6 +28,8 @@ from quantum_linear_solvers.linear_solvers.matrices.tridiagonal_toeplitz import 
 )
 from qiskit.quantum_info import Statevector
 
+from core.execution import default_executor, hhl_spec
+
 from problems.poisson_1d import PoissonProblem1D
 from solvers.quantum.result import SolverResult
 
@@ -232,52 +234,13 @@ def _extract_solution_statevector(
         dominant statevector amplitudes is emitted first, to identify which
         register failed to clear.
     """
-    N       = 2 ** num_qubits
-    n_total = circuit.num_qubits
-    n_b     = circuit.qregs[0].size
-    n_l     = circuit.qregs[1].size
-    n_ancilla = n_total - 1 - n_b - n_l
-
-    flag_bit_pos          = n_total - 1
-    clock_start           = n_b
-    ancilla_start         = n_b + n_l
-    non_b_non_flag_mask   = (
-        ((1 << n_l)       - 1) << clock_start
-        | ((1 << n_ancilla) - 1) << ancilla_start
+    # Routed through core.execution so that the same solver body runs under
+    # exact statevector evolution (the default and the thesis baseline), under
+    # a shot-based noisy simulator, or on hardware. The default executor
+    # reproduces the previous inline masking and diagnostics bit-for-bit; the
+    # register layout documented above is now expressed by ``hhl_spec``.
+    x_raw_real, _record = default_executor().extract(
+        circuit,
+        hhl_spec(circuit, num_qubits),
     )
-
-    sv    = Statevector(circuit).data
-    x_raw = np.zeros(N, dtype=complex)
-
-    for idx in range(2 ** n_total):
-        flag_bit    = (idx >> flag_bit_pos) & 1
-        middle_bits = idx & non_b_non_flag_mask
-        b_reg_idx   = idx & (N - 1)
-
-        if flag_bit == 1 and middle_bits == 0:
-            x_raw[b_reg_idx] = sv[idx]
-
-    x_raw_real = np.real(x_raw)
-
-    if np.allclose(x_raw_real, 0.0, atol=1e-12):
-        reg_info = [(r.name, r.size) for r in circuit.qregs]
-        print("\n  HHL post-selection diagnostics — "
-              "dominant statevector amplitudes by magnitude:")
-        magnitudes  = np.abs(sv)
-        top_indices = np.argsort(magnitudes)[::-1][:10]
-        for idx in top_indices:
-            print(
-                f"    idx={idx:5d}  "
-                f"|amp|={magnitudes[idx]:.6f}  "
-                f"flag={(idx >> flag_bit_pos) & 1}  "
-                f"clock={(idx & (((1 << n_l) - 1) << n_b)) >> n_b:0{n_l}b}  "
-                f"b_reg={idx & (N - 1)}"
-            )
-        raise RuntimeError(
-            f"HHL extraction returned a null vector under strict post-selection.\n"
-            f"Registers: {reg_info}\n"
-            f"Parameters: n_total={n_total}, n_b={n_b}, n_l={n_l}, "
-            f"n_ancilla={n_ancilla}."
-        )
-
     return x_raw_real

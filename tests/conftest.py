@@ -305,3 +305,52 @@ THOMAS_RESIDUAL_TOL  = 1e-10   # Thomas should be near machine precision
 HHL_REL_ERROR_TOL    = 0.20    # 20% — Trotter error at N=4, epsilon=0.01
 VQLS_REL_ERROR_TOL   = 0.15    # 15% — variational error with fast config
 VQLS_COST_TOL        = 0.05    # cost < 0.05 means the optimiser converged
+
+
+# -------- Addition for Quantum Hardware Test (QHT) ---------------------
+
+import json
+from pathlib import Path
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--update-baseline",
+        action="store_true",
+        default=False,
+        help=(
+            "Regenerate tests/baselines/baseline_v1.json from the current "
+            "code. Run this once, on the baseline commit, in the msc_qiskit "
+            "environment, and commit the result."
+        ),
+    )
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Write the golden baseline file, if this session was generating one."""
+    if not session.config.getoption("--update-baseline", default=False):
+        return
+
+    try:
+        from tests.test_regression_baseline import (
+            BASELINE_DIR, BASELINE_FILE, _STASH, _provenance,
+        )
+    except Exception:                                    # pragma: no cover
+        return
+
+    if not _STASH:
+        print("\n--update-baseline was given but no cases ran; nothing written.")
+        return
+
+    BASELINE_DIR.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema":     1,
+        "provenance": _provenance(),
+        "cases":      dict(sorted(_STASH.items())),
+    }
+    BASELINE_FILE.write_text(json.dumps(payload, indent=2) + "\n")
+
+    print(f"\nBaseline written: {BASELINE_FILE} ({len(_STASH)} cases)")
+    print(f"  git sha : {payload['provenance']['git_sha']}")
+    print(f"  versions: {payload['provenance']['versions']}")
+    print("  Commit this file. It is the thesis replication contract.")
