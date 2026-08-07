@@ -561,7 +561,7 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--max-degree", type=int, default=None,
+        "--max-degree", type=int, default=500,
         help=(
             "Hard cap on QSVT polynomial degree. "
             "None = uncapped (use pyqsp's own selection). "

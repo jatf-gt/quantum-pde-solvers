@@ -178,31 +178,32 @@ def hhl_solve_4th(
         )
     x_raw_unit = x_raw / x_raw_norm
 
-    print(f"\n  [HHL-4th diagnostic]")
-    print(f"    num_qubits (data register) = {num_qubits}")
-    print(f"    total circuit qubits       = {solution.state.num_qubits}")
-    print(f"    ||x_raw||                  = {np.linalg.norm(x_raw):.6e}")
-    print(f"    x_raw                      = {x_raw}")
-    print(f"    ||A_norm @ x_raw||         = {np.linalg.norm(A_norm @ x_raw):.6e}")
-    cos_angle = np.dot(b_norm, A_norm @ x_raw) / (
-        np.linalg.norm(A_norm @ x_raw) * np.linalg.norm(b_norm) + 1e-300
-    )
-    print(f"    cos(A_norm x_raw, b_norm)  = {cos_angle:.6f}")
-    print(f"    u_thomas                   = {np.linalg.solve(A, b)}")
+    # print(f"\n  [HHL-4th diagnostic]")
+    # print(f"    num_qubits (data register) = {num_qubits}")
+    # print(f"    total circuit qubits       = {solution.state.num_qubits}")
+    # print(f"    ||x_raw||                  = {np.linalg.norm(x_raw):.6e}")
+    # print(f"    x_raw                      = {x_raw}")
+    # print(f"    ||A_norm @ x_raw||         = {np.linalg.norm(A_norm @ x_raw):.6e}")
+    # cos_angle = np.dot(b_norm, A_norm @ x_raw) / (
+    #     np.linalg.norm(A_norm @ x_raw) * np.linalg.norm(b_norm) + 1e-300
+    # )
+    # print(f"    cos(A_norm x_raw, b_norm)  = {cos_angle:.6f}")
+    # print(f"    u_thomas                   = {np.linalg.solve(A, b)}")
 
     # Recover physical scale: find c such that c * A @ x_raw_unit ≈ b
     Ax = A @ x_raw_unit
     denom = float(np.dot(Ax, Ax))
     numer = float(np.dot(b, Ax))
-    print(f"    denom_phys = {denom:.6e}")
-    print(f"    numer_phys = {numer:.6e}")
-    print(f"    c_phys     = {numer / denom:.6e}")
+    # print(f"    denom_phys = {denom:.6e}")
+    # print(f"    numer_phys = {numer:.6e}")
+    # print(f"    c_phys     = {numer / denom:.6e}")
     c_phys = numer / denom
     u = c_phys * x_raw_unit
 
     residual = float(
         np.linalg.norm(A @ u - b) / (np.linalg.norm(b) + 1e-300)
     )
+    # print(f"    residual = {residual:.6e}")
     wall = time.perf_counter() - t_start
 
     return SolverResult(
