@@ -27,7 +27,11 @@ Usage:
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 # Case IDs affected by the geometry correction, cross-checked against
 # core/cases.py by AST-searching every case-building function for a
