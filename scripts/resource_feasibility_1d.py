@@ -30,7 +30,11 @@ hardware run would actually submit.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 from core.resources import (
     HERON_R2_TWO_QUBIT_GATE_BUDGET,
