@@ -406,6 +406,7 @@ class SweepConfig:
     save_solutions:  bool = True
     save_history:    bool = True
     estimate_only:   bool = False
+    order:           int = 2
     # Opt-in, OFF by default.  See the discussion in the module header of the
     # submit script: switching scheme with N makes the work-versus-N curve
     # discontinuous and conflates solver scaling with scheme scaling.
@@ -587,6 +588,50 @@ def _estimate_case(case_id, N, prob, cfg: SweepConfig) -> None:
                  s.upper(), secs, secs / 3600.0)
 
 
+def _run_4th_order_solver_3d(problem, inner: str, cfg: SweepConfig, N: int) -> 'OuterResult':
+    from scripts.debug_3d_4th import jacobi_3d_4th
+    from solvers.outer.core import OuterResult, WorkLog
+    import io, contextlib
+    
+    t0 = time.perf_counter()
+    with contextlib.redirect_stdout(io.StringIO()):
+        phi, iters, converged, history = jacobi_3d_4th(
+            N=N,
+            f_vals=problem.f,
+            dx=problem.spacings[0],
+            dy=problem.spacings[1],
+            dz=problem.spacings[2],
+            bc_lo=problem.bc_lo,
+            bc_hi=problem.bc_hi,
+            periodic=problem.periodic,
+            inner=inner,
+            inner_kwargs=cfg.inner_config(N).get(inner, {}),
+            u_exact=np.zeros_like(problem.f), 
+            u_thomas=np.zeros_like(problem.f), 
+            tol=cfg.tol,
+            max_iter=cfg.scheme_options.get("max_iter", 500),
+            print_every=999999,
+        )
+    wall = time.perf_counter() - t0
+    
+    w = WorkLog()
+    w.add(N, N * iters)
+    
+    return OuterResult(
+        u=phi,
+        scheme="line-jacobi-4th",
+        inner=inner,
+        converged=converged,
+        n_outer=iters,
+        residual=history[-1] if history else float("nan"),
+        residual_history=history,
+        work=w,
+        wall_time_s=wall,
+        stop_reason="tol_met" if converged else "max_iter",
+        diagnostics={"update": "jacobi", "omega": 1.0, "final_delta": history[-1] if history else float("nan")}
+    )
+
+
 def _run_case(section: str, N: int, cfg: SweepConfig, results: list) -> None:
     prob, phi_ref, f_vals, case_id, mode_m = SECTIONS[section](N)
     inner_cfg = cfg.inner_config(N)
@@ -620,8 +665,11 @@ def _run_case(section: str, N: int, cfg: SweepConfig, results: list) -> None:
         "x".join(map(str, lv.problem.shape)) for lv in levels))
 
     # ── classical reference ───────────────────────────────────────────────────
-    res_T = solve(prob, inner="thomas", scheme=scheme,
-                  inner_options=inner_cfg, **kw)
+    if cfg.order == 4:
+        res_T = _run_4th_order_solver_3d(prob, "thomas", cfg, N)
+    else:
+        res_T = solve(prob, inner="thomas", scheme=scheme,
+                      inner_options=inner_cfg, **kw)
     phi_T = res_T.u
     # Every per-solver line is tagged with [case N=..]. This is not cosmetic:
     # each worker process opens its own handle to the shared log file (see
@@ -655,8 +703,11 @@ def _run_case(section: str, N: int, cfg: SweepConfig, results: list) -> None:
     # ── quantum solvers ───────────────────────────────────────────────────────
     for solver_name in cfg.solvers:
         try:
-            res_q = solve(prob, inner=solver_name, scheme=scheme,
-                          inner_options=inner_cfg, **kw)
+            if cfg.order == 4:
+                res_q = _run_4th_order_solver_3d(prob, solver_name, cfg, N)
+            else:
+                res_q = solve(prob, inner=solver_name, scheme=scheme,
+                              inner_options=inner_cfg, **kw)
         except Exception as exc:
             log.error("    [%s N=%d] %-6s FAILED: %s",
                       case_id, N, solver_name.upper(), exc, exc_info=True)
@@ -866,6 +917,8 @@ def main() -> None:
         description="Full 3-D HPC benchmark sweep for quantum PDE solvers.",
         formatter_class=argparse.RawDescriptionHelpFormatter)
 
+    ap.add_argument("--order", type=int, choices=[2, 4], default=2,
+                    help="Spatial discretisation order (2 or 4).")
     ap.add_argument("--max-n", type=int, default=16,
                     help="largest grid size (default %(default)s; 3-D sweeps "
                          "cost N^2 strip solves per sweep, so raise with care)")
@@ -942,7 +995,7 @@ def main() -> None:
         solvers=solvers, inner_options=inner_opts,
         scheme_options=coerce_scheme_opts(parse_kv(args.scheme_opt, "--scheme-opt")),
         save_solutions=not args.no_solutions, estimate_only=args.estimate,
-        scheme_crossover=args.scheme_crossover)
+        scheme_crossover=args.scheme_crossover, order=args.order)
 
     # Pre-flight: validate options (pure, no imports), then build the solvers
     # (which does import the quantum backends).  Kept separate so a missing
@@ -963,6 +1016,22 @@ def main() -> None:
                          f"install it, drop it from --solvers, or --estimate.")
             except Exception as exc:
                 ap.error(f"inner solver {name!r} could not be built: {exc}")
+
+    global RESULTS_DIR, LOG_FILE
+    
+    if args.order == 4:
+        RESULTS_DIR = Path("results") / "3Dhpc_run_4th"
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        LOG_FILE = RESULTS_DIR / "run.log"
+        logger = logging.getLogger()
+        for handler in logger.handlers[:]:
+            if isinstance(handler, logging.FileHandler):
+                logger.removeHandler(handler)
+        logger.addHandler(logging.FileHandler(LOG_FILE, mode="w" if _IS_MAIN_PROCESS else "a"))
+        
+        # Uncap N=4 for 4th order QSVT
+        if 4 in QSVT_MAX_DEGREE_3D:
+            QSVT_MAX_DEGREE_3D[4] = None
 
     _banner("QUANTUM PDE SOLVERS - 3D HPC BENCHMARK")
     log.info("  N values    : %s", N_values)

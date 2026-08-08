@@ -162,7 +162,7 @@ QSVT_MAX_DEGREE_BY_N: dict[int, Optional[int]] = {
 # it a different kappa than the standard TST matrix at the same N (confirmed
 # in your run.log: 437.70 at N=16 vs 116.46 everywhere else). 1000 computes
 # live in a few seconds regardless of kappa, per the capped-fit path.
-QSVT_UNCACHED_FALLBACK_DEGREE: int = 1000
+QSVT_UNCACHED_FALLBACK_DEGREE: int = 5000
 QSVT_MAX_DEGREE_FALLBACK: int = 5000
 
 # ── HHL / VQLS configuration ──────────────────────────────────────────────────
@@ -467,6 +467,13 @@ def _run_thomas(A: np.ndarray, b: np.ndarray,
             d     = np.asarray(b, dtype=float).copy()
 
             t0 = time.perf_counter()
+            # If the matrix is not strictly tridiagonal (e.g. 4th order pentadiagonal),
+            # fallback to a general solver since Thomas only works for tridiagonal.
+            if np.any(np.abs(np.triu(A, 2)) > 1e-12) or np.any(np.abs(np.tril(A, -2)) > 1e-12):
+                u = np.linalg.solve(A, d)
+                timings.append(time.perf_counter() - t0)
+                continue
+                
             # Forward elimination
             for i in range(1, N):
                 m        = lower[i - 1] / diag[i - 1]
@@ -597,7 +604,9 @@ def _resolve_qsvt_max_degree(kappa: float, epsilon: float, N: int) -> Optional[i
            candidate if candidate is not None else -1)
     if qsp_angles._load_disk(key) is not None:
         return candidate                       # cache hit: use the real cap
-    return QSVT_UNCACHED_FALLBACK_DEGREE        # cache miss: cheap fallback
+    # Cache miss: fallback to an N-dependent cap
+    fallback = min(QSVT_UNCACHED_FALLBACK_DEGREE, int(kappa * 15))
+    return max(100, fallback)
 
 
 def _build_qsvt_config(max_degree: Optional[int]):
@@ -762,6 +771,7 @@ def _run_all_solvers(
 
 def run_1d_generic_poisson_single_N(
     N: int, skip_qsvt: bool, results: list[RunResult], all_solutions: dict,
+    order: int,
 ) -> None:
     """Section 1: generic Poisson, homogeneous Dirichlet BCs, three sources."""
     _banner(f"SECTION 1 - Generic Poisson (fS, fL, fH), homogeneous BCs, N={N}")
@@ -776,6 +786,19 @@ def run_1d_generic_poisson_single_N(
         _section(f"Source: {src_key}  (N={N})")
 
         built = cases.get(case_name).build(N)
+        if order == 4:
+            from problems.poisson_1d_4th import PoissonProblem1D4th
+            import dataclasses
+            dx = built.spacings[0]
+            alpha = float(dx**2 * built.f_values[0] - built.b[0])
+            beta = float(dx**2 * built.f_values[-1] - built.b[-1])
+            prob_4th = PoissonProblem1D4th(
+                N=N,
+                f_vals=built.f_values,
+                alpha=alpha,
+                beta=beta
+            )
+            built = dataclasses.replace(built, A=prob_4th.A, b=prob_4th.b, kappa=prob_4th.kappa)
         x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
         case_id = f"1D_Poisson_{src_key}_hom"
 
@@ -787,6 +810,7 @@ def run_1d_generic_poisson_single_N(
 
 def run_1d_generic_poisson_nonhom_single_N(
     N: int, skip_qsvt: bool, results: list[RunResult], all_solutions: dict,
+    order: int,
 ) -> None:
     """
     Section 1b: generic Poisson, fS source, non-homogeneous Dirichlet BCs.
@@ -797,6 +821,19 @@ def run_1d_generic_poisson_nonhom_single_N(
     _banner(f"SECTION 1b - Generic Poisson (fS), non-homogeneous BCs, N={N}")
 
     built = cases.get("poisson_1d_fS_nonhom").build(N)
+    if order == 4:
+        from problems.poisson_1d_4th import PoissonProblem1D4th
+        import dataclasses
+        dx = built.spacings[0]
+        alpha = float(dx**2 * built.f_values[0] - built.b[0])
+        beta = float(dx**2 * built.f_values[-1] - built.b[-1])
+        prob_4th = PoissonProblem1D4th(
+            N=N,
+            f_vals=built.f_values,
+            alpha=alpha,
+            beta=beta
+        )
+        built = dataclasses.replace(built, A=prob_4th.A, b=prob_4th.b, kappa=prob_4th.kappa)
     x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
     case_id = "1D_Poisson_fS_nonhom"
 
@@ -808,6 +845,7 @@ def run_1d_generic_poisson_nonhom_single_N(
 
 def run_1d_het_single_N(
     N: int, skip_qsvt: bool, results: list[RunResult], all_solutions: dict,
+    order: int,
 ) -> None:
     """
     Section 2: HET axial Poisson, three sub-cases.
@@ -823,10 +861,27 @@ def run_1d_het_single_N(
     """
     _banner(f"SECTION 2 - HET Axial Poisson, N={N}")
 
+    def apply_4th_order(built):
+        if order != 4:
+            return built
+        from problems.poisson_1d_4th import PoissonProblem1D4th
+        import dataclasses
+        dx = built.spacings[0]
+        alpha = float(dx**2 * built.f_values[0] - built.b[0])
+        beta = float(dx**2 * built.f_values[-1] - built.b[-1])
+        prob_4th = PoissonProblem1D4th(
+            N=N,
+            f_vals=built.f_values,
+            alpha=alpha,
+            beta=beta
+        )
+        return dataclasses.replace(built, A=prob_4th.A, b=prob_4th.b, kappa=prob_4th.kappa)
+
     # ── Sub-case 3a: linear profile, homogeneous BCs ──────────────────────────
     _section(f"Sub-case 3a: linear profile, homogeneous BCs  (N={N})")
 
     built = cases.get("het_1d_3a_linear").build(N)
+    built = apply_4th_order(built)
     x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
     case_id = "HET_1D_3a_linear_hom"
 
@@ -839,6 +894,7 @@ def run_1d_het_single_N(
     _section(f"Sub-case 3b: Gaussian profile, V_d=300V, Dirichlet BCs  (N={N})")
 
     built = cases.get("het_1d_3b_gaussian_Vd300").build(N)
+    built = apply_4th_order(built)
     x, A, b, kappa = built.coords[0], built.A, built.b, built.kappa
     case_id = "HET_1D_3b_gaussian_Vd300"
 
@@ -859,12 +915,15 @@ def run_1d_het_single_N(
     log.info("  Reference: quadrature of the double integral of the source")
 
     built = cases.get("het_1d_3c_neumann").build(N)
-    x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
-    case_id = "HET_1D_3c_gaussian_NeumannDirichlet"
+    if order == 4:
+        log.warning("Sub-case 3c (Neumann) not supported by PoissonProblem1D4th. Skipping.")
+    else:
+        x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
+        case_id = "HET_1D_3c_gaussian_NeumannDirichlet"
 
-    log.info("  N=%3d  kappa=%.2f  sub-case=3c  h=%.5f", N, kappa, built.spacings[0])
-    _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
-                     skip_qsvt, results, all_solutions)
+        log.info("  N=%3d  kappa=%.2f  sub-case=3c  h=%.5f", N, kappa, built.spacings[0])
+        _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
+                         skip_qsvt, results, all_solutions)
 
 
 # ── Result serialisation ──────────────────────────────────────────────────────
@@ -945,7 +1004,7 @@ def _save_run_metadata(N_values: list[int], skip_qsvt: bool,
 
 # ── Work unit dispatch ────────────────────────────────────────────────────────
 
-def _execute_work_unit(work_type: str, N: int, skip_qsvt: bool
+def _execute_work_unit(work_type: str, N: int, skip_qsvt: bool, order: int
                        ) -> tuple[list[RunResult], dict]:
     """
     Execute one (case_family, N) work unit and return its results.
@@ -969,7 +1028,7 @@ def _execute_work_unit(work_type: str, N: int, skip_qsvt: bool
         log.error("Unknown work_type '%s'; skipping.", work_type)
         return results, solutions
 
-    fn(N, skip_qsvt, results, solutions)
+    fn(N, skip_qsvt, results, solutions, order)
     return results, solutions
 
 
@@ -998,6 +1057,8 @@ def main() -> None:
         description="Full 1-D HPC benchmark sweep for quantum PDE solvers.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    parser.add_argument("--order", type=int, choices=[2, 4], default=2,
+                        help="Spatial discretisation order (2 or 4).")
     parser.add_argument(
         "--max-n", type=int, default=max(N_VALUES_ALL),
         help=f"Largest N to include. The full sweep is {N_VALUES_ALL}; "
@@ -1024,7 +1085,23 @@ def main() -> None:
     # ── Resolve backend and report configuration ──────────────────────────────
     backend = get_aer_backend(prefer_gpu=_USE_GPU)
 
-    _banner("QUANTUM PDE SOLVER - FULL 1D HPC BENCHMARK RUN")
+    global RESULTS_DIR, LOG_FILE, QSVT_UNCACHED_FALLBACK_DEGREE
+    
+    if args.order == 4:
+        # Avoid overwriting 2nd-order results
+        RESULTS_DIR = Path("results") / "1Dhpc_run_4th"
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        LOG_FILE = RESULTS_DIR / "run.log"
+        QSVT_UNCACHED_FALLBACK_DEGREE = 5000
+        
+        # Reconfigure root logger to point to new file
+        logger = logging.getLogger()
+        for handler in logger.handlers[:]:
+            if isinstance(handler, logging.FileHandler):
+                logger.removeHandler(handler)
+        logger.addHandler(logging.FileHandler(LOG_FILE, mode="w" if _IS_MAIN_PROCESS else "a"))
+
+    _banner("QUANTUM PDE SOLVERS - 1D HPC BENCHMARK")
     log.info("  N values      : %s", N_values)
     log.info("  QSVT deg caps : %s", QSVT_MAX_DEGREE_BY_N)
     log.info("  Max workers   : %d", args.max_workers)
@@ -1063,7 +1140,7 @@ def main() -> None:
         for work_type, N, skip_qsvt in work_units:
             try:
                 partial_results, partial_solutions = _execute_work_unit(
-                    work_type, N, skip_qsvt)
+                    work_type, N, skip_qsvt, args.order)
                 results.extend(partial_results)
                 all_solutions.update(partial_solutions)
             except Exception as exc:
@@ -1077,7 +1154,7 @@ def main() -> None:
             max_tasks_per_child=1,   # fresh process per work unit
         ) as executor:
             futures = {
-                executor.submit(_execute_work_unit, wt, N, sq): (wt, N)
+                executor.submit(_execute_work_unit, wt, N, sq, args.order): (wt, N)
                 for wt, N, sq in work_units
             }
             for future in concurrent.futures.as_completed(futures):
