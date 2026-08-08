@@ -503,28 +503,77 @@ def _estimate_case(case_id, N, problem, cfg: SweepConfig) -> None:
 
 def _run_4th_order_solver_2d(problem: PoissonLine2D, inner: str, cfg: SweepConfig, N: int) -> 'OuterResult':
     from scripts.debug_2d_4th import jacobi_2d_4th
+    from solvers.outer.multigrid_4th import fmg_2d_4th, sor_2d_4th
     from solvers.outer.core import OuterResult, WorkLog
     import io, contextlib
     
     t0 = time.perf_counter()
     with contextlib.redirect_stdout(io.StringIO()):
-        phi, iters, converged, history = jacobi_2d_4th(
-            N=N,
-            f_vals=problem.f,
-            dx=problem.dx,
-            dy=problem.dy,
-            bc_x0=problem.bc_x0,
-            bc_x1=problem.bc_x1,
-            bc_y0=problem.bc_y0,
-            bc_y1=problem.bc_y1,
-            inner=inner,
-            inner_kwargs=cfg.inner_config(N).get(inner, {}),
-            u_exact=np.zeros_like(problem.f), 
-            u_thomas=np.zeros_like(problem.f), 
-            tol=cfg.tol,
-            max_iter=cfg.scheme_options.get("max_iter", 5000),
-            print_every=999999,
-        )
+        effective_scheme = cfg.scheme
+        if N <= 4 and cfg.scheme in ("fmg", "multigrid"):
+            effective_scheme = "sor"
+            
+        if effective_scheme in ("fmg", "multigrid"):
+            phi, history = fmg_2d_4th(
+                N=N,
+                f_vals=problem.f,
+                dx=problem.dx,
+                dy=problem.dy,
+                bc_x0=problem.bc_x0,
+                bc_x1=problem.bc_x1,
+                bc_y0=problem.bc_y0,
+                bc_y1=problem.bc_y1,
+                inner=inner,
+                inner_kwargs=cfg.inner_config(N).get(inner, {}),
+                tol=cfg.tol,
+                max_cycles=cfg.scheme_options.get("max_cycles", 30),
+            )
+            iters = len(history)
+            converged = (history[-1] < cfg.tol) if history else False
+            scheme_name = f"{effective_scheme}-4th"
+            omega_used = 1.0
+        elif effective_scheme == "sor":
+            omega = cfg.scheme_options.get("omega", 1.8)
+            phi, history = sor_2d_4th(
+                N=N,
+                f_vals=problem.f,
+                dx=problem.dx,
+                dy=problem.dy,
+                bc_x0=problem.bc_x0,
+                bc_x1=problem.bc_x1,
+                bc_y0=problem.bc_y0,
+                bc_y1=problem.bc_y1,
+                inner=inner,
+                inner_kwargs=cfg.inner_config(N).get(inner, {}),
+                tol=cfg.tol,
+                max_iter=cfg.scheme_options.get("max_iter", 5000),
+                omega=omega,
+            )
+            iters = len(history)
+            converged = (history[-1] < cfg.tol) if history else False
+            scheme_name = f"line-sor-4th (fallback)"
+            omega_used = omega
+        else:
+            phi, iters, converged, history = jacobi_2d_4th(
+                N=N,
+                f_vals=problem.f,
+                dx=problem.dx,
+                dy=problem.dy,
+                bc_x0=problem.bc_x0,
+                bc_x1=problem.bc_x1,
+                bc_y0=problem.bc_y0,
+                bc_y1=problem.bc_y1,
+                inner=inner,
+                inner_kwargs=cfg.inner_config(N).get(inner, {}),
+                u_exact=np.zeros_like(problem.f), 
+                u_thomas=np.zeros_like(problem.f), 
+                tol=cfg.tol,
+                max_iter=cfg.scheme_options.get("max_iter", 5000),
+                print_every=999999,
+            )
+            scheme_name = "line-jacobi-4th"
+            omega_used = 1.0
+            
     wall = time.perf_counter() - t0
     
     w = WorkLog()
@@ -532,7 +581,7 @@ def _run_4th_order_solver_2d(problem: PoissonLine2D, inner: str, cfg: SweepConfi
     
     return OuterResult(
         u=phi,
-        scheme="line-jacobi-4th",
+        scheme=scheme_name,
         inner=inner,
         converged=converged,
         n_outer=iters,
@@ -541,7 +590,7 @@ def _run_4th_order_solver_2d(problem: PoissonLine2D, inner: str, cfg: SweepConfi
         work=w,
         wall_time_s=wall,
         stop_reason="tol_met" if converged else "max_iter",
-        diagnostics={"update": "jacobi", "omega": 1.0, "final_delta": history[-1] if history else float("nan")}
+        diagnostics={"update": effective_scheme, "omega": omega_used, "final_delta": history[-1] if history else float("nan")}
     )
 
 

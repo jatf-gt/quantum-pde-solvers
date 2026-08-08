@@ -538,7 +538,7 @@ def _record(results, case_id, solver_name, N, prob, res, phi_ref, f_vals,
         qsvt_degree=(int(d["polynomial_degree_mean"])
                      if d.get("polynomial_degree_mean") is not None else None),
         qsvt_depth=(int(d["circuit_depth_mean"])
-                    if d.get("circuit_depth_mean") is not None else None),
+                     if d.get("circuit_depth_mean") is not None else None),
         hhl_scale_c=d.get("prop_const_mean"),
         scheme=res.scheme,
         convergence_factor=(rho if (rho is not None and np.isfinite(rho)) else None),
@@ -590,28 +590,77 @@ def _estimate_case(case_id, N, prob, cfg: SweepConfig) -> None:
 
 def _run_4th_order_solver_3d(problem, inner: str, cfg: SweepConfig, N: int) -> 'OuterResult':
     from scripts.debug_3d_4th import jacobi_3d_4th
+    from solvers.outer.multigrid_4th import fmg_3d_4th, sor_3d_4th
     from solvers.outer.core import OuterResult, WorkLog
     import io, contextlib
     
     t0 = time.perf_counter()
     with contextlib.redirect_stdout(io.StringIO()):
-        phi, iters, converged, history = jacobi_3d_4th(
-            N=N,
-            f_vals=problem.f,
-            dx=problem.spacings[0],
-            dy=problem.spacings[1],
-            dz=problem.spacings[2],
-            bc_lo=problem.bc_lo,
-            bc_hi=problem.bc_hi,
-            periodic=problem.periodic,
-            inner=inner,
-            inner_kwargs=cfg.inner_config(N).get(inner, {}),
-            u_exact=np.zeros_like(problem.f), 
-            u_thomas=np.zeros_like(problem.f), 
-            tol=cfg.tol,
-            max_iter=cfg.scheme_options.get("max_iter", 500),
-            print_every=999999,
-        )
+        effective_scheme = cfg.scheme
+        if (N <= 4 or any(problem.periodic)) and cfg.scheme in ("fmg", "multigrid"):
+            effective_scheme = "sor"
+            
+        if effective_scheme in ("fmg", "multigrid"):
+            phi, history = fmg_3d_4th(
+                N=N,
+                f_vals=problem.f,
+                dx=problem.spacings[0],
+                dy=problem.spacings[1],
+                dz=problem.spacings[2],
+                bc_lo=problem.bc_lo,
+                bc_hi=problem.bc_hi,
+                periodic=problem.periodic,
+                inner=inner,
+                inner_kwargs=cfg.inner_config(N).get(inner, {}),
+                tol=cfg.tol,
+                max_cycles=cfg.scheme_options.get("max_cycles", 30),
+            )
+            iters = len(history)
+            converged = (history[-1] < cfg.tol) if history else False
+            scheme_name = f"{effective_scheme}-4th"
+            omega_used = 1.0
+        elif effective_scheme == "sor":
+            omega = cfg.scheme_options.get("omega", 1.8)
+            phi, history = sor_3d_4th(
+                N=N,
+                f_vals=problem.f,
+                dx=problem.spacings[0],
+                dy=problem.spacings[1],
+                dz=problem.spacings[2],
+                bc_lo=problem.bc_lo,
+                bc_hi=problem.bc_hi,
+                periodic=problem.periodic,
+                inner=inner,
+                inner_kwargs=cfg.inner_config(N).get(inner, {}),
+                tol=cfg.tol,
+                max_iter=cfg.scheme_options.get("max_iter", 500),
+                omega=omega,
+            )
+            iters = len(history)
+            converged = (history[-1] < cfg.tol) if history else False
+            scheme_name = f"line-sor-4th (fallback)" if cfg.scheme in ("fmg", "multigrid") else "line-sor-4th"
+            omega_used = omega
+        else:
+            phi, iters, converged, history = jacobi_3d_4th(
+                N=N,
+                f_vals=problem.f,
+                dx=problem.spacings[0],
+                dy=problem.spacings[1],
+                dz=problem.spacings[2],
+                bc_lo=problem.bc_lo,
+                bc_hi=problem.bc_hi,
+                periodic=problem.periodic,
+                inner=inner,
+                inner_kwargs=cfg.inner_config(N).get(inner, {}),
+                u_exact=np.zeros_like(problem.f), 
+                u_thomas=np.zeros_like(problem.f), 
+                tol=cfg.tol,
+                max_iter=cfg.scheme_options.get("max_iter", 500),
+                print_every=999999,
+            )
+            scheme_name = "line-jacobi-4th"
+            omega_used = 1.0
+            
     wall = time.perf_counter() - t0
     
     w = WorkLog()
@@ -619,7 +668,7 @@ def _run_4th_order_solver_3d(problem, inner: str, cfg: SweepConfig, N: int) -> '
     
     return OuterResult(
         u=phi,
-        scheme="line-jacobi-4th",
+        scheme=scheme_name,
         inner=inner,
         converged=converged,
         n_outer=iters,
@@ -628,7 +677,7 @@ def _run_4th_order_solver_3d(problem, inner: str, cfg: SweepConfig, N: int) -> '
         work=w,
         wall_time_s=wall,
         stop_reason="tol_met" if converged else "max_iter",
-        diagnostics={"update": "jacobi", "omega": 1.0, "final_delta": history[-1] if history else float("nan")}
+        diagnostics={"update": effective_scheme, "omega": omega_used, "final_delta": history[-1] if history else float("nan")}
     )
 
 
