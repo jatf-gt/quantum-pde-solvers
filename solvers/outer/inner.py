@@ -245,6 +245,10 @@ class InnerSolverWrapper:
 def _thomas(**_):
     """Direct tridiagonal solve. The exact reference for every scheme."""
     def solve(A, b):
+        # Fallback to general solver for pentadiagonal matrices
+        if np.any(np.abs(np.triu(A, 2)) > 1e-12) or np.any(np.abs(np.tril(A, -2)) > 1e-12):
+            return np.linalg.solve(A, b), {}
+            
         n = len(b)
         m = A.diagonal(0).copy()
         up = A.diagonal(1).copy()

@@ -12,7 +12,10 @@ __pycache__/
 *.egg-info/
 results_hpc/
 results/1Dhpc_run/
+results/1Dhpc_run_4th/
 results/2Dhpc_run/
+results/2Dhpc_run_4th/
 results/3Dhpc_run/
+results/3Dhpc_run_4th/
 CLAUDE.md
 context/

@@ -88,6 +88,10 @@ def thomas_solve_system(A: np.ndarray, b: np.ndarray) -> np.ndarray:
     """
     N = len(b)
 
+    # Fallback to general solver for pentadiagonal matrices
+    if np.any(np.abs(np.triu(A, 2)) > 1e-12) or np.any(np.abs(np.tril(A, -2)) > 1e-12):
+        return np.linalg.solve(A, b)
+
     # Diagonals are extracted at call time, for compatibility with any
     # tridiagonal operator rather than one specific discretisation.
     b_diag = A.diagonal(0).copy()       # Principal diagonal
