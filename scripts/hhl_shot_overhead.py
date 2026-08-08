@@ -7,19 +7,35 @@ usable sample requires ~kappa^2 total shots. This script measures that
 overhead directly via core.hardware.hardware_postselection_sample, and
 reports it alongside the exact (statevector) value for comparison.
 
+A bug was found and fixed in this script's first version
+------------------------------------------------------------
+The first version passed main_diag/off_diag directly to
+TridiagonalToeplitz, without spectrally normalising them first --
+hhl_solve_system (solvers/quantum/hhl_1d.py) does normalise, and its
+docstring says so explicitly. Running the buggy version produced an exact
+post-selection probability of 0.95 for a kappa~9 problem, where ~1/kappa^2
+~ 0.012 was expected: two orders of magnitude off, and a direct consequence
+of feeding a Hamiltonian-simulation-based QPE routine an eigenvalue range
+it was never designed for. build_hhl_circuit below now normalises exactly
+as hhl_solve_system does, and a kappa-based sanity check (comparing the
+measured exact probability against the 1/kappa^2 order of magnitude) has
+been added so a similar mismatch would be flagged automatically rather than
+silently trusted.
+
 IMPORTANT -- one part of this script is untested here
 ----------------------------------------------------------
 Everything else in this Phase 5 delivery (core/hardware.py,
 block_encoding_fidelity.py) was validated directly against FakeTorino in
-this development environment. The HHL circuit construction below could not
-be: quantum_linear_solvers (hhl_1d.py's dependency) is present in the repo
-tree but its submodule contents were not populated in the sandbox this was
-built in, so `HHL().solve(...)` was never actually run here. The code below
-mirrors solvers.quantum.hhl_1d.hhl_solve_system's construction line for
-line, and hhl_spec (core.execution, already validated) handles the
-post-selection specification -- but please run this once yourself and sanity-
-check the exact-probability printout against a value you trust (e.g. from an
-existing HHL solve) before relying on the hardware numbers it produces.
+this development environment, and the normalisation fix above was checked
+character-for-character against the repository's current hhl_1d.py. The
+HHL circuit construction itself could not be run here: quantum_linear_solvers
+is present in the repo tree but not populated as an importable package in
+any sandbox clone available during development (no .gitmodules entry
+either -- it appears to be a local, uncommitted dependency on the
+development machine). Please run this once and check the sanity-check
+warning does not fire, and that the exact probability printed is in a
+plausible range for the kappa reported, before trusting the hardware
+numbers that follow it.
 
 Usage
 -----
@@ -48,19 +64,41 @@ def build_hhl_circuit(N: int, main_diag: float, off_diag: float, epsilon: float)
     Mirrors solvers.quantum.hhl_1d.hhl_solve_system's circuit construction
     exactly, stopping before statevector extraction (which this script does
     on hardware instead, via post-selection sampling).
+
+    Re-verified character-for-character against the repository's current
+    hhl_1d.py (commit e03dcc5) before this fix, after an earlier version of
+    this script passed the raw main_diag/off_diag values directly to
+    TridiagonalToeplitz instead of spectrally normalising them first --
+    hhl_solve_system's own docstring states its A parameter is "spectrally
+    normalised internally so that its eigenvalues lie within (-1, 1]" and
+    its body computes a_norm = A[0,0]/||A||_2, b_off = A[0,1]/||A||_2 before
+    ever constructing the TridiagonalToeplitz operator. Skipping that step
+    feeds the Hamiltonian-simulation-based QPE an eigenvalue range it was
+    never designed for, and the eigenvalue-inversion flag's success
+    probability -- the entire quantity this script exists to measure --
+    is meaningless under it.
     """
     from quantum_linear_solvers.linear_solvers.hhl import HHL
     from quantum_linear_solvers.linear_solvers.matrices.tridiagonal_toeplitz import (
         TridiagonalToeplitz,
     )
 
-    num_qubits = int(np.log2(N))
+    A = (
+        main_diag * np.eye(N)
+        + off_diag * np.diag(np.ones(N - 1), k=1)
+        + off_diag * np.diag(np.ones(N - 1), k=-1)
+    )
+    A_norm_factor = float(np.linalg.norm(A, ord=2))
+    a_norm = A[0, 0] / A_norm_factor
+    b_off  = A[0, 1] / A_norm_factor
+
+    num_qubits    = int(np.log2(N))
     trotter_steps = max(1, int(np.ceil(1.0 / epsilon)))
 
     matrix = TridiagonalToeplitz(
         num_state_qubits=num_qubits,
-        main_diag=main_diag,
-        off_diag=off_diag,
+        main_diag=a_norm,
+        off_diag=b_off,
         trotter_steps=trotter_steps,
     )
 
@@ -71,7 +109,7 @@ def build_hhl_circuit(N: int, main_diag: float, off_diag: float, epsilon: float)
         warnings.simplefilter("ignore")
         solution = hhl.solve(matrix, b)
 
-    return solution.state, num_qubits
+    return solution.state, num_qubits, A
 
 
 def main() -> None:
@@ -88,7 +126,7 @@ def main() -> None:
     print(f"Building HHL circuit: N={args.N}, main_diag={args.main_diag}, "
           f"off_diag={args.off_diag}, epsilon={args.epsilon}")
     try:
-        circuit, num_qubits = build_hhl_circuit(
+        circuit, num_qubits, A = build_hhl_circuit(
             args.N, args.main_diag, args.off_diag, args.epsilon
         )
     except ImportError as exc:
@@ -99,12 +137,40 @@ def main() -> None:
         return
 
     spec = hhl_spec(circuit, num_qubits)
-    print(f"Circuit: {circuit.num_qubits} qubits, depth {circuit.depth()}")
+
+    # Pre-transpilation depth is what solution.state reports directly and
+    # can look deceptively small if the circuit uses a handful of large,
+    # undecomposed composite instructions (QPE/reciprocal/prep blocks are
+    # typically built this way). Post-transpilation depth, via
+    # core.resources.transpile_report (Phase 2, same tool used throughout
+    # this project's hardware-feasibility numbers), is the one that reflects
+    # what actually gets submitted.
+    from core.resources import transpile_report
+    pre_depth = circuit.depth()
+    report = transpile_report(circuit, coupling_map=None, optimization_level=1)
+    print(f"Circuit: {circuit.num_qubits} qubits, "
+          f"pre-transpile depth={pre_depth}, post-transpile depth={report.post_depth}, "
+          f"two_qubit_count={report.two_qubit_count}")
 
     x_exact, exact_record = StatevectorExecutor(diagnostics=False).extract(circuit, spec)
-    print(f"\nExact post-selection probability: "
+    kappa = float(np.linalg.cond(A))
+    expected_order = 1.0 / kappa ** 2
+    print(f"\nMatrix condition number kappa ~ {kappa:.2f} "
+          f"(expected post-selection probability order of magnitude ~1/kappa^2 "
+          f"~ {expected_order:.4f})")
+    print(f"Exact post-selection probability: "
           f"{exact_record.postselect_probability:.6f}")
     print(f"Exact shot overhead (1/p): {exact_record.shot_overhead:.1f}")
+    if not (0.01 * expected_order <= exact_record.postselect_probability <= 100 * expected_order):
+        print(
+            "\n*** WARNING: exact post-selection probability is more than 100x "
+            "away from the 1/kappa^2 order-of-magnitude expectation. This is "
+            "not necessarily wrong (the 1/kappa^2 estimate is a rough guide, "
+            "not an exact formula), but it is worth checking before trusting "
+            "the hardware comparison below -- a similar mismatch here traced "
+            "back to an unnormalised TridiagonalToeplitz input in an earlier "
+            "version of this script. ***"
+        )
 
     if args.real:
         print(f"\nSubmitting to real hardware ({args.backend or 'least-busy'})...")
@@ -112,6 +178,16 @@ def main() -> None:
     else:
         print("\nRunning against FakeTorino (local testing, no queue, no cost)...")
         context = HardwareContext.local_testing()
+
+    expected_accepted = args.shots * exact_record.postselect_probability
+    if expected_accepted < 20:
+        suggested_shots = int(np.ceil(30 / max(exact_record.postselect_probability, 1e-6)))
+        print(
+            f"\nNote: at p~{exact_record.postselect_probability:.4f}, "
+            f"{args.shots} shots gives an expected ~{expected_accepted:.1f} "
+            f"accepted samples -- too few for a tight confidence interval. "
+            f"Consider --shots {suggested_shots} for ~30 expected accepted samples."
+        )
 
     sample = hardware_postselection_sample(circuit, spec, context, shots=args.shots)
 

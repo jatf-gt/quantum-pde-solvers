@@ -113,13 +113,18 @@ class TestHardwareEstimateBatch:
         results = hardware_estimate_batch(pairs, ctx, shots=500)
         assert results[0].provenance.job_id == results[1].provenance.job_id
 
-    def test_resilience_level_recorded_in_provenance(self, ctx):
+    def test_resilience_level_is_none_in_local_testing(self, ctx):
+        # Local testing mode genuinely ignores resilience_level -- the
+        # provenance should say so honestly (None), not echo back the
+        # configured value as if it took effect. See HardwareContext.estimator
+        # and hardware_estimate_batch's provenance construction.
         qc = QuantumCircuit(1)
         qc.h(0)
         results = hardware_estimate_batch(
             [(qc, SparsePauliOp("Z"))], ctx, shots=200
         )
-        assert results[0].provenance.resilience_level == ctx.resilience_level
+        assert ctx.is_local_testing is True
+        assert results[0].provenance.resilience_level is None
 
 
 # ── Fidelity estimation ───────────────────────────────────────────────────────

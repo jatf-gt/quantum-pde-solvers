@@ -211,7 +211,14 @@ class HardwareContext:
     def sampler(self):
         from qiskit_ibm_runtime import SamplerV2
         s = SamplerV2(mode=self.backend)
-        s.options.dynamical_decoupling.enable = self.dynamical_decoupling
+        # resilience_level/dynamical_decoupling genuinely have no effect in
+        # local-testing mode -- the Runtime SDK warns on every job if they
+        # are set anyway (observed: over a million warnings across a modest
+        # test suite, since the warning fires per-PUB, not once). Skipping
+        # them here is not an optimisation, it is the correct behaviour: a
+        # Fake backend has no dynamical-decoupling hardware to configure.
+        if not self.is_local_testing:
+            s.options.dynamical_decoupling.enable = self.dynamical_decoupling
         if self.seed is not None and self.is_local_testing:
             s.options.simulator.seed_simulator = self.seed
         return s
@@ -219,8 +226,9 @@ class HardwareContext:
     def estimator(self):
         from qiskit_ibm_runtime import EstimatorV2
         e = EstimatorV2(mode=self.backend)
-        e.options.resilience_level = self.resilience_level
-        e.options.dynamical_decoupling.enable = self.dynamical_decoupling
+        if not self.is_local_testing:
+            e.options.resilience_level = self.resilience_level
+            e.options.dynamical_decoupling.enable = self.dynamical_decoupling
         if self.seed is not None and self.is_local_testing:
             e.options.simulator.seed_simulator = self.seed
         return e
@@ -467,7 +475,10 @@ def hardware_estimate_batch(
         backend_name      = context.backend.name,
         backend_version   = _backend_version(context.backend),
         is_local_testing  = context.is_local_testing,
-        resilience_level  = context.resilience_level,
+        # None in local-testing mode: the option genuinely has no effect
+        # there (see HardwareContext.estimator), so recording the
+        # configured value would misrepresent what actually happened.
+        resilience_level  = None if context.is_local_testing else context.resilience_level,
         shots             = shots,
         wall_time_s       = wall_time,
     )
