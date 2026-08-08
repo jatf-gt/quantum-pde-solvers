@@ -150,28 +150,41 @@ def _build_rhs_strip(
     phi: np.ndarray,
     f_vals: np.ndarray,
     dx: float,
+    dy: float | None = None,
+    bc_x0: float | np.ndarray = 0.0,
+    bc_x1: float | np.ndarray = 0.0,
+    bc_y0: float | np.ndarray = 0.0,
+    bc_y1: float | np.ndarray = 0.0,
 ) -> np.ndarray:
-    """
-    Build the RHS for the j-th strip in the fourth-order line-Jacobi scheme.
-
-    The implicit direction uses the fourth-order stencil (strip matrix
-    with y-diagonal absorbed).  The explicit y-coupling uses second-order
-    finite differences, scaled by 12 to match the 12h²-scaled strip
-    convention::
-
-        b_i  =  12h² f(x_i, y_j)  -  12 φ[i, j-1]  -  12 φ[i, j+1]
-
-    The factor of 12 arises from multiplying the y-coupling 1/h² by the
-    strip prefactor 12h²:  12h² × u_{j±1}/h²  =  12 u_{j±1}.
-    """
+    if dy is None:
+        dy = dx
+    kappa_aniso = (dx / dy)**2
     N = phi.shape[0]
     b = 12.0 * dx**2 * f_vals[:, j].copy()
 
-    # Second-order coupling in y (explicit direction), scaled by 12
+    # X-boundary corrections (4th order implicit direction)
+    ax0 = bc_x0[j] if isinstance(bc_x0, np.ndarray) else bc_x0
+    ax1 = bc_x1[j] if isinstance(bc_x1, np.ndarray) else bc_x1
+    
+    b[0] -= 18.0 * ax0
+    if N > 1:
+        b[1] += ax0
+    b[-1] -= 18.0 * ax1
+    if N > 1:
+        b[-2] += ax1
+
+    # Y-boundary corrections (2nd order explicit direction, scaled by 12)
     if j > 0:
-        b -= 12.0 * phi[:, j - 1]
+        b -= 12.0 * kappa_aniso * phi[:, j - 1]
+    else:
+        ay0 = bc_y0 if isinstance(bc_y0, np.ndarray) else np.full(N, bc_y0)
+        b -= 12.0 * kappa_aniso * ay0
+
     if j < N - 1:
-        b -= 12.0 * phi[:, j + 1]
+        b -= 12.0 * kappa_aniso * phi[:, j + 1]
+    else:
+        ay1 = bc_y1 if isinstance(bc_y1, np.ndarray) else np.full(N, bc_y1)
+        b -= 12.0 * kappa_aniso * ay1
 
     return b
 
@@ -189,13 +202,18 @@ def jacobi_2d_4th(
     N: int,
     f_vals: np.ndarray,
     dx: float,
-    inner: str,
-    inner_kwargs: dict,
-    u_exact: np.ndarray,
-    u_thomas: np.ndarray,
+    dy: float | None = None,
+    bc_x0: float | np.ndarray = 0.0,
+    bc_x1: float | np.ndarray = 0.0,
+    bc_y0: float | np.ndarray = 0.0,
+    bc_y1: float | np.ndarray = 0.0,
+    inner: str = "thomas",
+    inner_kwargs: dict | None = None,
+    u_exact: np.ndarray | None = None,
+    u_thomas: np.ndarray | None = None,
     tol: float = 1e-6,
     max_iter: int = 200,
-    print_every: int = 10,
+    print_every: int = 1,
 ) -> tuple[np.ndarray, int, bool, list[float]]:
     """
     2D mixed-order line-Jacobi outer iteration.
@@ -203,18 +221,15 @@ def jacobi_2d_4th(
     Uses the fourth-order pentadiagonal strip matrix (with y-diagonal
     absorbed) for the implicit direction and 12-scaled second-order
     coupling in the explicit y-direction.
-
-    Parameters
-    ----------
-    inner : str
-        Inner solver: 'thomas', 'vqls', or 'qsvt'.
-    inner_kwargs : dict
-        Solver-specific keyword arguments.
     """
+    if inner_kwargs is None:
+        inner_kwargs = {}
+    if dy is None:
+        dy = dx
+    kappa_aniso = (dx / dy)**2
+
     A_strip = build_strip_matrix_4th(N, dx)
-    # Absorb the y-coupling diagonal into the strip matrix:
-    # 12h² × (-2u_j/h²) = -24u_j  ⟹  diag(A) -= 24.
-    A_strip -= 24.0 * np.eye(N)
+    A_strip -= 24.0 * kappa_aniso * np.eye(N)
     phi = np.zeros((N, N))
     errors = []
 
@@ -232,7 +247,7 @@ def jacobi_2d_4th(
     for it in range(max_iter):
         phi_new = phi.copy()
         for j in range(N):
-            b_j = _build_rhs_strip(j, phi, f_vals, dx)
+            b_j = _build_rhs_strip(j, phi, f_vals, dx, dy, bc_x0, bc_x1, bc_y0, bc_y1)
             phi_new[:, j] = solve_strip(b_j)
 
         delta = float(np.max(np.abs(phi_new - phi)))

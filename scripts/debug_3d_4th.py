@@ -138,18 +138,81 @@ def _build_rhs_strip_3d(
              -  12 φ[i, j-1, k]  -  12 φ[i, j+1, k]   (y)
              -  12 φ[i, j, k-1]  -  12 φ[i, j, k+1]   (z)
     """
+def _build_rhs_strip(
+    j: int,
+    k: int,
+    phi: np.ndarray,
+    f_vals: np.ndarray,
+    dx: float,
+    dy: float | None = None,
+    dz: float | None = None,
+    bc_lo: tuple = (0.0, 0.0, 0.0),
+    bc_hi: tuple = (0.0, 0.0, 0.0),
+    periodic: tuple = (False, False, False),
+) -> np.ndarray:
+    if dy is None:
+        dy = dx
+    if dz is None:
+        dz = dx
+    kappa_y = (dx / dy)**2
+    kappa_z = (dx / dz)**2
     N = phi.shape[0]
     b = 12.0 * dx**2 * f_vals[:, j, k].copy()
 
-    # Second-order coupling in y and z, scaled by 12
+    # X-boundary corrections (4th order implicit direction, non-periodic)
+    ax0 = bc_lo[0]
+    ax1 = bc_hi[0]
+    def _extract_bc(bc_array, idx_j, idx_k):
+        if isinstance(bc_array, np.ndarray):
+            return bc_array[idx_j, idx_k]
+        return bc_array
+    
+    val0 = _extract_bc(ax0, j, k)
+    val1 = _extract_bc(ax1, j, k)
+    b[0] -= 18.0 * val0
+    if N > 1:
+        b[1] += val0
+    b[-1] -= 18.0 * val1
+    if N > 1:
+        b[-2] += val1
+
+    # Y-boundary corrections (2nd order explicit direction)
     if j > 0:
-        b -= 12.0 * phi[:, j-1, k]
+        b -= 12.0 * kappa_y * phi[:, j-1, k]
+    elif periodic[1]:
+        b -= 12.0 * kappa_y * phi[:, -1, k]
+    else:
+        ay0 = bc_lo[1]
+        v_ay0 = ay0[:, k] if isinstance(ay0, np.ndarray) else np.full(N, ay0)
+        b -= 12.0 * kappa_y * v_ay0
+
     if j < N - 1:
-        b -= 12.0 * phi[:, j+1, k]
+        b -= 12.0 * kappa_y * phi[:, j+1, k]
+    elif periodic[1]:
+        b -= 12.0 * kappa_y * phi[:, 0, k]
+    else:
+        ay1 = bc_hi[1]
+        v_ay1 = ay1[:, k] if isinstance(ay1, np.ndarray) else np.full(N, ay1)
+        b -= 12.0 * kappa_y * v_ay1
+
+    # Z-boundary corrections (2nd order explicit direction)
     if k > 0:
-        b -= 12.0 * phi[:, j, k-1]
+        b -= 12.0 * kappa_z * phi[:, j, k-1]
+    elif periodic[2]:
+        b -= 12.0 * kappa_z * phi[:, j, -1]
+    else:
+        az0 = bc_lo[2]
+        v_az0 = az0[:, j] if isinstance(az0, np.ndarray) else np.full(N, az0)
+        b -= 12.0 * kappa_z * v_az0
+
     if k < N - 1:
-        b -= 12.0 * phi[:, j, k+1]
+        b -= 12.0 * kappa_z * phi[:, j, k+1]
+    elif periodic[2]:
+        b -= 12.0 * kappa_z * phi[:, j, 0]
+    else:
+        az1 = bc_hi[2]
+        v_az1 = az1[:, j] if isinstance(az1, np.ndarray) else np.full(N, az1)
+        b -= 12.0 * kappa_z * v_az1
 
     return b
 
@@ -160,10 +223,15 @@ def jacobi_3d_4th(
     N: int,
     f_vals: np.ndarray,
     dx: float,
-    inner: str,
-    inner_kwargs: dict,
-    u_exact: np.ndarray,
-    u_thomas: np.ndarray,
+    dy: float | None = None,
+    dz: float | None = None,
+    bc_lo: tuple = (0.0, 0.0, 0.0),
+    bc_hi: tuple = (0.0, 0.0, 0.0),
+    periodic: tuple = (False, False, False),
+    inner: str = "thomas",
+    inner_kwargs: dict | None = None,
+    u_exact: np.ndarray | None = None,
+    u_thomas: np.ndarray | None = None,
     tol: float = 1e-6,
     max_iter: int = 300,
     print_every: int = 20,
@@ -175,11 +243,17 @@ def jacobi_3d_4th(
     z-diagonals absorbed, total shift -48) for the implicit direction
     and 12-scaled second-order coupling in the explicit y,z-directions.
     """
+    if inner_kwargs is None:
+        inner_kwargs = {}
+    if dy is None:
+        dy = dx
+    if dz is None:
+        dz = dx
+    kappa_y = (dx / dy)**2
+    kappa_z = (dx / dz)**2
+
     A_strip = build_strip_matrix_4th(N, dx)
-    # Absorb the y- and z-coupling diagonals into the strip matrix:
-    # Each transverse direction contributes 12h² × (-2u/h²) = -24u.
-    # Two transverse directions ⇒ total shift = -48.
-    A_strip -= 48.0 * np.eye(N)
+    A_strip -= 24.0 * (kappa_y + kappa_z) * np.eye(N)
     phi = np.zeros((N, N, N))
     errors = []
 
@@ -198,7 +272,9 @@ def jacobi_3d_4th(
         phi_new = phi.copy()
         for j in range(N):
             for k in range(N):
-                b_jk = _build_rhs_strip_3d(j, k, phi, f_vals, dx)
+                b_jk = _build_rhs_strip(
+                    j, k, phi, f_vals, dx, dy, dz, bc_lo, bc_hi, periodic
+                )
                 phi_new[:, j, k] = solve_strip(b_jk)
 
         delta = float(np.max(np.abs(phi_new - phi)))

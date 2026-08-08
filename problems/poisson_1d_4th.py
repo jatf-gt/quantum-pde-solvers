@@ -85,7 +85,8 @@ class PoissonProblem1D4th:
     def __init__(
         self,
         N: int,
-        source_fn: str = "fS",
+        source_fn: str | None = None,
+        f_vals: np.ndarray | None = None,
         alpha: float = 0.0,
         beta: float = 0.0,
     ) -> None:
@@ -97,14 +98,17 @@ class PoissonProblem1D4th:
             raise ValueError(
                 f"N must be a power of 2 for amplitude encoding; got N={N}."
             )
-        if source_fn not in SOURCE_FUNCTIONS:
+        if source_fn is not None and source_fn not in SOURCE_FUNCTIONS:
             raise ValueError(
                 f"Unknown source function '{source_fn}'. "
                 f"Valid options: {list(SOURCE_FUNCTIONS)}"
             )
+        if source_fn is None and f_vals is None:
+            raise ValueError("Must provide either source_fn or f_vals")
 
         self.N = N
         self.source_fn = source_fn
+        self._f_vals_input = f_vals
         self.alpha = alpha
         self.beta = beta
 
@@ -187,12 +191,17 @@ class PoissonProblem1D4th:
         """
         N = self.N
         dx = self.dx
-        f = SOURCE_FUNCTIONS[self.source_fn]
+        if self.source_fn is not None:
+            f = SOURCE_FUNCTIONS[self.source_fn]
+            f_vals = f(self.x)
+        else:
+            f_vals = self._f_vals_input
+            
         alpha = self.alpha
         beta = self.beta
 
         # Base RHS: 12 h^2 · f(x_i)
-        b = 12.0 * dx**2 * f(self.x)
+        b = 12.0 * dx**2 * f_vals
 
         # ── Left boundary corrections ─────────────────────────────────────────
         b[0] -= 18.0 * alpha      # row 0: -16α (from +16u_0) - 2α (from ghost)
