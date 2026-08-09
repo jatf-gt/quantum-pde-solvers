@@ -1,0 +1,4 @@
+[submodule "quantum_linear_solvers"]
+	path = quantum_linear_solvers
+	url = https://github.com/jatf-gt/quantum_linear_solvers.git
+	branch = main

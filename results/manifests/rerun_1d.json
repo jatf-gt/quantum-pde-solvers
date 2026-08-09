@@ -1,0 +1,1239 @@
+{
+  "rerun": [
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.28599417489,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3601.1203612135723,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.218771365471,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.2569169988856,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.215778922662,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.35793423187,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.1899474300444,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.2119110012427,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.2333907252178,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.2332488466054,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.45306470990181e-05,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 52.47053480613977,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 1.3990909243002534,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.49755160231143236,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 4.1221268475055695e-05,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 42.365342303179204,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 102.02021352294832,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 3.006369486451149,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 6.0381367802619934e-05,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 91.81330690626055,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 252.48799229599535,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 16.53385934047401,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 9.677279740571976e-05,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.1581904571503,
+      "reasons": [
+        "stale_geometry",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 498.9836773686111,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 4.017453631386161,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 0.00017693545669317245,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.210390395485,
+      "reasons": [
+        "stale_geometry",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 64,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 885.2237091567367,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 3.2873442387208343,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 778.6407250231132,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 742.8967653969303,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 3600.2115233885124,
+      "reasons": [
+        "solver_error",
+        "no_error_metric"
+      ]
+    }
+  ],
+  "keep": [
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.336183726787567e-05
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 54.25629967264831
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.193407400511205
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.5573576251044869
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 4.099123179912567e-05
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 59.56759118847549
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 100.81103508081287
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 3.1463119639083743
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 6.21601939201355e-05
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 104.07300381734967
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 243.805928950198
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 15.7592145614326
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 9.631365537643433e-05
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 441.728294425644
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 3.5201549222692847
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "Thomas",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 0.0001644948497414589
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 64,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 985.2375675765797
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 4.072322345338762
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.401096910238266e-05
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 52.531039418652654
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 1.982710481621325
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.47984923981130123
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 4.0152110159397125e-05
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 56.81073646619916
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 104.32684964034706
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.9845154471695423
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 5.978252738714218e-05
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 102.48454992473125
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 247.02048081625253
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 17.55713082011789
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 9.559281170368195e-05
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 439.9781577186659
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 3.4649928929284215
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 0.00017358362674713135
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "VQLS",
+      "N": 64,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 944.8265898348764
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "QSVT",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 4.922308096662164
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.3610500395298004e-05
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 56.4827447719872
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.0677756229415536
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.5355311473831534
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 4.3340958654880524e-05
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 58.669790162704885
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 31.735681107267737
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.3372458536177874
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 5.939137190580368e-05
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 100.04500510171056
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 231.63422338292003
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 10.23780715558678
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 9.783264249563217e-05
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 519.6986560272053
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 4.7649930734187365
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "Thomas",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 0.00016862526535987854
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "VQLS",
+      "N": 64,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 1067.6398904034868
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "QSVT",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 4.85280233155936
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.5140663385391235e-05
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 56.58505533821881
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.744907279498875
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.5292732696980238
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 4.2601488530635834e-05
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 59.39455798268318
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 108.73600282147527
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.5125244008377194
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 5.8552250266075134e-05
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 97.53176093567163
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 229.19936749245971
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 10.399489890784025
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 9.716302156448364e-05
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 519.4815050335601
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 3.568988587707281
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "Thomas",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 0.00016831420361995697
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "VQLS",
+      "N": 64,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 975.8209490524605
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "QSVT",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 4.100353422574699
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.449153155088425e-05
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 56.51448979601264
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 7.140165968798101
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.5335907815024257
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 4.317238926887512e-05
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 53.17114184983075
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 109.14330322947353
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.575110032223165
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 5.916226655244827e-05
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 87.48927712719887
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 227.52911684196442
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 11.642464324831963
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 9.596254676580429e-05
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 513.1785448286682
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 4.430290424264967
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "Thomas",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 0.00017533451318740845
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "VQLS",
+      "N": 64,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 960.6771694812924
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "QSVT",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 3.519859803840518
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.37306410074234e-05
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 55.494569869711995
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 5.6327950283885
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 9.78120996709913
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 4.2650848627090454e-05
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 126.25193208269775
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 144.4863436864689
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 6.160233169794083e-05
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 64.02280154172331
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 259.769701519981
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 1539.2647099969909
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 9.863264858722687e-05
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 637.1857607960701
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 1102.1551929600537
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 0.00017129536718130112
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 64,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 1104.3683744687587
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 64,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 845.3080450668931
+    }
+  ],
+  "drift": [],
+  "n_rows_recorded": 140,
+  "orphan_archives": [],
+  "generated": "2026-08-09T19:57:37+00:00",
+  "dim": 1,
+  "results_dir": "results\\1Dhpc_run",
+  "strict": false,
+  "expected": {
+    "cases": [
+      "1D_Poisson_fH_hom",
+      "1D_Poisson_fL_hom",
+      "1D_Poisson_fS_hom",
+      "1D_Poisson_fS_nonhom",
+      "HET_1D_3a_linear_hom",
+      "HET_1D_3b_gaussian_Vd300",
+      "HET_1D_3c_gaussian_NeumannDirichlet"
+    ],
+    "n_values": [
+      4,
+      8,
+      16,
+      32,
+      64
+    ],
+    "solvers": [
+      "Thomas",
+      "HHL",
+      "VQLS",
+      "QSVT"
+    ]
+  }
+}

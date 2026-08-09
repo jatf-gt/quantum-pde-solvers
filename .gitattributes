@@ -1,0 +1,11 @@
+# Shell scripts are executed on Linux (Imperial CX3, PBS Pro) but authored on
+# Windows. Without this, git checks them out with CRLF endings and the cluster
+# rejects them at the shebang with "bad interpreter: /bin/bash^M" - a failure that
+# occurs before any job output exists to diagnose it from.
+*.sh  text eol=lf
+
+# PBS job scripts carry no extension convention beyond .sh, but keep the runners and
+# any config read by them consistent too.
+*.py  text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf

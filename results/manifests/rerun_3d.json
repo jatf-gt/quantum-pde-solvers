@@ -1,0 +1,848 @@
+{
+  "rerun": [
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "Thomas",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "HHL",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "VQLS",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "QSVT",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "Thomas",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "HHL",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "VQLS",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "QSVT",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "Thomas",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "HHL",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "VQLS",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "QSVT",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "Thomas",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "HHL",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "VQLS",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "QSVT",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "Thomas",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "HHL",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "VQLS",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "QSVT",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "Thomas",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "HHL",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "VQLS",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "QSVT",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "Thomas",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "HHL",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "VQLS",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "QSVT",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "Thomas",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "HHL",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "VQLS",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "QSVT",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "Thomas",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "HHL",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "VQLS",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "QSVT",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "HHL",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 30053.287647143938,
+      "reasons": [
+        "wall_time_exceeded"
+      ]
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 25329.247895848937,
+      "reasons": [
+        "wall_time_exceeded"
+      ]
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "HHL",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 26922.783537704498,
+      "reasons": [
+        "wall_time_exceeded"
+      ]
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 24649.415015886538,
+      "reasons": [
+        "wall_time_exceeded"
+      ]
+    }
+  ],
+  "keep": [
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.008127588778734207
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 130.1855224748142
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 184.37446280010045
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 60.157974898815155
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.10735279880464077
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 2545.251167859882
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 7358.20362476306
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 674.995638019871
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 0.35879919584840536
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 207.3148618908599
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.00699381809681654
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 142.16618734411895
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 190.2920832838863
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 57.758241140749305
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.09711993392556906
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 2651.4451886867173
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 10788.138293178286
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 702.3875989769585
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 0.39377214573323727
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 22001.334180792794
+    },
+    {
+      "case": "3D_Poisson_HighMode_n2m3l4",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 229.97252301312983
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.008027845993638039
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 146.1905313669704
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 600.1407775911503
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 64.36114662792534
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.09071134869009256
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 2352.6521874442697
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 5863.866567515768
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 696.3725443622097
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 0.3131831241771579
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 184.81262767966837
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.007978754118084908
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 124.75472473911941
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 204.75428168009967
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 61.58852995885536
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.11731497710570693
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 2282.3230322906747
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 8168.056534125004
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 733.771017412655
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 0.5549443885684013
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 19895.597878484987
+    },
+    {
+      "case": "3D_Poisson_TwoGaussian_cube",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 274.18800022266805
+    }
+  ],
+  "drift": [],
+  "n_rows_recorded": 46,
+  "orphan_archives": {
+    "stale": [
+      "solution3d_3D_HET_Discharge_SPT100_HHL_N16.npz",
+      "solution3d_3D_HET_Discharge_SPT100_HHL_N4.npz",
+      "solution3d_3D_HET_Discharge_SPT100_HHL_N8.npz",
+      "solution3d_3D_HET_Discharge_SPT100_QSVT_N16.npz",
+      "solution3d_3D_HET_Discharge_SPT100_QSVT_N4.npz",
+      "solution3d_3D_HET_Discharge_SPT100_QSVT_N8.npz",
+      "solution3d_3D_HET_Discharge_SPT100_Thomas_N16.npz",
+      "solution3d_3D_HET_Discharge_SPT100_Thomas_N4.npz",
+      "solution3d_3D_HET_Discharge_SPT100_Thomas_N8.npz",
+      "solution3d_3D_HET_Discharge_SPT100_VQLS_N16.npz",
+      "solution3d_3D_HET_Discharge_SPT100_VQLS_N4.npz",
+      "solution3d_3D_HET_Discharge_SPT100_VQLS_N8.npz",
+      "solution3d_3D_HET_MMS_SPT100_HHL_N16.npz",
+      "solution3d_3D_HET_MMS_SPT100_HHL_N4.npz",
+      "solution3d_3D_HET_MMS_SPT100_HHL_N8.npz",
+      "solution3d_3D_HET_MMS_SPT100_QSVT_N16.npz",
+      "solution3d_3D_HET_MMS_SPT100_QSVT_N4.npz",
+      "solution3d_3D_HET_MMS_SPT100_QSVT_N8.npz",
+      "solution3d_3D_HET_MMS_SPT100_Thomas_N16.npz",
+      "solution3d_3D_HET_MMS_SPT100_Thomas_N4.npz",
+      "solution3d_3D_HET_MMS_SPT100_Thomas_N8.npz",
+      "solution3d_3D_HET_MMS_SPT100_VQLS_N16.npz",
+      "solution3d_3D_HET_MMS_SPT100_VQLS_N4.npz",
+      "solution3d_3D_HET_MMS_SPT100_VQLS_N8.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_HHL_N16.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_HHL_N4.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_HHL_N8.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_QSVT_N16.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_QSVT_N4.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_QSVT_N8.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_Thomas_N16.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_Thomas_N4.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_Thomas_N8.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_VQLS_N16.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_VQLS_N4.npz",
+      "solution3d_3D_HET_RotatingSpoke_SPT100_VQLS_N8.npz"
+    ],
+    "unexplained": [
+      "solution3d_3D_Laplace_BCdriven_cube_HHL_N16.npz",
+      "solution3d_3D_Poisson_TripleSin_cube_HHL_N16.npz"
+    ]
+  },
+  "generated": "2026-08-09T19:58:42+00:00",
+  "dim": 3,
+  "results_dir": "results\\3Dhpc_run",
+  "strict": false,
+  "expected": {
+    "cases": [
+      "3D_HET_Discharge_SPT100",
+      "3D_HET_MMS_SPT100",
+      "3D_HET_RotatingSpoke_SPT100",
+      "3D_Laplace_BCdriven_cube",
+      "3D_Poisson_HighMode_n2m3l4",
+      "3D_Poisson_TripleSin_cube",
+      "3D_Poisson_TwoGaussian_cube"
+    ],
+    "n_values": [
+      4,
+      8,
+      16
+    ],
+    "solvers": [
+      "Thomas",
+      "HHL",
+      "VQLS",
+      "QSVT"
+    ]
+  }
+}
