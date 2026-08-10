@@ -112,7 +112,7 @@ DEFAULT_N_1D = "4,8,16"
 DEFAULT_N_2D = "4,8,16,32,64,128,256"
 
 
-def kappa_1d(N: int) -> float:
+def kappa_1d(N: int, order: int = 2) -> float:
     """
     Computes κ(A) for the 1-D Poisson operator at resolution N.
 
@@ -123,13 +123,29 @@ def kappa_1d(N: int) -> float:
     ----------
     N : int
         Number of interior nodes.
+    order : {2, 4}
+        Spatial discretisation order. Order 4 uses the pentadiagonal operator from
+        `problems/poisson_1d_4th.py` — the same class the 4th-order solver builds,
+        for the same cache-key reason.
+
+        The 4th-order operator is *better* conditioned than the 2nd-order one at
+        equal N, not worse: κ₄ = 11.95 / 42.14 / 154.5 at N = 4 / 8 / 16 against
+        κ₂ = 9.47 / 34.3 / 130.6, an asymptotic ratio of 4/3. The "2.5×" figure
+        quoted in `qsvt_1d_4th.py` is the ratio of *spectral norms* (30/12), not of
+        condition numbers, and must not be used to size this computation.
 
     Returns
     -------
     float
-        κ = |λ|_max / |λ|_min, growing as O(N²).
+        κ = |λ|_max / |λ|_min, growing as O(N²) at either order.
     """
-    eigs = np.abs(np.linalg.eigvalsh(build_tst_matrix(N)))
+    if order == 4:
+        from problems.poisson_1d_4th import PoissonProblem1D4th
+        A = PoissonProblem1D4th(N=N, f_vals=np.zeros(N),
+                                alpha=0.0, beta=0.0).A
+    else:
+        A = build_tst_matrix(N)
+    eigs = np.abs(np.linalg.eigvalsh(A))
     return float(eigs.max() / eigs.min())
 
 
@@ -165,7 +181,8 @@ def kappa_2d(N: int, domain: str) -> float:
     return problem.kappa_row()
 
 
-def build_targets(dim: int, n_values: list[int], domain: str) -> list[tuple]:
+def build_targets(dim: int, n_values: list[int], domain: str,
+                  order: int = 2) -> list[tuple]:
     """
     Enumerates the (label, N, kappa) triples to precompute.
 
@@ -180,12 +197,32 @@ def build_targets(dim: int, n_values: list[int], domain: str) -> list[tuple]:
         Resolutions, processed in ascending order.
     domain : {'square', 'het', 'all'}
         2-D domain selection; ignored when dim == 1.
+    order : {2, 4}
+        Spatial discretisation order.
 
     Returns
     -------
     targets : list[tuple[str, int, float]]
         Ordered (label, N, kappa) triples.
+
+    Raises
+    ------
+    NotImplementedError
+        For ``dim == 2`` with ``order == 4``. The 2-D 4th-order strip operator is
+        not yet defined: `solvers/outer/multigrid_4th.py`'s boundary closure is
+        first-order accurate (measured 0.85-0.99 against a manufactured solution),
+        so any κ taken from it would key the cache to an operator that is about to
+        change. Precomputing against it would be worse than not precomputing:
+        a stale key is a silent miss that relocates the expensive computation into
+        the sweep. See `docs/HPC_REPAIR_PLAN.md`, Phase 4.
     """
+    if dim == 2 and order == 4:
+        raise NotImplementedError(
+            "2-D 4th-order phases cannot be precomputed yet: the strip operator "
+            "is unsettled (see docs/HPC_REPAIR_PLAN.md Phase 4). Any cache entry "
+            "written now would be keyed to an operator that is going to change, "
+            "and would silently miss at runtime.")
+
     targets: list[tuple[str, int, float]] = []
     seen: set[float] = set()
 
@@ -196,7 +233,7 @@ def build_targets(dim: int, n_values: list[int], domain: str) -> list[tuple]:
         pairs = [(d, N) for N in n_values for d in domains]
 
     for label, N in pairs:
-        kappa = kappa_1d(N) if dim == 1 else kappa_2d(N, label)
+        kappa = kappa_1d(N, order) if dim == 1 else kappa_2d(N, label)
         key = round(kappa, 4)
         if key in seen:
             continue
@@ -214,6 +251,14 @@ def main() -> None:
         "--dim", type=int, choices=(1, 2), required=True,
         help="Problem dimension. 1-D has kappa = O(N²) and is expensive; 2-D "
              "has kappa -> 3 and is cheap at every N.",
+    )
+    parser.add_argument(
+        "--order", type=int, choices=(2, 4), default=2,
+        help="Spatial discretisation order. Order 4 uses the pentadiagonal "
+             "operator, whose kappa is 4/3 of the tridiagonal one asymptotically "
+             "(11.95/42.14/154.5 at N=4/8/16) - a MILDER cost increase than the "
+             "'2.5x' spectral-norm ratio quoted in qsvt_1d_4th.py suggests. Only "
+             "--dim 1 supports order 4 at present; see build_targets.",
     )
     parser.add_argument(
         "--n-values", type=str, default=None,
@@ -260,10 +305,11 @@ def main() -> None:
         reverse=True,      # largest (cheapest) epsilon first
     )
 
-    targets = build_targets(args.dim, n_values, args.domain)
+    targets = build_targets(args.dim, n_values, args.domain, args.order)
 
     if args.list_kappas:
-        print(f"\n  {args.dim}-D kappa values (as used for the cache key)\n")
+        print(f"\n  {args.dim}-D order-{args.order} kappa values "
+              f"(as used for the cache key)\n")
         print(f"  {'domain':<8} {'N':>5} {'kappa':>12}")
         print("  " + "-" * 27)
         for label, N, kappa in targets:
@@ -275,7 +321,7 @@ def main() -> None:
     qsp_angles._ENABLE_DISK_WRITE = True
 
     print("=" * 68)
-    print(f"  QSVT Phase Precomputation — {args.dim}-D")
+    print(f"  QSVT Phase Precomputation — {args.dim}-D, order {args.order}")
     print("=" * 68)
     print(f"  N values (ascending)  : {n_values}")
     if args.dim == 2:

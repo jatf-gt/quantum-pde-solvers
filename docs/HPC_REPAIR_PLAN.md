@@ -17,11 +17,11 @@ integration of the 4th-order pentadiagonal discretisation, and completion of the
 |---|-------|-------|
 | 0 | Stop, preserve, and scope | **complete** — `results_hpc_copy/` holds the re-synced backup; geometry impact settled |
 | 1 | Gap manifest | **complete** — all three manifests generated; classification corrected three times against real data |
-| 2 | Correctness: pentadiagonal operator | pending (Wave 2) |
+| 2 | Correctness: pentadiagonal operator | **complete** — dense block encoding in, truncation now raises, `hhl_4th`/`qsvt_4th` registered |
 | 3 | Environment and deployment | complete |
 | 4 | Fold order=4 into the `LineProblem` protocol | pending (Wave 2) |
 | 5 | Reporting, diagnostics and provenance | **partly done** — the items Wave 1 depends on are in; the new `RunResult` columns are not |
-| 6 | QSVT phase precompute for 4th order | pending (Wave 2) |
+| 6 | QSVT phase precompute for 4th order | **1-D done** (`--order 4`, `hpc/jobs/submit_precompute_4th.sh`); 2-D/3-D refused until Phase 4 settles the operator |
 | 7 | Consolidate `hpc/jobs/` and submit | **scripts ready; submission is the user's call** |
 
 ### Wave 1 is ready to submit
@@ -336,6 +336,69 @@ of a solve to the *wrong problem* could otherwise be manufactured.
 
 ### Phase 4 — Fold order = 4 into the `LineProblem` protocol
 
+> **Blocked on a defect found 2026-08-10 that is larger than this phase.** The
+> 4th-order *boundary closure* is wrong, in 1-D as well as in 2-D/3-D, so there is
+> no correct operator yet for these classes to wrap. Measured convergence orders,
+> direct dense solves against manufactured solutions:
+>
+> | Scheme | u = sin(πx), homogeneous | u = x(1−x), homogeneous | u = eˣ, u(0)=1, u(1)=e |
+> |---|---|---|---|
+> | `problems/poisson_1d_4th.py` | **3.95** ✓ | 1.98 | **−0.01 (no convergence)** |
+> | `solvers/outer/multigrid_4th.py` (2-D) | 0.88 | — | — |
+>
+> The 1-D class appeared sound only because it had been exercised on
+> `poisson_1d_fS_hom`, whose solution −sin(πx)/π² is *odd about both boundaries* —
+> precisely the case where the closure is exact. Any other solution loses two
+> orders; any non-zero Dirichlet datum loses convergence altogether. That covers
+> `1D_Poisson_fL_hom`, `fH_hom`, `1D_Poisson_fS_nonhom` (α=1, β=2) and **every HET
+> case** (V_d = 300 V at the anode).
+>
+> **Diagnosis.** The ghost node one step outside the boundary is taken as
+> `u₋₁ = 2α − u₁`, an odd reflection about the boundary. Two errors follow.
+>
+> 1. Substituting it into the row-0 stencil gives `16α` from the boundary node and
+>    `−2α` from the ghost, totalling **14α**. The implementation sums them with the
+>    same sign and uses **18α**. The residual `A·u_exact − b` is then O(1) at rows 0
+>    and N−1 and at machine level everywhere else — 4.00 for u = eˣ with α = 1, i.e.
+>    exactly 4α, and 10.88 = 4β at the far boundary.
+> 2. The reflection itself is only O(h²) accurate:
+>    `u(−h) − [2u(0) − u(h)] = h²u″(0) + O(h⁴)`. Divided by the stencil's 12h²
+>    prefactor that is an O(1) consistency error at one row, capping the scheme at
+>    order 2. The PDE supplies the missing term for free, since `u″(0) = f(0)`.
+>
+> **Fix, verified.** `b[0] -= 14α` (not 18α) and `b[0] += h²·f(0)`, symmetrically at
+> the far end. Orders then measured **3.95 / machine-exact / 3.93** on the three
+> solutions above. Both corrections are **right-hand-side only**: `A` is untouched,
+> so its symmetry — required by `build_dense_block_encoding` and by
+> `PentadiagonalToeplitz` — is preserved, and **κ, the cache keys and the phase
+> precompute all remain valid**.
+>
+> **Consequence for the interface.** `f` at the two boundary nodes becomes required
+> data. `PoissonProblem1D4th` currently receives interior values only, so the
+> correction has to be threaded from the source functions in `core/cases.py`. In
+> 2-D/3-D the same closure governs the strip direction, so the same data is needed
+> per strip.
+>
+> **Decision taken (user, 2026-08-10): true 4th order in every direction.** The
+> mixed design — 4th order along the strip, 2nd order transverse — is capped at
+> order 2 by construction, measured 1.95 even after the strip operator is corrected,
+> because `strip_sweep` hardcodes the transverse coupling as `1/h²` at j±1 only.
+> Reaching order 4 therefore also requires the transverse stencil to carry j±2,
+> which means extending `strip_sweep`. Two protocol additions, both optional so that
+> the 2nd-order path stays bit-identical:
+>
+> - `transverse_terms(axis, index, n)` — the (offset, coefficient) pairs to gather,
+>   defaulting to `[(−1, 1/h²), (+1, 1/h²)]`.
+> - `row_matrix_for(idx)` — defaulting to `row_matrix()`. Needed because the
+>   transverse operator's diagonal differs on the two boundary-adjacent strips, so
+>   there are **two** distinct strip matrices rather than one. That is affordable:
+>   two block encodings and two phase sets, not N.
+>
+> Verification gates before any 4th-order submission: order ≈ 4 in 1-D, 2-D and 3-D
+> on at least one solution that is *not* odd about the boundaries and one with
+> non-zero Dirichlet data; and the 2nd-order numbers unchanged — SOR 33/66/130, FMG
+> 3 cycles, legacy Jacobi 26/73.
+
 - New `problems/poisson_line_2d_4th.py` and `problems/poisson_line_3d_4th.py`,
   mirroring `problems/poisson_line_2d.py`, providing `shape`, `dx`, `dy`,
   `row_matrix()`, `rhs()`, `apply()` and `coarsen()`. The pentadiagonal components
@@ -426,9 +489,25 @@ Measured pentadiagonal condition numbers:
 κ₄ᵗʰ/κ₂ⁿᵈ → 4/3. The "2.5×" figure in `qsvt_1d_4th.py:12-16` is the *spectral-norm*
 ratio 30/12, not a condition-number ratio.
 
-- **Locally:** 2D and 3D pentadiagonal phases (degrees ≈ 95–280) — minutes.
 - **On the cluster:** 1D pentadiagonal at N = 4, 8, 16, staged smallest-first, with
-  `max_degree=5000` as the existing 1D cache uses.
+  `max_degree=5000` as the existing 1D cache uses. **Done** —
+  `hpc/jobs/submit_precompute_4th.sh`, staged via `N_VALUES`. Measured κ values,
+  which match the table above and confirm the 4/3 ratio: 11.9477 / 42.1378 /
+  154.5126 / 586.8093 at N = 4 / 8 / 16 / 32, against 9.4721 / 32.1634 / 116.4612 /
+  440.6886 at order 2.
+
+  Not a laptop task, contrary to the original estimate: N=4 at the *cheapest*
+  epsilon did not complete in 35 minutes on one core locally, which is why this is a
+  71 h batch job staged smallest-first.
+
+  Because the Phase 4 boundary fix is right-hand-side only, `A` and therefore κ are
+  unchanged by it — **this precompute stays valid and can be submitted now**, ahead
+  of Phase 4.
+- **2D and 3D are refused,** not merely deferred: `build_targets` raises on
+  `--dim 2 --order 4`. The strip operator is unsettled (see Phase 4), so any entry
+  written now would be keyed to an operator about to change, and a stale key is a
+  silent miss that relocates the expensive computation into the sweep — the exact
+  failure the cache exists to prevent.
 - Optionally purge the four orphaned pre-geometry-fix entries (`k1p9228_*`,
   `k2p1581_*`).
 
