@@ -29,6 +29,16 @@ context/
 docs/*
 !docs/*.md
 
+# Ad hoc backup copies made before a cleanup or a rerun. One such directory was
+# named "results.backup." with a TRAILING DOT, which Windows cannot create: once
+# committed, no Windows clone could check the branch out at all, and git aborted
+# with "invalid path" before any merge or rebase could begin. Excluded by pattern
+# so that a hand-made backup can never be committed again.
+results.backup*/
+results_backup*/
+*.backup/
+*.bak
+
 # Generated cluster output, excluded by kind rather than by directory name.
 # The per-directory rules above only protect the six sweep directories that
 # exist today; a job writing to a new directory (a wave, a resumed sweep, a
