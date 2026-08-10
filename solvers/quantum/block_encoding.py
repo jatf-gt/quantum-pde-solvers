@@ -68,8 +68,80 @@ from qiskit.quantum_info import Operator
 # Number of ancilla qubits for the Sz.-Nagy block encoding.
 _N_ANCILLA_BE = 1
 
+# Relative tolerance on max|A - A†| / max|A| before A is rejected as non-Hermitian.
+# Loose enough to admit a matrix assembled in floating point from a symmetric
+# stencil, which accumulates round-off asymmetry of order the machine epsilon times
+# the number of accumulated terms; tight enough to reject a genuinely asymmetric
+# operator, such as a one-sided boundary row that was intended to be symmetrised.
+_HERMITIAN_TOL = 1e-10
+
+# Absolute tolerance below which ‖A‖₂ is treated as zero. Subnormalising by a value
+# at this scale would amplify round-off into the block encoding without limit.
+_ZERO_MATRIX_TOL = 1e-14
+
+# Relative tolerance on entries outside the tridiagonal band, used by
+# `assert_tridiagonal`. Set well above round-off but far below any physically
+# meaningful stencil coefficient: the 4th-order operator's ±2 band is 1/12 of its
+# main diagonal, some eleven orders of magnitude above this threshold, so the guard
+# cannot mistake a real band for numerical noise in either direction.
+_BAND_TOL = 1e-12
+
 
 # ── Public Interface ──────────────────────────────────────────────────────────
+
+def assert_tridiagonal(A: np.ndarray, solver: str) -> None:
+    """
+    Rejects a matrix carrying any band beyond the tridiagonal.
+
+    Guards the two-scalar fast paths in `solvers/quantum/hhl_1d.py` and
+    `solvers/quantum/qsvt_1d.py`, both of which reconstruct their operator from
+    ``A[0,0]`` and ``A[0,1]`` alone. That reconstruction is exact for the 2nd-order
+    TST operator and is retained because it reproduces the published figures
+    bit-for-bit — but for the 4th-order pentadiagonal operator it silently discarded
+    the ±2 band and solved a *different, tridiagonal* system. Nothing failed: the
+    solve converged, the residual was computed against the truncated matrix, and the
+    row looked entirely healthy. Every 4th-order HHL and QSVT result produced before
+    2026-08-10 is invalid for this reason.
+
+    Raising here converts that silent corruption into an immediate, named error, and
+    points the caller at the dense encoding that does handle the operator.
+
+    Parameters
+    ----------
+    A : np.ndarray, shape (N, N)
+        Candidate operator.
+    solver : str
+        Solver name, for the message (e.g. ``"HHL"``).
+
+    Raises
+    ------
+    ValueError
+        If any entry outside the three central diagonals exceeds
+        `_BAND_TOL` relative to the largest entry of A.
+    """
+    A = np.asarray(A)
+    N = A.shape[0]
+    if N < 3:
+        return
+
+    scale = float(np.max(np.abs(A))) or 1.0
+    # Everything outside |i - j| <= 1. Built as a mask rather than by inspecting
+    # the k=+-2 diagonals alone, so a stencil wider still cannot slip through.
+    idx      = np.arange(N)
+    off_band = np.abs(idx[:, None] - idx[None, :]) > 1
+    leak     = float(np.max(np.abs(A[off_band]))) if off_band.any() else 0.0
+
+    if leak / scale > _BAND_TOL:
+        raise ValueError(
+            f"{solver} received a matrix with non-zero entries outside the "
+            f"tridiagonal band: max|off-band| / max|A| = {leak / scale:.3e}. "
+            f"This code path reconstructs the operator from A[0,0] and A[0,1] "
+            f"alone, so those entries would be silently discarded and a different "
+            f"system solved. For the 4th-order pentadiagonal operator use the "
+            f"order-4 solver ({solver.lower()}_4th), which block encodes A in full "
+            f"via build_dense_block_encoding."
+        )
+
 
 def build_tst_block_encoding(
     N         : int,
@@ -132,24 +204,92 @@ def build_tst_block_encoding(
     # Normalised matrix: M = A / alpha, ||M||_2 = 1.
     M = A / alpha
 
-    # Sz.-Nagy dilation: construct the 2N x 2N unitary.
-    U_2N = _sznagy_dilation(M)
+    return _assemble_dilation_circuit(M, alpha, name="BlockEnc_TST")
 
-    # Embed into a quantum circuit.
-    # Total qubits: n (data) + 1 (ancilla).
-    # The 2N x 2N unitary acts on (n+1) qubits.
-    data = QuantumRegister(n,              name="data")
-    anc  = AncillaRegister(_N_ANCILLA_BE,  name="anc_be")
-    qc   = QuantumCircuit(data, anc, name="BlockEnc_TST")
 
-    # In Qiskit's convention, the circuit acts on qubits [data[0], ...,
-    # data[n-1], anc[0]], corresponding to the statevector ordering where
-    # data[0] is the LSB and anc[0] is the MSB.
-    # The UnitaryGate is applied to all n+1 qubits in this order.
-    gate = UnitaryGate(U_2N, label="U_BE")
-    qc.append(gate, list(range(n)) + [n])
+def build_dense_block_encoding(
+    A : np.ndarray,
+) -> tuple[QuantumCircuit, float]:
+    """
+    Constructs a block encoding circuit for an arbitrary Hermitian matrix A.
 
-    return qc, alpha
+    The circuit implements
+
+        (⟨0_anc| ⊗ I_n) U_A (|0_anc⟩ ⊗ I_n) = A / α
+
+    with α = ‖A‖₂, identically to `build_tst_block_encoding` — the only difference
+    is that A is supplied in full rather than reconstructed from two scalars.
+
+    Purpose
+    -------
+    The banded structure of A is irrelevant to the Sz.-Nagy dilation, which acts on
+    a general Hermitian contraction. `build_tst_block_encoding` is TST-specific only
+    in its *constructor*: it rebuilds A from `main_diag` and `off_diag`, and so
+    cannot represent an operator with any further bands. Applied to the 4th-order
+    pentadiagonal operator that constructor silently discarded the ±2 band, block
+    encoding a *different, tridiagonal* matrix. The solve then converged neatly to
+    the answer to the wrong problem, which is why the defect survived several runs
+    undetected.
+
+    Complexity
+    ----------
+    The dilation is dense: O(N³) for the eigendecomposition of I - M², and the
+    resulting `UnitaryGate` on n+1 qubits synthesises to O(4ⁿ) = O(N²) two-qubit
+    gates. This is the same asymptotic cost `build_tst_block_encoding` already pays
+    — neither is a structure-exploiting encoding, and neither claims to be. Both
+    exist to make the *algorithmic* behaviour of HHL and QSVT measurable at small N,
+    not to demonstrate an asymptotic advantage in the encoding itself.
+
+    Parameters
+    ----------
+    A : np.ndarray, shape (N, N)
+        Hermitian matrix, N a power of 2. Any bandwidth, including dense.
+
+    Returns
+    -------
+    circuit : QuantumCircuit
+        Block encoding circuit on n + 1 qubits, with register layout
+        (Qiskit little-endian): qubits 0…n-1 the data register, qubit n the
+        ancilla register.
+    alpha : float
+        Subnormalisation factor, the spectral norm of A.
+
+    Raises
+    ------
+    ValueError
+        If A is not square, if its dimension is not a positive power of 2, if it is
+        not Hermitian to within `_HERMITIAN_TOL`, or if it is numerically zero.
+    """
+    A = np.asarray(A)
+    if A.ndim != 2 or A.shape[0] != A.shape[1]:
+        raise ValueError(f"A must be a square matrix, received shape {A.shape}.")
+
+    N = A.shape[0]
+    if N <= 0 or (N & (N - 1)) != 0:
+        raise ValueError(
+            f"A's dimension must be a positive power of 2, received N={N}. "
+            f"Amplitude encoding addresses the N basis states with log2(N) qubits."
+        )
+
+    asymmetry = float(np.max(np.abs(A - A.conj().T))) if N else 0.0
+    scale     = float(np.max(np.abs(A))) or 1.0
+    if asymmetry / scale > _HERMITIAN_TOL:
+        raise ValueError(
+            f"A must be Hermitian: max|A - A†| / max|A| = {asymmetry / scale:.3e} "
+            f"exceeds {_HERMITIAN_TOL:.1e}. The Sz.-Nagy dilation assumes a "
+            f"Hermitian contraction, and a non-Hermitian argument yields a "
+            f"non-unitary dilation rather than an error at circuit level."
+        )
+
+    eigs  = np.linalg.eigvalsh(A)
+    alpha = float(np.max(np.abs(eigs)))
+    if alpha < _ZERO_MATRIX_TOL:
+        raise ValueError(
+            "A is numerically zero; there is no subnormalisation factor and the "
+            "linear system is degenerate."
+        )
+
+    return _assemble_dilation_circuit(A / alpha, alpha, name="BlockEnc_Dense")
 
 
 def block_encoding_matrix(
@@ -229,6 +369,59 @@ def subnormalisation_factor(
 
 
 # ── Private Helpers ───────────────────────────────────────────────────────────
+
+def _assemble_dilation_circuit(
+    M     : np.ndarray,
+    alpha : float,
+    name  : str,
+) -> tuple[QuantumCircuit, float]:
+    """
+    Wraps the Sz.-Nagy dilation of a normalised matrix in a circuit.
+
+    Shared by `build_tst_block_encoding` and `build_dense_block_encoding` so that
+    the register layout and qubit ordering are defined once. The two constructors
+    differ only in how they obtain M; if the embedding conventions were duplicated,
+    a QSVT phase sequence calibrated against one would silently misapply to the
+    other.
+
+    Parameters
+    ----------
+    M : np.ndarray, shape (N, N)
+        Hermitian matrix with ‖M‖₂ ≤ 1, i.e. A / α.
+    alpha : float
+        Subnormalisation factor, returned unchanged for the caller's convenience.
+    name : str
+        Circuit name, identifying the constructor in a drawn circuit.
+
+    Returns
+    -------
+    circuit : QuantumCircuit
+        Block encoding circuit on n + 1 qubits.
+    alpha : float
+        As supplied.
+    """
+    N = M.shape[0]
+    n = int(np.log2(N))
+
+    # Sz.-Nagy dilation: construct the 2N x 2N unitary.
+    U_2N = _sznagy_dilation(M)
+
+    # Embed into a quantum circuit.
+    # Total qubits: n (data) + 1 (ancilla).
+    # The 2N x 2N unitary acts on (n+1) qubits.
+    data = QuantumRegister(n,              name="data")
+    anc  = AncillaRegister(_N_ANCILLA_BE,  name="anc_be")
+    qc   = QuantumCircuit(data, anc, name=name)
+
+    # In Qiskit's convention, the circuit acts on qubits [data[0], ...,
+    # data[n-1], anc[0]], corresponding to the statevector ordering where
+    # data[0] is the LSB and anc[0] is the MSB.
+    # The UnitaryGate is applied to all n+1 qubits in this order.
+    gate = UnitaryGate(U_2N, label="U_BE")
+    qc.append(gate, list(range(n)) + [n])
+
+    return qc, alpha
+
 
 def _sznagy_dilation(M: np.ndarray) -> np.ndarray:
     """

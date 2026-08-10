@@ -95,6 +95,8 @@ from core.execution import default_executor, qsvt_spec
 
 from problems.poisson_1d import PoissonProblem1D
 from solvers.quantum.block_encoding import (
+    assert_tridiagonal,
+    build_dense_block_encoding,
     build_tst_block_encoding,
     _N_ANCILLA_BE,
 )
@@ -196,9 +198,10 @@ def qsvt_solve(
 
 
 def qsvt_solve_system(
-    A      : np.ndarray,
-    b      : np.ndarray,
-    config : QSVTConfig1D = DEFAULT_QSVT_CONFIG,
+    A        : np.ndarray,
+    b        : np.ndarray,
+    config   : QSVTConfig1D = DEFAULT_QSVT_CONFIG,
+    encoding : str = "tst",
 ) -> QSVTSolverResult:
     """
     Solve the linear system Au = b using QSVT on raw NumPy arrays.
@@ -211,11 +214,30 @@ def qsvt_solve_system(
     Parameters
     ----------
     A : np.ndarray, shape (N, N)
-        Hermitian TST system matrix.
+        Hermitian system matrix. Tridiagonal under the default encoding; any
+        bandwidth under ``encoding="dense"``.
     b : np.ndarray, shape (N,)
         Right-hand side vector.
     config : QSVTConfig1D
         Solver hyperparameters.
+    encoding : {"tst", "dense"}
+        Which block-encoding constructor to use.
+
+        ``"tst"`` (default) rebuilds the operator from ``A[0,0]`` and ``A[0,1]``.
+        Retained as the default because it reproduces the published 2nd-order
+        figures bit-for-bit, and guarded by `assert_tridiagonal` so that a wider
+        stencil raises instead of being silently truncated.
+
+        ``"dense"`` block encodes A in full via `build_dense_block_encoding`, at
+        identical asymptotic cost. Required for the 4th-order pentadiagonal
+        operator, and selected for it by `solvers/quantum/qsvt_1d_4th.py`.
+
+        Everything downstream of the encoding — the subnormalisation α, the phase
+        angles, the circuit, the extraction — is independent of this choice, since α
+        is computed from the eigenvalues of the supplied A either way. That is what
+        makes injecting the constructor preferable to a parallel implementation: a
+        second copy of the pipeline would let the 4th-order path drift away from the
+        2nd-order one it is meant to be compared against.
 
     Returns
     -------
@@ -225,11 +247,16 @@ def qsvt_solve_system(
     Raises
     ------
     ValueError
-        If N is not a power of 2, A is not Hermitian, or b is zero.
+        If N is not a power of 2, A is not Hermitian, b is zero, `encoding` is
+        unrecognised, or `encoding="tst"` is given a matrix with a band outside the
+        tridiagonal.
     RuntimeError
         If phase angle computation fails or solution extraction yields
         an all-zero vector.
     """
+    if encoding not in ("tst", "dense"):
+        raise ValueError(
+            f"encoding must be 'tst' or 'dense', received {encoding!r}.")
     N = len(b)
     n = int(np.log2(N))
 
@@ -267,8 +294,6 @@ def qsvt_solve_system(
     # A is now positive definite; proceed with standard QSVT.
 
     # ── Stage 1: block encoding ───────────────────────────────────────────────
-    main_diag = float(A[0, 0])
-    off_diag  = float(A[0, 1])
     # Use the spectral norm (largest eigenvalue) as the subnormalisation
     # factor alpha, rather than |a|+2|b| (subnormalisation_factor). This is
     # what build_tst_block_encoding uses internally to construct the block
@@ -278,7 +303,14 @@ def qsvt_solve_system(
     eigs_for_alpha = np.linalg.eigvalsh(A)
     alpha          = float(np.max(np.abs(eigs_for_alpha)))
 
-    be_circuit, alpha_check = build_tst_block_encoding(N, main_diag, off_diag)
+    if encoding == "dense":
+        be_circuit, alpha_check = build_dense_block_encoding(A)
+    else:
+        # Given A[0,0] and A[0,1] only, so any wider band would be discarded
+        # without trace and a different system solved. Refuse rather than truncate.
+        assert_tridiagonal(A, "QSVT")
+        be_circuit, alpha_check = build_tst_block_encoding(
+            N, float(A[0, 0]), float(A[0, 1]))
 
     # Effective condition number after subnormalisation.
     # kappa_eff = alpha * kappa(A) / ||A||_2

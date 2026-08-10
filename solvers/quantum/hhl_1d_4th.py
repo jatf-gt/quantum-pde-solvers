@@ -55,13 +55,52 @@ def hhl_solve_4th(
     trotter_steps: int | None = None,
 ) -> SolverResult:
     """
-    Solve the fourth-order 1D Poisson system using HHL with
-    PentadiagonalToeplitz Hamiltonian simulation.
+    Solve the fourth-order 1D Poisson system using HHL, from a problem object.
+
+    Convenience wrapper over `hhl_solve_system_4th`; see that function for the
+    normalisation and proportionality-recovery derivations.
 
     Parameters
     ----------
     problem : PoissonProblem1D4th
         The fourth-order discretised problem.
+    epsilon : float
+        HHL error tolerance (controls QPE register size and Trotter steps).
+        Default 0.01.
+    trotter_steps : int or None
+        Number of Trotter steps for the Hamiltonian simulation. If None, the
+        `PentadiagonalToeplitz` class auto-computes a value.
+
+    Returns
+    -------
+    SolverResult
+        Physical solution and diagnostics.
+    """
+    return hhl_solve_system_4th(problem.A, problem.b, epsilon=epsilon,
+                                trotter_steps=trotter_steps)
+
+
+def hhl_solve_system_4th(
+    A: np.ndarray,
+    b: np.ndarray,
+    epsilon: float = 0.01,
+    trotter_steps: int | None = None,
+) -> SolverResult:
+    """
+    Solve a pentadiagonal system Au = b using HHL, on raw NumPy arrays.
+
+    The array-level interface, matching the ``(A, b) -> result`` shape that
+    `solvers/outer/inner.py` adapts into a strip solver. Registered there as
+    ``"hhl_4th"``; without it, a 4th-order 2-D or 3-D solve would draw the
+    2nd-order factory from the registry, whose `TridiagonalToeplitz` discards the
+    ±2 band and solves a different system on every strip.
+
+    Parameters
+    ----------
+    A : np.ndarray, shape (N, N)
+        Hermitian pentadiagonal system matrix, N a power of 2.
+    b : np.ndarray, shape (N,)
+        Right-hand side vector.
     epsilon : float
         HHL error tolerance (controls QPE register size and Trotter steps).
         Default 0.01.
@@ -112,9 +151,9 @@ def hhl_solve_4th(
 
     t_start = time.perf_counter()
 
-    A = problem.A
-    b = problem.b
-    N = problem.N
+    A = np.asarray(A)
+    b = np.asarray(b)
+    N = len(b)
 
     # ── Normalise ─────────────────────────────────────────────────────────────
     alpha = float(np.linalg.norm(A, ord=2))   # spectral norm = ||A||_2

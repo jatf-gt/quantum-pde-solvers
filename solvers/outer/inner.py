@@ -383,6 +383,77 @@ def _qsvt(**opts):
     return solve
 
 
+# ── Fourth-order (pentadiagonal) inner solvers ────────────────────────────────
+#
+# Registered separately rather than folded into the 2nd-order factories above,
+# because the two differ in the operator they may legally be given, not merely in
+# a parameter. `hhl_solve_system` and `qsvt_solve_system` reconstruct their operator
+# from A[0,0] and A[0,1] alone; handed the pentadiagonal strip matrix they discarded
+# the ±2 band and solved a *tridiagonal* system instead. That produced errors of
+# 52 % (N=4), 237 % (N=8) and 117 % (N=16) against the true pentadiagonal solution
+# — and reported none of it, since the residual was computed against the truncated
+# operator. Both now raise on a wider band rather than truncating.
+#
+# Thomas is absent by design: `solvers/classical/thomas.py` implements the
+# tridiagonal algorithm specifically and cannot factor a pentadiagonal matrix. The
+# 4th-order classical reference is the direct dense solve, reached through the
+# ordinary "thomas" entry's own guard.
+
+@register("hhl_4th", options={
+    "epsilon": Option(float, 0.01,
+                      "Trotter/phase precision. Dominant cost driver: "
+                      "circuit depth grows as 1/epsilon."),
+})
+def _hhl_4th(epsilon=0.01, **_):
+    from solvers.quantum.hhl_1d_4th import hhl_solve_system_4th
+
+    def solve(A, b):
+        res = hhl_solve_system_4th(A, b, epsilon=epsilon)
+        return (np.asarray(res.u, dtype=float),
+                {"prop_const": float(getattr(res, "prop_const", np.nan))})
+    return solve
+
+
+@register("qsvt_4th", options={
+    "max_degree":     Option(int, help="cap on the QSP polynomial degree. The "
+                                       "dominant cost driver: circuit depth is "
+                                       "O(degree). Unset = uncapped."),
+    "epsilon":        Option(float, help="target inversion accuracy; sets the "
+                                         "required degree when uncapped"),
+    "angle_method":   Option(str, help="QSP angle solver, e.g. sym_qsp_direct"),
+    "max_degree_cap": Option(int, help="hard ceiling used during angle finding"),
+    "device_name":    Option(str, help="simulator backend"),
+    "verbose":        Option(bool, help="per-solve angle-finding logging"),
+    "label":          Option(str, help="diagnostic label identifying this "
+                                       "problem instance in the proportionality-"
+                                       "recovery output, e.g. a case name. Purely "
+                                       "cosmetic - does not affect the solution."),
+})
+def _qsvt_4th(**opts):
+    import dataclasses
+    from solvers.quantum.qsvt_1d import QSVTConfig1D
+    from solvers.quantum.qsvt_1d_4th import (QSVTConfig1D4th,
+                                             qsvt_solve_system_4th)
+
+    declared = {f.name for f in dataclasses.fields(QSVTConfig1D)}
+    unknown = set(opts) - declared
+    if unknown:
+        raise ValueError(f"QSVTConfig1D has no field(s) {sorted(unknown)}; "
+                         f"the option registry is out of date with qsvt_1d.py")
+    # Unset -> the 4th-order defaults, which are looser than the 2nd-order ones:
+    # the pentadiagonal operator's condition number is 4/3 of the tridiagonal one
+    # in the asymptotic limit, so the same epsilon costs a proportionally higher
+    # polynomial degree.
+    cfg = QSVTConfig1D(**opts) if opts else QSVTConfig1D4th().to_qsvt_config()
+
+    def solve(A, b):
+        res = qsvt_solve_system_4th(A, b, config=cfg)
+        return (np.asarray(res.u, dtype=float),
+                {"polynomial_degree": getattr(res, "polynomial_degree", None),
+                 "circuit_depth": getattr(res, "circuit_depth", None)})
+    return solve
+
+
 # ── Factory ───────────────────────────────────────────────────────────────────
 
 def get_inner(name: str, fallback_to_thomas: bool = True,

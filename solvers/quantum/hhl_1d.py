@@ -31,6 +31,7 @@ from qiskit.quantum_info import Statevector
 from core.execution import default_executor, hhl_spec
 
 from problems.poisson_1d import PoissonProblem1D
+from solvers.quantum.block_encoding import assert_tridiagonal
 from solvers.quantum.result import SolverResult
 
 
@@ -115,6 +116,12 @@ def hhl_solve_system(
         post-selection criteria, or if proportionality recovery degenerates.
     """
     N = len(b)
+
+    # ── Phase 0: Structural Precondition ──────────────────────────────────────
+    # `TridiagonalToeplitz` below is constructed from A[0,0] and A[0,1] only, so any
+    # wider band would be discarded without trace and a different system solved.
+    # Refuse rather than truncate; see `assert_tridiagonal`.
+    assert_tridiagonal(A, "HHL")
 
     # ── Phase 1: Spectral Normalisation ───────────────────────────────────────
     A_norm_factor = float(np.linalg.norm(A, ord=2))

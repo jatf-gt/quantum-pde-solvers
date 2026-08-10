@@ -14,23 +14,38 @@ subnormalisation factor alpha:
     alpha_tri  = ||A_tri||_2  ≈ 4 / pi^2 * (N+1)^2  * (2/h^2)
     alpha_pent = ||A_pent||_2 ≈ (30/12) * alpha_tri  ≈ 2.5 * alpha_tri
 
-This increases the effective condition number seen by the QSP phase
-angle computation:
+Note that 30/12 ≈ 2.5 is the ratio of *spectral norms*, not of condition
+numbers.  The condition-number ratio is far milder,
 
-    kappa_eff = kappa(A_pent)
+    kappa_pent / kappa_tri → 4/3
 
-and therefore the polynomial degree required for the 1/x approximation.
-For small N (4, 8) this is still tractable on a laptop.
+so the polynomial degree required for the 1/x approximation grows by roughly a
+third rather than by a factor of 2.5.  Measured pentadiagonal condition numbers:
+11.95 (N=4), 42.14 (N=8), 154.5 (N=16) in 1-D; 2.80/3.36/3.58 for the 2-D mixed
+order strip; 1.98/2.22/2.30 in 3-D.
 
 Architecture
 ------------
 This module is intentionally thin.  It:
-  1. Builds the block encoding from block_encoding.py (unchanged).
-  2. Computes QSP phase angles from qsp_angles.py (unchanged).
-  3. Assembles and runs the QSVT circuit from qsvt_1d.py (unchanged).
+  1. Computes QSP phase angles from qsp_angles.py (unchanged).
+  2. Assembles and runs the QSVT circuit from qsvt_1d.py (unchanged), passing
+     ``encoding="dense"`` so that the pentadiagonal operator is block encoded in
+     full.
+  3. Returns the standard QSVTSolverResult.
 
-No new circuit primitives are needed.  The entire QSVT machinery
-generalises to the pentadiagonal case for free.
+**The dense encoding is the whole point of this module.**  It previously called
+`qsvt_solve_system` with the default TST encoding, which reconstructs the operator
+from ``A[0,0]`` and ``A[0,1]`` and thereby discarded the ±2 band entirely — block
+encoding a tridiagonal matrix and solving a different system.  Nothing failed
+visibly: the solve converged and the residual was computed against the truncated
+operator, so the results looked sound.  Every 4th-order QSVT result produced before
+2026-08-10 is invalid for this reason.  `build_tst_block_encoding` now raises on a
+pentadiagonal argument rather than truncating it, so the defect cannot recur
+silently.
+
+No new circuit primitives are needed: only the encoding constructor differs, and
+the Sz.-Nagy dilation was never tridiagonal-specific — it dilates any Hermitian
+contraction.  The rest of the QSVT machinery generalises for free.
 
 Usage
 -----
@@ -101,9 +116,9 @@ def qsvt_solve_4th(
     """
     Solve the fourth-order 1D Poisson system using QSVT.
 
-    Delegates entirely to qsvt_solve_system() from qsvt_1d.py, which
-    accepts any (A, b) pair and handles block encoding, phase angle
-    computation, circuit assembly, and solution extraction internally.
+    Thin wrapper over `qsvt_solve_system`, differing from the 2nd-order path in one
+    respect only: it requests the **dense** block encoding, so that the
+    pentadiagonal operator is encoded in full.
 
     Parameters
     ----------
@@ -135,4 +150,39 @@ def qsvt_solve_4th(
         problem.A,
         problem.b,
         config=config.to_qsvt_config(),
+        encoding="dense",
     )
+
+
+def qsvt_solve_system_4th(
+    A      : np.ndarray,
+    b      : np.ndarray,
+    config: QSVTConfig1D | None = None,
+) -> QSVTSolverResult:
+    """
+    Solve a pentadiagonal system Au = b with QSVT, on raw NumPy arrays.
+
+    The array-level counterpart of `qsvt_solve_4th`, matching the
+    ``(A, b) -> result`` shape that `solvers/outer/inner.py` adapts into a strip
+    solver. Registered there as ``"qsvt_4th"``; without it, a 4th-order 2-D or 3-D
+    solve would draw the 2nd-order factory from the registry and truncate every
+    strip.
+
+    Parameters
+    ----------
+    A : np.ndarray, shape (N, N)
+        Hermitian pentadiagonal system matrix.
+    b : np.ndarray, shape (N,)
+        Right-hand side vector.
+    config : QSVTConfig1D, optional
+        Solver hyperparameters. Defaults to the 4th-order defaults in
+        `QSVTConfig1D4th`, which are looser than the 2nd-order ones.
+
+    Returns
+    -------
+    QSVTSolverResult
+        Physical solution and circuit diagnostics.
+    """
+    if config is None:
+        config = QSVTConfig1D4th().to_qsvt_config()
+    return qsvt_solve_system(A, b, config=config, encoding="dense")

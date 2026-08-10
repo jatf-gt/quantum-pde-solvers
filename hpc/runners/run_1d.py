@@ -610,13 +610,31 @@ def _run_thomas(A: np.ndarray, b: np.ndarray,
         log.warning("    Thomas failed: %s", exc)
         return None, float("nan"), 0.0, 0.0, 0.0
 
-def _hhl_worker(A, b, epsilon, q):
+def _hhl_worker(A, b, epsilon, q, order: int = 2):
+    """
+    Run one HHL solve in a child process and return its result through `q`.
+
+    Dispatches on `order`. The 2nd-order module reconstructs its operator from
+    ``A[0,0]`` and ``A[0,1]``, so at order 4 it would discard the ±2 band and solve
+    a tridiagonal system — measured at 52 % error (N=4) rising to 237 % (N=8)
+    against the true pentadiagonal solution. It now raises rather than truncating,
+    which is why the dispatch here is required and not merely tidier.
+    """
+    if order == 4:
+        from solvers.quantum.hhl_1d_4th import hhl_solve_system_4th
+        res = hhl_solve_system_4th(A, b, epsilon=epsilon)
+        # Matched to the 2nd-order module's (u, x_raw, c) tuple, so that
+        # `_run_hhl` needs no knowledge of which order produced the result.
+        q.put((res.u, res.raw_state, res.prop_const))
+        return
+
     from solvers.quantum.hhl_1d import hhl_solve_system
     q.put(hhl_solve_system(A, b, epsilon))
 
 def _run_hhl(A: np.ndarray, b: np.ndarray, N: int,
              epsilon: float = HHL_EPSILON,
              timeout_s: float = HHL_TIMEOUT_S,
+             order: int = 2,
              ) -> tuple[Optional[np.ndarray], float, float, bool, float, str]:
     """
     HHL via the project module solvers/quantum/hhl_1d.py, with a HARD wall-clock timeout.
@@ -644,7 +662,7 @@ def _run_hhl(A: np.ndarray, b: np.ndarray, N: int,
     """
     ctx = mp.get_context("spawn")
     q = ctx.Queue()
-    p = ctx.Process(target=_hhl_worker, args=(A, b, epsilon, q))
+    p = ctx.Process(target=_hhl_worker, args=(A, b, epsilon, q, order))
     t0 = time.perf_counter()
     p.start()
     p.join(timeout=timeout_s)
@@ -762,7 +780,7 @@ def _build_qsvt_config(max_degree: Optional[int]):
 
 
 def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int, kappa: float,
-              time_limit: Optional[float]
+              time_limit: Optional[float], order: int = 2,
               ) -> tuple[Optional[np.ndarray], float, float, bool, int, int, Optional[int]]:
     max_deg = _resolve_qsvt_max_degree(kappa, HHL_EPSILON, N)
 
@@ -771,12 +789,19 @@ def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int, kappa: float,
         return None, float("nan"), 0.0, False, -1, -1, max_deg
 
     try:
-        from solvers.quantum.qsvt_1d import qsvt_solve_system
+        # Dispatched on order: the 2nd-order entry point block encodes the operator
+        # from A[0,0] and A[0,1] alone and now raises on a wider band, whereas the
+        # 4th-order one encodes A in full via the Sz.-Nagy dilation.
+        if order == 4:
+            from solvers.quantum.qsvt_1d_4th import (
+                qsvt_solve_system_4th as _qsvt_entry)
+        else:
+            from solvers.quantum.qsvt_1d import qsvt_solve_system as _qsvt_entry
 
         cfg = _build_qsvt_config(max_deg)
 
         t0 = time.perf_counter()
-        result = qsvt_solve_system(A, b, config=cfg)
+        result = _qsvt_entry(A, b, config=cfg)
         wall = time.perf_counter() - t0
 
         if time_limit is not None and wall > time_limit:
@@ -901,6 +926,7 @@ def _run_all_solvers(
     results:       list[RunResult],
     all_solutions: dict,
     reference:     str = "exact",
+    order:         int = 2,
 ) -> None:
     """
     Run Thomas -> HHL -> VQLS -> QSVT on one assembled system and record all.
@@ -953,7 +979,7 @@ def _run_all_solvers(
     # ── HHL ───────────────────────────────────────────────────────────────────
     if sel.wants_solver("hhl"):
         u_H, res_H, t_H, conv_H, c_H, note_H = _run_hhl(
-            A, b, N, timeout_s=sel.hhl_timeout_s)
+            A, b, N, timeout_s=sel.hhl_timeout_s, order=order)
         if u_H is not None:
             if u_ref is not None:
                 log.info("    HHL     MaxRelErr=%7.3f%%  Residual=%.3e  Time=%.3fs",
@@ -990,7 +1016,7 @@ def _run_all_solvers(
     if not sel.wants_solver("qsvt"):
         return
     u_Q, res_Q, t_Q, conv_Q, deg_Q, dep_Q, cap_Q = _run_qsvt(
-        A, b, N, kappa, QSVT_TIME_LIMIT_S)
+        A, b, N, kappa, QSVT_TIME_LIMIT_S, order=order)
 
     if u_Q is not None and u_ref is not None:
         log.info("    QSVT    MaxRelErr=%7.3f%%  Residual=%.3e  Time=%.1fs  "
@@ -1043,7 +1069,7 @@ def run_1d_generic_poisson_single_N(
         log.info("  N=%3d  kappa=%.2f  case=%s", N, kappa, case_id)
 
         _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
-                         sel, results, all_solutions)
+                         sel, results, all_solutions, order=order)
 
 
 def run_1d_generic_poisson_nonhom_single_N(
@@ -1078,7 +1104,7 @@ def run_1d_generic_poisson_nonhom_single_N(
     log.info("  N=%3d  kappa=%.2f  case=%s", N, kappa, case_id)
 
     _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
-                     sel, results, all_solutions)
+                     sel, results, all_solutions, order=order)
 
 
 def run_1d_het_single_N(
@@ -1125,7 +1151,7 @@ def run_1d_het_single_N(
 
     log.info("  N=%3d  kappa=%.2f  sub-case=3a", N, kappa)
     _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
-                     sel, results, all_solutions)
+                     sel, results, all_solutions, order=order)
 
     # ── Sub-case 3b: Gaussian profile, V_d = 300 V ────────────────────────────
     # No closed-form solution, so the Thomas result is the reference.
@@ -1138,7 +1164,8 @@ def run_1d_het_single_N(
 
     log.info("  N=%3d  kappa=%.2f  sub-case=3b  V_d=300V", N, kappa)
     _run_all_solvers(case_id, N, x, A, b, None, kappa,
-                     sel, results, all_solutions, reference="thomas")
+                     sel, results, all_solutions, reference="thomas",
+                     order=order)
 
     # Electric field diagnostic (derived quantity of physical interest).
     thomas_key = f"{case_id}_Thomas_N{N}"
@@ -1161,7 +1188,7 @@ def run_1d_het_single_N(
 
         log.info("  N=%3d  kappa=%.2f  sub-case=3c  h=%.5f", N, kappa, built.spacings[0])
         _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
-                         sel, results, all_solutions)
+                         sel, results, all_solutions, order=order)
 
 
 # ── Result serialisation ──────────────────────────────────────────────────────
