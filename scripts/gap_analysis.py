@@ -120,19 +120,23 @@ These markers are tested **before** `EXCEPTION_MARKERS`, because the substring
 outcomes used to share.
 """
 
-HHL_TIMEOUT_S: float = 3600.0
+LEGACY_HHL_TIMEOUT_S: float = 3600.0
 """
-The hard per-solve HHL budget, mirroring ``run_1d.HHL_TIMEOUT_S``.
+The per-solve HHL budget **under which the existing 1-D archive was produced**.
 
-Needed to classify rows written *before* `_run_hhl` distinguished its two failure
-modes: those carry only ``notes="solver_error"``, and the sole surviving evidence
-that the solve ran to its budget rather than raising is a ``wall_time_s`` at or
-above the budget. Rows written since carry an explicit ``hhl_timeout`` marker and do
-not rely on this inference.
+A historical constant, not a mirror of the runner's current default. It exists only
+to classify rows written before `_run_hhl` distinguished its two failure modes:
+those carry nothing but ``notes="solver_error"``, and the sole surviving evidence
+that the solve ran to its budget rather than raising is a ``wall_time_s`` at or above
+it. The thirteen such rows all record 3600.2 s.
 
-Not imported from the runner: `scripts/gap_analysis.py` must remain runnable on a
-node with no Qiskit installed, and importing the runner pulls in the whole solver
-stack. The duplication is checked by `tests/test_gap_analysis.py`.
+Deliberately **decoupled** from `run_1d.HHL_TIMEOUT_S`, which is now a
+``--hhl-timeout-s`` default and expected to be raised: at 3600 s HHL does not
+complete for N>=32, so finding where it does means increasing it. Rows produced at a
+raised budget carry an explicit ``hhl_timeout:<budget>s`` marker and never reach this
+inference, so the two values may diverge freely. Tying them together would have
+meant that raising the runtime budget silently reclassified the historical rows as
+genuine errors and scheduled 13 h of recomputation.
 """
 
 STALE_GEOMETRY_CASES: frozenset[str] = frozenset({
@@ -275,7 +279,7 @@ def classify_row(row: dict, strict: bool = False, dim: int = 1
     timed_out = (
         any(marker in notes for marker in TIMEOUT_MARKERS)
         or (dim == 1 and str(row.get("solver", "")).lower() == "hhl"
-            and wall is not None and float(wall) >= HHL_TIMEOUT_S)
+            and wall is not None and float(wall) >= LEGACY_HHL_TIMEOUT_S)
     )
     if timed_out:
         flags.append("solver_timeout")

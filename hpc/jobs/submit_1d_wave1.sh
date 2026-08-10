@@ -43,7 +43,7 @@
 # ============================================================================
 
 #PBS -N qpde_1d_wave1
-#PBS -l walltime=06:00:00
+#PBS -l walltime=24:00:00
 #PBS -l select=1:ncpus=4:mem=32gb
 #PBS -o results/1Dhpc_run/pbs_stdout_wave1.log
 #PBS -e results/1Dhpc_run/pbs_stderr_wave1.log

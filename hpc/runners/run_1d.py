@@ -231,10 +231,21 @@ QSVT_MAX_DEGREE_FALLBACK: int = 5000
 HHL_EPSILON: float = 0.01
 VQLS_SEED: int = 42
 
-# Hard per-solve wall-clock budget for HHL, in seconds. Named rather than left as
-# a default argument because the gap analysis needs the same number to recognise a
-# timed-out row as a terminal measurement rather than a fault: see `_run_hhl`.
-HHL_TIMEOUT_S: float = 3600.0
+# Default hard per-solve wall-clock budget for HHL, in seconds, overridable with
+# ``--hhl-timeout-s``. Named rather than left as a bare default argument so that the
+# banner and the run metadata can report it.
+#
+# This is a free parameter, not a fixed property of the benchmark. At N>=32 the 1-D
+# operator reaches kappa ~ 1.7e3 and HHL's clock register grows with kappa, so the
+# budget determines whether the solve completes at all; raising it is how the
+# completion threshold gets located. Whatever it is set to, a timed-out row records
+# the value in its notes, so rows from runs at different budgets stay comparable.
+#
+# `scripts/gap_analysis.py` deliberately does NOT track this value. It keeps its own
+# LEGACY_HHL_TIMEOUT_S = 3600, the budget the *existing archive* was produced under,
+# because that is a fact about recorded data and must not move when this default is
+# raised - see the docstring there.
+HHL_TIMEOUT_S: float = 5400.0
 
 # ── Solver and case families ──────────────────────────────────────────────────
 # The quantum solvers that `--solvers` selects among. Thomas is deliberately
@@ -644,8 +655,10 @@ def _run_hhl(A: np.ndarray, b: np.ndarray, N: int,
         log.warning("    HHL: killed after exceeding %.0fs timeout (N=%d). "
                     "This is a recorded outcome, not a fault: kappa=%.3g here.",
                     timeout_s, N, float(np.linalg.cond(A)))
+        # The budget is part of the note, so a one-hour timeout is distinguishable
+        # from a six-hour one without consulting the run metadata.
         return (None, float("nan"), time.perf_counter() - t0, False,
-                float("nan"), "hhl_timeout")
+                float("nan"), f"hhl_timeout:{timeout_s:.0f}s")
 
     try:
         u, x_raw, c = q.get_nowait()
@@ -815,10 +828,20 @@ class RunSelection:
         `fnmatch`; any other pattern is treated as a case-insensitive substring,
         so ``--cases 3b`` selects `HET_1D_3b_gaussian_Vd300` without the caller
         having to spell out the full identifier.
+    hhl_timeout_s : float
+        Hard per-solve wall-clock budget for HHL, in seconds. Carried here rather
+        than read from the module constant because it must survive the spawn
+        boundary — a worker re-imports this module and would otherwise see the
+        default — and because it determines *whether a solve completes at all*,
+        which makes it part of what this invocation executes rather than a
+        peripheral tuning knob. The existing archive was produced at HHL_TIMEOUT_S s; a
+        different value is recorded in the row's note and in the metadata, so a
+        later reader can tell a one-hour timeout from a six-hour one.
     """
 
-    solvers: tuple[str, ...] = QUANTUM_SOLVERS_1D
-    cases:   tuple[str, ...] = ()
+    solvers:       tuple[str, ...] = QUANTUM_SOLVERS_1D
+    cases:         tuple[str, ...] = ()
+    hhl_timeout_s: float           = HHL_TIMEOUT_S
 
     def wants_solver(self, solver: str) -> bool:
         """
@@ -929,7 +952,8 @@ def _run_all_solvers(
 
     # ── HHL ───────────────────────────────────────────────────────────────────
     if sel.wants_solver("hhl"):
-        u_H, res_H, t_H, conv_H, c_H, note_H = _run_hhl(A, b, N)
+        u_H, res_H, t_H, conv_H, c_H, note_H = _run_hhl(
+            A, b, N, timeout_s=sel.hhl_timeout_s)
         if u_H is not None:
             if u_ref is not None:
                 log.info("    HHL     MaxRelErr=%7.3f%%  Residual=%.3e  Time=%.3fs",
@@ -1276,6 +1300,7 @@ def _save_run_metadata(N_values: list[int], sel: RunSelection,
         "sections":            sections if sections is not None else list(SECTION_FAMILIES),
         "solvers":             list(sel.solvers),
         "cases_filter":        list(sel.cases),
+        "hhl_timeout_s":       sel.hhl_timeout_s,
         "phase_tag":           phase_tag,
         # Retained under its historical name so existing readers of
         # run_metadata.json continue to resolve it; it is now derived from the
@@ -1453,6 +1478,17 @@ def main() -> None:
              "33 outstanding rows would discard the other 107.",
     )
     parser.add_argument(
+        "--hhl-timeout-s", type=float, default=HHL_TIMEOUT_S,
+        help=f"Hard per-solve wall-clock budget for HHL, in seconds "
+             f"(default: {HHL_TIMEOUT_S:.0f}). The existing archive's thirteen "
+             f"timed-out rows were produced at 3600 s, at which HHL does not "
+             f"complete for N>=32 (kappa ~ 1.7e3); raising this is how the "
+             f"completion threshold is located. A timed-out row records the budget "
+             f"in its notes, so rows from runs at different budgets stay "
+             f"comparable. The PBS walltime must exceed this by enough to cover "
+             f"every remaining solve in the job.",
+    )
+    parser.add_argument(
         "--phase-tag", default=None,
         help="Label for this step, recorded in the log session banner and in "
              "run_metadata_<tag>.json. Lets a multi-step PBS job attribute each "
@@ -1497,9 +1533,14 @@ def main() -> None:
     if args.skip_qsvt:
         solvers = tuple(s for s in solvers if s != "qsvt")
 
+    if args.hhl_timeout_s <= 0:
+        parser.error("--hhl-timeout-s must be positive; there is no way to record "
+                     "a solve that was never permitted to start.")
+
     sel = RunSelection(
         solvers=solvers,
         cases=tuple(c.strip() for c in (args.cases or "").split(",") if c.strip()),
+        hhl_timeout_s=args.hhl_timeout_s,
     )
 
     # ── Resolve backend and report configuration ──────────────────────────────
@@ -1523,6 +1564,7 @@ def main() -> None:
     log.info("  Sections      : %s", sections)
     log.info("  Solvers       : Thomas + %s", list(sel.solvers) or "(none)")
     log.info("  Case filter   : %s", list(sel.cases) or "(all cases)")
+    log.info("  HHL budget    : %.0f s per solve", sel.hhl_timeout_s)
     log.info("  Append        : %s", args.append)
     log.info("  QSVT deg caps : %s", QSVT_MAX_DEGREE_BY_N)
     log.info("  Max workers   : %d", args.max_workers)

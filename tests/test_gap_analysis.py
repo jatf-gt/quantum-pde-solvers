@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.gap_analysis import (HHL_TIMEOUT_S, classify_row,
+from scripts.gap_analysis import (LEGACY_HHL_TIMEOUT_S, classify_row,
                                   STALE_GEOMETRY_CASES)
 
 
@@ -119,9 +119,25 @@ class TestPerSolveTimeout:
 
     def test_explicit_timeout_marker_is_a_flag(self):
         reasons, flags = classify_row(
-            _row(notes="rel_vs_thomas;hhl_timeout", converged=False,
+            _row(notes="rel_vs_thomas;hhl_timeout:3600s", converged=False,
                  err_vs_thomas=None, max_rel_err=None,
-                 wall_time_s=HHL_TIMEOUT_S), dim=1)
+                 wall_time_s=LEGACY_HHL_TIMEOUT_S), dim=1)
+        assert reasons == []
+        assert "solver_timeout" in flags
+
+    def test_a_raised_budget_is_recognised_without_the_legacy_inference(self):
+        """
+        A row produced at a raised ``--hhl-timeout-s`` must classify on its marker.
+
+        The budget is expected to be raised — at 3600 s HHL does not complete for
+        N>=32, so finding where it does means increasing it. Such a row's wall time
+        bears no relation to `LEGACY_HHL_TIMEOUT_S`, and in 2-D/3-D the inference is
+        switched off entirely, so the explicit marker must carry the classification
+        on its own.
+        """
+        reasons, flags = classify_row(
+            _row(notes="hhl_timeout:21600s", converged=False, err_vs_thomas=None,
+                 max_rel_err=None, wall_time_s=21600.4), dim=2)
         assert reasons == []
         assert "solver_timeout" in flags
 
@@ -176,26 +192,31 @@ class TestStaleGeometry:
         assert "HET_1D_3b_gaussian_Vd300" in STALE_GEOMETRY_CASES
 
 
-def test_timeout_constant_matches_the_runner():
+def test_legacy_budget_describes_the_existing_archive():
     """
-    The duplicated budget must not drift from the runner's own value.
+    `LEGACY_HHL_TIMEOUT_S` is a fact about recorded data, not a mirror of the runner.
 
-    `scripts/gap_analysis.py` declares `HHL_TIMEOUT_S` rather than importing it,
-    so that the tool stays runnable on a node with no Qiskit installed — importing
-    the runner pulls in the whole solver stack. This test is what makes that
-    duplication safe.
+    It must NOT be pinned to `run_1d.HHL_TIMEOUT_S`: that value is a
+    ``--hhl-timeout-s`` default and is expected to be raised, whereas the thirteen
+    rows this constant classifies were all produced at 3600 s and stay that way
+    forever. Coupling them would mean that raising the runtime budget silently
+    reclassified those rows as genuine errors and scheduled 13 h of recomputation.
+
+    What is checked instead is the historical claim itself, against the archive.
     """
-    import ast
+    import json
     from pathlib import Path
 
-    src = Path("hpc/runners/run_1d.py").read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    found = None
-    for node in ast.walk(tree):
-        if isinstance(node, ast.AnnAssign) and getattr(node.target, "id", None) == \
-                "HHL_TIMEOUT_S":
-            found = ast.literal_eval(node.value)
-    assert found is not None, "run_1d.py no longer defines HHL_TIMEOUT_S"
-    assert found == HHL_TIMEOUT_S, (
-        f"run_1d.HHL_TIMEOUT_S={found} but gap_analysis.HHL_TIMEOUT_S="
-        f"{HHL_TIMEOUT_S}; a timed-out row would be misclassified as an error.")
+    assert LEGACY_HHL_TIMEOUT_S == 3600.0
+
+    summary = Path("results/1Dhpc_run/results_full.json")
+    if not summary.exists():                # pragma: no cover - archive not present
+        pytest.skip("1D archive not present in this checkout")
+    rows = json.loads(summary.read_text(encoding="utf-8"))
+    timed_out = [r for r in rows
+                 if r["solver"] == "HHL" and (r.get("wall_time_s") or 0) >= 3600.0]
+    assert timed_out, "no timed-out HHL rows found; the constant's premise is gone"
+    for row in timed_out:
+        # Every one sits just above the budget, never far beyond it - which is what
+        # makes the wall-clock inference sound for these rows.
+        assert 3600.0 <= row["wall_time_s"] < 3660.0, row
