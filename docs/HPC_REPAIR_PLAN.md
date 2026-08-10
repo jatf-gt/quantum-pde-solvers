@@ -9,9 +9,77 @@ integration of the 4th-order pentadiagonal discretisation, and completion of the
 
 ---
 
+## Session log — 2026-08-10 into 2026-08-11
+
+**Objective for the next session: get jobs submitted early on 2026-08-11.**
+Read this section first, then §8 for the benchmarking framework.
+
+### Committed
+
+| Commit | What |
+|---|---|
+| `8191325` | **Phase 4a** — the 1-D 4th-order boundary closure, corrected and pinned |
+| `90d76f1` | **Phase 4b step 1** — `strip_sweep` extended for a higher-order transverse stencil |
+| `e87caae` | **Phase 8.1** — legacy HPC sweep schema separated from the new publication archive |
+| `2bdf1c0` | `docs/HPC_OPERATIONAL_ISSUES.md` — the unreadable `run.log` issue (OI-1) |
+
+### Uncommitted, and blocking every submission
+
+`_preflight.sh` refuses a dirty tree, so **nothing can be submitted until this
+settles** — not Wave 1, not the 4th-order phase precompute.
+
+```
+ M .gitignore                    ← dropped "!docs/*.md"; new docs are now untracked
+ M benchmark/{__init__,metrics,plotting,reporting,results_io,runner}.py
+?? benchmark/{equal_accuracy,hardware,sensitivity,tables}.py
+```
+
+`tests/test_integration.py` does not import: it still expects
+`BenchmarkResult2D`, retired by the `metrics.py` rewrite. It is the only failing
+module; everything else is green.
+
+### Priority order for the next session
+
+1. **Make the tree committable.** Add the typed `BenchmarkResult2D` (§8.2a) —
+   this unbreaks `test_integration.py` *and* gives 2-D/3-D somewhere to record
+   their outer-layer results, so it is not merely a test fix. Restore the
+   `!docs/*.md` negation in `.gitignore`. Commit the `benchmark/` work.
+2. **Preflight-verify and submit** the QSVT 4th-order phase precompute (ready,
+   κ confirmed unchanged) and Wave 1 (manifests verified at 22 / 55 / 40).
+3. **Verify 1-D order-4 is submittable.** The operator is now correct (Phase 4a)
+   and HHL/QSVT see the true pentadiagonal (Phase 2), but the path has not been
+   exercised end-to-end since.
+4. **Wire the new metrics into the existing section runners** — *not* the
+   wholesale replacement with `run_primary_1d` that Part II of the design
+   document proposes. Each job records the new metrics for its own scope. An
+   unwired metric costs a resubmission for metrics only, never for the solves,
+   so this ranks below getting the solves running.
+5. **Phase 4b step 2** — `problems/poisson_line_2d_4th.py`, then 3-D. 2-D/3-D
+   order 4 stays unsubmittable until this lands: the closure in
+   `multigrid_4th.py` is an *even* reflection with the `18α` error, measured
+   order 0.88.
+
+### Verification assets established today, reusable tomorrow
+
+- **2nd-order outer baseline**: 15 configurations (sor/fmg/jacobi/gauss-seidel
+  in 2-D, sor/fmg in 3-D) recording iteration count, residual to 12 s.f., work
+  count and a SHA-256 digest of the solution field. Any change to `strip_sweep`
+  or the schemes must reproduce it byte-for-byte. Legacy Jacobi 26/73.
+- **`tests/test_poisson_1d_4th.py`** — 21 tests, confirmed load-bearing: against
+  the defective closure 8 fail, and the only convergence test that still passes
+  is the sinusoid, the historical blind spot.
+- **The `gap_analysis.py` invocations** that actually reproduce 22 / 55 / 40 are
+  recorded below; the abbreviated form reports 98 and 96.
+- **`tests/baselines/baseline_v1.json` does not exist**, so 5 tests in
+  `test_regression_baseline.py` have been silently skipping since they were
+  written. The "replication guarantee" is currently inert. The tag
+  `v1.0-thesis-baseline` is at `b94dc62` if it is to be generated properly.
+
+---
+
 ## Status
 
-*Last revised 2026-08-10.*
+*Last revised 2026-08-11.*
 
 | # | Phase | State |
 |---|-------|-------|
