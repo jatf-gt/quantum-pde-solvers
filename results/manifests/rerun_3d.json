@@ -362,16 +362,6 @@
     },
     {
       "case": "3D_Laplace_BCdriven_cube",
-      "solver": "HHL",
-      "N": 16,
-      "reasons": [
-        "missing"
-      ],
-      "flags": [],
-      "wall_time_s": null
-    },
-    {
-      "case": "3D_Laplace_BCdriven_cube",
       "solver": "VQLS",
       "N": 16,
       "flags": [
@@ -393,16 +383,6 @@
       "reasons": [
         "wall_time_exceeded"
       ]
-    },
-    {
-      "case": "3D_Poisson_TripleSin_cube",
-      "solver": "HHL",
-      "N": 16,
-      "reasons": [
-        "missing"
-      ],
-      "flags": [],
-      "wall_time_s": null
     },
     {
       "case": "3D_Poisson_TripleSin_cube",
@@ -501,6 +481,15 @@
       "N": 16,
       "flags": [],
       "wall_time_s": 0.35879919584840536
+    },
+    {
+      "case": "3D_Laplace_BCdriven_cube",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": null
     },
     {
       "case": "3D_Laplace_BCdriven_cube",
@@ -675,6 +664,15 @@
     },
     {
       "case": "3D_Poisson_TripleSin_cube",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": null
+    },
+    {
+      "case": "3D_Poisson_TripleSin_cube",
       "solver": "QSVT",
       "N": 16,
       "flags": [],
@@ -774,7 +772,7 @@
     }
   ],
   "drift": [],
-  "n_rows_recorded": 46,
+  "n_rows_recorded": 48,
   "orphan_archives": {
     "stale": [
       "solution3d_3D_HET_Discharge_SPT100_HHL_N16.npz",
@@ -814,12 +812,9 @@
       "solution3d_3D_HET_RotatingSpoke_SPT100_VQLS_N4.npz",
       "solution3d_3D_HET_RotatingSpoke_SPT100_VQLS_N8.npz"
     ],
-    "unexplained": [
-      "solution3d_3D_Laplace_BCdriven_cube_HHL_N16.npz",
-      "solution3d_3D_Poisson_TripleSin_cube_HHL_N16.npz"
-    ]
+    "unexplained": []
   },
-  "generated": "2026-08-09T19:58:42+00:00",
+  "generated": "2026-08-10T14:19:34+00:00",
   "dim": 3,
   "results_dir": "results\\3Dhpc_run",
   "strict": false,

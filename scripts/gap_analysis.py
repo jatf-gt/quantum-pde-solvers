@@ -42,11 +42,22 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
-from benchmark.results_io import SweepArchive
+# ``pytest.ini`` sets ``pythonpath = .``, but a bare ``python3 scripts/gap_analysis.py``
+# puts ``scripts/`` on ``sys.path[0]`` rather than the repository root, so the local
+# import below fails however sound the working directory. The PBS submission scripts
+# invoke this module exactly that way for their post-run analysis, and the step is
+# guarded with ``|| true``, so the failure was silent: the manifest simply never
+# appeared. Resolving the root from ``__file__`` makes the invocation location
+# irrelevant, matching what every module under ``hpc/runners/`` already does.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+from benchmark.results_io import SweepArchive  # noqa: E402
 
 # ── Policy ────────────────────────────────────────────────────────────────────
 
@@ -93,6 +104,36 @@ EXCEPTION_MARKERS: tuple[str, ...] = (
     "No module named", "Error", "error", "Traceback", "Exception",
 )
 """Substrings in ``notes`` betraying a recorded exception rather than a real result."""
+
+TIMEOUT_MARKERS: tuple[str, ...] = ("hhl_timeout", "timeout", "timed_out")
+"""
+Substrings in ``notes`` marking a solve that *reached its budget*, not one that broke.
+
+A timeout is a measurement. `hpc/runners/run_1d.py::_run_hhl` imposes a hard
+one-hour budget per solve, and at N=32 and N=64 the 1-D operator's condition number
+reaches ~1.7e3, growing HHL's clock register to the point where the statevector
+simulation does not finish inside it. Recording that is the point of the benchmark;
+recomputing it spends another hour to obtain the same row.
+
+These markers are tested **before** `EXCEPTION_MARKERS`, because the substring
+``"error"`` would otherwise capture the historical note ``"solver_error"`` that both
+outcomes used to share.
+"""
+
+HHL_TIMEOUT_S: float = 3600.0
+"""
+The hard per-solve HHL budget, mirroring ``run_1d.HHL_TIMEOUT_S``.
+
+Needed to classify rows written *before* `_run_hhl` distinguished its two failure
+modes: those carry only ``notes="solver_error"``, and the sole surviving evidence
+that the solve ran to its budget rather than raising is a ``wall_time_s`` at or
+above the budget. Rows written since carry an explicit ``hhl_timeout`` marker and do
+not rely on this inference.
+
+Not imported from the runner: `scripts/gap_analysis.py` must remain runnable on a
+node with no Qiskit installed, and importing the runner pulls in the whole solver
+stack. The duplication is checked by `tests/test_gap_analysis.py`.
+"""
 
 STALE_GEOMETRY_CASES: frozenset[str] = frozenset({
     "HET_1D_3b_gaussian_Vd300",
@@ -191,7 +232,8 @@ def merge_case_ids(discovered: Iterable[str], observed: Iterable[str]) -> list[s
 
 # ── Classification ────────────────────────────────────────────────────────────
 
-def classify_row(row: dict, strict: bool = False) -> tuple[list[str], list[str]]:
+def classify_row(row: dict, strict: bool = False, dim: int = 1
+                 ) -> tuple[list[str], list[str]]:
     """
     Separates grounds for recomputation from merely notable properties of a row.
 
@@ -202,6 +244,14 @@ def classify_row(row: dict, strict: bool = False) -> tuple[list[str], list[str]]
     strict : bool
         Escalate the soft flags into recompute reasons, so that anything which did
         not cleanly meet tolerance is rerun.
+    dim : int
+        Spatial dimension of the sweep, 1, 2 or 3. Required because
+        ``wall_time_s`` means different things across the two schemas: in 1-D it is
+        one solve, and so is comparable against `HHL_TIMEOUT_S`; in 2-D and 3-D it
+        is an entire outer iteration over N (or N²) strip solves, which routinely
+        exceeds an hour in the normal course of a sound run. Applying the 1-D
+        timeout inference there would mark most large-N HHL rows as timed out and
+        suppress the very reasons that schedule them for rerun.
 
     Returns
     -------
@@ -217,7 +267,19 @@ def classify_row(row: dict, strict: bool = False) -> tuple[list[str], list[str]]
         reasons.append("stale_geometry")
 
     notes = str(row.get("notes") or "")
-    if any(marker in notes for marker in EXCEPTION_MARKERS):
+    # Order matters: a timed-out solve is a terminal measurement, whereas a raised
+    # exception is a defect, and the historical note "solver_error" was written for
+    # both. Test for the timeout first, then fall back to the wall-clock inference
+    # for rows predating the explicit marker, and only then treat it as an error.
+    wall = row.get("wall_time_s")
+    timed_out = (
+        any(marker in notes for marker in TIMEOUT_MARKERS)
+        or (dim == 1 and str(row.get("solver", "")).lower() == "hhl"
+            and wall is not None and float(wall) >= HHL_TIMEOUT_S)
+    )
+    if timed_out:
+        flags.append("solver_timeout")
+    elif any(marker in notes for marker in EXCEPTION_MARKERS):
         reasons.append("solver_error")
 
     stop = str(row.get("stop_reason") or "")
@@ -238,7 +300,14 @@ def classify_row(row: dict, strict: bool = False) -> tuple[list[str], list[str]]
         if err is None:
             err, basis = row.get("max_rel_err"), "vs_exact"
         if err is None:
-            reasons.append("no_error_metric")
+            # A timed-out solve has no error metric *because* it produced no
+            # solution, which is the recorded outcome rather than a missing
+            # measurement. Escalating it here would reinstate by the back door the
+            # recomputation the timeout classification above exists to prevent.
+            if timed_out:
+                flags.append("no_error_metric")
+            else:
+                reasons.append("no_error_metric")
         elif float(err) > IMPLAUSIBLE_REL_ERR_PCT:
             # A flag, not a reason. A large error can be the finding rather than a
             # fault: in 1-D the operator's condition number reaches ~1.7e3 by N=64,
@@ -260,6 +329,7 @@ def analyse(
     n_values: Iterable[int],
     solvers:  Iterable[str],
     strict:   bool = False,
+    dim:      int = 1,
 ) -> dict:
     """
     Classifies every expected combination against the recorded summary.
@@ -272,6 +342,9 @@ def analyse(
         The expected grid.
     strict : bool
         Treat any row that did not cleanly meet tolerance as outstanding.
+    dim : int
+        Spatial dimension, forwarded to `classify_row`, whose wall-clock timeout
+        inference is valid only for the 1-D schema.
 
     Returns
     -------
@@ -298,7 +371,7 @@ def analyse(
                                   "reasons": ["missing"], "flags": [],
                                   "wall_time_s": None})
                     continue
-                reasons, flags = classify_row(row, strict=strict)
+                reasons, flags = classify_row(row, strict=strict, dim=dim)
                 entry = {"case": case, "solver": solver, "N": int(N),
                          "flags": flags, "wall_time_s": row.get("wall_time_s")}
                 if reasons:
@@ -496,7 +569,8 @@ def main() -> None:
     print(f"  cases from {runner} + recorded rows: {len(cases)}")
     print(f"  N={n_values}  solvers={solvers}")
     print("=" * 78)
-    manifest = analyse(archive, cases, n_values, solvers, strict=args.strict)
+    manifest = analyse(archive, cases, n_values, solvers, strict=args.strict,
+                       dim=args.dim)
     manifest.update({
         "generated":   datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "dim":         args.dim,

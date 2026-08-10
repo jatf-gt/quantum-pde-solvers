@@ -1,136 +1,6 @@
 {
   "rerun": [
     {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "HHL",
-      "N": 32,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3600.28599417489,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "HHL",
-      "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3601.1203612135723,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "HHL",
-      "N": 32,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3600.218771365471,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "HHL",
-      "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3600.2569169988856,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
-      "case": "1D_Poisson_fS_hom",
-      "solver": "HHL",
-      "N": 32,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3600.215778922662,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
-      "case": "1D_Poisson_fS_hom",
-      "solver": "HHL",
-      "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3600.35793423187,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
-      "case": "1D_Poisson_fS_nonhom",
-      "solver": "HHL",
-      "N": 32,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3600.1899474300444,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
-      "case": "1D_Poisson_fS_nonhom",
-      "solver": "HHL",
-      "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3600.2119110012427,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
-      "case": "HET_1D_3a_linear_hom",
-      "solver": "HHL",
-      "N": 32,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3600.2333907252178,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
-      "case": "HET_1D_3a_linear_hom",
-      "solver": "HHL",
-      "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3600.2332488466054,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
       "case": "HET_1D_3b_gaussian_Vd300",
       "solver": "Thomas",
       "N": 4,
@@ -268,12 +138,13 @@
       "solver": "HHL",
       "N": 32,
       "flags": [
-        "not_converged"
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
       ],
       "wall_time_s": 3600.1581904571503,
       "reasons": [
-        "stale_geometry",
-        "no_error_metric"
+        "stale_geometry"
       ]
     },
     {
@@ -314,12 +185,13 @@
       "solver": "HHL",
       "N": 64,
       "flags": [
-        "not_converged"
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
       ],
       "wall_time_s": 3600.210390395485,
       "reasons": [
-        "stale_geometry",
-        "no_error_metric"
+        "stale_geometry"
       ]
     },
     {
@@ -366,19 +238,6 @@
         "not_converged"
       ],
       "wall_time_s": 742.8967653969303,
-      "reasons": [
-        "solver_error",
-        "no_error_metric"
-      ]
-    },
-    {
-      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
-      "solver": "HHL",
-      "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 3600.2115233885124,
       "reasons": [
         "solver_error",
         "no_error_metric"
@@ -481,6 +340,17 @@
     },
     {
       "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3600.28599417489
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
       "solver": "VQLS",
       "N": 32,
       "flags": [
@@ -502,6 +372,17 @@
       "N": 64,
       "flags": [],
       "wall_time_s": 0.0001644948497414589
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3601.1203612135723
     },
     {
       "case": "1D_Poisson_fH_hom",
@@ -616,6 +497,17 @@
     },
     {
       "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3600.218771365471
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
       "solver": "VQLS",
       "N": 32,
       "flags": [
@@ -637,6 +529,17 @@
       "N": 64,
       "flags": [],
       "wall_time_s": 0.00017358362674713135
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3600.2569169988856
     },
     {
       "case": "1D_Poisson_fL_hom",
@@ -750,6 +653,17 @@
     },
     {
       "case": "1D_Poisson_fS_hom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3600.215778922662
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
       "solver": "VQLS",
       "N": 32,
       "flags": [
@@ -770,6 +684,17 @@
       "N": 64,
       "flags": [],
       "wall_time_s": 0.00016862526535987854
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3600.35793423187
     },
     {
       "case": "1D_Poisson_fS_hom",
@@ -883,6 +808,17 @@
     },
     {
       "case": "1D_Poisson_fS_nonhom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3600.1899474300444
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
       "solver": "VQLS",
       "N": 32,
       "flags": [
@@ -904,6 +840,17 @@
       "N": 64,
       "flags": [],
       "wall_time_s": 0.00016831420361995697
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3600.2119110012427
     },
     {
       "case": "1D_Poisson_fS_nonhom",
@@ -1020,6 +967,17 @@
     },
     {
       "case": "HET_1D_3a_linear_hom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3600.2333907252178
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
       "solver": "VQLS",
       "N": 32,
       "flags": [
@@ -1041,6 +999,17 @@
       "N": 64,
       "flags": [],
       "wall_time_s": 0.00017533451318740845
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3600.2332488466054
     },
     {
       "case": "HET_1D_3a_linear_hom",
@@ -1187,6 +1156,17 @@
     },
     {
       "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 3600.2115233885124
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
       "solver": "VQLS",
       "N": 64,
       "flags": [
@@ -1207,8 +1187,11 @@
   ],
   "drift": [],
   "n_rows_recorded": 140,
-  "orphan_archives": [],
-  "generated": "2026-08-09T19:57:37+00:00",
+  "orphan_archives": {
+    "stale": [],
+    "unexplained": []
+  },
+  "generated": "2026-08-10T14:09:43+00:00",
   "dim": 1,
   "results_dir": "results\\1Dhpc_run",
   "strict": false,

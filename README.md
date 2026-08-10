@@ -141,11 +141,13 @@ poisson_hhl/
 │   │   ├── precompute_phases.py     # QSVT phase-angle precompute, --dim {1,2} (see §4.4)
 │   │   └── plot_results.py          # Post-processing, --dim {1,2,3}; thin CLI over benchmark/hpc_plotting.py
 │   └── jobs/                        # PBS Pro job scripts (site-specific — see "Adapting to another cluster")
+│       ├── _preflight.sh            # Environment + provenance gate, sourced by every job below
 │       ├── submit_hpc_1D.sh         # PBS job: full 1D sweep, CPU — §4.2
 │       ├── submit_hpc_gpu.sh        # PBS job: full 1D sweep, GPU (L40S / cuStateVec) — §4.3
 │       ├── submit_hpc_2D.sh         # PBS job: full 2D sweep — §4.7
-│       ├── submit_hpc_2D_gapfill.sh # PBS job: fill gaps left by a killed 2D sweep
 │       ├── submit_hpc_3D.sh         # PBS job: full 3D sweep — §4.7
+│       ├── submit_hpc_{1D,2D,3D}_4th.sh  # PBS jobs: pentadiagonal sweeps — blocked, see docs/HPC_REPAIR_PLAN.md
+│       ├── submit_{1d,2d,3d}_wave1.sh    # PBS jobs: manifest-driven gap fill — see hpc/README.md
 │       ├── submit_precompute_hpc.sh # PBS job: 1D QSVT phase-angle precompute — §4.4
 │       └── submit_precompute_2D.sh  # PBS job: 2D QSVT phase-angle precompute — §4.4
 │

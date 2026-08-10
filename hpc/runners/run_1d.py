@@ -64,6 +64,7 @@ import argparse
 import concurrent.futures
 import csv
 import dataclasses
+import fnmatch
 import json
 import logging
 import os
@@ -109,10 +110,71 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_FILE, mode="w" if _IS_MAIN_PROCESS else "a"),
+        # Append, never truncate. A single PBS job invokes this runner several
+        # times in sequence (one step per resolution band or solver group), and
+        # under mode="w" each invocation destroyed its predecessor's log: a job
+        # that ran five steps ended holding only the fifth. The history is the
+        # sole record of which rows a walltime-killed step had reached, so it is
+        # exactly what must not be discarded. Sessions are delimited by the
+        # banner written by `_log_session_header` instead.
+        logging.FileHandler(LOG_FILE, mode="a"),
     ],
 )
 log = logging.getLogger(__name__)
+
+
+def _log_session_header(phase_tag: Optional[str] = None) -> None:
+    """
+    Delimit one invocation within an appended log.
+
+    Called once from the parent process after the output directory and any phase
+    tag are resolved. Workers do not call it: `_IS_MAIN_PROCESS` is false in a
+    spawned child, and a banner per work unit would defeat the purpose.
+
+    Parameters
+    ----------
+    phase_tag : str, optional
+        Step label supplied by the submission script (e.g. ``wave1_het_small``),
+        recorded so a row can be attributed to the step that produced it.
+    """
+    if not _IS_MAIN_PROCESS:
+        return
+    log.info("=" * 78)
+    log.info("SESSION START  %s  pid=%d  phase=%s  argv=%s",
+             time.strftime("%Y-%m-%d %H:%M:%S"), os.getpid(),
+             phase_tag or "(untagged)", " ".join(sys.argv[1:]) or "(no arguments)")
+    log.info("=" * 78)
+
+
+def _redirect_log_file(path: Path) -> None:
+    """
+    Point the root logger's file handler at `path`, preserving its formatter.
+
+    Required because the output directory depends on `--order`, which is known
+    only after argument parsing, whereas the handler is installed at import time.
+
+    The replacement inherits the original formatter rather than accepting
+    logging's bare ``"%(message)s"`` default, which stripped the timestamp and PID
+    from every 4th-order log line and left the interleaved output of parallel work
+    units unattributable. The new handler appends, for the reason given where the
+    first one is installed.
+
+    Parameters
+    ----------
+    path : Path
+        Destination log file. Its parent directory must already exist.
+    """
+    logger = logging.getLogger()
+    fmt = None
+    for handler in logger.handlers[:]:
+        if isinstance(handler, logging.FileHandler):
+            fmt = fmt or handler.formatter
+            handler.close()
+            logger.removeHandler(handler)
+    new_handler = logging.FileHandler(path, mode="a")
+    if fmt is not None:
+        new_handler.setFormatter(fmt)
+    logger.addHandler(new_handler)
 
 # ── Suppress external library logging noise ───────────────────────────────────
 # Qiskit transpiler pass timings, IBM provider plugin errors, and Aer backend
@@ -168,6 +230,26 @@ QSVT_MAX_DEGREE_FALLBACK: int = 5000
 # ── HHL / VQLS configuration ──────────────────────────────────────────────────
 HHL_EPSILON: float = 0.01
 VQLS_SEED: int = 42
+
+# Hard per-solve wall-clock budget for HHL, in seconds. Named rather than left as
+# a default argument because the gap analysis needs the same number to recognise a
+# timed-out row as a terminal measurement rather than a fault: see `_run_hhl`.
+HHL_TIMEOUT_S: float = 3600.0
+
+# ── Solver and case families ──────────────────────────────────────────────────
+# The quantum solvers that `--solvers` selects among. Thomas is deliberately
+# absent: it is always executed, both because it costs microseconds and because
+# it is the reference solution for sub-case 3b, which has no closed form.
+QUANTUM_SOLVERS_1D: tuple[str, ...] = ("hhl", "vqls", "qsvt")
+
+# Section label -> work-unit family, as dispatched in `_execute_work_unit`. The
+# labels match the section headings in the log and in README section 5, so a
+# gap-analysis row can be traced to a `--sections` argument without a lookup.
+SECTION_FAMILIES: dict[str, str] = {
+    "1":  "generic_poisson",
+    "1b": "generic_poisson_nonhom",
+    "2":  "het_1d",
+}
 
 # ── Timing repeats ────────────────────────────────────────────────────────────
 # Repeats give a mean/std rather than a single sample, which is what makes a
@@ -409,19 +491,42 @@ def _save_all_solutions(all_solutions: dict) -> None:
     The per-case files remain the primary record; this is a convenience for
     post-processing. Previously `all_solutions` was assembled, pickled back
     from every worker process, merged -- and then silently discarded.
+
+    Any archive already present is read back and merged, with this invocation's
+    entries superseding same-key predecessors. A scope-restricted run (`--cases`,
+    `--n-values`) holds only its own solutions in memory, so a plain overwrite
+    would have replaced a complete archive with a handful of entries — the same
+    class of loss that `--append` prevents in the summary table.
+
+    Parameters
+    ----------
+    all_solutions : dict
+        Mapping of ``"<case>_<solver>_N<N>"`` to a dict carrying ``x``, ``u`` and
+        optionally ``u_exact``, as accumulated by `_record`.
     """
     if not all_solutions:
         return
+    path = RESULTS_DIR / "all_solutions.npz"
+
     flat: dict[str, np.ndarray] = {}
+    if path.exists():
+        try:
+            with np.load(path, allow_pickle=False) as prior:
+                flat.update({k: prior[k] for k in prior.files})
+            log.info("Merging %d prior entry array(s) from %s", len(flat), path)
+        except Exception as exc:
+            log.warning("Could not read %s (%s); it will be rewritten from this "
+                        "run's solutions only.", path, exc)
+            flat = {}
+
     for key, entry in all_solutions.items():
         flat[f"{key}__x"] = entry["x"]
         flat[f"{key}__u"] = entry["u"]
         if entry.get("u_exact") is not None:
             flat[f"{key}__u_exact"] = entry["u_exact"]
-    path = RESULTS_DIR / "all_solutions.npz"
     np.savez_compressed(path, **flat)
-    log.info("Consolidated solutions saved to %s (%d entries)",
-             path, len(all_solutions))
+    log.info("Consolidated solutions saved to %s (%d entries this run, "
+             "%d arrays total)", path, len(all_solutions), len(flat))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -500,16 +605,26 @@ def _hhl_worker(A, b, epsilon, q):
 
 def _run_hhl(A: np.ndarray, b: np.ndarray, N: int,
              epsilon: float = HHL_EPSILON,
-             timeout_s: float = 3600.0,
-             ) -> tuple[Optional[np.ndarray], float, float, bool, float]:
+             timeout_s: float = HHL_TIMEOUT_S,
+             ) -> tuple[Optional[np.ndarray], float, float, bool, float, str]:
     """
     HHL via the project module solvers/quantum/hhl_1d.py, with a HARD wall-clock timeout.
 
-    Returns (u, residual, wall_s, converged, scale_c).
+    Returns (u, residual, wall_s, converged, scale_c, failure_note).
 
     `scale_c` is the proportionality-recovery constant. It is NOT derivable
     from the returned solution vector afterwards, so it is propagated rather
     than discarded.
+
+    `failure_note` is empty on success, ``"hhl_timeout"`` when the budget expired
+    and ``"hhl_error"`` when the solve raised. The distinction is load-bearing for
+    the gap analysis, not cosmetic. Both outcomes previously yielded ``u=None`` and
+    hence the single note ``"solver_error"``, which made a *measured* result
+    indistinguishable from a *defect*: at N=32 and N=64 the 1-D operator reaches
+    kappa ~ 1.7e3, HHL's clock register grows with kappa, and the solve genuinely
+    does not finish inside an hour. That is the benchmark's finding. Classified as
+    an error, those thirteen rows were scheduled for recomputation, which would
+    have spent 13 h of cluster time reproducing thirteen identical timeouts.
 
     Unlike QSVT's post-hoc warning, this actually terminates the underlying
     process on timeout -- statevector-simulated HHL scales with the clock
@@ -526,19 +641,22 @@ def _run_hhl(A: np.ndarray, b: np.ndarray, N: int,
     if p.is_alive():
         p.terminate()
         p.join()
-        log.warning("    HHL: killed after exceeding %.0fs timeout (N=%d).",
-                   timeout_s, N)
-        return None, float("nan"), time.perf_counter() - t0, False, float("nan")
+        log.warning("    HHL: killed after exceeding %.0fs timeout (N=%d). "
+                    "This is a recorded outcome, not a fault: kappa=%.3g here.",
+                    timeout_s, N, float(np.linalg.cond(A)))
+        return (None, float("nan"), time.perf_counter() - t0, False,
+                float("nan"), "hhl_timeout")
 
     try:
         u, x_raw, c = q.get_nowait()
 
     except Exception as exc:
         log.warning("    HHL failed: %s", exc)
-        return None, float("nan"), time.perf_counter() - t0, False, float("nan")
+        return (None, float("nan"), time.perf_counter() - t0, False,
+                float("nan"), "hhl_error")
 
     wall = time.perf_counter() - t0
-    return u, _relative_residual(A, u, b), wall, True, float(c)
+    return u, _relative_residual(A, u, b), wall, True, float(c), ""
 
 
 def _run_vqls(A: np.ndarray, b: np.ndarray, N: int
@@ -665,6 +783,87 @@ def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int, kappa: float,
         return None, float("nan"), 0.0, False, -1, -1, max_deg
 
 
+# ── Run selection ─────────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class RunSelection:
+    """
+    Which (case, solver) combinations this invocation is to execute.
+
+    Replaces the former `skip_qsvt` boolean, which could express exactly one of
+    the restrictions a gap-fill run needs. The 2026-08-09 gap analysis put the
+    1D outstanding work at 33 rows out of 140 — 20 of them a single case,
+    `HET_1D_3b_gaussian_Vd300`, at five resolutions — against a driver whose only
+    scope control was `--max-n`. Re-running the whole sweep to reach 33 rows would
+    have recomputed 107 sound rows, several of them multi-hour HHL solves at
+    N=32/64.
+
+    Frozen so that it is hashable and unambiguously picklable across the
+    `ProcessPoolExecutor` boundary, and so that no worker can mutate the parent's
+    scope.
+
+    Attributes
+    ----------
+    solvers : tuple of str
+        Quantum solvers to execute, drawn from ("hhl", "vqls", "qsvt"). Thomas is
+        always executed and recorded regardless: it costs microseconds, and it is
+        the reference solution against which sub-case 3b's quantum errors are
+        measured, so excluding it would silently invalidate that case.
+    cases : tuple of str
+        Case-identifier patterns. An empty tuple selects every case. A pattern
+        containing a glob metacharacter (``*``, ``?``, ``[``) is matched with
+        `fnmatch`; any other pattern is treated as a case-insensitive substring,
+        so ``--cases 3b`` selects `HET_1D_3b_gaussian_Vd300` without the caller
+        having to spell out the full identifier.
+    """
+
+    solvers: tuple[str, ...] = QUANTUM_SOLVERS_1D
+    cases:   tuple[str, ...] = ()
+
+    def wants_solver(self, solver: str) -> bool:
+        """
+        Report whether `solver` is in scope.
+
+        Parameters
+        ----------
+        solver : str
+            Solver key, lower case (e.g. ``"hhl"``).
+
+        Returns
+        -------
+        bool
+            True if the solver is to be executed and recorded.
+        """
+        return solver.lower() in self.solvers
+
+    def wants_case(self, case_id: str) -> bool:
+        """
+        Report whether `case_id` is in scope.
+
+        Parameters
+        ----------
+        case_id : str
+            Case identifier as recorded in the results (e.g.
+            ``"HET_1D_3b_gaussian_Vd300"``).
+
+        Returns
+        -------
+        bool
+            True if the case is to be executed.
+        """
+        if not self.cases:
+            return True
+        target = case_id.lower()
+        for pattern in self.cases:
+            p = pattern.lower()
+            if any(ch in p for ch in "*?["):
+                if fnmatch.fnmatch(target, p):
+                    return True
+            elif p in target:
+                return True
+        return False
+
+
 # ── Per-case solver driver ────────────────────────────────────────────────────
 
 def _run_all_solvers(
@@ -675,7 +874,7 @@ def _run_all_solvers(
     b:             np.ndarray,
     u_exact:       Optional[np.ndarray],
     kappa:         float,
-    skip_qsvt:     bool,
+    sel:           RunSelection,
     results:       list[RunResult],
     all_solutions: dict,
     reference:     str = "exact",
@@ -691,7 +890,16 @@ def _run_all_solvers(
     case runners. Those blocks had drifted apart from one another over time,
     which is precisely how the missing accuracy norms and inconsistent NPZ
     archiving crept in.
+
+    A solver excluded by `sel` is neither executed *nor recorded*. The distinction
+    matters under `--append`: a placeholder row for a skipped solver would
+    supersede the sound row already on disk, converting a scope restriction into
+    data loss.
     """
+    if not sel.wants_case(case_id):
+        log.info("    %s N=%d excluded by --cases; skipping.", case_id, N)
+        return
+
     n_data_qubits = int(np.log2(N)) if N > 0 and (N & (N - 1)) == 0 else None
 
     # ── Thomas (classical reference) ──────────────────────────────────────────
@@ -720,36 +928,42 @@ def _run_all_solvers(
     ref_note = "rel_vs_thomas" if reference == "thomas" else ""
 
     # ── HHL ───────────────────────────────────────────────────────────────────
-    u_H, res_H, t_H, conv_H, c_H = _run_hhl(A, b, N)
-    if u_H is not None:
-        if u_ref is not None:
-            log.info("    HHL     MaxRelErr=%7.3f%%  Residual=%.3e  Time=%.3fs",
-                     _max_rel_err(u_H, u_ref), res_H, t_H)
-        else:
-            log.info("    HHL     Residual=%.3e  Time=%.3fs", res_H, t_H)
-    _record(results, all_solutions, case_id, "HHL", N, kappa,
-            x, u_H, u_ref, A, b, res_H, t_H, conv_H, notes=ref_note,
-            n_qubits=n_data_qubits, hhl_epsilon=HHL_EPSILON,
-            hhl_scale_c=c_H if u_H is not None else None)
+    if sel.wants_solver("hhl"):
+        u_H, res_H, t_H, conv_H, c_H, note_H = _run_hhl(A, b, N)
+        if u_H is not None:
+            if u_ref is not None:
+                log.info("    HHL     MaxRelErr=%7.3f%%  Residual=%.3e  Time=%.3fs",
+                         _max_rel_err(u_H, u_ref), res_H, t_H)
+            else:
+                log.info("    HHL     Residual=%.3e  Time=%.3fs", res_H, t_H)
+        # The reference marker and the failure mode are both recorded; a timed-out
+        # 3b row carries "rel_vs_thomas;hhl_timeout" rather than losing one to the
+        # other, which is what previously hid the timeouts behind the reference note.
+        _record(results, all_solutions, case_id, "HHL", N, kappa,
+                x, u_H, u_ref, A, b, res_H, t_H, conv_H,
+                notes=";".join(filter(None, (ref_note, note_H))),
+                n_qubits=n_data_qubits, hhl_epsilon=HHL_EPSILON,
+                hhl_scale_c=c_H if u_H is not None else None)
 
     # ── VQLS ──────────────────────────────────────────────────────────────────
-    u_V, res_V, t_V, conv_V, cost_V, lay_V, res_ct_V = _run_vqls(A, b, N)
-    if u_V is not None:
-        if u_ref is not None:
-            log.info("    VQLS    MaxRelErr=%7.3f%%  Residual=%.3e  Time=%.3fs  "
-                     "cost=%.2e", _max_rel_err(u_V, u_ref), res_V, t_V, cost_V)
-        else:
-            log.info("    VQLS    Residual=%.3e  Time=%.3fs  cost=%.2e",
-                     res_V, t_V, cost_V)
-    _record(results, all_solutions, case_id, "VQLS", N, kappa,
-            x, u_V, u_ref, A, b, res_V, t_V, conv_V, notes=ref_note,
-            n_qubits=n_data_qubits, vqls_final_cost=cost_V,
-            vqls_n_layers=lay_V if u_V is not None else None,
-            vqls_n_restarts=res_ct_V if u_V is not None else None,
-            random_seed=VQLS_SEED)
+    if sel.wants_solver("vqls"):
+        u_V, res_V, t_V, conv_V, cost_V, lay_V, res_ct_V = _run_vqls(A, b, N)
+        if u_V is not None:
+            if u_ref is not None:
+                log.info("    VQLS    MaxRelErr=%7.3f%%  Residual=%.3e  Time=%.3fs  "
+                         "cost=%.2e", _max_rel_err(u_V, u_ref), res_V, t_V, cost_V)
+            else:
+                log.info("    VQLS    Residual=%.3e  Time=%.3fs  cost=%.2e",
+                         res_V, t_V, cost_V)
+        _record(results, all_solutions, case_id, "VQLS", N, kappa,
+                x, u_V, u_ref, A, b, res_V, t_V, conv_V, notes=ref_note,
+                n_qubits=n_data_qubits, vqls_final_cost=cost_V,
+                vqls_n_layers=lay_V if u_V is not None else None,
+                vqls_n_restarts=res_ct_V if u_V is not None else None,
+                random_seed=VQLS_SEED)
 
     # ── QSVT ──────────────────────────────────────────────────────────────────
-    if skip_qsvt:
+    if not sel.wants_solver("qsvt"):
         return
     u_Q, res_Q, t_Q, conv_Q, deg_Q, dep_Q, cap_Q = _run_qsvt(
         A, b, N, kappa, QSVT_TIME_LIMIT_S)
@@ -770,7 +984,7 @@ def _run_all_solvers(
 # ── Case runners ──────────────────────────────────────────────────────────────
 
 def run_1d_generic_poisson_single_N(
-    N: int, skip_qsvt: bool, results: list[RunResult], all_solutions: dict,
+    N: int, sel: RunSelection, results: list[RunResult], all_solutions: dict,
     order: int,
 ) -> None:
     """Section 1: generic Poisson, homogeneous Dirichlet BCs, three sources."""
@@ -805,11 +1019,11 @@ def run_1d_generic_poisson_single_N(
         log.info("  N=%3d  kappa=%.2f  case=%s", N, kappa, case_id)
 
         _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
-                         skip_qsvt, results, all_solutions)
+                         sel, results, all_solutions)
 
 
 def run_1d_generic_poisson_nonhom_single_N(
-    N: int, skip_qsvt: bool, results: list[RunResult], all_solutions: dict,
+    N: int, sel: RunSelection, results: list[RunResult], all_solutions: dict,
     order: int,
 ) -> None:
     """
@@ -840,11 +1054,11 @@ def run_1d_generic_poisson_nonhom_single_N(
     log.info("  N=%3d  kappa=%.2f  case=%s", N, kappa, case_id)
 
     _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
-                     skip_qsvt, results, all_solutions)
+                     sel, results, all_solutions)
 
 
 def run_1d_het_single_N(
-    N: int, skip_qsvt: bool, results: list[RunResult], all_solutions: dict,
+    N: int, sel: RunSelection, results: list[RunResult], all_solutions: dict,
     order: int,
 ) -> None:
     """
@@ -887,7 +1101,7 @@ def run_1d_het_single_N(
 
     log.info("  N=%3d  kappa=%.2f  sub-case=3a", N, kappa)
     _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
-                     skip_qsvt, results, all_solutions)
+                     sel, results, all_solutions)
 
     # ── Sub-case 3b: Gaussian profile, V_d = 300 V ────────────────────────────
     # No closed-form solution, so the Thomas result is the reference.
@@ -900,7 +1114,7 @@ def run_1d_het_single_N(
 
     log.info("  N=%3d  kappa=%.2f  sub-case=3b  V_d=300V", N, kappa)
     _run_all_solvers(case_id, N, x, A, b, None, kappa,
-                     skip_qsvt, results, all_solutions, reference="thomas")
+                     sel, results, all_solutions, reference="thomas")
 
     # Electric field diagnostic (derived quantity of physical interest).
     thomas_key = f"{case_id}_Thomas_N{N}"
@@ -923,13 +1137,80 @@ def run_1d_het_single_N(
 
         log.info("  N=%3d  kappa=%.2f  sub-case=3c  h=%.5f", N, kappa, built.spacings[0])
         _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
-                         skip_qsvt, results, all_solutions)
+                         sel, results, all_solutions)
 
 
 # ── Result serialisation ──────────────────────────────────────────────────────
 
+def _load_existing_results(path: Path) -> list[RunResult]:
+    """
+    Load rows from a previous invocation for `--append` to build on.
+
+    Unknown fields in the JSON (e.g. from an older schema) are dropped rather than
+    raising, and a missing or unparsable file yields an empty list rather than
+    aborting: `--append` must never be the reason a sweep fails to start.
+
+    Parameters
+    ----------
+    path : Path
+        Location of a previous ``results_full.json``.
+
+    Returns
+    -------
+    list of RunResult
+        Rows recovered, oldest first. Empty if the file is absent or unreadable.
+    """
+    if not path.exists():
+        return []
+    try:
+        with open(path) as fh:
+            rows = json.load(fh)
+    except Exception as exc:
+        log.warning("Could not parse %s (%s); starting without prior results.",
+                    path, exc)
+        return []
+    valid = {f.name for f in dataclasses.fields(RunResult)}
+    out: list[RunResult] = []
+    for d in rows:
+        try:
+            out.append(RunResult(**{k: v for k, v in d.items() if k in valid}))
+        except Exception as exc:
+            log.warning("Skipping unreadable prior row: %s", exc)
+    return out
+
+
+def _dedupe_results(results: list[RunResult]) -> list[RunResult]:
+    """
+    Collapse superseded rows, retaining the most recent for each identity.
+
+    A sweep is uniquely indexed by (case, solver, N); a second row for that triple
+    is a recomputation of the first, not an additional datum. `--append` merges the
+    previous ``results_full.json`` ahead of the rows produced by this invocation,
+    so the later occurrence of any key is by construction the newer measurement.
+
+    Parameters
+    ----------
+    results : list of RunResult
+        Rows in chronological order, oldest first.
+
+    Returns
+    -------
+    list of RunResult
+        Deduplicated rows, in first-seen order so the file's layout stays stable
+        across appends rather than reshuffling on every save.
+    """
+    keep: dict = {}
+    for r in results:
+        keep[(r.case, r.solver, r.N)] = r
+    if len(keep) != len(results):
+        log.info("Superseded %d duplicate row(s) on (case, solver, N).",
+                 len(results) - len(keep))
+    return list(keep.values())
+
+
 def _save_results(results: list[RunResult]) -> None:
     """Write the results table to JSON and CSV."""
+    results = _dedupe_results(results)
     json_path = RESULTS_DIR / "results_full.json"
     with open(json_path, "w") as f:
         json.dump([asdict(r) for r in results], f, indent=2, default=str)
@@ -948,13 +1229,34 @@ def _save_results(results: list[RunResult]) -> None:
         log.info("Results saved to %s", csv_path)
 
 
-def _save_run_metadata(N_values: list[int], skip_qsvt: bool,
-                       max_workers: int) -> None:
+def _save_run_metadata(N_values: list[int], sel: RunSelection,
+                       max_workers: int, order: int = 2,
+                       sections: Optional[list[str]] = None,
+                       phase_tag: Optional[str] = None) -> None:
     """
     Environment and run-configuration provenance.
 
     Written BEFORE the sweep starts so that it survives a crash or a walltime
     kill; without it a partial result set is not reproducible.
+
+    Parameters
+    ----------
+    N_values : list of int
+        Resolutions in scope for this invocation.
+    sel : RunSelection
+        Solver and case scope, recorded so a gap-fill run's restriction is part of
+        the provenance rather than being inferable only from the absent rows.
+    max_workers : int
+        Worker process count.
+    order : int, optional
+        Spatial discretisation order, 2 or 4. Previously recorded nowhere in 1D,
+        which left the two orders' metadata indistinguishable.
+    sections : list of str, optional
+        Section labels in scope (see `SECTION_FAMILIES`).
+    phase_tag : str, optional
+        Step label; when given, the record is additionally written to
+        ``run_metadata_<tag>.json`` so successive steps of one job do not
+        overwrite each other's provenance.
     """
     meta: dict = {
         # ── Environment ───────────────────────────────────────────────────────
@@ -970,7 +1272,15 @@ def _save_run_metadata(N_values: list[int], skip_qsvt: bool,
         "pbs_queue":   os.environ.get("PBS_QUEUE"),
         # ── Run configuration (not derivable from the results table) ──────────
         "N_values":            N_values,
-        "skip_qsvt":           skip_qsvt,
+        "order":               order,
+        "sections":            sections if sections is not None else list(SECTION_FAMILIES),
+        "solvers":             list(sel.solvers),
+        "cases_filter":        list(sel.cases),
+        "phase_tag":           phase_tag,
+        # Retained under its historical name so existing readers of
+        # run_metadata.json continue to resolve it; it is now derived from the
+        # solver selection rather than being an independent flag.
+        "skip_qsvt":           not sel.wants_solver("qsvt"),
         "max_workers":         max_workers,
         "qsvt_max_n":          QSVT_MAX_N,
         "qsvt_time_limit_s":   QSVT_TIME_LIMIT_S,
@@ -997,14 +1307,46 @@ def _save_run_metadata(N_values: list[int], skip_qsvt: bool,
         meta["git_commit"] = "unknown"
         meta["git_dirty"]  = None
 
-    with open(RESULTS_DIR / "run_metadata.json", "w") as f:
-        json.dump(meta, f, indent=2)
-    log.info("Run metadata saved to %s", RESULTS_DIR / "run_metadata.json")
+    for name in filter(None, ("run_metadata.json",
+                              f"run_metadata_{phase_tag}.json" if phase_tag else None)):
+        with open(RESULTS_DIR / name, "w") as f:
+            json.dump(meta, f, indent=2)
+        log.info("Run metadata saved to %s", RESULTS_DIR / name)
 
 
 # ── Work unit dispatch ────────────────────────────────────────────────────────
 
-def _execute_work_unit(work_type: str, N: int, skip_qsvt: bool, order: int
+def _init_worker(results_dir: Path, qsvt_fallback_degree: int) -> None:
+    """
+    Propagates the main process's resolved configuration into a worker.
+
+    This is load-bearing, not defensive. `ProcessPoolExecutor` is constructed with
+    ``max_tasks_per_child=1``, and CPython selects the **spawn** start method
+    whenever that argument is given without an explicit context. A spawned worker
+    re-imports this module from scratch, so it sees the module-level defaults rather
+    than the values `main` assigned under ``global`` — and `_save_solution` reads
+    `RESULTS_DIR` from inside the worker.
+
+    The consequence was silent and destructive: an ``--order 4`` sweep wrote its
+    summary to ``results/1Dhpc_run_4th`` from the parent whilst every per-solution
+    archive went to ``results/1Dhpc_run`` from the workers, overwriting the
+    2nd-order fields with 4th-order ones. The summaries were left describing
+    solutions that no longer matched the archives beside them.
+
+    Parameters
+    ----------
+    results_dir : Path
+        Output directory resolved by `main`, including the 4th-order variant.
+    qsvt_fallback_degree : int
+        Degree used when no cached QSVT phase set matches, likewise resolved by
+        `main` and likewise previously lost on spawn.
+    """
+    global RESULTS_DIR, QSVT_UNCACHED_FALLBACK_DEGREE
+    RESULTS_DIR = results_dir
+    QSVT_UNCACHED_FALLBACK_DEGREE = qsvt_fallback_degree
+
+
+def _execute_work_unit(work_type: str, N: int, sel: RunSelection, order: int
                        ) -> tuple[list[RunResult], dict]:
     """
     Execute one (case_family, N) work unit and return its results.
@@ -1023,12 +1365,18 @@ def _execute_work_unit(work_type: str, N: int, skip_qsvt: bool, order: int
         "het_1d":                 run_1d_het_single_N,
     }
 
+    # The dispatch table and SECTION_FAMILIES must stay in step, otherwise a
+    # --sections argument resolves to a family this function cannot execute and
+    # the unit is silently skipped with a single log line.
+    assert set(dispatch) == set(SECTION_FAMILIES.values()), \
+        "dispatch table and SECTION_FAMILIES have diverged"
+
     fn = dispatch.get(work_type)
     if fn is None:
         log.error("Unknown work_type '%s'; skipping.", work_type)
         return results, solutions
 
-    fn(N, skip_qsvt, results, solutions, order)
+    fn(N, sel, results, solutions, order)
     return results, solutions
 
 
@@ -1066,9 +1414,49 @@ def main() -> None:
              f"(default: {max(N_VALUES_ALL)}, i.e. the whole sweep).",
     )
     parser.add_argument(
+        "--n-values", type=str, default=None,
+        help="Comma-separated resolutions to run, e.g. --n-values 32,64. Takes "
+             "precedence over --max-n. Required for a gap-fill run, where the "
+             "outstanding resolutions are not a prefix of the sweep.",
+    )
+    parser.add_argument(
+        "--sections", type=str, default=",".join(SECTION_FAMILIES),
+        help=f"Comma-separated section labels to run, from "
+             f"{sorted(SECTION_FAMILIES)} (default: all).",
+    )
+    parser.add_argument(
+        "--solvers", type=str, default=",".join(QUANTUM_SOLVERS_1D),
+        help=f"Comma-separated quantum solvers to run, from "
+             f"{list(QUANTUM_SOLVERS_1D)} (default: all). Thomas always runs: it "
+             f"costs microseconds and is sub-case 3b's reference solution.",
+    )
+    parser.add_argument(
+        "--cases", type=str, default=None,
+        help="Comma-separated case filters. A value containing *, ? or [ is "
+             "treated as a glob against the case identifier; anything else as a "
+             "case-insensitive substring. E.g. --cases 3b selects only "
+             "HET_1D_3b_gaussian_Vd300.",
+    )
+    parser.add_argument(
         "--skip-qsvt", action="store_true",
         help="Omit QSVT from all cases. Use for a rapid validation sweep or "
-             "if the QSVT module is unavailable.",
+             "if the QSVT module is unavailable. Equivalent to removing qsvt "
+             "from --solvers; retained because every existing submission script "
+             "passes it.",
+    )
+    parser.add_argument(
+        "--append", action="store_true",
+        help="Merge with the rows already in results_full.json instead of "
+             "replacing them. Rows are superseded on (case, solver, N), so a "
+             "re-run of a triple replaces it rather than duplicating it. Required "
+             "for any partial or gap-fill run - without it, a run restricted to "
+             "33 outstanding rows would discard the other 107.",
+    )
+    parser.add_argument(
+        "--phase-tag", default=None,
+        help="Label for this step, recorded in the log session banner and in "
+             "run_metadata_<tag>.json. Lets a multi-step PBS job attribute each "
+             "row to the step that produced it.",
     )
     parser.add_argument(
         "--max-workers", type=int, default=MAX_WORKERS_DEFAULT,
@@ -1078,9 +1466,41 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    N_values = [n for n in N_VALUES_ALL if n <= args.max_n]
-    if not N_values:
-        parser.error(f"--max-n {args.max_n} excludes every N in {N_VALUES_ALL}.")
+    # ── Resolve scope ─────────────────────────────────────────────────────────
+    if args.n_values:
+        try:
+            N_values = [int(tok) for tok in args.n_values.split(",") if tok.strip()]
+        except ValueError:
+            parser.error(f"--n-values {args.n_values!r} is not a comma-separated "
+                         f"list of integers.")
+        unknown = [n for n in N_values if n not in N_VALUES_ALL]
+        if unknown:
+            parser.error(f"--n-values contains {unknown}, which are not in the "
+                         f"sweep {N_VALUES_ALL}.")
+    else:
+        N_values = [n for n in N_VALUES_ALL if n <= args.max_n]
+        if not N_values:
+            parser.error(f"--max-n {args.max_n} excludes every N in {N_VALUES_ALL}.")
+
+    sections = [s.strip() for s in args.sections.split(",") if s.strip()]
+    unknown_sections = [s for s in sections if s not in SECTION_FAMILIES]
+    if unknown_sections:
+        parser.error(f"--sections contains {unknown_sections}; valid labels are "
+                     f"{sorted(SECTION_FAMILIES)}.")
+
+    solvers = tuple(s.strip().lower() for s in args.solvers.split(",") if s.strip())
+    unknown_solvers = [s for s in solvers if s not in QUANTUM_SOLVERS_1D]
+    if unknown_solvers:
+        parser.error(f"--solvers contains {unknown_solvers}; valid solvers are "
+                     f"{list(QUANTUM_SOLVERS_1D)}. Thomas is always run and is "
+                     f"not selectable.")
+    if args.skip_qsvt:
+        solvers = tuple(s for s in solvers if s != "qsvt")
+
+    sel = RunSelection(
+        solvers=solvers,
+        cases=tuple(c.strip() for c in (args.cases or "").split(",") if c.strip()),
+    )
 
     # ── Resolve backend and report configuration ──────────────────────────────
     backend = get_aer_backend(prefer_gpu=_USE_GPU)
@@ -1094,15 +1514,16 @@ def main() -> None:
         LOG_FILE = RESULTS_DIR / "run.log"
         QSVT_UNCACHED_FALLBACK_DEGREE = 5000
         
-        # Reconfigure root logger to point to new file
-        logger = logging.getLogger()
-        for handler in logger.handlers[:]:
-            if isinstance(handler, logging.FileHandler):
-                logger.removeHandler(handler)
-        logger.addHandler(logging.FileHandler(LOG_FILE, mode="w" if _IS_MAIN_PROCESS else "a"))
+        _redirect_log_file(LOG_FILE)
 
+    _log_session_header(args.phase_tag)
     _banner("QUANTUM PDE SOLVERS - 1D HPC BENCHMARK")
+    log.info("  Order         : %d", args.order)
     log.info("  N values      : %s", N_values)
+    log.info("  Sections      : %s", sections)
+    log.info("  Solvers       : Thomas + %s", list(sel.solvers) or "(none)")
+    log.info("  Case filter   : %s", list(sel.cases) or "(all cases)")
+    log.info("  Append        : %s", args.append)
     log.info("  QSVT deg caps : %s", QSVT_MAX_DEGREE_BY_N)
     log.info("  Max workers   : %d", args.max_workers)
     log.info("  Output dir    : %s", RESULTS_DIR.resolve())
@@ -1116,11 +1537,22 @@ def main() -> None:
                     args.max_workers, os.cpu_count())
 
     # Provenance first, so it survives a crash or walltime kill.
-    _save_run_metadata(N_values, args.skip_qsvt, args.max_workers)
+    _save_run_metadata(N_values, sel, args.max_workers, order=args.order,
+                       sections=sections, phase_tag=args.phase_tag)
 
     t_global_start = time.perf_counter()
     results: list[RunResult] = []
     all_solutions: dict = {}
+
+    # Prior rows are merged ahead of anything this invocation produces, so
+    # `_dedupe_results` resolves a repeated (case, solver, N) in favour of the
+    # new measurement. Without --append a scope-restricted run would write only
+    # its own rows and discard every sound row already on disk.
+    if args.append:
+        prior = _load_existing_results(RESULTS_DIR / "results_full.json")
+        if prior:
+            log.info("--append: merging with %d prior row(s).", len(prior))
+        results.extend(prior)
 
     # ── Build the work unit list ──────────────────────────────────────────────
     # Smallest N first: with only a handful of workers and a large spread in
@@ -1130,19 +1562,24 @@ def main() -> None:
     # runs behind them. Ascending order guarantees N=4/8/16 complete and are
     # written to disk before any worker can get tied up on N=32/64.
     work_units = [
-        (family, N, args.skip_qsvt)
+        (SECTION_FAMILIES[section], N)
         for N in sorted(N_values)
-        for family in ("generic_poisson", "generic_poisson_nonhom", "het_1d")
+        for section in sections
     ]
 
     if args.max_workers == 1:
         log.info("Serial execution mode (max_workers=1).")
-        for work_type, N, skip_qsvt in work_units:
+        for work_type, N in work_units:
             try:
                 partial_results, partial_solutions = _execute_work_unit(
-                    work_type, N, skip_qsvt, args.order)
+                    work_type, N, sel, args.order)
                 results.extend(partial_results)
                 all_solutions.update(partial_solutions)
+                # Written after every unit, not only at the end. A walltime kill
+                # previously lost the whole summary table whilst leaving the
+                # per-solution archives on disk, so the sweep's own record of what
+                # it had achieved had to be reconstructed from the .npz filenames.
+                _save_results(results)
             except Exception as exc:
                 log.error("Work unit failed: type=%s N=%d - %s",
                           work_type, N, exc, exc_info=True)
@@ -1151,11 +1588,13 @@ def main() -> None:
                  len(work_units), args.max_workers)
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=args.max_workers,
-            max_tasks_per_child=1,   # fresh process per work unit
+            max_tasks_per_child=1,   # fresh process per work unit; forces spawn
+            initializer=_init_worker,
+            initargs=(RESULTS_DIR, QSVT_UNCACHED_FALLBACK_DEGREE),
         ) as executor:
             futures = {
-                executor.submit(_execute_work_unit, wt, N, sq, args.order): (wt, N)
-                for wt, N, sq in work_units
+                executor.submit(_execute_work_unit, wt, N, sel, args.order): (wt, N)
+                for wt, N in work_units
             }
             for future in concurrent.futures.as_completed(futures):
                 work_type, N = futures[future]
@@ -1163,6 +1602,7 @@ def main() -> None:
                     partial_results, partial_solutions = future.result()
                     results.extend(partial_results)
                     all_solutions.update(partial_solutions)
+                    _save_results(results)
                     log.info("Work unit done: type=%-24s N=%-3d "
                              "(%d results so far).",
                              work_type, N, len(results))

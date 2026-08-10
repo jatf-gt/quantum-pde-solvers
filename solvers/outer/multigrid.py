@@ -73,6 +73,7 @@ from typing import Optional
 import numpy as np
 
 from solvers.outer.core import (LineProblem2D, OuterResult, StagnationMonitor,
+                                WallTimeExceeded,
                                 WorkLog, strip_sweep)
 
 
@@ -203,9 +204,14 @@ def build_hierarchy(problem, max_levels: int = 10) -> list[Level]:
 
 # ── Cycles ────────────────────────────────────────────────────────────────────
 
-class _WallTimeExceeded(Exception):
-    """Internal signal only - unwinds a _v_cycle recursion cleanly on a
-    deadline, without ever interrupting a strip_sweep in progress."""
+_WallTimeExceeded = WallTimeExceeded
+"""
+Retained alias. The exception now lives in `core.py` because the deadline is
+enforced inside `strip_sweep` itself, one strip solve at a time, rather than only
+between sweeps here. The checks below remain as an early exit — they cost nothing
+and unwind the recursion one frame sooner — but they are no longer what bounds the
+overshoot.
+"""
 
 
 def _v_cycle(levels, l, u, rhs, inner, work, nu1, nu2, n_coarse, deadline=None):
@@ -237,13 +243,13 @@ def _v_cycle(levels, l, u, rhs, inner, work, nu1, nu2, n_coarse, deadline=None):
         for _ in range(n_coarse):
             if deadline is not None and time.perf_counter() > deadline:
                 raise _WallTimeExceeded()
-            strip_sweep(prob, u, rhs, inner, work, omega=1.0)
+            strip_sweep(prob, u, rhs, inner, work, omega=1.0, deadline=deadline)
         return u
 
     for _ in range(nu1):
         if deadline is not None and time.perf_counter() > deadline:
             raise _WallTimeExceeded()
-        strip_sweep(prob, u, rhs, inner, work, omega=1.0)
+        strip_sweep(prob, u, rhs, inner, work, omega=1.0, deadline=deadline)
 
     r = rhs - prob.apply(u)
     r_c = lev.restrict(r)
@@ -255,7 +261,7 @@ def _v_cycle(levels, l, u, rhs, inner, work, nu1, nu2, n_coarse, deadline=None):
     for _ in range(nu2):
         if deadline is not None and time.perf_counter() > deadline:
             raise _WallTimeExceeded()
-        strip_sweep(prob, u, rhs, inner, work, omega=1.0)
+        strip_sweep(prob, u, rhs, inner, work, omega=1.0, deadline=deadline)
     return u
 
 
@@ -347,7 +353,8 @@ def solve_multigrid(
             for _ in range(n_coarse):
                 if deadline is not None and time.perf_counter() > deadline:
                     raise _WallTimeExceeded()
-                strip_sweep(levels[-1].problem, u, rhs_levels[-1], inner, work, 1.0)
+                strip_sweep(levels[-1].problem, u, rhs_levels[-1], inner, work, 1.0,
+                            deadline=deadline)
             # Checked once per ascending level in addition to the fine-grained
             # checks inside _v_cycle itself, so a level that is skipped
             # entirely (deadline already passed before it starts) is caught

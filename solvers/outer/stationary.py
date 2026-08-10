@@ -48,6 +48,7 @@ import time
 import numpy as np
 
 from solvers.outer.core import (LineProblem2D, OuterResult, StagnationMonitor,
+                                WallTimeExceeded,
                                 WorkLog, strip_sweep)
 
 
@@ -91,9 +92,12 @@ def solve_stationary(
     patience : stagnation window.  A quantum inner solver has an error floor;
         once the iteration reaches it, further sweeps cost circuit simulations
         and buy nothing.  Stagnation is reported as such, not as convergence.
-    max_wall_s : hard wall-clock budget in seconds.  Checked once per outer
-        iteration - never mid-strip-solve, so a partially-completed circuit
-        is never interrupted.  Exists because stagnation detection bounds the
+    max_wall_s : hard wall-clock budget in seconds.  Checked before each
+        individual strip solve - never mid-solve, so a partially-completed
+        circuit is never interrupted, and the overshoot is bounded by one strip
+        solve rather than by one whole sweep.  The distinction is not academic:
+        at N=64 a sweep is 64 HHL solves at ~180 s, so a per-sweep test permits
+        a ~3.2 h overrun.  Exists because stagnation detection bounds the
         *iteration count*, not the *cost per iteration*: a solver whose
         per-strip cost is simply large (HHL, VQLS at N >~ 32) can still burn
         many hours reaching its own stagnation point.  On timeout the current
@@ -127,11 +131,21 @@ def solve_stationary(
     stop = "max_iter"
     delta = float("nan")
 
+    # Enforced inside the sweep, one strip solve at a time. The per-iteration test
+    # below remains as the clean exit; on its own it would let a single sweep of N
+    # expensive quantum solves overrun the budget entirely before being noticed.
+    deadline = None if max_wall_s is None else t0 + max_wall_s
+
     for it in range(max_iter):
         u_old = u.copy()
-        strip_sweep(problem, u, rhs, inner, work, omega=om,
-                    reverse=symmetric and (it % 2 == 1),
-                    jacobi=(update == "jacobi"))
+        try:
+            strip_sweep(problem, u, rhs, inner, work, omega=om,
+                        reverse=symmetric and (it % 2 == 1),
+                        jacobi=(update == "jacobi"),
+                        deadline=deadline)
+        except WallTimeExceeded:
+            stop = "wall_time_exceeded"
+            break
 
         res = float(np.linalg.norm(rhs - problem.apply(u)) / b_norm)
         delta = float(np.max(np.abs(u - u_old)))

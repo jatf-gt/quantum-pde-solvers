@@ -109,10 +109,69 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  pid=%(process)-6d  %(levelname)-8s  %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
+    # Append, never truncate. A single PBS job invokes this runner several times
+    # in sequence (submit_3d_wave1.sh runs three steps), and under mode="w" each
+    # step destroyed its predecessor's log, leaving only the last. The history is
+    # the sole record of how far a walltime-killed step had progressed. Sessions
+    # are delimited by `_log_session_header`.
     handlers=[logging.StreamHandler(sys.stdout),
-              logging.FileHandler(LOG_FILE, mode="w" if _IS_MAIN_PROCESS else "a")],
+              logging.FileHandler(LOG_FILE, mode="a")],
 )
 log = logging.getLogger(__name__)
+
+
+def _log_session_header(phase_tag: Optional[str] = None) -> None:
+    """
+    Delimit one invocation within an appended log.
+
+    Called once from the parent process after the output directory and any phase
+    tag are resolved. Workers do not call it: `_IS_MAIN_PROCESS` is false in a
+    spawned child, and a banner per work unit would defeat the purpose.
+
+    Parameters
+    ----------
+    phase_tag : str, optional
+        Step label supplied by the submission script (e.g. ``wave1_qsvt_all``),
+        recorded so a row can be attributed to the step that produced it.
+    """
+    if not _IS_MAIN_PROCESS:
+        return
+    log.info("=" * 78)
+    log.info("SESSION START  %s  pid=%d  phase=%s  argv=%s",
+             time.strftime("%Y-%m-%d %H:%M:%S"), os.getpid(),
+             phase_tag or "(untagged)", " ".join(sys.argv[1:]) or "(no arguments)")
+    log.info("=" * 78)
+
+
+def _redirect_log_file(path: Path) -> None:
+    """
+    Point the root logger's file handler at `path`, preserving its formatter.
+
+    Required because the output directory depends on `--order`, which is known
+    only after argument parsing, whereas the handler is installed at import time.
+
+    The replacement inherits the original formatter rather than accepting
+    logging's bare ``"%(message)s"`` default, which stripped the timestamp and PID
+    from every 4th-order log line and left the interleaved output of parallel work
+    units unattributable. The new handler appends, for the reason given where the
+    first one is installed.
+
+    Parameters
+    ----------
+    path : Path
+        Destination log file. Its parent directory must already exist.
+    """
+    logger = logging.getLogger()
+    fmt = None
+    for handler in logger.handlers[:]:
+        if isinstance(handler, logging.FileHandler):
+            fmt = fmt or handler.formatter
+            handler.close()
+            logger.removeHandler(handler)
+    new_handler = logging.FileHandler(path, mode="a")
+    if fmt is not None:
+        new_handler.setFormatter(fmt)
+    logger.addHandler(new_handler)
 
 for _noisy in ("qiskit.transpiler", "qiskit_aer", "qiskit_ibm_runtime",
                "stevedore", "qiskit.passmanager", "pennylane"):
@@ -574,7 +633,13 @@ def _record(results, case_id, solver_name, N, prob, res, phi_ref, f_vals,
 # ── Per-case driver ───────────────────────────────────────────────────────────
 
 def _estimate_case(case_id, N, prob, cfg: SweepConfig) -> None:
+    # A multigrid scheme needs two levels, and a 4x4x4 grid cannot be coarsened at
+    # all, so solve() raises. _run_case already falls back to line-SOR for exactly
+    # this; without the same fallback here, --estimate aborted at N=4 - on the very
+    # sweep the estimate is meant to de-risk.
     scheme = cfg.scheme_for(N)
+    if scheme in ("multigrid", "fmg") and len(build_hierarchy(prob)) < 2:
+        scheme = "sor"
     res = solve(prob, inner="thomas", scheme=scheme,
                 inner_options=cfg.inner_config(N), **cfg.scheme_kwargs(scheme))
     by_size = res.work.solves_by_size
@@ -807,9 +872,65 @@ def _load_existing_results(path: Path) -> list:
     return out
 
 
+def _row_key(r) -> tuple:
+    """
+    Identity of a benchmark row for supersession purposes.
+
+    A sweep is uniquely indexed by (case, solver, N); a second row for that triple
+    is a recomputation of the first, not an additional datum.
+
+    `scheme` is deliberately excluded. A row recorded under the N<=4 line-SOR
+    fallback must be superseded by its rerun under FMG; keying on the scheme would
+    retain both and leave the degraded row in the summary beside the good one.
+
+    Parameters
+    ----------
+    r : RunResult3D
+        The row to key.
+
+    Returns
+    -------
+    tuple
+        Hashable identity: (case, solver, N).
+    """
+    return (r.case, r.solver, r.N)
+
+
+def _dedupe_results(results) -> list:
+    """
+    Collapse superseded rows, retaining the most recent for each identity.
+
+    `--append` merges the previous ``results_full.json`` ahead of the rows produced
+    by the current invocation, so the later occurrence of any key is by
+    construction the newer measurement. Without this step, re-running a step after
+    a failure - or any wave that revisits a partially-completed (section, N) -
+    wrote a second row for every solver already present, and the plotting and
+    gap-analysis layers had no basis on which to choose between them.
+
+    Parameters
+    ----------
+    results : list of RunResult3D
+        Rows in chronological order, oldest first.
+
+    Returns
+    -------
+    list of RunResult3D
+        Deduplicated rows, in first-seen order so the file's layout stays stable
+        across appends rather than reshuffling on every save.
+    """
+    keep: dict = {}
+    for r in results:
+        keep[_row_key(r)] = r
+    if len(keep) != len(results):
+        log.info("Superseded %d duplicate row(s) on (case, solver, N).",
+                 len(results) - len(keep))
+    return list(keep.values())
+
+
 def _save_results(results) -> None:
     if not results:
         return
+    results = _dedupe_results(results)
     with open(RESULTS_DIR / "results_full.json", "w") as fh:
         json.dump([asdict(r) for r in results], fh, indent=2, default=str)
     names = [f.name for f in dataclasses.fields(RunResult3D)]
@@ -863,6 +984,10 @@ def _save_metadata(N_values, cfg, sections, max_workers, tag=None) -> None:
 def _print_summary(results) -> None:
     if not results:
         return
+    # Deduplicated for the same reason the saved summary is: under --append the
+    # in-memory list still carries the superseded rows, and printing both invites
+    # the reader to compare a stale measurement against its own replacement.
+    results = _dedupe_results(results)
     _banner("SUMMARY")
     log.info("  %-32s %-7s %4s %6s %10s %10s %9s %9s",
              "case", "solver", "N", "outer", "solves", "w.cost", "err%", "vsThom%")
@@ -945,6 +1070,33 @@ def coerce_scheme_opts(d: dict) -> dict:
             except ValueError:
                 out[k] = float(v)
     return out
+
+
+def _init_worker(results_dir: Path, qsvt_caps: dict) -> None:
+    """
+    Propagates the main process's resolved configuration into a worker.
+
+    `ProcessPoolExecutor` is constructed with ``max_tasks_per_child=1``, and CPython
+    selects the **spawn** start method whenever that argument is given without an
+    explicit context. A spawned worker re-imports this module, so it sees the
+    module-level defaults rather than the values `main` assigned under ``global`` —
+    and `_save_solution_3d` reads `RESULTS_DIR` from inside the worker.
+
+    Left unset, an ``--order 4`` sweep wrote its summary to ``results/3Dhpc_run_4th``
+    from the parent whilst every per-solution archive went to ``results/3Dhpc_run``
+    from the workers, overwriting 2nd-order fields with 4th-order ones.
+
+    Parameters
+    ----------
+    results_dir : Path
+        Output directory resolved by `main`, including the 4th-order variant.
+    qsvt_caps : dict
+        Per-N QSVT degree caps as resolved by `main`, which uncaps N=4 at 4th order.
+    """
+    global RESULTS_DIR
+    RESULTS_DIR = results_dir
+    QSVT_MAX_DEGREE_3D.clear()
+    QSVT_MAX_DEGREE_3D.update(qsvt_caps)
 
 
 def _execute_work_unit(section: str, N: int, cfg: SweepConfig) -> list:
@@ -1072,16 +1224,13 @@ def main() -> None:
         RESULTS_DIR = Path("results") / "3Dhpc_run_4th"
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         LOG_FILE = RESULTS_DIR / "run.log"
-        logger = logging.getLogger()
-        for handler in logger.handlers[:]:
-            if isinstance(handler, logging.FileHandler):
-                logger.removeHandler(handler)
-        logger.addHandler(logging.FileHandler(LOG_FILE, mode="w" if _IS_MAIN_PROCESS else "a"))
+        _redirect_log_file(LOG_FILE)
         
         # Uncap N=4 for 4th order QSVT
         if 4 in QSVT_MAX_DEGREE_3D:
             QSVT_MAX_DEGREE_3D[4] = None
 
+    _log_session_header(args.phase_tag)
     _banner("QUANTUM PDE SOLVERS - 3D HPC BENCHMARK")
     log.info("  N values    : %s", N_values)
     log.info("  Sections    : %s", sections)
@@ -1118,7 +1267,9 @@ def main() -> None:
         log.info("Parallel execution: %d units over %d workers.",
                  len(work_units), args.max_workers)
         with concurrent.futures.ProcessPoolExecutor(
-                max_workers=args.max_workers, max_tasks_per_child=1) as ex:
+                max_workers=args.max_workers, max_tasks_per_child=1,
+                initializer=_init_worker,
+                initargs=(RESULTS_DIR, dict(QSVT_MAX_DEGREE_3D))) as ex:
             futures = {ex.submit(_execute_work_unit, s, N, cfg): (s, N)
                        for s, N in work_units}
             for fut in concurrent.futures.as_completed(futures):

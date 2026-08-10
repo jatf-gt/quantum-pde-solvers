@@ -23,8 +23,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Protocol, runtime_checkable
+import time
 
 import numpy as np
+
+
+class WallTimeExceeded(Exception):
+    """
+    Raised inside a sweep when the caller's wall-clock budget is spent.
+
+    Defined here rather than in `multigrid.py` because the budget is enforced at the
+    granularity of a single strip solve, inside `strip_sweep`, which every scheme
+    shares. The schemes catch it and return their best-effort iterate with
+    ``stop_reason="wall_time_exceeded"``.
+
+    Granularity matters, and coarser choices have been tried and found wanting. The
+    cap was originally tested once per V-cycle, which permitted a demonstrated 6.4x
+    overshoot: one cycle at N=64 with HHL ran 139,125 s against a 21,600 s budget,
+    because nothing interrupted it once begun. Moving the test to once per *sweep*
+    bounded the overshoot by one sweep's cost, but at N=64 a sweep is 64 strip solves
+    at ~180 s each, roughly 3.2 h. Testing before each individual strip solve bounds
+    the overshoot by one solve, whilst never interrupting a quantum circuit already
+    in flight.
+    """
 
 
 # ── Work accounting ───────────────────────────────────────────────────────────
@@ -237,6 +258,7 @@ def strip_sweep(
     omega:    float = 1.0,
     reverse:  bool = False,
     jacobi:   bool = False,
+    deadline: Optional[float] = None,
 ) -> np.ndarray:
     """
     One line-relaxation sweep, updating u in place.  Works in any dimension.
@@ -293,6 +315,11 @@ def strip_sweep(
     src = u.copy() if jacobi else u
 
     for idx in order:
+        # Tested before the solve, never during it, so a circuit already in flight
+        # always completes and the partially updated u remains a valid iterate.
+        if deadline is not None and time.perf_counter() > deadline:
+            raise WallTimeExceeded(
+                f"wall-clock budget exhausted after {work.total} strip solves")
         key = (slice(None),) + idx
         b = rhs[key].copy()
         for d, n in enumerate(transverse):

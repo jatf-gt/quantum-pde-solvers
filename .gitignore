@@ -11,6 +11,7 @@ __pycache__/
 *.jpg
 *.egg-info/
 results_hpc/
+results_hpc_copy/
 results/1Dhpc_run/
 results/1Dhpc_run_4th/
 results/2Dhpc_run/
@@ -18,4 +19,23 @@ results/2Dhpc_run_4th/
 results/3Dhpc_run/
 results/3Dhpc_run_4th/
 CLAUDE.md
+.agents
+.claude
 context/
+# Documentation prose is tracked; generated artefacts under docs/ are not.
+# The directory itself must stay un-excluded, otherwise git will not descend
+# into it and the negation below can never match.
+docs/*
+!docs/*.md
+
+# Generated cluster output, excluded by kind rather than by directory name.
+# The per-directory rules above only protect the six sweep directories that
+# exist today; a job writing to a new directory (a wave, a resumed sweep, a
+# fresh order) would otherwise commit its solution archives and logs. The QSVT
+# phase cache is the sole deliberate exception: those archives are the expensive
+# precompute and are tracked on purpose.
+*.npz
+!results/qsvt_phase_cache/*.npz
+*.log
+*.err
+*.out

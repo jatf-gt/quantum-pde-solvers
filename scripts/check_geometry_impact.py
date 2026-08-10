@@ -48,12 +48,22 @@ from __future__ import annotations
 import argparse
 import importlib
 import math
+import sys
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
 
-import core.cases as cases
-import core.het_geometry as geom
+# ``pytest.ini`` sets ``pythonpath = .``, but a bare ``python3 scripts/check_geometry_impact.py``
+# puts ``scripts/`` on ``sys.path[0]`` rather than the repository root, so the local
+# imports below fail however sound the working directory. Resolving the root from
+# ``__file__`` makes the invocation location irrelevant, matching what every module
+# under ``hpc/runners/`` already does.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+import core.cases as cases          # noqa: E402
+import core.het_geometry as geom    # noqa: E402
 
 # ── Superseded geometry ───────────────────────────────────────────────────────
 # The values in force before commit 861ff46. R_OUT was already correct at 50 mm;

@@ -11,16 +11,48 @@ integration of the 4th-order pentadiagonal discretisation, and completion of the
 
 ## Status
 
+*Last revised 2026-08-10.*
+
 | # | Phase | State |
 |---|-------|-------|
-| 0 | Stop, preserve, and scope | scoping done; `qdel` + re-sync outstanding (user) |
-| 1 | Gap manifest | tool complete; 1D/3D manifests generated, 2D blocked on re-sync |
-| 2 | Correctness: pentadiagonal operator | pending |
+| 0 | Stop, preserve, and scope | **complete** — `results_hpc_copy/` holds the re-synced backup; geometry impact settled |
+| 1 | Gap manifest | **complete** — all three manifests generated; classification corrected three times against real data |
+| 2 | Correctness: pentadiagonal operator | pending (Wave 2) |
 | 3 | Environment and deployment | complete |
-| 4 | Fold order=4 into the `LineProblem` protocol | pending |
-| 5 | Reporting, diagnostics and provenance | pending |
-| 6 | QSVT phase precompute for 4th order | pending |
-| 7 | Consolidate `hpc/jobs/` and submit | pending |
+| 4 | Fold order=4 into the `LineProblem` protocol | pending (Wave 2) |
+| 5 | Reporting, diagnostics and provenance | **partly done** — the items Wave 1 depends on are in; the new `RunResult` columns are not |
+| 6 | QSVT phase precompute for 4th order | pending (Wave 2) |
+| 7 | Consolidate `hpc/jobs/` and submit | **scripts ready; submission is the user's call** |
+
+### Wave 1 is ready to submit
+
+Outstanding work, from `results/manifests/rerun_{1,2,3}d.json`:
+
+| Sweep | Rows | Job | Walltime |
+|---|---|---|---|
+| 1D | 22 of 140 | `hpc/jobs/submit_1d_wave1.sh` | 6 h |
+| 2D | 55 of 100 | `hpc/jobs/submit_2d_wave1.sh` | 60 h |
+| 3D | 40 of 84 | `hpc/jobs/submit_3d_wave1.sh` | 48 h |
+
+Every job sources `_preflight.sh`, which **refuses a dirty tree** — so the working
+tree must be committed and pushed before any submission.
+
+### What was fixed on 2026-08-10, and what it prevented
+
+| Defect | Consequence had it shipped |
+|---|---|
+| `run.log` opened `mode="w"` | Each wave-1 script runs its driver 3–5 times; every step destroyed the previous step's log, so a job that ran five steps would have ended holding only the fifth. Now appended, with a `SESSION START` banner per invocation. |
+| `--append` did not deduplicate | `submit_2d_wave1.sh` deliberately revisits section 3 at N=32, where three of four solvers are missing. Every already-present solver would have gained a second, contradictory row. Rows are now superseded on `(case, solver, N)`. **The 3D summary was already carrying four such duplicate sets**, since collapsed. |
+| 1D driver had no scope control | Its only flag was `--max-n`, and `_save_results` overwrote. Reaching 22 outstanding rows meant re-running all 140 — including thirteen 1 h HHL solves. It now takes `--n-values`, `--sections`, `--solvers`, `--cases`, `--append` and `--phase-tag`. |
+| Thirteen HHL rows misread as errors | `_run_hhl`'s hard 3600 s budget produced `u=None` and the note `"solver_error"`, indistinguishable from a crash. All thirteen record `wall_time_s = 3600.2` exactly: they are *measured* timeouts at κ ≈ 1.7e3, which is the benchmark's finding. Re-running them would have spent 13 h reproducing thirteen identical rows. The runner now records `hhl_timeout`, and `gap_analysis.py` treats a timeout as terminal. **1D outstanding fell 33 → 22.** |
+| Two 3D orphan rows | `scripts/recover_orphan_rows.py` rebuilds a summary row from a stored field by calling the runner's own `_record`, so the metric definitions match the instrumented rows exactly. Recovered both ≈ 6 h HHL solves at N=16 with no simulation. Cost columns are nulled, never zeroed, and every recovered row carries `notes="recovered_from_archive"`. **3D outstanding fell 42 → 40; ≈ 12 h preserved.** |
+| `gap_analysis.py` and `check_geometry_impact.py` were unrunnable as scripts | Neither put the repository root on `sys.path`, so `python3 scripts/gap_analysis.py` always failed on `import benchmark`. Both wave-1 scripts call it for their post-run analysis behind `\|\| true`, so the manifest would simply never have appeared. |
+| Superseded jobs still submittable | Six one-off scripts removed (`*_gapfill*`, `*_complete`, `*_resume`, `*_geometry_fix`). `submit_hpc_1D_geometry_fix.sh` was the dangerous one: its header asserts that 1D has no `--append`, which is no longer true, and it would have overwritten 118 sound rows. |
+
+New regression cover: `tests/test_gap_analysis.py` (16 tests pinning the
+classification policy, including that the 1D wall-clock inference must *not* apply in
+2D/3D, where `wall_time_s` is a whole outer iteration) and `tests/test_hpc_runners.py`
+(14 tests on supersession and scope). Suite: 623 passed, 5 skipped.
 
 ---
 
@@ -227,6 +259,25 @@ Cross-validation: the 1D manifest independently reports `stale_geometry 20`, exa
 `HET_1D_3b_gaussian_Vd300` × 5 resolutions × 4 solvers — matching the Phase 0.4
 geometry test derived by a completely different route.
 
+- **A third policy correction, 2026-08-10: a per-solve timeout is a measurement.**
+  `_run_hhl` imposes a hard 3600 s budget and, on expiry, returned `u=None` — which
+  `_record` wrote as the note `"solver_error"`, the same note an exception produces.
+  Thirteen 1D rows carry it, every one with `wall_time_s = 3600.2`: at N=32/64 the 1D
+  operator reaches κ ≈ 1.7e3 and the statevector simulation genuinely does not finish
+  inside an hour. **That is the result, not a defect.** Classified as errors they were
+  scheduled for recomputation, which would have spent 13 h reproducing thirteen
+  identical timeouts. The runner now records `hhl_timeout` against `hhl_error`, and
+  the classifier treats the former as a flag — including the `no_error_metric` that
+  necessarily follows from it, which would otherwise have reinstated the same
+  recomputation by the back door. **1D outstanding fell 33 → 22.** The inference used
+  for rows predating the marker is guarded to `dim == 1`: in 2D/3D `wall_time_s` is a
+  whole outer iteration over N or N² strip solves and routinely exceeds an hour in a
+  sound run, so applying it there would suppress real reasons. Both halves are pinned
+  by `tests/test_gap_analysis.py`.
+
+  Two 1D HHL failures survive as genuine: `HET_1D_3c_gaussian_NeumannDirichlet` at
+  N=8 and N=32, the latter having died after 743 s — well inside the budget.
+
 **Orphan-archive guard.** The tool also compares archives on disk against summary
 rows and refuses to be trusted when they disagree, splitting the two causes:
 
@@ -243,9 +294,23 @@ full recomputation of work that already exists.
 The two unexplained 3D orphans —
 `solution3d_3D_Laplace_BCdriven_cube_HHL_N16.npz` and
 `solution3d_3D_Poisson_TripleSin_cube_HHL_N16.npz` — are **completed fields whose
-rows were lost** when a job died mid-work-unit. Both are ≈ 6 h HHL solves. Their
-metrics can be recomputed from the archive with no quantum simulation at all, so they
-should be recovered offline rather than resubmitted (≈ 12 h saved).
+rows were lost** when a job died mid-work-unit. Both are ≈ 6 h HHL solves.
+
+**Recovered 2026-08-10** by `scripts/recover_orphan_rows.py --dim 3`, with no quantum
+simulation. The recovered metrics sit exactly where the neighbouring rows predict:
+`linf_err` 0.190 % and 0.260 % against QSVT's 0.201 % and 0.285 % at the same N,
+i.e. both at the mesh's discretisation floor, with `n_outer` of 10 and 9 matching the
+N=8 HHL pattern. The 3D summary now holds 48 rows and reports no unexplained orphans.
+
+The script is deliberately conservative about what it claims. It reuses the runner's
+own `_record`, so the accuracy definitions match the instrumented rows rather than
+being reimplemented; it recomputes the residual against a freshly assembled operator
+instead of inheriting a number from the process that died; it derives `converged`
+from that residual against the sweep tolerance rather than asserting a verdict; it
+takes the reference from the reassembled case, not from the archive, so a superseded
+definition cannot silently become the truth a solution is scored against; and it
+refuses to touch the 36 geometry-superseded archives, from which a plausible record
+of a solve to the *wrong problem* could otherwise be manufactured.
 
 ### Phase 2 — Correctness: present the true operator to the quantum solvers
 
@@ -288,9 +353,33 @@ should be recovered offline rather than resubmitted (≈ 12 h saved).
 
 ### Phase 5 — Reporting, diagnostics and provenance
 
-Route all writes through the already-declared
-`benchmark/results_io.py::save_solution` and `save_summary`, which were written for
-precisely this migration. Then make degradation impossible to overlook.
+**Partly done.** The items Wave 1 could not safely run without are in:
+
+- The per-strip-solve wall-clock deadline (R3), enforced inside `strip_sweep` in
+  `solvers/outer/core.py` and honoured by both the stationary and multigrid schemes.
+  Measured overshoot 1.02–1.04× the budget, against ~1× a whole sweep before.
+- `run.log` opened in **append** mode in all three drivers, with a `SESSION START`
+  banner per invocation carrying the phase tag and argv, and the 4th-order log
+  redirect now inheriting the formatter instead of silently dropping the timestamp
+  and PID from every line.
+- `--append` supersession on `(case, solver, N)` in all three drivers.
+- Incremental summary writes in the 1D driver, after every completed work unit
+  rather than only at the end, matching 2D/3D.
+- `order`, `sections`, `solvers`, `cases_filter` and `phase_tag` recorded in the 1D
+  `run_metadata.json`, plus a per-step `run_metadata_<tag>.json` so successive steps
+  of one job no longer overwrite each other's provenance.
+- `all_solutions.npz` **retained but merged** rather than overwritten. Retiring it
+  was the original plan; under a scope-restricted run the plain overwrite would have
+  replaced a complete archive with a handful of entries, so merging was the smaller
+  and safer change. Retirement stays available once `results_io` owns the writes.
+- Spawn-safe worker initialisation (`_init_worker`) in all three drivers, so
+  `RESULTS_DIR` and the QSVT degree caps resolved in `main` actually reach the
+  workers. Without it an `--order 4` sweep wrote its summary to `*_4th` from the
+  parent whilst every archive went to the 2nd-order directory from the workers.
+
+Still outstanding, all of it Wave 2: routing writes through
+`benchmark/results_io.py::save_solution` / `save_summary`, the new `RunResult`
+columns below, `RUN HEALTH SUMMARY`, and `run_health.json`.
 
 New and split columns on `RunResult`, `RunResult2D` and `RunResult3D`:
 
@@ -345,11 +434,24 @@ ratio 30/12, not a condition-number ratio.
 
 ### Phase 7 — Consolidate `hpc/jobs/` and submit
 
-Archive the ten superseded one-off scripts (`*_gapfill*`, `*_geometry_fix`,
-`*_resume`, `*_complete`, `*_4th`) under `hpc/jobs/archive/`. Retain five
-parameterised scripts — `submit_1d.sh`, `submit_2d.sh`, `submit_3d.sh`,
-`submit_precompute.sh`, `submit_gpu.sh` — driven by `ORDER`, `MANIFEST`,
-`N_VALUES`, `SECTIONS` and `SOLVERS`, each sourcing `_preflight.sh`.
+**Done for Wave 1.** Six superseded one-off scripts were **deleted** rather than
+archived — `submit_hpc_2D_gapfill.sh`, `submit_hpc_2D_gapfill_v2.sh`,
+`submit_hpc_2D_complete.sh`, `submit_hpc_3D_resume.sh`,
+`submit_hpc_3D_geometry_fix.sh`, `submit_hpc_1D_geometry_fix.sh` — since git history
+preserves them and a script sitting in `hpc/jobs/` is a script somebody can `qsub`.
+Each is superseded by the corresponding `submit_{1,2,3}d_wave1.sh`, which takes its
+scope from the manifest rather than from a hand-written gap map.
+
+The three `*_4th.sh` scripts are **retained**: they remain the only entry points for
+`--order 4`, and Phases 2/4/6 will rewrite that path before they are usable. They
+carry a "do not submit" note in `hpc/README.md` until then.
+
+Still outstanding for Wave 2: collapse the remaining scripts to five parameterised
+ones — `submit_1d.sh`, `submit_2d.sh`, `submit_3d.sh`, `submit_precompute.sh`,
+`submit_gpu.sh` — driven by `ORDER`, `MANIFEST`, `N_VALUES`, `SECTIONS` and
+`SOLVERS`. The `--manifest` flag itself is not built; the wave-1 scripts transcribe
+the manifest's scope into `--n-values`/`--sections`/`--solvers`/`--cases` by hand,
+with the derivation recorded in each header.
 
 | Wave | Contents | Gated on |
 |---|---|---|
