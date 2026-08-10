@@ -1,5 +1,12 @@
 """
-Tests for the HPC sweep schema contract, `benchmark/results_io.py`.
+Tests for the legacy HPC sweep schema contract, `benchmark/hpc_archive.py`.
+
+This module was `benchmark/results_io.py` until the professional benchmarking
+framework introduced a second, differently-shaped archive under that name. The
+two are distinguished in `benchmark/hpc_archive.py`'s docstring; the one tested
+here is the read-only, dimension-aware reader for the sweep directories that
+already exist on disk, and it is what `scripts/gap_analysis.py` builds the rerun
+manifests from.
 
 Two things are worth guarding here, and neither is exercised by any other test.
 
@@ -24,7 +31,7 @@ import sys
 import numpy as np
 import pytest
 
-from benchmark import results_io as rio
+from benchmark import hpc_archive as rio
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -68,7 +75,7 @@ def sweep_3d(tmp_path):
 
 # ── Import Hygiene ────────────────────────────────────────────────────────────
 
-def test_importing_results_io_does_not_pull_matplotlib():
+def test_importing_hpc_archive_does_not_pull_matplotlib():
     """
     The deferred-Matplotlib protection in hpc_plotting is void if the module it
     imports for loading pulls Matplotlib at import time. Checked in a
@@ -76,7 +83,7 @@ def test_importing_results_io_does_not_pull_matplotlib():
     be in `sys.modules` for unrelated reasons.
     """
     code = (
-        "import sys; import benchmark.results_io; "
+        "import sys; import benchmark.hpc_archive; "
         "print('matplotlib' in sys.modules)"
     )
     out = subprocess.run([sys.executable, "-c", code],

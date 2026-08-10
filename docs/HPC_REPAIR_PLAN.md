@@ -78,6 +78,95 @@ classification policy, including that the 1D wall-clock inference must *not* app
 
 ---
 
+## 0bis. Phase 8 — The professional benchmarking framework
+
+*Added 2026-08-10, from `context/13 - Designing a professional benchmarking
+framework for quantum solvers.txt`.*
+
+A publication-grade benchmarking and sensitivity layer has been implemented in
+`benchmark/`: `metrics.py` (rewritten), `results_io.py` (rewritten),
+`equal_accuracy.py`, `sensitivity.py`, `hardware.py`, `tables.py`, and rewritten
+`plotting.py`, `reporting.py`, `runner.py`. Part II of that document specifies the
+runner adaptations still required. **Objective: submit the outstanding jobs once,
+already recording every quantity the thesis and any subsequent paper will need**,
+rather than resubmitting later for metrics that were not captured.
+
+### 8.1 Collateral damage, and the repair
+
+The rewrite replaced `benchmark/results_io.py` wholesale. That module was **not**
+a generic persistence layer: it was the declared on-disk schema for the existing
+`results/{1,2,3}Dhpc_run/` sweeps. Losing it broke, silently in two cases:
+
+| Consumer | Consequence |
+|---|---|
+| **`scripts/gap_analysis.py`** | `TypeError` on `SweepArchive(dim=…)`. **This is the tool that generates the rerun manifests** — the only thing standing between a resubmission and the recomputation of 25–38 h rows. All three wave-1 job scripts call it behind `\|\| true`, so the manifest would simply never have appeared. |
+| `benchmark/hpc_plotting.py` | `ImportError` on `SOLVER_ORDER`. Every published HPC figure, 1D/2D/3D. |
+| `scripts/recover_orphan_rows.py`, `scripts/resource_feasibility_1d.py` | Same module, same failure. |
+| `tests/test_integration.py` | `ImportError` on `BenchmarkResult2D`. |
+
+**Repaired** by separating the two abstractions, which are genuinely different and
+had merely collided on one name:
+
+| | `benchmark/hpc_archive.py` *(restored)* | `benchmark/results_io.py` *(new)* |
+|---|---|---|
+| Describes | `results/{1,2,3}Dhpc_run/` | `results/<run_tag>/` + `tables/`, `figures/` |
+| Constructor | `SweepArchive(dir, dim=…)` | `SweepArchive(root, run_tag=…)` |
+| Rows | plain dicts, `FIELD_ALIASES` | typed `BenchmarkResult` |
+| Mode | read-only | read/write, incremental |
+
+Both keep the class name and are told apart by module, so the 27 existing
+annotations were untouched and only import lines changed. The legacy contract is
+fixed by data already on disk and cannot be renegotiated; new work targets
+`results_io`. Verified: the manifests reproduce at **22 / 55 / 40**.
+
+### 8.2 Two departures from the document, on academic grounds
+
+The document invites improvement, and two of its proposals should not be adopted
+as written.
+
+**(a) 2-D/3-D fields must not go into `notes` as a JSON string.** Part II proposes
+storing `n_outer`, `convergence_factor` and `level_kappas` in the free-text
+`notes` field "until a `BenchmarkResult2D` subclass is warranted". It is
+warranted. These are *primary results*: Section IV F is precisely a study of
+outer-iteration residual histories, and 2-D/3-D account for the majority of the
+outstanding rows. Buried in a JSON string they are untyped, absent from the
+summary CSV, and invisible to `tables.py` and `plotting.py` — which is to say,
+not reportable. The correct construction is a typed
+`BenchmarkResult2D(BenchmarkResult)` carrying `scheme_requested`,
+`scheme_effective`, `inner_solver`, `n_outer`, `converged`,
+`convergence_factor`, `residual_history`, `stop_reason`, `n_strip_solves`,
+`weighted_cost`, `level_kappas`, `kappa_row`, `inner_failures` and
+`inner_fallback_frac`, with the N×N field itself going to the `.npz` archive as
+it already does — keeping the result row flat and serialisable.
+
+This overlaps almost exactly with the **Phase 5** columns still outstanding
+(`scheme_requested`/`scheme_effective`, `capped_by`, `inner_failures`,
+`inner_fallback_frac`, `degraded`), so the two should be implemented once,
+together, rather than twice in different shapes.
+
+**(b) `_build_base_result` cannot serve 2-D/3-D unmodified.** It takes `(A, b)`
+and computes the residual from them. There is no assembled `A` in 2-D/3-D — the
+operator exists only as `problem.apply()` — so the document's instruction to
+reuse it "passing `u_thomas` as the reference" cannot be followed literally
+without fabricating a dense N²×N² system, which at N=64 is a 16.8 M-entry matrix
+assembled solely to compute a number `problem.apply()` already gives. It should
+be generalised to accept **either** `(A, b)` **or** a precomputed residual, so
+that 2-D/3-D pass the residual their own operator produces. The invariant the
+document rightly insists on — that metrics are measured from the solution vector,
+never inferred from parameters — is preserved either way.
+
+### 8.3 State
+
+- **Done:** the archive split (8.1), all new modules import, suite green except
+  `tests/test_integration.py`.
+- **Outstanding:** the typed `BenchmarkResult2D` and the `_build_base_result`
+  generalisation (8.2); the runner adaptations of Part II for
+  `run_{1,2,3}d.py` and `plot_results.py`; `--sensitivity`, `--equal-accuracy`,
+  `--extract-circuits` and `--r-target` flags; post-run table and figure
+  generation.
+
+---
+
 ## 1. Summary
 
 **No 4th-order quantum result produced to date is valid.** HHL failed on every

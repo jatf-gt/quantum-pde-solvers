@@ -56,7 +56,7 @@ from pathlib import Path
 
 import numpy as np
 
-from benchmark.results_io import SOLVER_ORDER, SweepArchive, field
+from benchmark.hpc_archive import SOLVER_ORDER, SweepArchive, field
 
 # Bound by `_matplotlib()` on first use rather than imported here. Two reasons,
 # both of which have bitten this code before: the Agg backend must be selected

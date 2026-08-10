@@ -13,7 +13,7 @@ Usage
 Output
 ------
 results_full.json / results_summary.csv in the target directory, via the
-same benchmark.results_io.save_summary used by the HPC sweep drivers, so
+same benchmark.hpc_archive.save_summary used by the HPC sweep drivers, so
 this composes with the existing plotting pipeline
 (benchmark/hpc_plotting.py) without a separate ingestion path.
 
@@ -102,7 +102,7 @@ def main() -> None:
               f"{row['unit_two_qubit_count']:8d} {row['total_two_qubit_count']:10d} "
               f"{str(row['feasible']):>9} {row['overshoot_factor']:7.2f}x")
 
-    from benchmark.results_io import save_summary
+    from benchmark.hpc_archive import save_summary
     save_summary(args.out, rows)
     print(f"\nWritten: {args.out}/results_full.json, "
           f"{args.out}/results_summary.csv")

@@ -57,7 +57,7 @@ from typing import Iterable, Optional
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from benchmark.results_io import SweepArchive  # noqa: E402
+from benchmark.hpc_archive import SweepArchive  # noqa: E402
 
 # ── Policy ────────────────────────────────────────────────────────────────────
 
