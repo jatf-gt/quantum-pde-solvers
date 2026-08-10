@@ -188,6 +188,100 @@ class LineProblem2D(Protocol):
         ...
 
 
+@runtime_checkable
+class HigherOrderTransverse(Protocol):
+    """
+    Optional extension of ``LineProblem2D`` for a higher-order transverse stencil.
+
+    A problem implementing *both* methods below can express a transverse stencil
+    wider than the standard three points.  A problem implementing neither - which
+    is every second-order problem in this package - gets the defaults documented
+    on each method, and ``strip_sweep`` then executes exactly the arithmetic it
+    always did, in the same order, on the same values: the second-order results
+    are bit-identical, not merely equivalent.
+
+    This is deliberately a *separate* protocol rather than two more members on
+    ``LineProblem2D``. Both protocols are ``runtime_checkable``, and a
+    ``runtime_checkable`` protocol tests only for the presence of its members, so
+    adding optional members to ``LineProblem2D`` would silently make every
+    existing problem class fail ``isinstance(p, LineProblem2D)`` - a check that
+    would then be quietly wrong rather than loudly broken.
+
+    ``strip_sweep`` does not require this protocol; it discovers the two methods
+    by ``getattr`` and falls back per method, so a partial implementation is
+    permitted, if rarely useful.
+    """
+
+    def transverse_terms(self, axis: int, index: int,
+                         n: int) -> tuple[tuple[int, float], ...]:
+        """
+        The transverse neighbours to gather into a strip's right-hand side.
+
+        Returns (offset, coefficient) pairs describing how the strip at
+        transverse position ``index`` along ``axis`` couples to its neighbours.
+        ``strip_sweep`` subtracts ``coefficient * u[neighbour]`` from the
+        right-hand side for each pair, skipping offsets that fall outside the
+        domain - their contribution is Dirichlet data and belongs to ``rhs()``.
+
+        Default (second-order, five-point):
+
+            ((-1, 1/h²), (+1, 1/h²))       h = spacings[axis]
+
+        A fourth-order transverse stencil returns four pairs away from the
+        boundary, with coefficients 16/(12h²) at ±1 and -1/(12h²) at ±2.  Near
+        a boundary it returns fewer: the ghost node produced by the reflection
+        is not a neighbour at all but a multiple of the strip's *own* value, so
+        it belongs on the diagonal of the strip operator - which is precisely
+        why ``row_matrix_for`` is needed alongside this method.
+
+        Parameters
+        ----------
+        axis : int
+            Index into ``shape``/``spacings``.  Axis 0 is the strip direction
+            and is never passed here; the transverse axes are 1 (and, in 3-D, 2).
+        index : int
+            Position of the strip along ``axis``.
+        n : int
+            Extent of ``axis``, i.e. ``shape[axis]``.
+
+        Returns
+        -------
+        tuple of (int, float)
+            Offset/coefficient pairs, in the order they are to be accumulated.
+        """
+        ...
+
+    def row_matrix_for(self, idx: tuple[int, ...]) -> np.ndarray:
+        """
+        The strip operator for the strip at transverse index ``idx``.
+
+        Default: ``row_matrix()`` for every strip.
+
+        A fourth-order transverse stencil needs this because the reflection at
+        a transverse boundary folds the ghost node onto the diagonal, so the
+        strips adjacent to a transverse boundary carry a different diagonal
+        from the interior ones.  The number of *distinct* matrices stays small
+        and independent of N - two in 2-D, at most four in 3-D - which is what
+        keeps the quantum cost bounded: a block encoding and a set of QSP phase
+        angles are needed per distinct matrix, not per strip.
+
+        Implementations should return the *same array object* for strips that
+        share an operator, so that callers can cache expensive per-matrix work
+        (block encodings, phase angles) keyed on identity.
+
+        Parameters
+        ----------
+        idx : tuple of int
+            Transverse index of the strip: ``(j,)`` in 2-D, ``(j, k)`` in 3-D.
+
+        Returns
+        -------
+        np.ndarray
+            The (Nx, Nx) strip operator.
+        """
+        ...
+
+
 # ── Stagnation detection ──────────────────────────────────────────────────────
 
 class StagnationMonitor:
@@ -298,7 +392,6 @@ def strip_sweep(
     shape = tuple(problem.shape)
     Nx = shape[0]
     transverse = shape[1:]
-    A = problem.row_matrix()
 
     # Spacings and periodicity, with a fallback for the original 2-D class.
     spacings = getattr(problem, "spacings", None)
@@ -308,6 +401,18 @@ def strip_sweep(
     if periodic is None:
         periodic = (False,) * len(shape)
     inv_h2 = [1.0 / spacings[d + 1] ** 2 for d in range(len(transverse))]
+
+    # Optional higher-order hooks (see LineProblem2D).  Both are resolved once,
+    # outside the loop: a problem that supplies neither - which is every
+    # second-order problem - pays one getattr per sweep and then follows the
+    # original code path exactly.
+    terms_for = getattr(problem, "transverse_terms", None)
+    matrix_for = getattr(problem, "row_matrix_for", None)
+    # Second-order default, precomputed per axis so the inner loop allocates
+    # nothing and accumulates in the original order: -1 before +1, axis by axis.
+    default_terms = [((-1, inv_h2[d]), (1, inv_h2[d]))
+                     for d in range(len(transverse))]
+    A = problem.row_matrix() if matrix_for is None else None
 
     order = list(np.ndindex(*transverse)) if transverse else [()]
     if reverse:
@@ -323,15 +428,18 @@ def strip_sweep(
         key = (slice(None),) + idx
         b = rhs[key].copy()
         for d, n in enumerate(transverse):
-            for step in (-1, 1):
+            terms = (default_terms[d] if terms_for is None
+                     else terms_for(d + 1, idx[d], n))
+            for step, coef in terms:
                 j = idx[d] + step
                 if periodic[d + 1]:
                     j %= n
                 elif j < 0 or j >= n:
                     continue
                 nb = (slice(None),) + idx[:d] + (j,) + idx[d + 1:]
-                b -= src[nb] * inv_h2[d]
-        x = np.asarray(inner(A, b), dtype=float)
+                b -= src[nb] * coef
+        x = np.asarray(inner(A if matrix_for is None else matrix_for(idx), b),
+                       dtype=float)
         work.add(Nx)
         if x.shape != (Nx,):
             raise ValueError(f"inner solver returned shape {x.shape}, "
