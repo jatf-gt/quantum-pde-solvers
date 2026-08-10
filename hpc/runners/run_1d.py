@@ -1031,6 +1031,60 @@ def _run_all_solvers(
             qsvt_max_degree=cap_Q)
 
 
+# ── Discretisation order ──────────────────────────────────────────────────────
+
+def _to_4th_order(built, N: int):
+    """
+    Re-express a second-order ``BuiltCase`` on the fourth-order operator.
+
+    The case registry assembles every 1D problem with the second-order TST
+    operator. Under ``--order 4`` the same continuous problem is re-discretised
+    with the pentadiagonal five-point stencil, replacing `A`, `b` and `kappa`
+    whilst leaving the coordinates, source samples and reference solution
+    untouched — the two discretisations approximate the same boundary value
+    problem, so the reference is common to both.
+
+    The Dirichlet data is recovered from the second-order right-hand side
+    rather than being passed alongside it: the registry absorbs it as
+    b[0] −= α and b[-1] −= β on top of h²·f, so α = h²·f₀ − b[0] inverts that
+    absorption exactly and needs no further bookkeeping in the registry.
+
+    The source values on the boundaries are forwarded when the case supplies
+    them. They are genuinely required data for the fourth-order closure (see
+    ``problems.poisson_1d_4th``), not a refinement; where a case leaves them
+    unset the problem class extrapolates, which is asymptotically adequate but
+    inaccurate on a sharply peaked source at coarse N.
+
+    Parameters
+    ----------
+    built : core.cases.BuiltCase
+        The case as assembled at second order.
+    N : int
+        Number of interior nodes, matching `built`.
+
+    Returns
+    -------
+    core.cases.BuiltCase
+        A copy carrying the fourth-order `A`, `b` and `kappa`.
+    """
+    import dataclasses
+
+    from problems.poisson_1d_4th import PoissonProblem1D4th
+
+    dx = built.spacings[0]
+    alpha = float(dx**2 * built.f_values[0] - built.b[0])
+    beta = float(dx**2 * built.f_values[-1] - built.b[-1])
+    prob_4th = PoissonProblem1D4th(
+        N=N,
+        f_vals=built.f_values,
+        alpha=alpha,
+        beta=beta,
+        f_boundary=built.f_boundary,
+    )
+    return dataclasses.replace(
+        built, A=prob_4th.A, b=prob_4th.b, kappa=prob_4th.kappa)
+
+
 # ── Case runners ──────────────────────────────────────────────────────────────
 
 def run_1d_generic_poisson_single_N(
@@ -1051,18 +1105,7 @@ def run_1d_generic_poisson_single_N(
 
         built = cases.get(case_name).build(N)
         if order == 4:
-            from problems.poisson_1d_4th import PoissonProblem1D4th
-            import dataclasses
-            dx = built.spacings[0]
-            alpha = float(dx**2 * built.f_values[0] - built.b[0])
-            beta = float(dx**2 * built.f_values[-1] - built.b[-1])
-            prob_4th = PoissonProblem1D4th(
-                N=N,
-                f_vals=built.f_values,
-                alpha=alpha,
-                beta=beta
-            )
-            built = dataclasses.replace(built, A=prob_4th.A, b=prob_4th.b, kappa=prob_4th.kappa)
+            built = _to_4th_order(built, N)
         x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
         case_id = f"1D_Poisson_{src_key}_hom"
 
@@ -1086,18 +1129,7 @@ def run_1d_generic_poisson_nonhom_single_N(
 
     built = cases.get("poisson_1d_fS_nonhom").build(N)
     if order == 4:
-        from problems.poisson_1d_4th import PoissonProblem1D4th
-        import dataclasses
-        dx = built.spacings[0]
-        alpha = float(dx**2 * built.f_values[0] - built.b[0])
-        beta = float(dx**2 * built.f_values[-1] - built.b[-1])
-        prob_4th = PoissonProblem1D4th(
-            N=N,
-            f_vals=built.f_values,
-            alpha=alpha,
-            beta=beta
-        )
-        built = dataclasses.replace(built, A=prob_4th.A, b=prob_4th.b, kappa=prob_4th.kappa)
+        built = _to_4th_order(built, N)
     x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
     case_id = "1D_Poisson_fS_nonhom"
 
@@ -1126,20 +1158,7 @@ def run_1d_het_single_N(
     _banner(f"SECTION 2 - HET Axial Poisson, N={N}")
 
     def apply_4th_order(built):
-        if order != 4:
-            return built
-        from problems.poisson_1d_4th import PoissonProblem1D4th
-        import dataclasses
-        dx = built.spacings[0]
-        alpha = float(dx**2 * built.f_values[0] - built.b[0])
-        beta = float(dx**2 * built.f_values[-1] - built.b[-1])
-        prob_4th = PoissonProblem1D4th(
-            N=N,
-            f_vals=built.f_values,
-            alpha=alpha,
-            beta=beta
-        )
-        return dataclasses.replace(built, A=prob_4th.A, b=prob_4th.b, kappa=prob_4th.kappa)
+        return built if order != 4 else _to_4th_order(built, N)
 
     # ── Sub-case 3a: linear profile, homogeneous BCs ──────────────────────────
     _section(f"Sub-case 3a: linear profile, homogeneous BCs  (N={N})")

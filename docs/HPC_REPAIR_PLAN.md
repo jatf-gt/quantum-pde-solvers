@@ -19,7 +19,7 @@ integration of the 4th-order pentadiagonal discretisation, and completion of the
 | 1 | Gap manifest | **complete** — all three manifests generated; classification corrected three times against real data |
 | 2 | Correctness: pentadiagonal operator | **complete** — dense block encoding in, truncation now raises, `hhl_4th`/`qsvt_4th` registered |
 | 3 | Environment and deployment | complete |
-| 4 | Fold order=4 into the `LineProblem` protocol | pending (Wave 2) |
+| 4 | Fold order=4 into the `LineProblem` protocol | **1-D closure fixed and pinned**; 2-D/3-D protocol work outstanding (Wave 2) |
 | 5 | Reporting, diagnostics and provenance | **partly done** — the items Wave 1 depends on are in; the new `RunResult` columns are not |
 | 6 | QSVT phase precompute for 4th order | **1-D done** (`--order 4`, `hpc/jobs/submit_precompute_4th.sh`); 2-D/3-D refused until Phase 4 settles the operator |
 | 7 | Consolidate `hpc/jobs/` and submit | **scripts ready; submission is the user's call** |
@@ -36,6 +36,28 @@ Outstanding work, from `results/manifests/rerun_{1,2,3}d.json`:
 
 Every job sources `_preflight.sh`, which **refuses a dirty tree** — so the working
 tree must be committed and pushed before any submission.
+
+**Regenerating the manifests requires the exact scope they were built with.**
+`gap_analysis.py` takes both the results directory and the N range as arguments,
+and neither default is the right one. Verified to reproduce 22 / 55 / 40 on
+2026-08-10:
+
+```bash
+python scripts/gap_analysis.py --dim 1 --results-dir results/1Dhpc_run           --n-values 4,8,16,32,64
+python scripts/gap_analysis.py --dim 2 --results-dir results_hpc_copy/2Dhpc_run  --n-values 4,8,16,32,64
+python scripts/gap_analysis.py --dim 3 --results-dir results/3Dhpc_run           --n-values 4,8,16
+```
+
+Two traps, both of which inflate the manifest into scheduling work that already
+exists or was never in scope:
+
+- **2D reads the backup, not the live directory.** `results/2Dhpc_run/` had its
+  `results_full.json` truncated to 2 rows by a job that was still running;
+  `results_hpc_copy/2Dhpc_run` is the authoritative copy. Pointing 2D at the live
+  directory reports **98** outstanding against the true 55.
+- **3D is scoped to N = 4, 8, 16.** It has no 32 or 64 configurations at all;
+  passing the 1D/2D N range invents 56 rows that were never planned and reports
+  **96** against the true 40.
 
 ### What was fixed on 2026-08-10, and what it prevented
 
@@ -336,10 +358,61 @@ of a solve to the *wrong problem* could otherwise be manufactured.
 
 ### Phase 4 — Fold order = 4 into the `LineProblem` protocol
 
-> **Blocked on a defect found 2026-08-10 that is larger than this phase.** The
-> 4th-order *boundary closure* is wrong, in 1-D as well as in 2-D/3-D, so there is
-> no correct operator yet for these classes to wrap. Measured convergence orders,
-> direct dense solves against manufactured solutions:
+#### 4a — The 1-D boundary closure: **fixed 2026-08-10**
+
+Applied to `problems/poisson_1d_4th.py` exactly as derived below: `b[0] -= 14α`
+in place of `18α`, plus `b[0] += h²·f(0)`, symmetrically at the far end. Measured
+orders, before and after, by dense direct solve against the manufactured
+solutions:
+
+| Solution | Before | After |
+|---|---|---|
+| u = sin(πx), α = β = 0 | 3.90 → 4.00 | 3.90 → 4.00 *(unchanged, as intended)* |
+| u = x(1−x)(2−x), α = β = 0 | 2.00 | **machine-exact** |
+| u = eˣ, α = 1, β = e | **−0.01, no convergence** | **3.95** |
+
+Through the case registry, at the resolutions the sweep runs:
+
+| Case | Order |
+|---|---|
+| `poisson_1d_fS_hom` | 4.00 *(unchanged)* |
+| `poisson_1d_fL_hom` | machine-exact (cubic solution) |
+| `poisson_1d_fS_nonhom` | **4.00** (was no convergence) |
+| `het_1d_3a_linear` | machine-exact (cubic solution) |
+| `poisson_1d_fH_hom` | 1.98 — correct: the source is discontinuous, so the
+  O(h⁴) truncation does not apply. This is the intended stress case. |
+
+**κ is unchanged**, confirmed to four decimals against the values Phase 6
+recorded — 11.9477 / 42.1378 / 154.5126 / 586.8093 at N = 4/8/16/32 — so the
+phase-angle cache and `hpc/jobs/submit_precompute_4th.sh` survive the fix, as
+predicted.
+
+**Boundary source data.** f(0) and f(1) are required data for the closure, not a
+refinement. They are threaded from the registry through a new optional
+`BuiltCase.f_boundary`, populated by `_dirichlet_1d` and `_build_3b` via the new
+`_f_boundary_1d` helper, and forwarded by a new `run_1d._to_4th_order` — which
+also replaces the three near-identical inline conversion blocks the driver
+previously carried. Where a case leaves it unset the problem class falls back to
+cubic extrapolation from the four nearest interior samples: O(h⁴) accurate, hence
+order-preserving, and verified to be so. The fallback is *not* sufficient for
+`het_1d_3b_gaussian_Vd300`, whose source is a Gaussian of magnitude ~10⁹ sited at
+0.6 L with σ = 5 mm; its true f(1) ≈ −1.08×10⁷ is not recoverable by
+extrapolation at N = 4–16, which is why the registry route exists.
+
+**Regression cover:** new `tests/test_poisson_1d_4th.py`, 21 tests. Verified
+load-bearing: against the defective closure 8 of them fail, and the only order-of-
+convergence test that still passes is the sinusoid — the historical blind spot.
+Suite: 680 passed, 5 skipped.
+
+#### 4b — 2-D/3-D: still outstanding
+
+> **Retained as the derivation of record.** The defect described here has been
+> **fixed in 1-D** (see 4a above) but **not in 2-D/3-D**: `multigrid_4th.py` carries
+> its own separate closure, `build_strip_matrix_4th` folds the ghost into
+> `A[0,1] += −1` rather than `A[0,0] += 1` — an *even* reflection, wrong for
+> Dirichlet data — and `_build_rhs_strip` still writes the `18α` form. Measured
+> convergence orders as originally found, direct dense solves against manufactured
+> solutions:
 >
 > | Scheme | u = sin(πx), homogeneous | u = x(1−x), homogeneous | u = eˣ, u(0)=1, u(1)=e |
 > |---|---|---|---|
@@ -373,8 +446,9 @@ of a solve to the *wrong problem* could otherwise be manufactured.
 > `PentadiagonalToeplitz` — is preserved, and **κ, the cache keys and the phase
 > precompute all remain valid**.
 >
-> **Consequence for the interface.** `f` at the two boundary nodes becomes required
-> data. `PoissonProblem1D4th` currently receives interior values only, so the
+> **Consequence for the interface** *(discharged in 1-D by `BuiltCase.f_boundary`;
+> the 2-D/3-D half stands)*. `f` at the two boundary nodes becomes required
+> data. `PoissonProblem1D4th` previously received interior values only, so the
 > correction has to be threaded from the source functions in `core/cases.py`. In
 > 2-D/3-D the same closure governs the strip direction, so the same data is needed
 > per strip.

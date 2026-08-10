@@ -132,6 +132,17 @@ class BuiltCase:
     kappa : float or None
         Condition number of the operator actually solved: κ(A) in 1D, κ of the
         strip operator in 2D and 3D.
+    f_boundary : tuple of float or None
+        Source term evaluated *on* the two boundaries, (f(0), f(1)). 1D only,
+        and populated only where the analytical source is known.
+
+        Unused by the second-order discretisation, whose boundary rows need
+        only the Dirichlet data. The fourth-order ghost-node closure of
+        ``problems.poisson_1d_4th`` additionally needs the governing equation
+        on the boundary, u″ = f, and so requires these two values; without them
+        it must extrapolate from the interior samples, which is asymptotically
+        adequate but inaccurate on a sharply peaked source at the coarse
+        resolutions the fourth-order sweep uses.
     """
 
     coords:   tuple[np.ndarray, ...]
@@ -142,6 +153,7 @@ class BuiltCase:
     b:        Optional[np.ndarray] = None
     problem:  Any = None
     kappa:    Optional[float] = None
+    f_boundary: Optional[tuple[float, float]] = None
 
 
 # ── Case Declaration ──────────────────────────────────────────────────────────
@@ -387,6 +399,32 @@ def _grid_1d(N: int) -> tuple[np.ndarray, float]:
     return np.arange(1, N + 1) * h, h
 
 
+def _f_boundary_1d(
+    source: Callable[[np.ndarray], np.ndarray]
+) -> tuple[float, float]:
+    """
+    Evaluates a 1D source term on the two boundaries, (f(0), f(1)).
+
+    Required by the fourth-order ghost-node closure of
+    ``problems.poisson_1d_4th``, which eliminates the ghost node using the
+    governing equation u″ = f evaluated on the boundary. The second-order
+    discretisation does not use these values.
+
+    Parameters
+    ----------
+    source : callable
+        f(x), the same callable the interior samples are drawn from. Must
+        accept and return a NumPy array.
+
+    Returns
+    -------
+    tuple of float
+        (f(0), f(1)).
+    """
+    edges = np.asarray(source(np.array([0.0, 1.0])), dtype=float)
+    return (float(edges[0]), float(edges[1]))
+
+
 def _tst(N: int) -> np.ndarray:
     """
     N×N Toeplitz Symmetric Tridiagonal operator: main diagonal −2, off-diagonals
@@ -462,8 +500,8 @@ def _dirichlet_1d(
     Returns
     -------
     BuiltCase
-        With `A`, `b`, `coords`, `f_values` and `kappa` populated, and `exact`
-        populated when a closed form was supplied.
+        With `A`, `b`, `coords`, `f_values`, `f_boundary` and `kappa`
+        populated, and `exact` populated when a closed form was supplied.
     """
     x, h = _grid_1d(N)
     A = _tst(N)
@@ -475,6 +513,7 @@ def _dirichlet_1d(
         coords=(x,), spacings=(h,), f_values=f,
         exact=None if exact is None else exact(x),
         A=A, b=b, kappa=_kappa(A),
+        f_boundary=_f_boundary_1d(source),
     )
 
 
@@ -701,6 +740,7 @@ def _build_3b(N: int) -> BuiltCase:
     return BuiltCase(
         coords=(x,), spacings=(h,), f_values=f,
         exact=None, A=A, b=b, kappa=_kappa(A),
+        f_boundary=_f_boundary_1d(_f_het_gaussian_3b),
     )
 
 
