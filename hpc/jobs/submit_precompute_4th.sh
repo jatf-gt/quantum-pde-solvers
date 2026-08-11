@@ -37,6 +37,33 @@
 #  the failure the cache exists to prevent. precompute_phases.py refuses
 #  `--dim 2 --order 4` for this reason. See docs/HPC_REPAIR_PLAN.md, Phase 4.
 #
+#  THE DEGREE TAG IS PART OF THE CACHE KEY
+#  ---------------------------------------
+#  The key is (round(kappa,4), round(epsilon,8), method, max_degree), where an
+#  uncapped run is recorded as the tag `d-1`. run_1d.py asks for the cap given by
+#  QSVT_MAX_DEGREE_BY_N at the resolution being solved:
+#
+#      N = 4, 8, 16   ->  None   ->  tag d-1     (uncapped)
+#      N = 32, 64     ->  5000   ->  tag d5000
+#
+#  Passing --max-degree 5000 at N = 4, 8 or 16 therefore writes an entry under a
+#  key no solver will ever request. The miss is silent: _resolve_qsvt_max_degree
+#  falls back to min(5000, int(15*kappa)) -- degree 179 / 632 / 2317 at
+#  N = 4 / 8 / 16 -- and the sweep proceeds at reduced polynomial accuracy having
+#  ignored 71 h of precompute. MAX_DEGREE is consequently UNSET by default here,
+#  and the guard below refuses any invocation whose tag does not match the tag the
+#  solver will look up. Verified 2026-08-11: none of the four order-4 keys is
+#  present in results/qsvt_phase_cache/.
+#
+#  Epsilon ordering
+#  ----------------
+#  The sweep itself only ever requests epsilon = 0.01 (run_1d.HHL_EPSILON). The
+#  additional 0.5 and 0.1 entries serve the Phase 8 sensitivity study, and
+#  precompute_phases.py processes epsilons largest-first -- i.e. it would compute
+#  the two optional entries before the one the sweep depends on, and a walltime
+#  kill would take exactly the entry that matters. This job therefore runs the
+#  sweep-critical epsilon in a first pass on its own, and the optional ones after.
+#
 #  Cost and staging
 #  ----------------
 #  Measured locally: N=4 (kappa 11.95) did not complete within 10 minutes on a
@@ -46,15 +73,25 @@
 #  written per (kappa, epsilon) pair, not at the end -- so resubmitting the same
 #  stage skips what is already cached.
 #
+#  The stage boundaries are set by the degree tag, not by taste: N <= 16 must be
+#  computed uncapped and N >= 32 capped at 5000, so the two cannot share one
+#  invocation.
+#
 #  Usage
 #  -----
-#    # Stage 1 -- N=4,8. Start here.
+#    # Stage 1 -- N=4,8, uncapped. Start here.
 #    export N_VALUES="4,8"
 #    qsub -v N_VALUES hpc/jobs/submit_precompute_4th.sh
 #
-#    # Stage 2 -- N=16, only once stage 1 has completed.
+#    # Stage 2 -- N=16, uncapped. Only once stage 1 has completed.
 #    export N_VALUES="16"
 #    qsub -v N_VALUES hpc/jobs/submit_precompute_4th.sh
+#
+#    # Stage 3 -- N=32, capped at 5000 to match QSVT_MAX_DEGREE_BY_N. Exploratory:
+#    # kappa = 586.8 and completion within 71 h is not guaranteed. Required only if
+#    # the 1-D order-4 sweep is to be run beyond N=16.
+#    export N_VALUES="32" MAX_DEGREE="5000"
+#    qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_4th.sh
 #
 #    # Confirm the keys before committing to a long job (computes nothing):
 #    python3 hpc/runners/precompute_phases.py --dim 1 --order 4 \
@@ -85,32 +122,34 @@
 #PBS -M juan.trobajo-flecha25@imperial.ac.uk
 #PBS -m abe
 
+set -u
+
 echo "============================================================"
 echo "  QSVT PHASE PRECOMPUTE (4th order) — HPC JOB START"
-echo "  Job ID    : $PBS_JOBID"
+echo "  Job ID    : ${PBS_JOBID:-interactive}"
 echo "  Node      : $(hostname)"
 echo "  Date/Time : $(date)"
-echo "  Work dir  : $PBS_O_WORKDIR"
+echo "  Work dir  : ${PBS_O_WORKDIR:-$(pwd)}"
 echo "  N_VALUES  : ${N_VALUES:-<not set, script default: 4,8>}"
-echo "  MAX_DEGREE: ${MAX_DEGREE:-5000 (matching the 2nd-order 1-D cache)}"
+echo "  MAX_DEGREE: ${MAX_DEGREE:-<not set: uncapped, tag d-1>}"
 echo "============================================================"
 
 # ── Repository root resolution ───────────────────────────────
 # PBS copies this script to a spool directory before executing it, so $0 and
 # BASH_SOURCE do NOT point at the original file. PBS_O_WORKDIR -- the directory
 # qsub was invoked from -- is the only reliable anchor.
-REPO_ROOT="${PBS_O_WORKDIR}"
+REPO_ROOT="${PBS_O_WORKDIR:-$(pwd)}"
 while [ ! -f "${REPO_ROOT}/pyproject.toml" ] && [ "${REPO_ROOT}" != "/" ]; do
     REPO_ROOT="$(dirname "${REPO_ROOT}")"
 done
 if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
-    echo "ERROR: no repository root (pyproject.toml) at or above ${PBS_O_WORKDIR}."
-    echo "       Submit from inside a clone, e.g. qsub hpc/jobs/$(basename "$0")"
+    echo "ERROR: no repository root (pyproject.toml) at or above ${PBS_O_WORKDIR:-$(pwd)}."
+    echo "       Submit from inside a clone, e.g. qsub hpc/jobs/submit_precompute_4th.sh"
     exit 1
 fi
 cd "${REPO_ROOT}" || { echo "ERROR: cannot cd to ${REPO_ROOT}"; exit 1; }
 
-if [ "${PBS_O_WORKDIR}" != "${REPO_ROOT}" ]; then
+if [ "${PBS_O_WORKDIR:-${REPO_ROOT}}" != "${REPO_ROOT}" ]; then
     echo "NOTE: submitted from ${PBS_O_WORKDIR}, not the repository root"
     echo "      (${REPO_ROOT}). The PBS stdout/stderr logs are under the former."
 fi
@@ -147,30 +186,131 @@ python3 -c "import pyqsp" || {
 
 mkdir -p results/qsvt_phase_cache
 
+N_VALUES="${N_VALUES:-4,8}"
+MAX_DEGREE="${MAX_DEGREE:-}"
+SWEEP_EPSILON="${SWEEP_EPSILON:-0.01}"
+EXTRA_EPSILONS="${EXTRA_EPSILONS:-0.5,0.1}"
+
+# ============================================================
+#  Cache-key guard
+# ============================================================
+# Refuses the job if the degree tag it would write differs from the tag run_1d.py
+# will request, which is the one way to spend 71 h and end with a cache the sweep
+# cannot see. The kappa is taken from the same problem class the solver builds,
+# never from the table in this header.
+echo ""
+echo "------------------------------------------------------------"
+echo "  Cache-key check -- what this job writes vs what run_1d asks"
+echo "------------------------------------------------------------"
+python3 - "${N_VALUES}" "${MAX_DEGREE}" "${SWEEP_EPSILON}" <<'PY' || exit 1
+import sys
+
+sys.path.insert(0, ".")
+sys.path.insert(0, "hpc/runners")
+
+import run_1d
+import precompute_phases as pp
+import solvers.quantum.qsp_angles as qa
+
+n_values = sorted({int(t) for t in sys.argv[1].split(",") if t.strip()})
+raw_cap = sys.argv[2].strip()
+epsilon = round(float(sys.argv[3]), 8)
+
+tag_written = int(raw_cap) if raw_cap else -1
+
+print(f"  {'N':>5} {'kappa':>12} {'solver key':>12} {'this job':>10} {'cached':>8}")
+print("  " + "-" * 52)
+
+mismatched = []
+for N in n_values:
+    cap = run_1d.QSVT_MAX_DEGREE_BY_N.get(N, run_1d.QSVT_MAX_DEGREE_FALLBACK)
+    tag_solver = cap if cap is not None else -1
+    kappa = pp.kappa_1d(N, 4)
+    cached = qa._load_disk((round(kappa, 4), epsilon, "auto", tag_solver)) is not None
+    print(f"  {N:>5} {kappa:>12.4f} {'d' + str(tag_solver):>12} "
+          f"{'d' + str(tag_written):>10} {str(cached):>8}")
+    if tag_solver != tag_written:
+        mismatched.append((N, tag_solver))
+
+if mismatched:
+    print()
+    print("  ABORTING: the degree tag written would not be the tag looked up.")
+    for N, tag_solver in mismatched:
+        print(f"    N={N}: run_1d.QSVT_MAX_DEGREE_BY_N gives tag d{tag_solver}, "
+              f"this job would write d{tag_written}.")
+    print()
+    print("  The miss would be silent -- _resolve_qsvt_max_degree falls back to")
+    print("  min(5000, int(15*kappa)) and the sweep runs at reduced polynomial")
+    print("  accuracy, having ignored this entire computation.")
+    print()
+    print("  Fix: leave MAX_DEGREE unset for N <= 16, and set MAX_DEGREE=5000 for")
+    print("  N >= 32. The two cannot share one invocation.")
+    sys.exit(1)
+
+print()
+print("  Cache keys confirmed: this job writes exactly what run_1d.py requests.")
+PY
+
 # ============================================================
 #  Precompute
 # ============================================================
-N_VALUES="${N_VALUES:-4,8}"
-MAX_DEGREE="${MAX_DEGREE:-5000}"
+CAP_ARGS=""
+if [ -n "${MAX_DEGREE}" ]; then
+    CAP_ARGS="--max-degree ${MAX_DEGREE}"
+fi
 
 echo ""
-echo "Computing 1-D order-4 phases for N=${N_VALUES}, max_degree=${MAX_DEGREE}"
+echo "Computing 1-D order-4 phases for N=${N_VALUES}"
 echo "Cache keys that will be written:"
 python3 hpc/runners/precompute_phases.py --dim 1 --order 4 \
         --n-values "${N_VALUES}" --list-kappas
 
+# Pass 1 -- the epsilon the sweep actually requests, alone, so that a walltime
+# kill cannot take it while the optional sensitivity entries survive.
 echo ""
+echo "------------------------------------------------------------"
+echo "  PASS 1/2 -- epsilon=${SWEEP_EPSILON} (required by the sweep)  $(date)"
+echo "------------------------------------------------------------"
 python3 hpc/runners/precompute_phases.py \
         --dim 1 --order 4 \
         --n-values "${N_VALUES}" \
-        --max-degree "${MAX_DEGREE}"
+        --epsilon "${SWEEP_EPSILON}" \
+        --extra-epsilons "" \
+        ${CAP_ARGS}
 RC=$?
+echo "PASS 1 finished $(date)  exit=${RC}"
+
+# Pass 2 -- the looser epsilons, for the Phase 8 sensitivity study only. Already
+# cached pairs are skipped, so this re-runs nothing from pass 1.
+if [ -n "${EXTRA_EPSILONS}" ]; then
+    echo ""
+    echo "------------------------------------------------------------"
+    echo "  PASS 2/2 -- epsilon=${EXTRA_EPSILONS} (sensitivity study)  $(date)"
+    echo "------------------------------------------------------------"
+    python3 hpc/runners/precompute_phases.py \
+            --dim 1 --order 4 \
+            --n-values "${N_VALUES}" \
+            --epsilon "${SWEEP_EPSILON}" \
+            --extra-epsilons "${EXTRA_EPSILONS}" \
+            ${CAP_ARGS}
+    RC2=$?
+    echo "PASS 2 finished $(date)  exit=${RC2}"
+    [ "${RC}" -eq 0 ] && RC=${RC2}
+fi
 
 echo ""
 echo "============================================================"
 echo "  Cache contents after this stage"
 echo "============================================================"
 ls -1 results/qsvt_phase_cache/ | wc -l | xargs echo "  entries:"
+
+# The cache is the most expensive artefact this pipeline produces -- up to 71 h of
+# non-parallelisable computation per stage -- and results/ is not backed up. Copy
+# it to RDS, as every sweep job does with its results.
+RDS_CACHE="${HOME}/qpde-results/qsvt_phase_cache_4th_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "${RDS_CACHE}"
+cp -r results/qsvt_phase_cache/* "${RDS_CACHE}/" 2>/dev/null
+echo "  cache copied to: ${RDS_CACHE}"
 
 echo ""
 echo "QSVT 4th-order precompute finished $(date)  exit=${RC}"
