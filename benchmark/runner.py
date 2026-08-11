@@ -1,639 +1,647 @@
 """
-Orchestrates the sequential execution sweeps for both the 1D and 2D Poisson benchmarks.
+Sweep drivers for the benchmarking framework.
 
-This module acts as the primary driver for replicating the numerical experiments
-detailed in the primary reference literature.
+This module provides the top-level orchestration functions that wire together
+problem construction, solver invocation, metric collection, and result
+persistence. It is the primary entry point for HPC runner scripts.
 
-1D Sweeps (Sections IV A–D)
----------------------------
-sweep_a : Homogeneous BCs, all source functions, N ∈ {8, 16}, ε = 0.01.
-sweep_b : Trotterisation precision (ε) sensitivity, homogeneous BCs, N = 16.
-sweep_c : Non-homogeneous BCs, fH, N ∈ {16, 32}.
-sweep_d : Condition number scaling verification (bypasses quantum solver).
+Sweep catalogue
+───────────────
+  run_primary_1d          Primary 1D benchmark: all solvers × all N.
+  run_equal_accuracy_1d   Equal-accuracy protocol for 1D cases.
+  run_sensitivity_1d      OAT sensitivity sweep for 1D cases (N ∈ {4, 8}).
+  run_primary_4th_1d      Primary 1D benchmark with 4th-order discretisation.
 
-2D Sweeps (Sections IV E–F)
----------------------------
-sweep_e : Homogeneous BCs, all source functions, N ∈ {8, 16}, baseline ε = 0.01.
-sweep_f : Non-homogeneous BCs, N = 8, evaluates specific asymmetric convergence criteria.
-sweep_g : Condition number scaling verification for the 2D line-Jacobi row matrix.
+Each function returns a list of BenchmarkResult objects and optionally
+writes to a SweepArchive. Incremental writing is used throughout: each
+result is persisted immediately after the solver returns, so partial
+progress survives a walltime kill on HPC.
+
+Design principles
+─────────────────
+  1. Solvers are called via the existing (A, b) → SolverResult interface
+     in solvers/quantum/. This module does not import solver internals.
+  2. The Thomas algorithm is always run first and its solution stored as
+     the reference for all subsequent quantum solver comparisons.
+  3. All metric computation is delegated to benchmark/equal_accuracy.py
+     (_build_base_result) to ensure a single point of truth.
+  4. Circuit metric extraction is optional (extract_circuits flag) to
+     allow fast sweeps without the transpilation overhead.
 """
+
 from __future__ import annotations
 
-import csv
+import logging
 import time
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
-from core.config import SimConfig1D, SimConfig2D
-from core.source_functions import SOURCE_FUNCTIONS_2D
-from problems.poisson_1d import PoissonProblem1D
-from problems.poisson_line_2d import PoissonLine2D
-from solvers.classical.thomas import thomas_solve
-from solvers.classical.numpy_ref import numpy_solve
-from solvers.outer import solve as outer_solve
-from solvers.quantum.hhl_1d import hhl_solve
-from solvers.quantum.vqls_1d import VQLSConfig1D
-from benchmark.metrics import (
-    BenchmarkResult,
-    BenchmarkResult2D,
-    Config2D,
-    compute_errors,
-    compute_errors_2d,
+from benchmark.metrics import BenchmarkResult, compute_residual
+from benchmark.equal_accuracy import (
+    _build_base_result,
+    sweep_hhl_equal_accuracy,
+    sweep_vqls_equal_accuracy,
+    sweep_qsvt_equal_accuracy,
+    EqualAccuracyResult,
+    DEFAULT_R_TARGET,
+    DEFAULT_BAND_FACTOR,
+    HHL_EPSILON_GRID,
+    VQLS_NLAYERS_GRID,
+    QSVT_MAXDEGREE_GRID,
 )
-from benchmark.reference_2d import fine_mesh_reference
-from benchmark.reporting import (
-    print_result_table,
-    print_result_table_2d,
-    print_convergence_summary,
+from benchmark.sensitivity import (
+    run_all_sensitivity_sweeps,
+    SensitivitySweepResult,
 )
-from benchmark.plotting import (
-    plot_solution_comparison_1d,
-    plot_solution_contours_2d,
-    plot_convergence_history,
-)
+from benchmark.results_io import SweepArchive
 
-# ── Global Execution Directives ───────────────────────────────────────────────
-
-OUTPUT_CSV  = True
-SAVE_FIGS   = True
-RESULTS_DIR = Path("results")
+log = logging.getLogger(__name__)
 
 
-# ── 2D Execution Directives ───────────────────────────────────────────────────
+# ── Problem builders ──────────────────────────────────────────────────────────
 
-# Outer scheme employed by the 2D sweeps. "jacobi" resolves to a simultaneous
-# strip update under the max|u^{n+1} − u^n| stopping test, which reproduces the
-# original validated line-Jacobi loop of Ghafourpour & Laizet (2025) exactly.
-# The sweeps deliberately do not use the faster "sor" or "fmg" schemes: their
-# purpose is replication of the published figures, and the outer scheme is one
-# of the quantities those figures report.
-SWEEP_SCHEME_2D = "jacobi"
-
-# Floor imposed on the precision parameter of the HHL strip solves. The Trotter
-# step count scales as 1/ε, and the 2D strip operator is so well conditioned
-# (κ(A_row) ≈ 2.77, bounded above by 3) that ten steps already saturate the
-# accuracy the line-Jacobi outer loop can exploit. Without this floor a sweep at
-# ε = 0.01 would request 100 Trotter steps per strip — a tenfold increase in
-# circuit depth, and hence in wall-clock time, for no measurable gain in the
-# converged field. The configured ε is preserved verbatim in the reported
-# metrics; only the strip solves are floored.
-MAX_TROTTER_STEPS_2D = 10
-EPSILON_FLOOR_2D     = 1.0 / MAX_TROTTER_STEPS_2D
-
-
-# ── 2D Execution Orchestration ────────────────────────────────────────────────
-
-def build_problem_2d(cfg: SimConfig2D) -> PoissonLine2D:
+def _build_problem_2nd(
+    N: int,
+    source_fn: str,
+    alpha: float,
+    beta: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, Optional[np.ndarray]]:
     """
-    Assembles the line-decomposed 2D Poisson problem for a sweep configuration.
+    Build the 2nd-order 1D Poisson problem.
 
-    The source function is evaluated at the interior nodes of the unit square
-    and handed to `PoissonLine2D` in the physical (unscaled) convention, in
-    which the operator carries the 1/dx² and 1/dy² factors rather than the
-    right-hand side carrying h². On the square meshes used throughout the 2D
-    sweeps (dx = dy = h) this is algebraically identical to the h²-scaled form
-    (diagonal −4, off-diagonal 1, right-hand side h²·f) of the reference
-    literature, and yields bit-identical solutions.
+    Returns (A, b, x, kappa, u_exact).
+    u_exact is None if no analytical solution exists.
+    """
+    from problems.poisson_1d import PoissonProblem1D
+    from core.config import SimConfig1D
+    from core.exact_solutions import EXACT_SOLUTIONS_1D
+
+    cfg = SimConfig1D(N=N, epsilon=0.01, source_fn=source_fn,
+                      alpha=alpha, beta=beta)
+    prob = PoissonProblem1D(cfg)
+
+    exact_fn = EXACT_SOLUTIONS_1D.get(source_fn)
+    u_exact = exact_fn(prob.x) if (exact_fn and alpha == 0.0 and beta == 0.0) else None
+
+    return prob.A, prob.b, prob.x, prob.kappa, u_exact
+
+
+def _build_problem_4th(
+    N: int,
+    source_fn: str,
+    alpha: float,
+    beta: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, Optional[np.ndarray]]:
+    """
+    Build the 4th-order 1D Poisson problem.
+
+    Returns (A, b, x, kappa, u_exact).
+    """
+    from problems.poisson_1d_4th import PoissonProblem1D4th
+
+    prob = PoissonProblem1D4th(N=N, source_fn=source_fn,
+                               alpha=alpha, beta=beta)
+    u_exact = prob.exact_solution()
+    return prob.A, prob.b, prob.x, prob.kappa, u_exact
+
+
+# ── Thomas reference solver ───────────────────────────────────────────────────
+
+def _run_thomas(
+    A: np.ndarray,
+    b: np.ndarray,
+) -> tuple[np.ndarray, float, float]:
+    """
+    Solve using NumPy's direct solver as the Thomas reference.
+
+    Returns (u_thomas, residual, wall_time_s).
+    NumPy's solver is used rather than the Thomas algorithm module to
+    handle both tridiagonal and pentadiagonal systems without branching.
+    """
+    t0 = time.perf_counter()
+    u = np.linalg.solve(A, b)
+    wall = time.perf_counter() - t0
+    return u, compute_residual(A, u, b), wall
+
+
+# ── Quantum solver wrappers ───────────────────────────────────────────────────
+
+def _run_hhl(
+    A: np.ndarray,
+    b: np.ndarray,
+    epsilon: float = 0.01,
+    extract_circuits: bool = True,
+) -> tuple[Optional[np.ndarray], float, float, dict]:
+    """
+    Run HHL and return (u, residual, wall_time_s, extra_fields).
+    extra_fields contains all HHL-specific BenchmarkResult fields.
+    """
+    from solvers.quantum.hhl_1d import hhl_solve_system, HHLConfig1D
+    from benchmark.metrics import extract_circuit_metrics
+
+    cfg = HHLConfig1D(epsilon=epsilon)
+    t0 = time.perf_counter()
+    try:
+        result = hhl_solve_system(A, b, config=cfg)
+        wall = time.perf_counter() - t0
+        u = np.array(result.solution)
+
+        extra: dict = {
+            "hhl_epsilon":       epsilon,
+            "hhl_trotter_steps": int(np.ceil(1.0 / epsilon)),
+        }
+
+        # Proportionality recovery residual
+        if hasattr(result, "raw_state") and result.raw_state is not None:
+            Ax_raw = A @ result.raw_state
+            c_val  = float(np.dot(b, Ax_raw) / (np.dot(Ax_raw, Ax_raw) + 1e-300))
+            extra["proportionality_residual"] = compute_residual(
+                A, c_val * result.raw_state, b
+            )
+
+        if extract_circuits and hasattr(result, "circuit"):
+            try:
+                extra["circuit_metrics"] = extract_circuit_metrics(
+                    result.circuit, optimisation_level=1
+                )
+            except Exception as e:
+                log.warning("  HHL circuit extraction failed: %s", e)
+
+        return u, compute_residual(A, u, b), wall, extra
+
+    except Exception as exc:
+        log.warning("  HHL failed (epsilon=%.4f): %s", epsilon, exc)
+        return None, float("nan"), time.perf_counter() - t0, {}
+
+
+def _run_vqls(
+    A: np.ndarray,
+    b: np.ndarray,
+    n_layers: int = 2,
+    n_restarts: int = 3,
+    extract_circuits: bool = True,
+) -> tuple[Optional[np.ndarray], float, float, dict]:
+    """
+    Run VQLS and return (u, residual, wall_time_s, extra_fields).
+    """
+    from solvers.quantum.vqls_1d import vqls_solve_system, VQLSConfig1D
+    from benchmark.metrics import extract_circuit_metrics
+
+    cfg = VQLSConfig1D(n_layers=n_layers, n_restarts=n_restarts)
+    t0 = time.perf_counter()
+    try:
+        result = vqls_solve_system(A, b, config=cfg)
+        wall = time.perf_counter() - t0
+        u = np.array(result.solution)
+
+        extra: dict = {
+            "vqls_n_layers":      n_layers,
+            "vqls_n_restarts":    n_restarts,
+            "vqls_cost_final":    float(result.final_cost),
+            "vqls_n_evaluations": getattr(result, "n_evaluations", None),
+            "vqls_converged":     getattr(result, "converged", None),
+        }
+
+        if extract_circuits and hasattr(result, "circuit"):
+            try:
+                extra["circuit_metrics"] = extract_circuit_metrics(
+                    result.circuit, optimisation_level=1
+                )
+            except Exception as e:
+                log.warning("  VQLS circuit extraction failed: %s", e)
+
+        return u, compute_residual(A, u, b), wall, extra
+
+    except Exception as exc:
+        log.warning("  VQLS failed (n_layers=%d): %s", n_layers, exc)
+        return None, float("nan"), time.perf_counter() - t0, {}
+
+
+def _run_qsvt(
+    A: np.ndarray,
+    b: np.ndarray,
+    max_degree: Optional[int] = None,
+    epsilon: float = 0.01,
+    extract_circuits: bool = True,
+) -> tuple[Optional[np.ndarray], float, float, dict]:
+    """
+    Run QSVT and return (u, residual, wall_time_s, extra_fields).
+    """
+    from solvers.quantum.qsvt_1d import qsvt_solve_system, QSVTConfig1D
+    from benchmark.metrics import extract_circuit_metrics
+
+    cfg = QSVTConfig1D(epsilon=epsilon, max_degree=max_degree,
+                       angle_method="auto")
+    t0 = time.perf_counter()
+    try:
+        result = qsvt_solve_system(A, b, config=cfg)
+        wall = time.perf_counter() - t0
+        u = np.array(result.solution)
+
+        alpha_sub = float(np.linalg.norm(A, ord=2))
+        kappa_val = float(
+            np.abs(np.linalg.eigvalsh(A)).max()
+            / np.abs(np.linalg.eigvalsh(A)).min()
+        )
+
+        extra: dict = {
+            "qsvt_polynomial_degree": getattr(result, "degree", None),
+            "qsvt_max_degree_cap":    max_degree,
+            "qsvt_subnormalisation":  alpha_sub,
+            "qsvt_kappa_eff":         kappa_val * alpha_sub,
+            "qsvt_angle_method":      "auto",
+            "qsvt_phase_from_cache":  getattr(result, "phase_from_cache", None),
+            "phase_lookup_time_s":    getattr(result, "phase_lookup_time_s", None),
+        }
+
+        if hasattr(result, "raw_state") and result.raw_state is not None:
+            Ax_raw = A @ result.raw_state
+            c_val  = float(np.dot(b, Ax_raw) / (np.dot(Ax_raw, Ax_raw) + 1e-300))
+            extra["proportionality_residual"] = compute_residual(
+                A, c_val * result.raw_state, b
+            )
+
+        if extract_circuits and hasattr(result, "circuit"):
+            try:
+                extra["circuit_metrics"] = extract_circuit_metrics(
+                    result.circuit, optimisation_level=1
+                )
+            except Exception as e:
+                log.warning("  QSVT circuit extraction failed: %s", e)
+
+        return u, compute_residual(A, u, b), wall, extra
+
+    except Exception as exc:
+        log.warning("  QSVT failed (max_degree=%s): %s", max_degree, exc)
+        return None, float("nan"), time.perf_counter() - t0, {}
+
+
+# ── Primary 1D sweep ──────────────────────────────────────────────────────────
+
+def run_primary_1d(
+    cases: list[dict],
+    N_values: list[int],
+    solvers: list[str],
+    archive: Optional[SweepArchive] = None,
+    extract_circuits: bool = True,
+    hhl_epsilon: float = 0.01,
+    vqls_n_layers: int = 2,
+    vqls_n_restarts: int = 3,
+    qsvt_max_degree: Optional[int] = None,
+    qsvt_epsilon: float = 0.01,
+    discretisation_order: int = 2,
+    backend_name: str = "aer_statevector",
+    hardware_run: bool = False,
+    backend_shots: Optional[int] = None,
+) -> list[BenchmarkResult]:
+    """
+    Run the primary 1D benchmark sweep.
+
+    For each (case, N, solver) combination:
+      1. Build the problem (2nd or 4th order).
+      2. Run the Thomas algorithm and store as reference.
+      3. Run each quantum solver and compute all metrics.
+      4. Write results to the archive incrementally.
 
     Parameters
     ----------
-    cfg : SimConfig2D
-        Sweep configuration supplying N, the source function identifier and the
-        four Dirichlet boundary values.
+    cases : list[dict]
+        Each dict must contain: 'case_id', 'source_fn', 'alpha', 'beta'.
+    N_values : list[int]
+        Problem sizes to sweep.
+    solvers : list[str]
+        Solvers to run: any subset of ['thomas', 'hhl', 'vqls', 'qsvt'].
+    archive : SweepArchive, optional
+        If provided, results are written incrementally after each solve.
+    extract_circuits : bool
+        If True, extract circuit metrics (adds transpilation overhead).
+    hhl_epsilon : float
+        HHL QPE precision parameter for the primary sweep.
+    vqls_n_layers : int
+        VQLS ansatz layers for the primary sweep.
+    vqls_n_restarts : int
+        VQLS restart count for the primary sweep.
+    qsvt_max_degree : int or None
+        QSVT polynomial degree cap. None = uncapped.
+    qsvt_epsilon : float
+        QSVT approximation precision.
+    discretisation_order : int
+        Spatial discretisation order: 2 or 4.
+    backend_name : str
+        Backend identifier for metadata.
+    hardware_run : bool
+        True if running on real hardware.
+    backend_shots : int or None
+        Shot count for hardware runs.
 
     Returns
     -------
-    problem : PoissonLine2D
-        (N, N) line-decomposed problem instance.
+    list[BenchmarkResult]
+        All results from the sweep.
     """
-    N = cfg.N
-    h = 1.0 / (N + 1)
-    coords = np.arange(1, N + 1) * h
-    X, Y = np.meshgrid(coords, coords, indexing="ij")
-
-    return PoissonLine2D(
-        SOURCE_FUNCTIONS_2D[cfg.source_fn](X, Y),
-        Lx=1.0, Ly=1.0,
-        bc_x0=cfg.bc_x0, bc_x1=cfg.bc_x1,
-        bc_y0=cfg.bc_y0, bc_y1=cfg.bc_y1,
-    )
-
-
-def reporting_config_2d(cfg: SimConfig2D) -> Config2D:
-    """Projects a sweep configuration onto the reporting fields of `Config2D`."""
-    return Config2D(
-        N=cfg.N,
-        source_fn=cfg.source_fn,
-        epsilon=cfg.epsilon,
-        bc_x0=cfg.bc_x0, bc_x1=cfg.bc_x1,
-        bc_y0=cfg.bc_y0, bc_y1=cfg.bc_y1,
-    )
-
-
-def run_pair_2d(
-    cfg          : SimConfig2D,
-    run_vqls     : bool = True,
-    vqls_options : dict | None = None,
-) -> tuple:
-    """
-    Builds the 2D problem, solves it with Thomas, HHL and optionally VQLS strip
-    solvers under the line-Jacobi outer scheme, and returns all benchmark results.
-
-    The high-fidelity reference solution is computed once via
-    `benchmark.reference_2d.fine_mesh_reference` and shared between every error
-    computation: it is independent of the solver under evaluation and is the
-    single most expensive classical step of a 2D configuration.
-
-    All three solvers are driven through `solvers.outer.solve` against the same
-    `PoissonLine2D` instance, differing only in the inner strip solver. This
-    guarantees that the comparison isolates the strip solver — identical outer
-    iteration, identical stopping test, identical right-hand side assembly.
-
-    Parameters
-    ----------
-    cfg : SimConfig2D
-        Problem configuration, supplying the mesh, source term, boundary data,
-        precision parameter and outer-iteration controls.
-    run_vqls : bool, default=True
-        Whether to additionally execute the VQLS strip solver.
-    vqls_options : dict, optional
-        Options forwarded to the VQLS strip solver, validated against the
-        registry declared in `solvers/outer/inner.py`. Unset entries retain the
-        defaults of `VQLSConfig1D`.
-
-    Returns
-    -------
-    tuple of BenchmarkResult2D
-        (thomas_br, hhl_br) if `run_vqls` is False, else
-        (thomas_br, hhl_br, vqls_br).
-
-    Notes
-    -----
-    Stagnation detection is disabled for these sweeps by setting `patience`
-    beyond the iteration ceiling. The detector exists to abort an outer loop
-    that has reached its inner solver's error floor, which is the correct
-    default for exploratory HPC runs; here it would suppress precisely the
-    non-converging residual histories that Section IV F of the reference
-    literature sets out to reproduce.
-    """
-    problem = build_problem_2d(cfg)
-    report_cfg = reporting_config_2d(cfg)
-
-    print(
-        f"\n  → 2D N={cfg.N}, f={cfg.source_fn}, "
-        f"BCs=({cfg.bc_x0},{cfg.bc_x1},{cfg.bc_y0},{cfg.bc_y1}), "
-        f"ε={cfg.epsilon:.4g}, tol={cfg.tol:.1e}, "
-        f"κ(A_row)={problem.kappa_row():.4f}"
-    )
-
-    t0    = time.perf_counter()
-    u_ref = fine_mesh_reference(
-        SOURCE_FUNCTIONS_2D[cfg.source_fn], cfg.N,
-        bc_x0=cfg.bc_x0, bc_x1=cfg.bc_x1,
-        bc_y0=cfg.bc_y0, bc_y1=cfg.bc_y1,
-    )
-    print(f"     Reference solve: {time.perf_counter() - t0:.2f}s")
-
-    outer_kwargs = dict(
-        scheme=SWEEP_SCHEME_2D,
-        tol=cfg.tol,
-        max_iter=cfg.max_iter,
-        patience=cfg.max_iter + 1,
-    )
-
-    results: list[BenchmarkResult2D] = []
-
-    for label, inner, inner_options in _solver_plan_2d(cfg, run_vqls, vqls_options):
-        t0 = time.perf_counter()
-        sr = outer_solve(problem, inner=inner, inner_options=inner_options,
-                         **outer_kwargs)
-        elapsed = time.perf_counter() - t0
-        print(
-            f"     {label:<10} {elapsed:>8.2f}s, "
-            f"{sr.n_outer:>4} iterations, "
-            f"converged={sr.converged}, stop={sr.stop_reason}"
-        )
-        results.append(
-            compute_errors_2d(problem, sr, report_cfg, label, u_reference=u_ref)
-        )
-
-    return tuple(results)
-
-
-# ── 1D Benchmark Sweeps ───────────────────────────────────────────────────────
-
-def sweep_a() -> list[BenchmarkResult]:
-    """
-    Executes Sweep A: Homogeneous boundary conditions (Reference Section IV A).
-    Evaluates all source functions across varied spatial resolutions at ε = 0.01.
-    """
-    print("\n" + "=" * 70)
-    print("SWEEP A — 1D Homogeneous BCs, ε=0.01")
-    print("=" * 70)
-
-    configs = [
-        SimConfig1D(N=N, epsilon=0.01, source_fn=fn)
-        for fn in ("fS", "fL", "fH")
-        for N  in (8, 16)
-    ]
-    return _run_1d_sweep(configs)
-
-
-def sweep_b() -> list[BenchmarkResult]:
-    """
-    Executes Sweep B: Precision sensitivity analysis (Reference Section IV D).
-    Examines the impact of Trotterisation variance on system error vectors.
-    """
-    print("\n" + "=" * 70)
-    print("SWEEP B — 1D ε sensitivity, N=16")
-    print("=" * 70)
-
-    configs = [
-        SimConfig1D(N=16, epsilon=eps, source_fn=fn)
-        for fn  in ("fL", "fH")
-        for eps in (0.1, 0.01, 0.001)
-    ]
-    return _run_1d_sweep(configs)
-
-
-def sweep_c() -> list[BenchmarkResult]:
-    """
-    Executes Sweep C: Non-homogeneous boundary conditions (Reference Section IV B).
-    Assesses algorithmic stability under asymmetric Dirichlet constraints.
-    """
-    print("\n" + "=" * 70)
-    print("SWEEP C — 1D Non-homogeneous BCs")
-    print("=" * 70)
-
-    configs = [
-        SimConfig1D(N=16, epsilon=0.005,  source_fn="fH", alpha=0.0,  beta=0.5),
-        SimConfig1D(N=16, epsilon=0.005,  source_fn="fH", alpha=-0.5, beta=0.5),
-        SimConfig1D(N=32, epsilon=0.0038, source_fn="fH", alpha=0.0,  beta=0.5),
-        SimConfig1D(N=32, epsilon=0.001,  source_fn="fH", alpha=-0.5, beta=0.5),
-    ]
-    return _run_1d_sweep(configs)
-
-
-def sweep_d() -> None:
-    """
-    Executes Sweep D: Condition number scaling verification (Reference Appendix B.1).
-    Validates theoretical κ(A) ~ O(N²) scaling for the 1D TST matrix.
-    """
-    print("\n" + "=" * 70)
-    print("SWEEP D — 1D Condition number scaling")
-    print("=" * 70)
-    print(f"\n  {'N':>4}  {'κ computed':>14}  {'κ theoretical':>16}  {'ratio':>8}")
-    print("  " + "-" * 48)
-    for N in (4, 8, 16, 32):
-        cfg   = SimConfig1D(N=N, epsilon=0.01, source_fn="fS")
-        prob  = PoissonProblem1D(cfg)
-        kappa_c = prob.kappa
-        kappa_t = (4.0 / np.pi**2) * (N + 1)**2
-        print(
-            f"  {N:>4}  {kappa_c:>14.4f}  "
-            f"{kappa_t:>16.4f}  {kappa_c/kappa_t:>8.4f}"
-        )
-
-
-# ── 2D Benchmark Sweeps ───────────────────────────────────────────────────────
-
-def sweep_e() -> list[BenchmarkResult2D]:
-    """
-    Executes Sweep E: 2D Homogeneous boundary conditions (Reference Section IV E).
-
-    Evaluates baseline parameters (ε = 0.01) across all source functions.
-    Maintains strict methodological parity with the literature by simulating
-    a relaxed precision (ε = 0.5) specifically for fS at N=16 to ensure
-    convergence consistency (Reference Figure 12).
-    """
-    print("\n" + "=" * 70)
-    print("SWEEP E — 2D Homogeneous BCs")
-    print("=" * 70)
-
-    configs = [
-        # N=8, all source functions, ε=0.01 (Reference Figure 10)
-        SimConfig2D(N=8, epsilon=0.01, source_fn="fS"),
-        SimConfig2D(N=8, epsilon=0.01, source_fn="fL"),
-        SimConfig2D(N=8, epsilon=0.01, source_fn="fH"),
-        # N=16, fL, ε=0.01 (Converges per literature specification)
-        SimConfig2D(N=16, epsilon=0.01, source_fn="fL", tol=1e-4),              # TODO: Run tol=1e-8 version in remote machine
-        # N=16, fS, ε=0.5 (Reference Figure 12 — relaxed precision required)
-        SimConfig2D(N=16, epsilon=0.5, source_fn="fS", tol=1e-4),
-        # N=16, fH, ε=0.03 (Reference Figure 13)
-        SimConfig2D(N=16, epsilon=0.03, source_fn="fH", tol=1e-4),
-    ]
-    return _run_2d_sweep(configs)
-
-
-def sweep_f() -> list[BenchmarkResult2D]:
-    """
-    Executes Sweep F: 2D Non-homogeneous boundary conditions (Reference Section IV F).
-
-    Investigates algorithmic stability and iterative divergence under specific
-    asymmetric boundary constraints at N=8. The second configuration explicitly
-    imposes an iteration ceiling (max_iter=200) to replicate the non-converging
-    residuals visualised in Figure 15.
-    """
-    print("\n" + "=" * 70)
-    print("SWEEP F — 2D Non-homogeneous BCs, N=8")
-    print("=" * 70)
-
-    configs = [
-        # Reference Figure 14: fH, complex asymmetric boundaries
-        SimConfig2D(
-            N=8, epsilon=0.01, source_fn="fH",
-            bc_x0=0.5, bc_x1=0.0,
-            bc_y0=0.0, bc_y1=0.0,
-        ),
-        # Reference Figure 15: fS, asymmetric boundaries (divergence anticipated)
-        SimConfig2D(
-            N=8, epsilon=0.01, source_fn="fS",
-            bc_x0=0.0,  bc_x1=0.08,
-            bc_y0=0.08, bc_y1=0.0,
-            max_iter=200,
-        ),
-        # Reference Figure 16: fS, symmetric boundaries (convergence anticipated)
-        SimConfig2D(
-            N=8, epsilon=0.01, source_fn="fS",
-            bc_x0=0.0,  bc_x1=0.08,
-            bc_y0=0.0,  bc_y1=0.08,
-        ),
-    ]
-    return _run_2d_sweep(configs)
-
-
-def sweep_g() -> None:
-    """
-    Executes Sweep G: Condition number scaling verification for the 2D operator.
-
-    Validates the analytical derivation (Appendix B.1) demonstrating that the
-    condition number of the 2D line-Jacobi sub-matrix (a=-4, b=1) approaches
-    a limit of 3 as N → ∞, contrasting the O(N²) divergence of the 1D system.
-    """
-    print("\n" + "=" * 70)
-    print("SWEEP G — 2D row matrix condition number (κ → 3 as N → ∞)")
-    print("=" * 70)
-    print(
-        f"\n  {'N':>4}  {'κ_1D':>10}  {'κ_2D_row':>12}  "
-        f"{'κ_2D theoretical':>18}"
-    )
-    print("  " + "-" * 50)
-    for N in (4, 8, 16, 32):
-        cfg_1d  = SimConfig1D(N=N, epsilon=0.01, source_fn="fS")
-        prob_1d = PoissonProblem1D(cfg_1d)
-        kappa_1d  = prob_1d.kappa
-
-        # The strip operator is independent of the source term and the boundary
-        # data, so a zero source suffices to instantiate it. The condition
-        # number is invariant under the uniform h² rescaling that separates the
-        # physical convention of PoissonLine2D from the scaled convention of the
-        # reference literature, so the two formulations agree exactly.
-        kappa_2d  = PoissonLine2D(np.zeros((N, N))).kappa_row()
-
-
-        # Theoretical limit evaluation: (6 - (π/(N+1))²) / (2 + (π/(N+1))²)
-        theta     = np.pi / (N + 1)
-        kappa_2d_t = (6 - theta**2) / (2 + theta**2)
-        print(
-            f"  {N:>4}  {kappa_1d:>10.4f}  {kappa_2d:>12.6f}  "
-            f"{kappa_2d_t:>18.6f}"
-        )
-
-
-# ── Data Exportation ──────────────────────────────────────────────────────────
-
-def save_to_csv_1d(results: list[BenchmarkResult], filename: str) -> None:
-    """Serialises aggregated 1D benchmark scalar metrics to a CSV format."""
-    RESULTS_DIR.mkdir(exist_ok=True)
-    filepath = RESULTS_DIR / filename
-    fieldnames = [
-        "solver", "N", "source_fn", "alpha", "beta", "epsilon",
-        "max_rel_error_pct", "avg_rel_error_pct",
-        "max_abs_error", "avg_abs_error",
-        "euclidean_residual", "prop_const",
-    ]
-    with open(filepath, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for r in results:
-            cfg = r.config
-            writer.writerow({
-                "solver":             r.solver,
-                "N":                  cfg.N,
-                "source_fn":          cfg.source_fn,
-                "alpha":              cfg.alpha,
-                "beta":               cfg.beta,
-                "epsilon":            cfg.epsilon,
-                "max_rel_error_pct":  r.max_rel_error,
-                "avg_rel_error_pct":  r.avg_rel_error,
-                "max_abs_error":      r.max_abs_error,
-                "avg_abs_error":      r.avg_abs_error,
-                "euclidean_residual": r.euclidean_residual,
-                "prop_const":         r.prop_const,
-            })
-    print(f"\n  Saved to {filepath}")
-
-
-def save_to_csv_2d(results: list[BenchmarkResult2D], filename: str) -> None:
-    """Serialises aggregated 2D benchmark scalar metrics to a CSV format."""
-    RESULTS_DIR.mkdir(exist_ok=True)
-    filepath = RESULTS_DIR / filename
-    fieldnames = [
-        "solver", "N", "source_fn", "epsilon",
-        "bc_x0", "bc_x1", "bc_y0", "bc_y1",
-        "max_rel_error_pct", "avg_rel_error_pct",
-        "max_abs_error", "avg_abs_error",
-        "iterations", "converged", "euclidean_residual",
-    ]
-    with open(filepath, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for r in results:
-            cfg = r.config
-            writer.writerow({
-                "solver":             r.solver,
-                "N":                  cfg.N,
-                "source_fn":          cfg.source_fn,
-                "epsilon":            cfg.epsilon,
-                "bc_x0":              cfg.bc_x0,
-                "bc_x1":              cfg.bc_x1,
-                "bc_y0":              cfg.bc_y0,
-                "bc_y1":              cfg.bc_y1,
-                "max_rel_error_pct":  r.max_rel_error,
-                "avg_rel_error_pct":  r.avg_rel_error,
-                "max_abs_error":      r.max_abs_error,
-                "avg_abs_error":      r.avg_abs_error,
-                "iterations":         r.iterations,
-                "converged":          r.converged,
-                "euclidean_residual": r.euclidean_residual,
-            })
-    print(f"\n  Saved to {filepath}")
-
-
-# ── Private Utility Methods ───────────────────────────────────────────────────
-
-def _run_1d_sweep(configs: list[SimConfig1D]) -> list[BenchmarkResult]:
-    """Evaluates sequential configurations via 1D Thomas and HHL algorithms."""
+    build_fn = _build_problem_2nd if discretisation_order == 2 else _build_problem_4th
     all_results: list[BenchmarkResult] = []
-    for cfg in configs:
-        thomas_br, hhl_br = run_pair_1d(cfg)
-        all_results.extend([thomas_br, hhl_br])
+
+    for case in cases:
+        case_id   = case["case_id"]
+        source_fn = case["source_fn"]
+        alpha     = case.get("alpha", 0.0)
+        beta      = case.get("beta",  0.0)
+
+        for N in N_values:
+            log.info(
+                "Primary sweep: case=%s  N=%d  order=%d",
+                case_id, N, discretisation_order,
+            )
+
+            try:
+                A, b, x, kappa, u_exact = build_fn(N, source_fn, alpha, beta)
+            except Exception as exc:
+                log.error("  Problem build failed: %s", exc)
+                continue
+
+            # Thomas reference (always run first)
+            u_thomas, r_thomas, t_thomas = _run_thomas(A, b)
+            rec_thomas = _build_base_result(
+                case_id=case_id, solver="thomas", N=N, kappa=kappa,
+                source_fn=source_fn, alpha_bc=alpha, beta_bc=beta,
+                discretisation_order=discretisation_order,
+                u_solver=u_thomas, A=A, b=b,
+                u_thomas=u_thomas, u_exact=u_exact,
+                wall_time_s=t_thomas, r_target=None,
+                backend_name="numpy_direct", hardware_run=False,
+            )
+            if "thomas" in solvers:
+                all_results.append(rec_thomas)
+                if archive:
+                    archive.write_solution(
+                        case_id, "thomas", N, x, u_thomas, u_exact,
+                        discretisation_order=discretisation_order,
+                    )
+                    archive.append_primary([rec_thomas])
+
+            # Quantum solvers
+            solver_dispatch = {
+                "hhl":  lambda: _run_hhl(A, b, epsilon=hhl_epsilon,
+                                         extract_circuits=extract_circuits),
+                "vqls": lambda: _run_vqls(A, b, n_layers=vqls_n_layers,
+                                          n_restarts=vqls_n_restarts,
+                                          extract_circuits=extract_circuits),
+                "qsvt": lambda: _run_qsvt(A, b, max_degree=qsvt_max_degree,
+                                          epsilon=qsvt_epsilon,
+                                          extract_circuits=extract_circuits),
+            }
+
+            for solver in solvers:
+                if solver == "thomas":
+                    continue
+                if solver not in solver_dispatch:
+                    log.warning("  Unknown solver '%s'; skipping.", solver)
+                    continue
+
+                log.info("  Running %s...", solver.upper())
+                u_sol, residual, wall, extra = solver_dispatch[solver]()
+
+                if u_sol is None:
+                    log.warning("  %s returned no solution; skipping.", solver.upper())
+                    continue
+
+                rec = _build_base_result(
+                    case_id=case_id, solver=solver, N=N, kappa=kappa,
+                    source_fn=source_fn, alpha_bc=alpha, beta_bc=beta,
+                    discretisation_order=discretisation_order,
+                    u_solver=u_sol, A=A, b=b,
+                    u_thomas=u_thomas, u_exact=u_exact,
+                    wall_time_s=wall, r_target=None,
+                    backend_name=backend_name,
+                    hardware_run=hardware_run,
+                    backend_shots=backend_shots,
+                )
+
+                # Apply extra fields from solver wrapper
+                for field_name, field_val in extra.items():
+                    if hasattr(rec, field_name):
+                        setattr(rec, field_name, field_val)
+
+                all_results.append(rec)
+                log.info(
+                    "  %s: residual=%.4e  err_vs_exact=%s%%  time=%.2fs",
+                    solver.upper(), rec.residual,
+                    f"{rec.max_rel_err_vs_exact:.3f}"
+                    if rec.max_rel_err_vs_exact else "N/A",
+                    wall,
+                )
+
+                if archive:
+                    archive.write_solution(
+                        case_id, solver, N, x, u_sol, u_exact, u_thomas,
+                        discretisation_order=discretisation_order,
+                    )
+                    archive.append_primary([rec])
+
     return all_results
 
 
-def _solver_plan_2d(
-    cfg          : SimConfig2D,
-    run_vqls     : bool,
-    vqls_options : dict | None,
-) -> list[tuple[str, str, dict]]:
-    """
-    Enumerates the (display label, inner solver, inner options) triples to run.
+# ── Equal-accuracy sweep ──────────────────────────────────────────────────────
 
-    The HHL entry applies the Trotter step floor documented at EPSILON_FLOOR_2D:
-    the strip solves receive max(cfg.epsilon, EPSILON_FLOOR_2D) whilst the
-    configured ε is reported unaltered.
+def run_equal_accuracy_1d(
+    cases: list[dict],
+    N_values: list[int],
+    solvers: list[str],
+    archive: Optional[SweepArchive] = None,
+    r_target: float = DEFAULT_R_TARGET,
+    band_factor: float = DEFAULT_BAND_FACTOR,
+    hhl_epsilon_grid: list[float] = HHL_EPSILON_GRID,
+    vqls_n_layers_grid: list[int] = VQLS_NLAYERS_GRID,
+    qsvt_max_degree_grid: list[Optional[int]] = QSVT_MAXDEGREE_GRID,
+    extract_circuits: bool = True,
+    discretisation_order: int = 2,
+    backend_name: str = "aer_statevector",
+    hardware_run: bool = False,
+    backend_shots: Optional[int] = None,
+) -> list[EqualAccuracyResult]:
+    """
+    Run the equal-accuracy protocol for all (case, N, solver) combinations.
 
     Parameters
     ----------
-    cfg : SimConfig2D
-        Sweep configuration.
-    run_vqls : bool
-        Whether to append the VQLS entry.
-    vqls_options : dict, optional
-        Options forwarded to the VQLS strip solver.
+    cases : list[dict]
+        Problem cases (same format as run_primary_1d).
+    N_values : list[int]
+        Problem sizes. Recommended: [4, 8] for equal-accuracy runs
+        (the parameter sweep multiplies the solver call count by 5–10×).
+    solvers : list[str]
+        Quantum solvers to sweep: subset of ['hhl', 'vqls', 'qsvt'].
+        Thomas is excluded (it achieves machine-precision residuals that
+        are unreachable by quantum solvers).
+    archive : SweepArchive, optional
+        If provided, results are written after each solver sweep.
+    r_target : float
+        Target relative residual.
+    band_factor : float
+        Acceptance band multiplier.
 
     Returns
     -------
-    plan : list[tuple[str, str, dict]]
-        Ordered execution plan. The classical entry is always first so its
-        timing anchors the console table.
+    list[EqualAccuracyResult]
+        One result per (case, N, solver) combination.
     """
-    plan = [
-        ("Thomas-2D", "thomas", {}),
-        ("HHL-2D",    "hhl",    {"epsilon": max(cfg.epsilon, EPSILON_FLOOR_2D)}),
-    ]
-    if run_vqls:
-        plan.append(("VQLS-2D", "vqls", dict(vqls_options or {})))
-    return plan
+    build_fn = _build_problem_2nd if discretisation_order == 2 else _build_problem_4th
+    all_ea: list[EqualAccuracyResult] = []
+
+    for case in cases:
+        case_id   = case["case_id"]
+        source_fn = case["source_fn"]
+        alpha     = case.get("alpha", 0.0)
+        beta      = case.get("beta",  0.0)
+
+        for N in N_values:
+            log.info(
+                "Equal-accuracy sweep: case=%s  N=%d  r_target=%.2e",
+                case_id, N, r_target,
+            )
+
+            try:
+                A, b, x, kappa, u_exact = build_fn(N, source_fn, alpha, beta)
+            except Exception as exc:
+                log.error("  Problem build failed: %s", exc)
+                continue
+
+            u_thomas, _, _ = _run_thomas(A, b)
+
+            common_kwargs = dict(
+                A=A, b=b, u_thomas=u_thomas, u_exact=u_exact,
+                case_id=case_id, N=N, kappa=kappa,
+                source_fn=source_fn, alpha_bc=alpha, beta_bc=beta,
+                discretisation_order=discretisation_order,
+                r_target=r_target, band_factor=band_factor,
+                extract_circuits=extract_circuits,
+                backend_name=backend_name,
+                hardware_run=hardware_run,
+                backend_shots=backend_shots,
+            )
+
+            sweep_dispatch = {
+                "hhl":  lambda: sweep_hhl_equal_accuracy(
+                    **common_kwargs, epsilon_grid=hhl_epsilon_grid
+                ),
+                "vqls": lambda: sweep_vqls_equal_accuracy(
+                    **common_kwargs, n_layers_grid=vqls_n_layers_grid
+                ),
+                "qsvt": lambda: sweep_qsvt_equal_accuracy(
+                    **common_kwargs, max_degree_grid=qsvt_max_degree_grid
+                ),
+            }
+
+            for solver in solvers:
+                if solver == "thomas":
+                    continue
+                if solver not in sweep_dispatch:
+                    log.warning("  Unknown solver '%s'; skipping.", solver)
+                    continue
+
+                try:
+                    ear = sweep_dispatch[solver]()
+                    all_ea.append(ear)
+                    log.info(
+                        "  %s: best_r=%.4e  in_band=%s  calls=%d",
+                        solver.upper(), ear.best_result.residual,
+                        ear.in_band, ear.n_solver_calls,
+                    )
+                    if archive:
+                        archive.write_equal_accuracy(all_ea)
+                except Exception as exc:
+                    log.error(
+                        "  Equal-accuracy sweep failed for %s: %s", solver, exc
+                    )
+
+    return all_ea
 
 
-def _run_2d_sweep(configs: list[SimConfig2D]) -> list[BenchmarkResult2D]:
+# ── Sensitivity sweep ─────────────────────────────────────────────────────────
+
+def run_sensitivity_1d(
+    cases: list[dict],
+    N_values: list[int],
+    solvers: list[str],
+    archive: Optional[SweepArchive] = None,
+    extract_circuits: bool = True,
+    discretisation_order: int = 2,
+    backend_name: str = "aer_statevector",
+    hardware_run: bool = False,
+    backend_shots: Optional[int] = None,
+) -> dict[str, list[SensitivitySweepResult]]:
     """
-    Evaluates configurations in sequence with the Thomas and HHL inner solvers
-    under the line-Jacobi outer scheme.
+    Run OAT sensitivity sweeps for all specified solvers.
 
-    VQLS is deliberately excluded from the sweeps. The 2D reporting and plotting
-    layers consume a flat list of alternating (Thomas, HHL) pairs — see
-    `_plot_2d_pairs` — so a third solver per configuration would silently
-    misalign every pair. Run VQLS through `run_pair_2d(cfg, run_vqls=True)`
-    directly when it is required.
-    """
-    all_results: list[BenchmarkResult2D] = []
-    for cfg in configs:
-        thomas_br, hhl_br = run_pair_2d(cfg, run_vqls=False)
-        all_results.extend([thomas_br, hhl_br])
-    return all_results
-
-
-def _plot_1d_pairs(
-    results: list[BenchmarkResult],
-    save_fig: bool = False,
-) -> None:
-    """Iterates through alternating (Thomas, HHL) pairs to trigger 1D rendering."""
-    for i in range(0, len(results), 2):
-        plot_solution_comparison_1d(results[i], results[i + 1], save_fig)
-
-
-def _plot_2d_pairs(
-    results:            list[BenchmarkResult2D],
-    use_relative_error: bool = True,
-    save_fig:           bool = False,
-) -> None:
-    """
-    Iterates through alternating (Thomas, HHL) pairs to trigger 2D contour
-    mapping and iterative convergence rendering.
-    """
-    for i in range(0, len(results), 2):
-        thomas_br = results[i]
-        hhl_br    = results[i + 1]
-
-        plot_solution_contours_2d(
-            thomas_br, hhl_br,
-            use_relative_error=use_relative_error,
-            save_fig=save_fig,
-        )
-
-        plot_convergence_history(
-            [thomas_br, hhl_br],
-            save_fig=save_fig,
-        )
-
-
-# ── 1D Execution Orchestration ────────────────────────────────────────────────
-
-def run_pair_1d(
-    cfg:         SimConfig1D,
-    run_vqls:    bool       = True,
-    vqls_config: "VQLSConfig1D" = None,
-) -> tuple:
-    """
-    Instantiates the 1D problem and sequentially executes classical Thomas,
-    quantum HHL, and optionally VQLS resolutions, aggregating the resultant metrics.
-
-    Returns a dynamically sized tuple containing the benchmark data structures
-    contingent upon the `run_vqls` execution flag.
+    Sensitivity analysis is restricted to N ∈ {4, 8} in practice.
+    This function does not enforce this restriction, but the caller
+    should pass only small N values to keep runtime tractable.
 
     Parameters
     ----------
-    cfg : SimConfig1D
-        Configuration parameters governing the 1D simulation instance.
-    run_vqls : bool, default=True
-        Boolean flag dictating the execution of the Variational Quantum Linear Solver.
-    vqls_config : VQLSConfig1D, optional
-        Hyperparameter structure governing the variational optimisation.
-        Defaults to DEFAULT_VQLS_CONFIG if omitted.
+    cases : list[dict]
+        Problem cases. Sensitivity sweeps use the first case only
+        (typically the canonical fS homogeneous case).
+    N_values : list[int]
+        Problem sizes. Recommended: [4, 8].
+    solvers : list[str]
+        Quantum solvers to sweep.
+    archive : SweepArchive, optional
+        If provided, results are written after each solver sweep.
+
+    Returns
+    -------
+    dict[str, list[SensitivitySweepResult]]
+        Mapping solver -> list of sweep results (one per parameter).
     """
-    from solvers.quantum.vqls_1d import vqls_solve, VQLSConfig1D, DEFAULT_VQLS_CONFIG
+    build_fn = _build_problem_2nd if discretisation_order == 2 else _build_problem_4th
 
-    problem = PoissonProblem1D(cfg)
-    print(f"\n  → {problem.summary()}")
+    # Use only the first case for sensitivity analysis
+    case = cases[0]
+    case_id   = case["case_id"]
+    source_fn = case["source_fn"]
+    alpha     = case.get("alpha", 0.0)
+    beta      = case.get("beta",  0.0)
 
-    # Classical Reference Execution
-    t0        = time.perf_counter()
-    thomas_sr = thomas_solve(problem)
-    t_thomas  = time.perf_counter() - t0
+    all_sensitivity: dict[str, list[SensitivitySweepResult]] = {}
 
-    # Quantum HHL Execution
-    t0     = time.perf_counter()
-    hhl_sr = hhl_solve(problem)
-    t_hhl  = time.perf_counter() - t0
+    for N in N_values:
+        log.info("Sensitivity sweep: case=%s  N=%d", case_id, N)
 
-    print(
-        f"     Thomas: {t_thomas:.3f}s  |  "
-        f"HHL: {t_hhl:.1f}s",
-        end="",
-    )
+        try:
+            A, b, x, kappa, u_exact = build_fn(N, source_fn, alpha, beta)
+        except Exception as exc:
+            log.error("  Problem build failed: %s", exc)
+            continue
 
-    thomas_br = compute_errors(problem, thomas_sr, u_thomas=None)
-    hhl_br    = compute_errors(problem, hhl_sr,    u_thomas=thomas_sr.u)
+        u_thomas, _, _ = _run_thomas(A, b)
 
-    if not run_vqls:
-        print()
-        return thomas_br, hhl_br
+        for solver in solvers:
+            if solver == "thomas":
+                continue
+            log.info("  Solver: %s", solver.upper())
 
-    # Variational Quantum Linear Solver (VQLS) Execution
-    vc = vqls_config if vqls_config is not None else DEFAULT_VQLS_CONFIG
-    t0      = time.perf_counter()
-    vqls_sr = vqls_solve(problem, config=vc)
-    t_vqls  = time.perf_counter() - t0
+            try:
+                sweeps = run_all_sensitivity_sweeps(
+                    solver=solver,
+                    A=A, b=b,
+                    u_thomas=u_thomas, u_exact=u_exact,
+                    case_id=case_id, N=N, kappa=kappa,
+                    source_fn=source_fn, alpha_bc=alpha, beta_bc=beta,
+                    discretisation_order=discretisation_order,
+                    extract_circuits=extract_circuits,
+                    backend_name=backend_name,
+                    hardware_run=hardware_run,
+                    backend_shots=backend_shots,
+                )
+                key = f"{solver}_N{N}"
+                all_sensitivity[key] = sweeps
+                if archive:
+                    archive.write_sensitivity(f"{solver}_N{N}", sweeps)
+            except Exception as exc:
+                log.error("  Sensitivity sweep failed for %s: %s", solver, exc)
 
-    print(
-        f"  |  VQLS: {t_vqls:.1f}s "
-        f"(cost={vqls_sr.final_cost:.4f}, "
-        f"evals={vqls_sr.n_circuit_evals})"
-    )
-
-    vqls_br = compute_errors(problem, vqls_sr, u_thomas=thomas_sr.u)
-
-    return thomas_br, hhl_br, vqls_br
+    return all_sensitivity

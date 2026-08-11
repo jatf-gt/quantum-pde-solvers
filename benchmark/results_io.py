@@ -1,570 +1,444 @@
 """
-On-disk schema for a completed HPC sweep: the contract between the runners that
-write results and the post-processing that reads them.
+On-disk persistence layer for the benchmarking framework.
 
-Why this module exists
-----------------------
-The schema was previously defined nowhere. It was triplicated on the write side
-— three result dataclasses, three solution writers, three metadata writers — and
-re-derived on the read side from bare string literals scattered across
-seventeen plotting functions. The two halves were coupled by nothing but those
-literals, with three consequences:
+Schema contract
+───────────────
+All benchmark output is written to a structured directory tree:
 
-*   The same quantity carries three names. The 1D driver writes ``u_solver``,
-    the 2D driver ``phi_solver`` and the 3D driver ``phi``. The 2D writer papers
-    over this with an explicit alias so that the 1D-era reader keeps working;
-    the alias, rather than any declaration, is the contract.
-*   A filename change breaks the reader silently. Every caller treats a missing
-    archive as "not run", so a renamed file yields an empty figure set rather
-    than an error.
-*   ``run_metadata.json`` is written by all three drivers and read by none.
+  results/<run_tag>/
+    ├── results_full.json          Complete BenchmarkResult list (primary).
+    ├── results_summary.csv        Flat CSV of all primary fields.
+    ├── equal_accuracy.json        EqualAccuracyResult list.
+    ├── sensitivity_<solver>.json  SensitivitySweepResult list per solver.
+    ├── run_metadata.json          Run configuration and environment info.
+    ├── tables/                    LaTeX .tex files (from benchmark/tables.py).
+    ├── figures/                   Saved figures (.pdf, .png).
+    └── solutions/                 Per-solve .npz archives.
+        └── <case_id>_<solver>_N<N>.npz
 
-This module is the single declaration. Reading goes through `SweepArchive`;
-field names go through `FIELD_ALIASES` rather than being spelled at the point of
-use; and `SweepArchive.missing` distinguishes "not run" from "not found",
-which is what makes a silently empty figure set impossible.
+The schema is intentionally flat: all BenchmarkResult fields are stored
+at the top level of each JSON record (CircuitMetrics is flattened with a
+'circuit_' prefix). This allows the CSV to be opened directly in a
+spreadsheet without nested parsing.
 
-Scope
------
-Reader side only, for now. The functions here are written so that the HPC
-runners can adopt them for writing — `solution_filename` is the same convention
-they build by hand — but they are deliberately not yet wired into those drivers,
-because 2D and 3D sweeps are in flight on the cluster and changing what they
-write would strand the results already produced. That migration belongs with the
-move of the runners into `hpc/`.
+Backward compatibility
+──────────────────────
+The reader functions accept both the new BenchmarkResult schema (this
+module) and the legacy schema from earlier runner versions. Legacy fields
+are mapped to their new equivalents where possible; unmapped fields are
+silently ignored.
 
-This module must import no plotting stack. `benchmark/hpc_plotting.py` defers its
-Matplotlib import specifically so that the Agg backend is not forced on a process
-that wants an interactive one, and listing a sweep's contents must not require a
-plotting stack to be installed at all.
-
-Schema summary
---------------
-Each sweep directory contains:
-
-    results_full.json     One record per (case, solver, N). Ten fields are
-                          common to all three dimensions; the rest are
-                          dimension-specific — see `COMMON_ROW_FIELDS`.
-    results_summary.csv   The same rows, flattened. Written but never read.
-    <prefix>_{case}_{solver}_N{N}.npz
-                          One archive per solution, written as it is produced,
-                          so a walltime kill loses the summary but not the data.
-    run_metadata.json     Environment and configuration provenance.
-
-The 1D driver additionally writes ``all_solutions.npz``, a consolidated archive
-that nothing reads.
+References
+──────────
+  Ghafourpour & Laizet (2025) Phys. Rev. Applied 24, 024032.
 """
+
 from __future__ import annotations
 
 import csv
 import json
+import platform
+import sys
+import time
+from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Optional
 
 import numpy as np
 
+from benchmark.metrics import BenchmarkResult, CircuitMetrics
+from benchmark.equal_accuracy import EqualAccuracyResult
+from benchmark.sensitivity import SensitivitySweepResult
 
-# ── Schema Constants ──────────────────────────────────────────────────────────
 
-SOLVER_ORDER: tuple[str, ...] = ("Thomas", "HHL", "VQLS", "QSVT")
-"""Canonical solver ordering. Fixes column order in every field figure, so the
-same solver occupies the same position throughout a sweep. Unrecognised labels
-sort last rather than raising: a sweep may legitimately introduce a solver this
-module has not been told about."""
+# ── Legacy field aliases ──────────────────────────────────────────────────────
+# Maps old field names (from earlier runner versions) to new field names.
+# Used in _dict_to_benchmark_result to maintain backward compatibility.
 
-SOLUTION_PREFIX: dict[int, str] = {1: "solutions", 2: "solutions", 3: "solution3d"}
-"""Filename stem of the solution archives, per dimension. 1D and 2D share a
-stem, so nothing but the containing directory distinguishes their archives."""
-
-COMMON_ROW_FIELDS: frozenset[str] = frozenset({
-    "case", "solver", "N", "max_rel_err", "max_abs_err", "residual",
-    "wall_time_s", "converged", "notes", "rel_l2_err", "rms_err",
-})
-"""The eleven summary fields every dimension writes. Everything else is
-dimension-specific: 1D alone carries circuit metrics (`n_qubits`,
-`circuit_depth`, `success_probability`); 2D and 3D alone carry outer-iteration
-metrics (`scheme`, `n_outer`, `weighted_cost`, `stop_reason`, `linf_err`,
-`err_vs_thomas`). Reading a dimension-specific field from the wrong dimension is
-a KeyError, which is why `row_field` exists."""
-
-FIELD_ALIASES: dict[str, tuple[str, ...]] = {
-    "solution": ("u_solver", "phi_solver", "phi"),
-    "exact":    ("u_exact", "phi_exact"),
-    "source":   ("f_vals", "f"),
+_LEGACY_ALIASES: dict[str, str] = {
+    "max_rel_err":           "max_rel_err_vs_exact",
+    "max_abs_err":           "max_abs_err_vs_exact",
+    "wall_time":             "wall_time_s",
+    "converged":             "vqls_converged",
+    "final_cost":            "vqls_cost_final",
+    "degree":                "qsvt_polynomial_degree",
+    "circuit_depth":         "circuit_depth_opt1",   # flattened
+    "n_qubits":              "circuit_n_qubits",     # flattened
+    "epsilon":               "hhl_epsilon",
+    "trotter_steps":         "hhl_trotter_steps",
+    "n_layers":              "vqls_n_layers",
+    "n_restarts":            "vqls_n_restarts",
 }
-"""
-Names under which the same physical quantity is archived, in preference order.
-
-`solution` is the computed field: 1D writes ``u_solver``, 2D ``phi_solver`` and
-3D ``phi``. The 2D driver also writes a ``u_solver`` alias for backward
-compatibility, so both spellings appear in a 2D archive and the preference order
-decides. `field` resolves these; no caller should spell them directly.
-"""
 
 
-# ── Filename Convention ───────────────────────────────────────────────────────
+# ── BenchmarkResult serialisation ─────────────────────────────────────────────
 
-def solution_filename(case: str, solver: str, N: int, dim: int = 1) -> str:
+def _benchmark_result_to_dict(result: BenchmarkResult) -> dict:
+    """Serialise a BenchmarkResult to a JSON-compatible flat dictionary."""
+    return result.to_dict()
+
+
+def _dict_to_benchmark_result(d: dict) -> BenchmarkResult:
     """
-    Builds the archive filename for one solution.
+    Deserialise a dictionary to a BenchmarkResult.
 
-    This is the convention the three runners currently construct independently.
-    Routing both sides through this function is what makes a rename a loud
-    failure rather than a silently empty figure set.
-
-    Parameters
-    ----------
-    case : str
-        Case identifier as recorded in the summary.
-    solver : str
-        Solver label.
-    N : int
-        Resolution.
-    dim : int
-        Spatial dimension, selecting the filename stem.
-
-    Returns
-    -------
-    str
-        Filename including the ``.npz`` extension.
-
-    Raises
-    ------
-    KeyError
-        If `dim` is not 1, 2 or 3.
+    Handles both the current schema and legacy schemas from earlier runner
+    versions via _LEGACY_ALIASES.
     """
-    return f"{SOLUTION_PREFIX[dim]}_{case}_{solver}_N{N}.npz"
+    # Apply legacy aliases
+    for old, new in _LEGACY_ALIASES.items():
+        if old in d and new not in d:
+            d[new] = d.pop(old)
+
+    # Reconstruct CircuitMetrics from flattened fields
+    cm = None
+    circuit_fields = {
+        k[len("circuit_"):]: v
+        for k, v in d.items()
+        if k.startswith("circuit_") and v is not None
+    }
+    if circuit_fields:
+        try:
+            cm = CircuitMetrics(**circuit_fields)
+        except TypeError:
+            cm = None
+
+    # Remove flattened circuit fields from d before passing to BenchmarkResult
+    d_clean = {k: v for k, v in d.items() if not k.startswith("circuit_")}
+
+    # Fill missing optional fields with None
+    all_fields = BenchmarkResult.__dataclass_fields__
+    for fname in all_fields:
+        if fname not in d_clean:
+            d_clean[fname] = None
+
+    # Enforce required non-optional fields
+    for fname in ("case_id", "solver", "N", "discretisation_order",
+                  "kappa", "source_fn", "alpha_bc", "beta_bc",
+                  "residual", "max_rel_err_vs_thomas",
+                  "max_abs_err_vs_thomas", "wall_time_s"):
+        if d_clean.get(fname) is None:
+            d_clean[fname] = 0 if fname in ("N", "discretisation_order") else (
+                "" if fname in ("case_id", "solver", "source_fn") else 0.0
+            )
+
+    d_clean["circuit_metrics"] = cm
+    d_clean.pop("circuit_metrics", None)   # remove if already present
+
+    try:
+        result = BenchmarkResult(**{
+            k: v for k, v in d_clean.items()
+            if k in all_fields
+        })
+        result.circuit_metrics = cm
+        return result
+    except Exception as exc:
+        raise ValueError(
+            f"Failed to deserialise BenchmarkResult from dict: {exc}\n"
+            f"Dict keys: {list(d_clean.keys())}"
+        ) from exc
 
 
-def field(data: dict, kind: str) -> Optional[np.ndarray]:
-    """
-    Resolves an aliased field from a loaded archive.
-
-    Parameters
-    ----------
-    data : dict
-        Archive contents as returned by `SweepArchive.solution`.
-    kind : str
-        Logical field name, a key of `FIELD_ALIASES`: ``"solution"``,
-        ``"exact"`` or ``"source"``.
-
-    Returns
-    -------
-    np.ndarray or None
-        The first alias present in the archive, or None if none is.
-
-    Raises
-    ------
-    KeyError
-        If `kind` is not a recognised logical field. Unknown field names are
-        rejected rather than returning None, since silently absorbing a typo
-        would present as "this solution has no solution field".
-    """
-    if kind not in FIELD_ALIASES:
-        raise KeyError(
-            f"Unknown field '{kind}'. Valid: {sorted(FIELD_ALIASES)}."
-        )
-    for name in FIELD_ALIASES[kind]:
-        if name in data:
-            return data[name]
-    return None
-
-
-def row_field(row: dict, name: str, default: Any = None) -> Any:
-    """
-    Reads a summary field, tolerating its absence in other dimensions.
-
-    Parameters
-    ----------
-    row : dict
-        One record from `results_full.json`.
-    name : str
-        Field name.
-    default : Any
-        Value returned when the field is absent.
-
-    Returns
-    -------
-    Any
-        The field value, or `default`.
-
-    Raises
-    ------
-    KeyError
-        If `name` is one of `COMMON_ROW_FIELDS` and is nonetheless missing.
-        A common field absent from a row means the file is malformed, which
-        should not be papered over with a default.
-    """
-    if name in COMMON_ROW_FIELDS and name not in row:
-        raise KeyError(
-            f"Row is missing the common field '{name}'; the summary is "
-            f"malformed. Row keys: {sorted(row)}."
-        )
-    return row.get(name, default)
-
-
-# ── Sweep Archive ─────────────────────────────────────────────────────────────
+# ── SweepArchive ──────────────────────────────────────────────────────────────
 
 class SweepArchive:
     """
-    Reader for the output directory of a single HPC sweep.
+    Manages the on-disk archive for a complete benchmark sweep.
 
-    Holds the three things that differ between the 1D, 2D and 3D drivers — the
-    results directory, the naming convention of the archived solutions, and
-    where figures are written — so that the post-processing above is written
-    once and works for all three.
+    Provides methods to write and read all result types (primary,
+    equal-accuracy, sensitivity) and to check archive completeness.
 
-    Attributes
+    Parameters
     ----------
-    results_dir : Path
-        Directory containing `results_full.json` and the per-solution `.npz`
-        archives.
-    dim : int
-        Spatial dimension of the sweep, selecting the archive filename stem.
-    solution_prefix : str
-        Filename stem of the solution archives, derived from `dim` unless
-        overridden.
-    plots_dir : Path
-        Destination for figures. The 2D and 3D drivers use a `plots/`
-        subdirectory; the 1D driver writes alongside its results, and its
-        figures are referenced in written work under those names.
-    skip_scheme_comparison : bool
-        Whether to exclude rows tagged `scheme_comparison` from the grouped
-        views. Those rows belong to the `--compare-schemes` study and would
-        otherwise appear as spurious duplicate solvers in the vs-N plots.
+    root : Path or str
+        Root directory for this sweep's output.
+    run_tag : str
+        Short identifier for this run (e.g. '1D_primary_2026-08-10').
     """
 
-    def __init__(
-        self,
-        results_dir:            Path,
-        dim:                    int = 1,
-        solution_prefix:        str | None = None,
-        plots_subdir:           str | None = "plots",
-        skip_scheme_comparison: bool = False,
-    ) -> None:
-        """
-        Parameters
-        ----------
-        results_dir : Path
-            Sweep output directory.
-        dim : int
-            Spatial dimension, 1, 2 or 3.
-        solution_prefix : str, optional
-            Overrides the stem implied by `dim`. Present for sweeps written
-            before the convention settled.
-        plots_subdir : str or None
-            Subdirectory for figures; None writes alongside the results.
-        skip_scheme_comparison : bool
-            Exclude `scheme_comparison` rows from the grouped views.
-        """
-        self.results_dir = Path(results_dir)
-        self.dim = int(dim)
-        self.solution_prefix = (solution_prefix if solution_prefix is not None
-                                else SOLUTION_PREFIX[self.dim])
-        self.plots_dir = (self.results_dir / plots_subdir if plots_subdir
-                          else self.results_dir)
-        self.skip_scheme_comparison = skip_scheme_comparison
+    def __init__(self, root: Path | str, run_tag: str = "") -> None:
+        self.root = Path(root)
+        self.run_tag = run_tag
+        self.solutions_dir = self.root / "solutions"
+        self.tables_dir    = self.root / "tables"
+        self.figures_dir   = self.root / "figures"
 
-    # ── Loading ───────────────────────────────────────────────────────────────
+        for d in (self.root, self.solutions_dir,
+                  self.tables_dir, self.figures_dir):
+            d.mkdir(parents=True, exist_ok=True)
 
-    def rows(self) -> list[dict]:
-        """
-        Reads the sweep summary.
+    # ── Primary results ───────────────────────────────────────────────────────
 
-        Returns
-        -------
-        list of dict
-            One record per (case, solver, N) combination.
-
-        Raises
-        ------
-        SystemExit
-            If the summary is absent. A walltime-killed job writes its
-            per-solution archives but never its summary, so this is a routine
-            outcome rather than an error worth a traceback.
-        """
-        path = self.results_dir / "results_full.json"
-        if not path.exists():
-            raise SystemExit(
-                f"No results found at {path}. Run the corresponding HPC driver "
-                f"first, or point --results-dir at a completed sweep."
+    def write_primary(self, results: list[BenchmarkResult]) -> None:
+        """Write primary BenchmarkResult list to JSON and CSV."""
+        # JSON
+        json_path = self.root / "results_full.json"
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(
+                [_benchmark_result_to_dict(r) for r in results],
+                f, indent=2, default=str,
             )
-        with open(path) as fh:
-            return json.load(fh)
 
-    def solution(self, case: str, solver: str, N: int) -> dict | None:
+        # CSV
+        csv_path = self.root / "results_summary.csv"
+        if results:
+            rows = [_benchmark_result_to_dict(r) for r in results]
+            fieldnames = list(rows[0].keys())
+            with open(csv_path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+
+    def read_primary(self) -> list[BenchmarkResult]:
+        """Read primary results from JSON. Returns empty list if file absent."""
+        json_path = self.root / "results_full.json"
+        if not json_path.exists():
+            return []
+        with open(json_path, encoding="utf-8") as f:
+            raw = json.load(f)
+        return [_dict_to_benchmark_result(d) for d in raw]
+
+    def append_primary(self, new_results: list[BenchmarkResult]) -> None:
         """
-        Loads one archived solution.
+        Append new results to the existing primary JSON, avoiding duplicates.
 
-        Parameters
-        ----------
-        case : str
-            Case identifier as recorded in the summary.
-        solver : str
-            Solver label.
-        N : int
-            Resolution.
-
-        Returns
-        -------
-        dict or None
-            Every array in the archive, keyed by name, or None if the
-            combination was not run.
+        A result is considered a duplicate if it has the same
+        (case_id, solver, N, discretisation_order, sensitivity_param,
+        sensitivity_value) as an existing entry.
         """
-        path = self.results_dir / f"{self.solution_prefix}_{case}_{solver}_N{N}.npz"
-        if not path.exists():
-            return None
-        with np.load(path) as d:
-            return {k: d[k] for k in d.files}
+        existing = self.read_primary()
+        existing_keys = {
+            (r.case_id, r.solver, r.N, r.discretisation_order,
+             r.sensitivity_param, r.sensitivity_value)
+            for r in existing
+        }
+        to_add = [
+            r for r in new_results
+            if (r.case_id, r.solver, r.N, r.discretisation_order,
+                r.sensitivity_param, r.sensitivity_value)
+            not in existing_keys
+        ]
+        self.write_primary(existing + to_add)
 
-    def metadata(self) -> dict:
-        """
-        Reads the run provenance record.
+    # ── Solution archives ─────────────────────────────────────────────────────
 
-        Returns
-        -------
-        dict
-            Environment and configuration as recorded by the driver, or an empty
-            dict if absent. Absence is not an error: the record is provenance,
-            not data, and a sweep remains fully interpretable without it.
-        """
-        path = self.results_dir / "run_metadata.json"
-        if not path.exists():
-            return {}
-        with open(path) as fh:
-            return json.load(fh)
-
-    def missing(self, rows: list[dict]) -> list[tuple[str, str, int]]:
-        """
-        Reports summary rows whose solution archive is absent.
-
-        This is the check that distinguishes a partial sweep from a broken
-        filename convention. Every plotting caller treats a missing archive as
-        "not run" and simply omits it, so without this a renamed or relocated
-        archive presents as a quietly incomplete figure set.
-
-        Parameters
-        ----------
-        rows : list of dict
-            Summary records, from `rows`.
-
-        Returns
-        -------
-        list of tuple
-            (case, solver, N) for each row with no archive on disk, in summary
-            order.
-        """
-        gaps = []
-        for r in rows:
-            case, solver, N = r["case"], r["solver"], r["N"]
-            if self.solution(case, solver, N) is None:
-                gaps.append((case, solver, int(N)))
-        return gaps
-
-    # ── Grouping ──────────────────────────────────────────────────────────────
-
-    def _keep(self, row: dict) -> bool:
-        """Whether a summary row belongs in the grouped views."""
-        if self.skip_scheme_comparison:
-            return not row.get("notes", "").startswith("scheme_comparison")
-        return True
-
-    def group_by_case_N(self, rows: list[dict]) -> dict[tuple, list[dict]]:
-        """
-        Groups as {(case, N): [row, …]}, solvers in canonical order.
-
-        The ordering matters for the field plots: it fixes the column order so
-        the same solver occupies the same position in every figure of a sweep.
-
-        Parameters
-        ----------
-        rows : list of dict
-            Summary records.
-
-        Returns
-        -------
-        dict
-            Keyed by (case, N).
-        """
-        groups: dict[tuple, list[dict]] = {}
-        for r in rows:
-            if not self._keep(r):
-                continue
-            groups.setdefault((r["case"], r["N"]), []).append(r)
-        for key in groups:
-            groups[key].sort(key=lambda r: solver_sort_key(r["solver"]))
-        return groups
-
-    def group_by_case_solver(self, rows: list[dict]) -> dict[tuple, list[dict]]:
-        """
-        Groups as {(case, solver): [row, …]} sorted by N, for vs-N plots.
-
-        Parameters
-        ----------
-        rows : list of dict
-            Summary records.
-
-        Returns
-        -------
-        dict
-            Keyed by (case, solver).
-        """
-        groups: dict[tuple, list[dict]] = {}
-        for r in rows:
-            if not self._keep(r):
-                continue
-            groups.setdefault((r["case"], r["solver"]), []).append(r)
-        for key in groups:
-            groups[key].sort(key=lambda r: r["N"])
-        return groups
-
-    def group_nested(self, rows: list[dict]) -> dict:
-        """
-        Groups as {case: {solver: [row, …]}} sorted by N.
-
-        The nested form the 1D plots are written against, iterating cases as
-        figures and solvers as curves within them.
-
-        Parameters
-        ----------
-        rows : list of dict
-            Summary records.
-
-        Returns
-        -------
-        dict
-            Nested by case then solver.
-        """
-        grouped: dict = {}
-        for r in rows:
-            grouped.setdefault(r["case"], {}).setdefault(r["solver"], []).append(r)
-        for case in grouped:
-            for solver in grouped[case]:
-                grouped[case][solver].sort(key=lambda x: x["N"])
-        return grouped
-
-    def series(
+    def write_solution(
         self,
-        grouped: dict[tuple, list[dict]],
-        case:    str,
-        exclude: tuple[str, ...] = (),
-    ) -> Iterator[tuple[str, list[dict]]]:
+        case_id: str,
+        solver: str,
+        N: int,
+        x: np.ndarray,
+        u_solver: np.ndarray,
+        u_exact: Optional[np.ndarray] = None,
+        u_thomas: Optional[np.ndarray] = None,
+        discretisation_order: int = 2,
+    ) -> Path:
         """
-        Iterates (solver, rows) for one case from a case-solver grouping.
-
-        Every vs-N plot repeated the same inner filter — loop the whole
-        grouping, skip keys whose case does not match — in four places.
-
-        Solvers are yielded in **lexical** order, not the canonical
-        `SOLVER_ORDER`. That is deliberate: the call sites this replaces
-        iterate `sorted(grouped.items())`, which sorts by the (case, solver)
-        key and therefore alphabetically. Imposing the canonical order here
-        would reorder every legend and line in the existing 2-D and 3-D
-        figures — a restyling, not a refactor. Use `group_by_case_N`, which
-        does sort canonically, where column order matters.
+        Save solution vectors to a compressed NPZ archive.
 
         Parameters
         ----------
-        grouped : dict
-            Output of `group_by_case_solver`.
-        case : str
-            Case to select.
-        exclude : tuple of str
-            Solver labels to skip, e.g. the classical reference in a plot that
-            measures everything relative to it.
+        x : np.ndarray, shape (N,)
+            Interior node coordinates.
+        u_solver : np.ndarray, shape (N,)
+            Solver solution vector.
+        u_exact : np.ndarray or None
+            Analytical solution, if available.
+        u_thomas : np.ndarray or None
+            Thomas reference solution, if available.
 
-        Yields
-        ------
-        tuple
-            (solver, rows), lexically ordered by solver.
+        Returns
+        -------
+        Path
+            Path of the written .npz file.
         """
-        for (c, solver), rs in sorted(grouped.items()):
-            if c == case and solver not in exclude:
-                yield solver, rs
+        fname = (
+            self.solutions_dir
+            / f"{case_id}_{solver}_N{N}_ord{discretisation_order}.npz"
+        )
+        arrays: dict[str, np.ndarray] = {"x": x, "u_solver": u_solver}
+        if u_exact is not None:
+            arrays["u_exact"] = u_exact
+        if u_thomas is not None:
+            arrays["u_thomas"] = u_thomas
+        np.savez_compressed(fname, **arrays)
+        return fname
 
+    def read_solution(
+        self,
+        case_id: str,
+        solver: str,
+        N: int,
+        discretisation_order: int = 2,
+    ) -> Optional[dict[str, np.ndarray]]:
+        """
+        Load a solution archive. Returns None if the file does not exist.
+        """
+        fname = (
+            self.solutions_dir
+            / f"{case_id}_{solver}_N{N}_ord{discretisation_order}.npz"
+        )
+        if not fname.exists():
+            # Try legacy filename convention (no _ord suffix)
+            fname_legacy = (
+                self.solutions_dir / f"{case_id}_{solver}_N{N}.npz"
+            )
+            if fname_legacy.exists():
+                fname = fname_legacy
+            else:
+                return None
+        data = np.load(fname, allow_pickle=False)
+        return dict(data)
 
-def solver_sort_key(s: str) -> tuple:
-    """
-    Orders solvers canonically, with unrecognised labels last.
+    # ── Equal-accuracy results ────────────────────────────────────────────────
 
-    Parameters
-    ----------
-    s : str
-        Solver label.
+    def write_equal_accuracy(self, ea_results: list[EqualAccuracyResult]) -> None:
+        """Write equal-accuracy results to JSON."""
+        path = self.root / "equal_accuracy.json"
+        records = []
+        for ear in ea_results:
+            records.append({
+                "solver":             ear.solver,
+                "r_target":           ear.r_target,
+                "band_factor":        ear.band_factor,
+                "in_band":            ear.in_band,
+                "n_solver_calls":     ear.n_solver_calls,
+                "total_sweep_time_s": ear.total_sweep_time_s,
+                "notes":              ear.notes,
+                "best_result":        _benchmark_result_to_dict(ear.best_result),
+                "all_results":        [
+                    _benchmark_result_to_dict(r) for r in ear.all_results
+                ],
+            })
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(records, f, indent=2, default=str)
 
-    Returns
-    -------
-    tuple
-        Sort key.
-    """
-    return (SOLVER_ORDER.index(s) if s in SOLVER_ORDER else 99, s)
+    def read_equal_accuracy(self) -> list[EqualAccuracyResult]:
+        """Read equal-accuracy results from JSON."""
+        path = self.root / "equal_accuracy.json"
+        if not path.exists():
+            return []
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)
+        results = []
+        for rec in raw:
+            best = _dict_to_benchmark_result(rec["best_result"])
+            all_r = [_dict_to_benchmark_result(d) for d in rec["all_results"]]
+            results.append(EqualAccuracyResult(
+                solver=rec["solver"],
+                r_target=rec["r_target"],
+                band_factor=rec["band_factor"],
+                in_band=rec["in_band"],
+                best_result=best,
+                all_results=all_r,
+                n_solver_calls=rec["n_solver_calls"],
+                total_sweep_time_s=rec["total_sweep_time_s"],
+                notes=rec.get("notes", ""),
+            ))
+        return results
 
+    # ── Sensitivity results ───────────────────────────────────────────────────
 
-# ── Writing ───────────────────────────────────────────────────────────────────
-#
-# Provided so the HPC runners can adopt a single declaration of the schema they
-# currently each construct by hand. Not yet wired into those drivers: 2D and 3D
-# sweeps are in flight, and changing what they write would strand results
-# already produced. See the module docstring.
+    def write_sensitivity(
+        self,
+        solver: str,
+        sweeps: list[SensitivitySweepResult],
+    ) -> None:
+        """Write sensitivity sweep results to JSON for one solver."""
+        path = self.root / f"sensitivity_{solver}.json"
+        records = []
+        for sweep in sweeps:
+            records.append({
+                "solver":             sweep.solver,
+                "param_name":         sweep.param_name,
+                "param_values":       sweep.param_values,
+                "baseline_config":    sweep.baseline_config,
+                "n_solver_calls":     sweep.n_solver_calls,
+                "total_sweep_time_s": sweep.total_sweep_time_s,
+                "results":            [
+                    _benchmark_result_to_dict(r) for r in sweep.results
+                ],
+            })
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(records, f, indent=2, default=str)
 
-def save_summary(results_dir: Path, rows: list[dict]) -> None:
-    """
-    Writes `results_full.json` and `results_summary.csv`.
+    def read_sensitivity(self, solver: str) -> list[SensitivitySweepResult]:
+        """Read sensitivity results for one solver from JSON."""
+        path = self.root / f"sensitivity_{solver}.json"
+        if not path.exists():
+            return []
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)
+        sweeps = []
+        for rec in raw:
+            results = [_dict_to_benchmark_result(d) for d in rec["results"]]
+            sweeps.append(SensitivitySweepResult(
+                solver=rec["solver"],
+                param_name=rec["param_name"],
+                param_values=rec["param_values"],
+                results=results,
+                baseline_config=rec.get("baseline_config", {}),
+                n_solver_calls=rec["n_solver_calls"],
+                total_sweep_time_s=rec["total_sweep_time_s"],
+            ))
+        return sweeps
 
-    Parameters
-    ----------
-    results_dir : Path
-        Sweep output directory; created if absent.
-    rows : list of dict
-        Result records, one per (case, solver, N).
-    """
-    results_dir = Path(results_dir)
-    results_dir.mkdir(parents=True, exist_ok=True)
+    # ── Run metadata ──────────────────────────────────────────────────────────
 
-    with open(results_dir / "results_full.json", "w") as fh:
-        json.dump(rows, fh, indent=2, default=str)
+    def write_metadata(self, config: dict) -> None:
+        """
+        Write run metadata (configuration, environment) to JSON.
 
-    if not rows:
-        return
-    fieldnames = list(rows[0].keys())
-    with open(results_dir / "results_summary.csv", "w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
+        Parameters
+        ----------
+        config : dict
+            Run configuration dictionary. Merged with environment info.
+        """
+        meta = {
+            "run_tag":         self.run_tag,
+            "timestamp":       time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "python_version":  sys.version,
+            "platform":        platform.platform(),
+            "config":          config,
+        }
+        path = self.root / "run_metadata.json"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, default=str)
 
+    # ── Archive completeness ──────────────────────────────────────────────────
 
-def save_solution(
-    results_dir: Path,
-    case:        str,
-    solver:      str,
-    N:           int,
-    dim:         int,
-    **arrays:    np.ndarray,
-) -> Path:
-    """
-    Writes one solution archive.
+    def missing(
+        self,
+        expected_cases: list[str],
+        expected_solvers: list[str],
+        expected_N: list[int],
+    ) -> list[tuple[str, str, int]]:
+        """
+        Report (case_id, solver, N) combinations present in the primary
+        JSON but whose solution archive (.npz) is absent.
 
-    Parameters
-    ----------
-    results_dir : Path
-        Sweep output directory; created if absent.
-    case, solver : str
-        Identifiers.
-    N : int
-        Resolution.
-    dim : int
-        Spatial dimension, selecting the filename stem.
-    **arrays
-        Arrays to archive. Field names should be the first entry of the
-        corresponding `FIELD_ALIASES` tuple for the dimension in question.
+        Parameters
+        ----------
+        expected_cases : list[str]
+            Case identifiers expected in the sweep.
+        expected_solvers : list[str]
+            Solver names expected.
+        expected_N : list[int]
+            Problem sizes expected.
 
-    Returns
-    -------
-    Path
-        Path written.
-    """
-    results_dir = Path(results_dir)
-    results_dir.mkdir(parents=True, exist_ok=True)
-    path = results_dir / solution_filename(case, solver, N, dim)
-    np.savez_compressed(path, **arrays)
-    return path
+        Returns
+        -------
+        list[tuple[str, str, int]]
+            Missing (case_id, solver, N) combinations.
+        """
+        existing = self.read_primary()
+        existing_keys = {
+            (r.case_id, r.solver, r.N) for r in existing
+        }
+        missing = []
+        for case_id in expected_cases:
+            for solver in expected_solvers:
+                for N in expected_N:
+                    if (case_id, solver, N) not in existing_keys:
+                        missing.append((case_id, solver, N))
+        return missing
