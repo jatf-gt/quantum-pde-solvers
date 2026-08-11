@@ -15,15 +15,26 @@ depends only on (kappa, epsilon) — not on the right-hand side. Every strip sol
 at a given resolution therefore reuses one set of angles, and computing them
 once offline removes them from the critical path of the sweep entirely.
 
-Cost is governed by kappa, and the two dimensions sit at opposite extremes:
+Cost is governed by kappa, and the dimensions sit at opposite extremes:
 
     1-D   kappa = O(N²)   — degree ~939 at N=4, rising steeply. Large N may be
                             impractical even capped; treat N >= 32 as exploratory.
     2-D   kappa -> 3⁻     — degree ~30-60 irrespective of N. The whole 2-D set
                             precomputes in under two minutes.
+    3-D   kappa -> 2⁻     — cheaper still, both transverse directions
+                            contributing to the strip diagonal.
 
 This is the same asymptotic contrast that motivates the line decomposition in
 the first place.
+
+One resolution, several keys
+----------------------------
+At fourth order in 2-D and 3-D a single (domain, N) contributes more than one
+target. The odd reflection at a transverse boundary folds the ghost node onto
+the strip's own diagonal, so the boundary-adjacent strips carry a different
+operator and a different kappa: two distinct matrices in 2-D, up to four in
+3-D, and two when a transverse axis is periodic. A sweep requests all of them,
+so all of them are enumerated here. The count does not grow with N.
 
 Incremental safety
 ------------------
@@ -110,6 +121,9 @@ HET_LZ, HET_LR = geom.L_Z, geom.L_R
 # default spans the full sweep because kappa is bounded by 3 throughout.
 DEFAULT_N_1D = "4,8,16"
 DEFAULT_N_2D = "4,8,16,32,64,128,256"
+# 3-D sweeps cost N² strip solves per outer iteration, so the sweep itself does
+# not go beyond 16; there is nothing to precompute above it.
+DEFAULT_N_3D = "4,8,16"
 
 
 def kappa_1d(N: int, order: int = 2) -> float:
@@ -149,9 +163,18 @@ def kappa_1d(N: int, order: int = 2) -> float:
     return float(eigs.max() / eigs.min())
 
 
-def kappa_2d(N: int, domain: str) -> float:
+def kappa_2d(N: int, domain: str, order: int = 2) -> dict[str, float]:
     """
-    Computes κ(A_row) for the 2-D line-decomposed strip operator.
+    Computes κ of every distinct 2-D strip operator at resolution N.
+
+    At second order there is one strip operator and the returned mapping has a
+    single entry. At fourth order there are **two**, independent of N: the odd
+    reflection at a transverse boundary folds the ghost node onto the strip's
+    own diagonal, so the strips adjacent to y=0 and y=Ly carry A_row + c_y·I.
+    Both are requested at runtime and both therefore need a cache entry —
+    precomputing only the interior one leaves 2/N of the strip solves computing
+    their phases inline, which is precisely the cost this cache exists to
+    remove.
 
     Parameters
     ----------
@@ -159,13 +182,15 @@ def kappa_2d(N: int, domain: str) -> float:
         Number of interior nodes per direction.
     domain : {'square', 'het'}
         'square' is the unit square (dx = dy); 'het' is the axial-radial HET
-        channel, whose aspect ratio Lz/Lr = 2.0 gives a distinct κ sequence.
+        channel, whose aspect ratio gives a distinct κ sequence.
+    order : {2, 4}
+        Spatial discretisation order.
 
     Returns
     -------
-    float
-        κ(A_row), bounded above by 3 for the square and approaching ≈1.5 for
-        the HET aspect ratio.
+    dict
+        {label: κ}, the label naming the strip family ('' at second order,
+        'interior'/'boundary' at fourth).
 
     Raises
     ------
@@ -173,12 +198,70 @@ def kappa_2d(N: int, domain: str) -> float:
         If `domain` is unrecognised.
     """
     if domain == "square":
-        problem = PoissonLine2D(np.zeros((N, N)))
+        lengths = (1.0, 1.0)
     elif domain == "het":
-        problem = PoissonLine2D(np.zeros((N, N)), Lx=HET_LZ, Ly=HET_LR)
+        lengths = (HET_LZ, HET_LR)
     else:
         raise ValueError(f"Unknown 2-D domain {domain!r}. Valid: 'square', 'het'.")
-    return problem.kappa_row()
+
+    if order == 4:
+        from problems.poisson_line_2d_4th import PoissonLine2D4th
+        problem = PoissonLine2D4th(np.zeros((N, N)),
+                                   Lx=lengths[0], Ly=lengths[1])
+        return problem.kappa_rows()
+    problem = PoissonLine2D(np.zeros((N, N)), Lx=lengths[0], Ly=lengths[1])
+    return {"": problem.kappa_row()}
+
+
+def kappa_3d(N: int, domain: str, order: int = 2) -> dict[str, float]:
+    """
+    Computes κ of every distinct 3-D strip operator at resolution N.
+
+    At fourth order the count is at most four — none, one or both transverse
+    boundaries adjacent — and only two when a transverse axis is periodic, a
+    periodic axis having no boundary and hence no ghost node. The 3-D strip
+    operator is better conditioned than the 2-D one at either order, κ → 2⁻
+    rather than 3⁻, both transverse directions contributing to the diagonal.
+
+    Parameters
+    ----------
+    N : int
+        Number of nodes per direction.
+    domain : {'cube', 'het'}
+        'cube' is the unit cube with Dirichlet data on all six faces; 'het' is
+        the SPT-100 channel unwrapped to a slab, azimuthally periodic.
+    order : {2, 4}
+        Spatial discretisation order.
+
+    Returns
+    -------
+    dict
+        {label: κ}. Labels are '' at second order and the transverse-adjacency
+        tuple, rendered as a string, at fourth.
+
+    Raises
+    ------
+    ValueError
+        If `domain` is unrecognised.
+    """
+    if domain == "cube":
+        lengths, periodic = (1.0, 1.0, 1.0), (False, False, False)
+    elif domain == "het":
+        lengths = (geom.L_Z, geom.L_R, geom.L_S)
+        periodic = (False, False, True)
+    else:
+        raise ValueError(f"Unknown 3-D domain {domain!r}. Valid: 'cube', 'het'.")
+
+    if order == 4:
+        from problems.poisson_line_3d_4th import PoissonLine3D4th
+        problem = PoissonLine3D4th(np.zeros((N, N, N)), lengths=lengths,
+                                   periodic=periodic)
+        return {f"adj{key[0]}{key[1]}": kappa
+                for key, kappa in problem.kappa_rows().items()}
+    from problems.poisson_line_3d import PoissonLine3D
+    problem = PoissonLine3D(np.zeros((N, N, N)), lengths=lengths,
+                            periodic=periodic)
+    return {"": problem.kappa_row()}
 
 
 def build_targets(dim: int, n_values: list[int], domain: str,
@@ -205,40 +288,40 @@ def build_targets(dim: int, n_values: list[int], domain: str,
     targets : list[tuple[str, int, float]]
         Ordered (label, N, kappa) triples.
 
-    Raises
-    ------
-    NotImplementedError
-        For ``dim == 2`` with ``order == 4``. The 2-D 4th-order strip operator is
-        not yet defined: `solvers/outer/multigrid_4th.py`'s boundary closure is
-        first-order accurate (measured 0.85-0.99 against a manufactured solution),
-        so any κ taken from it would key the cache to an operator that is about to
-        change. Precomputing against it would be worse than not precomputing:
-        a stale key is a silent miss that relocates the expensive computation into
-        the sweep. See `docs/HPC_REPAIR_PLAN.md`, Phase 4.
+    Notes
+    -----
+    In 2-D and 3-D at fourth order a single resolution contributes **several**
+    targets, one per distinct strip operator: the strips adjacent to a
+    transverse boundary carry the folded ghost node on their diagonal and so
+    have their own κ. Enumerating only the interior operator would leave those
+    strips computing their phases inline at runtime.
     """
-    if dim == 2 and order == 4:
-        raise NotImplementedError(
-            "2-D 4th-order phases cannot be precomputed yet: the strip operator "
-            "is unsettled (see docs/HPC_REPAIR_PLAN.md Phase 4). Any cache entry "
-            "written now would be keyed to an operator that is going to change, "
-            "and would silently miss at runtime.")
-
     targets: list[tuple[str, int, float]] = []
     seen: set[float] = set()
 
     if dim == 1:
         pairs = [("1D", N) for N in n_values]
-    else:
+    elif dim == 2:
         domains = ("square", "het") if domain == "all" else (domain,)
+        pairs = [(d, N) for N in n_values for d in domains]
+    else:
+        domains = ("cube", "het") if domain in ("all", "square") else (domain,)
         pairs = [(d, N) for N in n_values for d in domains]
 
     for label, N in pairs:
-        kappa = kappa_1d(N, order) if dim == 1 else kappa_2d(N, label)
-        key = round(kappa, 4)
-        if key in seen:
-            continue
-        seen.add(key)
-        targets.append((label, N, kappa))
+        if dim == 1:
+            families = {"": kappa_1d(N, order)}
+        elif dim == 2:
+            families = kappa_2d(N, label, order)
+        else:
+            families = kappa_3d(N, label, order)
+
+        for suffix, kappa in sorted(families.items()):
+            key = round(kappa, 4)
+            if key in seen:
+                continue
+            seen.add(key)
+            targets.append((f"{label}/{suffix}" if suffix else label, N, kappa))
 
     return targets
 
@@ -248,17 +331,19 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--dim", type=int, choices=(1, 2), required=True,
+        "--dim", type=int, choices=(1, 2, 3), required=True,
         help="Problem dimension. 1-D has kappa = O(N²) and is expensive; 2-D "
-             "has kappa -> 3 and is cheap at every N.",
+             "has kappa -> 3 and 3-D kappa -> 2, both cheap at every N.",
     )
     parser.add_argument(
         "--order", type=int, choices=(2, 4), default=2,
         help="Spatial discretisation order. Order 4 uses the pentadiagonal "
              "operator, whose kappa is 4/3 of the tridiagonal one asymptotically "
-             "(11.95/42.14/154.5 at N=4/8/16) - a MILDER cost increase than the "
-             "'2.5x' spectral-norm ratio quoted in qsvt_1d_4th.py suggests. Only "
-             "--dim 1 supports order 4 at present; see build_targets.",
+             "(11.95/42.14/154.5 at N=4/8/16 in 1-D) - a MILDER cost increase "
+             "than the '2.5x' spectral-norm ratio quoted in qsvt_1d_4th.py "
+             "suggests. In 2-D and 3-D order 4 has SEVERAL distinct strip "
+             "operators per resolution, all of which are enumerated and all of "
+             "which the sweep requests; see build_targets.",
     )
     parser.add_argument(
         "--n-values", type=str, default=None,
@@ -267,10 +352,13 @@ def main() -> None:
              f"{DEFAULT_N_2D} for --dim 2.",
     )
     parser.add_argument(
-        "--domain", type=str, default="all", choices=("square", "het", "all"),
-        help="2-D domain (ignored for --dim 1). The strip operator depends on "
-             "the grid aspect ratio, so the unit square and the HET channel "
-             "have different kappa sequences. (default: all)",
+        "--domain", type=str, default="all",
+        choices=("square", "cube", "het", "all"),
+        help="2-D/3-D domain (ignored for --dim 1). The strip operator depends "
+             "on the grid aspect ratio, so the unit square (2-D) or unit cube "
+             "(3-D) and the HET channel have different kappa sequences. "
+             "'square' and 'cube' name the same non-dimensional domain in their "
+             "respective dimensions and are interchangeable. (default: all)",
     )
     parser.add_argument(
         "--epsilon", type=float, default=0.01,
@@ -295,7 +383,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    default_n = DEFAULT_N_1D if args.dim == 1 else DEFAULT_N_2D
+    default_n = {1: DEFAULT_N_1D, 2: DEFAULT_N_2D, 3: DEFAULT_N_3D}[args.dim]
     n_values = sorted({int(n) for n in (args.n_values or default_n).split(",")
                        if n.strip()})
 
@@ -310,10 +398,10 @@ def main() -> None:
     if args.list_kappas:
         print(f"\n  {args.dim}-D order-{args.order} kappa values "
               f"(as used for the cache key)\n")
-        print(f"  {'domain':<8} {'N':>5} {'kappa':>12}")
-        print("  " + "-" * 27)
+        print(f"  {'strip family':<18} {'N':>5} {'kappa':>12}")
+        print("  " + "-" * 37)
         for label, N, kappa in targets:
-            print(f"  {label:<8} {N:>5} {kappa:>12.4f}")
+            print(f"  {label:<18} {N:>5} {kappa:>12.4f}")
         print()
         return
 
@@ -324,7 +412,7 @@ def main() -> None:
     print(f"  QSVT Phase Precomputation — {args.dim}-D, order {args.order}")
     print("=" * 68)
     print(f"  N values (ascending)  : {n_values}")
-    if args.dim == 2:
+    if args.dim in (2, 3):
         print(f"  domain(s)             : {args.domain}")
     print(f"  epsilon values         : {eps_values}")
     print(f"  max_degree cap         : {args.max_degree}")
@@ -336,7 +424,7 @@ def main() -> None:
     t_total = time.perf_counter()
 
     for label, N, kappa in targets:
-        print(f"{label:<8} N={N:<4} kappa={kappa:.4f}", flush=True)
+        print(f"{label:<18} N={N:<4} kappa={kappa:.4f}", flush=True)
 
         for eps in eps_values:
             max_deg_key = args.max_degree if args.max_degree is not None else -1

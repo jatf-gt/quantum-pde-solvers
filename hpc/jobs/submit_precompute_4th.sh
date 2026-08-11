@@ -5,10 +5,10 @@
 #
 #  Companion to submit_precompute_hpc.sh (2nd order, 1-D) and
 #  submit_precompute_2D.sh (2nd order, 2-D). Runs
-#  `hpc/runners/precompute_phases.py --dim 1 --order 4`.
+#  `hpc/runners/precompute_phases.py --dim ${DIM} --order 4`, DIM defaulting to 1.
 #
-#  Why a separate job, and why 1-D only
-#  ------------------------------------
+#  Why a separate job from the 2nd-order ones
+#  ------------------------------------------
 #  The phase angles depend on kappa alone, and the pentadiagonal operator has a
 #  different kappa from the tridiagonal one at the same N:
 #
@@ -28,14 +28,18 @@
 #  phases inline, which is the single most expensive non-parallelisable step in the
 #  pipeline.
 #
-#  2-D and 3-D are deliberately NOT covered here. The 2-D/3-D 4th-order strip
-#  operator is unsettled: the boundary closure in solvers/outer/multigrid_4th.py is
-#  first-order accurate (measured convergence 0.85-0.99 against a manufactured
-#  solution, where 4 is intended), so its kappa is about to change. A cache entry
-#  written against it would be keyed to a superseded operator and would silently
-#  miss at runtime, relocating the expensive computation into the sweep -- exactly
-#  the failure the cache exists to prevent. precompute_phases.py refuses
-#  `--dim 2 --order 4` for this reason. See docs/HPC_REPAIR_PLAN.md, Phase 4.
+#  2-D and 3-D are covered too, selected with DIM, and cost minutes rather than
+#  days: their strip kappa is bounded -- 2.49-3.14 in 2-D and 1.41-2.08 in 3-D
+#  across the whole sweep -- so the polynomial degree stays small at every N. They
+#  were previously refused because the strip operator was unsettled; it is now
+#  problems/poisson_line_{2,3}d_4th.py, verified to order 3.84-4.12.
+#
+#  ONE RESOLUTION CONTRIBUTES SEVERAL KEYS in 2-D and 3-D at order 4. The odd
+#  reflection at a transverse boundary folds the ghost node onto the strip's own
+#  diagonal, so the boundary-adjacent strips carry a different operator and hence
+#  a different kappa: two distinct matrices in 2-D, up to four in 3-D, and two
+#  when a transverse axis is periodic. A sweep requests all of them.
+#  precompute_phases.py enumerates them; --list-kappas prints the full set.
 #
 #  THE DEGREE TAG IS PART OF THE CACHE KEY
 #  ---------------------------------------
@@ -45,6 +49,10 @@
 #
 #      N = 4, 8, 16   ->  None   ->  tag d-1     (uncapped)
 #      N = 32, 64     ->  5000   ->  tag d5000
+#
+#  run_2d.py and run_3d.py do the same through QSVT_MAX_DEGREE_{2D,3D}, whose cap
+#  above N=16 is 500 rather than 5000. The guard reads whichever table applies to
+#  DIM rather than restating any of them here.
 #
 #  Passing --max-degree 5000 at N = 4, 8 or 16 therefore writes an entry under a
 #  key no solver will ever request. The miss is silent: _resolve_qsvt_max_degree
@@ -74,8 +82,9 @@
 #  stage skips what is already cached.
 #
 #  The stage boundaries are set by the degree tag, not by taste: N <= 16 must be
-#  computed uncapped and N >= 32 capped at 5000, so the two cannot share one
-#  invocation.
+#  computed uncapped and N >= 32 capped, so the two cannot share one invocation.
+#  Staging matters only in 1-D. In 2-D and 3-D kappa is bounded below 3.2, so the
+#  entire set completes in minutes and needs no staging at all.
 #
 #  Usage
 #  -----
@@ -92,6 +101,11 @@
 #    # the 1-D order-4 sweep is to be run beyond N=16.
 #    export N_VALUES="32" MAX_DEGREE="5000"
 #    qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_4th.sh
+#
+#    # 2-D and 3-D -- minutes, not hours. Both domains, every distinct strip
+#    # operator, over the resolutions the sweeps actually reach.
+#    export DIM="2"; qsub -v DIM hpc/jobs/submit_precompute_4th.sh
+#    export DIM="3"; qsub -v DIM hpc/jobs/submit_precompute_4th.sh
 #
 #    # Confirm the keys before committing to a long job (computes nothing):
 #    python3 hpc/runners/precompute_phases.py --dim 1 --order 4 \
@@ -130,7 +144,8 @@ echo "  Job ID    : ${PBS_JOBID:-interactive}"
 echo "  Node      : $(hostname)"
 echo "  Date/Time : $(date)"
 echo "  Work dir  : ${PBS_O_WORKDIR:-$(pwd)}"
-echo "  N_VALUES  : ${N_VALUES:-<not set, script default: 4,8>}"
+echo "  DIM       : ${DIM:-<not set, script default: 1>}"
+echo "  N_VALUES  : ${N_VALUES:-<not set, per-dimension default>}"
 echo "  MAX_DEGREE: ${MAX_DEGREE:-<not set: uncapped, tag d-1>}"
 echo "============================================================"
 
@@ -186,7 +201,13 @@ python3 -c "import pyqsp" || {
 
 mkdir -p results/qsvt_phase_cache
 
-N_VALUES="${N_VALUES:-4,8}"
+DIM="${DIM:-1}"
+case "${DIM}" in
+  1) N_VALUES="${N_VALUES:-4,8}" ;;
+  2) N_VALUES="${N_VALUES:-4,8,16,32,64}" ;;
+  3) N_VALUES="${N_VALUES:-4,8,16}" ;;
+  *) echo "ERROR: DIM must be 1, 2 or 3; got ${DIM}"; exit 1 ;;
+esac
 MAX_DEGREE="${MAX_DEGREE:-}"
 SWEEP_EPSILON="${SWEEP_EPSILON:-0.01}"
 EXTRA_EPSILONS="${EXTRA_EPSILONS:-0.5,0.1}"
@@ -202,53 +223,75 @@ echo ""
 echo "------------------------------------------------------------"
 echo "  Cache-key check -- what this job writes vs what run_1d asks"
 echo "------------------------------------------------------------"
-python3 - "${N_VALUES}" "${MAX_DEGREE}" "${SWEEP_EPSILON}" <<'PY' || exit 1
+python3 - "${DIM}" "${N_VALUES}" "${MAX_DEGREE}" "${SWEEP_EPSILON}" <<'PY' || exit 1
 import sys
 
 sys.path.insert(0, ".")
 sys.path.insert(0, "hpc/runners")
 
-import run_1d
 import precompute_phases as pp
 import solvers.quantum.qsp_angles as qa
 
-n_values = sorted({int(t) for t in sys.argv[1].split(",") if t.strip()})
-raw_cap = sys.argv[2].strip()
-epsilon = round(float(sys.argv[3]), 8)
+dim = int(sys.argv[1])
+n_values = sorted({int(t) for t in sys.argv[2].split(",") if t.strip()})
+raw_cap = sys.argv[3].strip()
+epsilon = round(float(sys.argv[4]), 8)
 
 tag_written = int(raw_cap) if raw_cap else -1
 
-print(f"  {'N':>5} {'kappa':>12} {'solver key':>12} {'this job':>10} {'cached':>8}")
-print("  " + "-" * 52)
+# The cap the SWEEP will request, taken from the runner's own table in every
+# dimension rather than restated here: a table restated in a shell script is a
+# table that drifts, and a drifted degree tag is a silent cache miss.
+if dim == 1:
+    import run_1d
+    caps, fallback = run_1d.QSVT_MAX_DEGREE_BY_N, run_1d.QSVT_MAX_DEGREE_FALLBACK
+elif dim == 2:
+    import run_2d
+    caps, fallback = run_2d.QSVT_MAX_DEGREE_2D, None
+else:
+    import run_3d
+    caps, fallback = run_3d.QSVT_MAX_DEGREE_3D, None
+
+# Every distinct strip operator, not one per resolution: in 2-D and 3-D at order
+# 4 the boundary-adjacent strips carry their own kappa and their own cache entry.
+targets = pp.build_targets(dim, n_values, "all", 4)
+
+print(f"  {'strip family':>18} {'N':>5} {'kappa':>12} {'solver key':>12} "
+      f"{'this job':>10} {'cached':>8}")
+print("  " + "-" * 74)
+
+runner = {1: "run_1d.py", 2: "run_2d.py", 3: "run_3d.py"}[dim]
 
 mismatched = []
-for N in n_values:
-    cap = run_1d.QSVT_MAX_DEGREE_BY_N.get(N, run_1d.QSVT_MAX_DEGREE_FALLBACK)
+for label, N, kappa in targets:
+    cap = caps.get(N, fallback)
     tag_solver = cap if cap is not None else -1
-    kappa = pp.kappa_1d(N, 4)
     cached = qa._load_disk((round(kappa, 4), epsilon, "auto", tag_solver)) is not None
-    print(f"  {N:>5} {kappa:>12.4f} {'d' + str(tag_solver):>12} "
+    print(f"  {label:>18} {N:>5} {kappa:>12.4f} {'d' + str(tag_solver):>12} "
           f"{'d' + str(tag_written):>10} {str(cached):>8}")
-    if tag_solver != tag_written:
+    if tag_solver != tag_written and (N, tag_solver) not in mismatched:
         mismatched.append((N, tag_solver))
 
 if mismatched:
     print()
     print("  ABORTING: the degree tag written would not be the tag looked up.")
     for N, tag_solver in mismatched:
-        print(f"    N={N}: run_1d.QSVT_MAX_DEGREE_BY_N gives tag d{tag_solver}, "
+        print(f"    N={N}: {runner} requests tag d{tag_solver}, "
               f"this job would write d{tag_written}.")
     print()
-    print("  The miss would be silent -- _resolve_qsvt_max_degree falls back to")
-    print("  min(5000, int(15*kappa)) and the sweep runs at reduced polynomial")
-    print("  accuracy, having ignored this entire computation.")
+    print(f"  The miss would be silent: {runner} would find no entry and compute")
+    print("  the phases inline, at whatever degree its own fallback allows, having")
+    print("  ignored this entire computation.")
     print()
-    print("  Fix: leave MAX_DEGREE unset for N <= 16, and set MAX_DEGREE=5000 for")
-    print("  N >= 32. The two cannot share one invocation.")
+    print("  Fix: match MAX_DEGREE to the runner's table over the N in scope --")
+    print("  1-D: unset for N <= 16, 5000 for N >= 32.")
+    print("  2-D/3-D: unset for N <= 16, 500 for N >= 32.")
+    print("  Capped and uncapped resolutions cannot share one invocation.")
     sys.exit(1)
 
 print()
-print("  Cache keys confirmed: this job writes exactly what run_1d.py requests.")
+print(f"  Cache keys confirmed: this job writes exactly what {runner} requests,")
+print(f"  for all {len(targets)} distinct strip operator(s) in scope.")
 PY
 
 # ============================================================
@@ -260,9 +303,9 @@ if [ -n "${MAX_DEGREE}" ]; then
 fi
 
 echo ""
-echo "Computing 1-D order-4 phases for N=${N_VALUES}"
+echo "Computing ${DIM}-D order-4 phases for N=${N_VALUES}"
 echo "Cache keys that will be written:"
-python3 hpc/runners/precompute_phases.py --dim 1 --order 4 \
+python3 hpc/runners/precompute_phases.py --dim "${DIM}" --order 4 \
         --n-values "${N_VALUES}" --list-kappas
 
 # Pass 1 -- the epsilon the sweep actually requests, alone, so that a walltime
@@ -272,7 +315,7 @@ echo "------------------------------------------------------------"
 echo "  PASS 1/2 -- epsilon=${SWEEP_EPSILON} (required by the sweep)  $(date)"
 echo "------------------------------------------------------------"
 python3 hpc/runners/precompute_phases.py \
-        --dim 1 --order 4 \
+        --dim "${DIM}" --order 4 \
         --n-values "${N_VALUES}" \
         --epsilon "${SWEEP_EPSILON}" \
         --extra-epsilons "" \
@@ -288,7 +331,7 @@ if [ -n "${EXTRA_EPSILONS}" ]; then
     echo "  PASS 2/2 -- epsilon=${EXTRA_EPSILONS} (sensitivity study)  $(date)"
     echo "------------------------------------------------------------"
     python3 hpc/runners/precompute_phases.py \
-            --dim 1 --order 4 \
+            --dim "${DIM}" --order 4 \
             --n-values "${N_VALUES}" \
             --epsilon "${SWEEP_EPSILON}" \
             --extra-epsilons "${EXTRA_EPSILONS}" \
@@ -307,7 +350,7 @@ ls -1 results/qsvt_phase_cache/ | wc -l | xargs echo "  entries:"
 # The cache is the most expensive artefact this pipeline produces -- up to 71 h of
 # non-parallelisable computation per stage -- and results/ is not backed up. Copy
 # it to RDS, as every sweep job does with its results.
-RDS_CACHE="${HOME}/qpde-results/qsvt_phase_cache_4th_$(date +%Y%m%d_%H%M%S)"
+RDS_CACHE="${HOME}/qpde-results/qsvt_phase_cache_4th_${DIM}d_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${RDS_CACHE}"
 cp -r results/qsvt_phase_cache/* "${RDS_CACHE}/" 2>/dev/null
 echo "  cache copied to: ${RDS_CACHE}"
