@@ -1,249 +1,243 @@
-# Quantum Linear System Solvers for the Poisson Equation: HHL, VQLS, and QSVT Applied to Hall Effect Thruster Plasma Modelling
+# Quantum Linear System Solvers for the Poisson Equation
 
-This repository contains the computational framework developed for the MSc thesis *"A Comparative Study of HHL, VQLS, and QSVT Algorithms for Solving Poisson-Type PDEs with Application to Hall-Effect Thruster Plasma Modelling"*, Department of Aeronautics, Imperial College London (2026).
+**HHL, VQLS, and QSVT applied to Hall Effect Thruster plasma modelling**
 
-The codebase implements and benchmarks three quantum linear system algorithms — the Harrow-Hassidim-Lloyd (HHL) algorithm, the Variational Quantum Linear Solver (VQLS), and the Quantum Singular Value Transformation (QSVT) — applied to the Poisson boundary value problem in one and two spatial dimensions. A physically motivated application to the electrostatic Poisson equation in Hall Effect Thruster (HET) plasma modelling is included as a proof-of-concept demonstration.
+MSc thesis, *A Comparative Study of HHL, VQLS, and QSVT Algorithms for Solving Poisson-Type PDEs with Application to Hall-Effect Thruster Plasma Modelling*, Department of Aeronautics, Imperial College London, 2026.
 
-The 1D formulation employs a direct Toeplitz Symmetric Tridiagonal (TST) operator. The 2D resolution is achieved via a hybrid quantum-classical line-Jacobi iterative decomposition scheme. All results are benchmarked against the Thomas algorithm (classical tridiagonal direct solver) and, where available, against closed-form analytical solutions.
+Three quantum linear system algorithms — Harrow-Hassidim-Lloyd (HHL), the Variational Quantum Linear Solver (VQLS), and the Quantum Singular Value Transformation (QSVT) — are implemented and benchmarked against the classical Thomas algorithm on the Poisson boundary value problem in one, two, and three spatial dimensions. A physical application models the electrostatic field in a Hall Effect Thruster (HET) discharge channel.
 
-The numerical benchmarks systematically replicate and extend those of **Ghafourpour & Laizet (2025)** (*Physical Review Applied* 24, 024032), with the VQLS implementation following **Bravo-Prieto et al. (2023)** (*Quantum* 7, 1188) and the QSVT implementation following **Gilyen et al. (2019)** (*STOC 2019*) and **Martyn et al. (2021)** (*PRX Quantum* 2, 040203). The HET plasma application draws on the physical model of **Boeuf & Garrigues (1998)** (*Journal of Applied Physics* 84, 3541).
+The numerical benchmarks replicate and extend **Ghafourpour and Laizet (2025)** (*Phys. Rev. Applied* 24, 024032). The VQLS implementation follows **Bravo-Prieto et al. (2023)** (*Quantum* 7, 1188). The QSVT implementation follows **Gilyen et al. (2019)** (*STOC*) and **Martyn et al. (2021)** (*PRX Quantum* 2, 040203). The HET model draws on **Boeuf and Garrigues (1998)** (*J. Appl. Phys.* 84, 3541).
 
-### Project status
+---
 
-**New here? Run `python scripts/tutorial.py --dim 2 --N 32`.** It solves a 2D
-Poisson problem and prints a comparison of the outer schemes in a couple of
-seconds, with no quantum backend required. `--dim 1` and `--dim 3` work the
-same way, and `--inner qsvt` swaps in a quantum solver.
+### Start here
 
-The laptop-scale benchmarking pipeline covers 1D, 2D and 3D Poisson problems and
-the HET plasma application, all runnable directly via `scripts/`.
+```bash
+python scripts/tutorial.py --dim 2 --N 32
+```
 
-An **HPC deployment on Imperial College's CX3 cluster** pushes each sweep to
-larger $N$ than is practical on a laptop, with both CPU and GPU (cuStateVec)
-execution paths. The 1D, 2D and 3D pipelines are all complete and described in
-§4.
+Solves a 2D Poisson problem, compares outer schemes, and prints results in seconds. No quantum backend is needed unless you pass `--inner hhl`, `--inner vqls`, or `--inner qsvt`.
 
-**Architecture note.** 2D and 3D problems have no solvers of their own. The
-domain is decomposed into 1D strips and an *outer iteration* (`solvers/outer`)
-sweeps over them, handing each strip to the same 1D solver used in the 1D case.
-Every quantum solver therefore works in any dimension unmodified, and — because
-the strip operator is far better conditioned than the 1D Poisson operator
-($\kappa 	o 3$ in 2D and $	o 2$ in 3D, against $O(N^2)$ in 1D) — is cheaper
-per strip in higher dimensions, not dearer.
+---
+
+### Architecture note
+
+2D and 3D problems have no dedicated solvers. The domain is cut into 1D strips; `solvers/outer` sweeps over them, passing each strip to the same 1D inner solver used in the 1D case. Every quantum solver therefore works in any dimension without modification. The strip operator is far better conditioned than the full 1D Poisson matrix: $\kappa_\text{row} \to 3^-$ in 2D and $\to 2^-$ in 3D as $N \to \infty$, against $\mathcal{O}(N^2)$ in 1D. Quantum solvers are therefore *cheaper* per strip in higher dimensions, not dearer.
 
 ---
 
 ## Table of Contents
 
-1. [Repository Architecture](#1-repository-architecture)
-2. [Prerequisites and Installation](#2-prerequisites-and-installation)
-3. [Execution Protocols (Local)](#3-execution-protocols-local)
-4. [HPC / Cluster Execution (Imperial College CX3)](#4-hpc--cluster-execution-imperial-college-cx3)
-5. [Benchmark Sweep Directory](#5-benchmark-sweep-directory)
-6. [Physical Application: HET Plasma Modelling](#6-physical-application-het-plasma-modelling)
-7. [Algorithm Summary](#7-algorithm-summary)
-8. [Test Suite](#8-test-suite)
-9. [Methodological Notes](#9-methodological-notes)
+1. [Repository layout](#1-repository-layout)
+2. [Prerequisites and installation](#2-prerequisites-and-installation)
+3. [Local execution](#3-local-execution)
+4. [HPC execution (Imperial CX3)](#4-hpc-execution-imperial-cx3)
+5. [Benchmark sweep catalogue](#5-benchmark-sweep-catalogue)
+6. [Physical application: HET plasma](#6-physical-application-het-plasma)
+7. [Algorithm summary](#7-algorithm-summary)
+8. [Test suite](#8-test-suite)
+9. [Methodological notes](#9-methodological-notes)
 10. [References](#10-references)
 
 ---
 
-## 1. Repository Architecture
+## 1. Repository layout
 
-The codebase is organised into a strictly layered, decoupled architecture separating problem instantiation, algorithmic execution, post-processing, and physical application. Data flows in one direction only: `core` → `problems` → `solvers` → `benchmark` → `scripts`.
-
-The root of the repository also carries a set of HPC job-submission scripts and standalone diagnostic/plotting utilities that sit outside this layered core (see §4).
+Data flows in one direction: `core` -> `problems` -> `solvers` -> `benchmark` -> `scripts`.
 
 ```
 poisson_hhl/
-│
-├── core/                            # Shared infrastructure — PDE-agnostic
-│   ├── cases.py                     # Canonical case registry: 27 cases, 1D/2D/3D
-│   ├── het_geometry.py              # Single SPT-100 geometry, shared by 1D/2D/3D
-│   ├── config.py                    # SimConfig1D, SimConfig2D
-│   ├── exact_solutions.py           # Analytical solutions: 1D (fS, fL, fH) and 2D sinusoidal
-│   ├── het_config.py                # HETConfig, HETPhysicalConfig, physical constants
-│   └── source_functions.py          # Source functions: fS, fL, fH (1D and 2D); HET profiles
-│
-├── problems/                        # Domain discretisation and operator assembly
-│   ├── poisson_1d.py                # 1D TST matrix, RHS, PoissonProblem1D container
-│   ├── poisson_line_2d.py           # 2D line-decomposed problem, PoissonLine2D
-│   ├── poisson_line_3d.py           # 3D line-decomposed problem, PoissonLine3D
-│   ├── het_plasma_1d.py             # HET 1D: HETPoissonProblem1D, HETPhysicalProblem1D
-│   └── het_plasma_2d.py             # HET 2D: thin PoissonLine2D builders over core/het_config.py
-│
-├── solvers/                         # Algorithmic resolution implementations
-│   ├── backend_factory.py           # Centralised Aer backend selection (CPU/GPU)
-│   ├── classical/
-│   │   ├── thomas.py                # Thomas algorithm: thomas_solve, thomas_solve_system
-│   │   └── numpy_ref.py             # NumPy direct solver (debugging reference)
-│   ├── quantum/
-│   │   ├── result.py                # SolverResult, VQLSSolverResult, QSVTSolverResult
-│   │   ├── hhl_1d.py                # HHL 1D: hhl_solve, hhl_solve_system
-│   │   ├── vqls_utils.py            # LCU Pauli decomposition, ansatz, cost function
-│   │   ├── vqls_1d.py               # VQLS 1D: vqls_solve, vqls_solve_system, VQLSConfig1D
-│   │   ├── block_encoding.py        # Sz.-Nagy block encoding for TST matrices
-│   │   ├── qsp_angles.py            # QSP phase angle computation via pyqsp / Chebyshev
-│   │   └── qsvt_1d.py               # QSVT 1D: qsvt_solve, qsvt_solve_system, QSVTConfig1D
-│   └── outer/                       # The single 2D/3D architecture: strip decomposition
-│       ├── core.py                  # LineProblem2D/InnerSolver protocols, strip_sweep
-│       ├── inner.py                 # Validated (A,b)->x registry: thomas/hhl/vqls/qsvt
-│       ├── stationary.py            # jacobi / gauss-seidel / sor
-│       └── multigrid.py             # V-cycle / full multigrid (fmg)
-│
-├── benchmark/                       # Evaluation orchestration and reporting
-│   ├── results_io.py                # On-disk sweep schema contract (read + write)
-│   ├── diagnostics.py               # Shared comparison-table/study primitives for debug_2d/3d.py
-│   ├── metrics.py                   # BenchmarkResult, BenchmarkResult2D, compute_errors
-│   ├── plotting.py                  # Matplotlib figure primitives: arrays in, Figure out
-│   ├── hpc_plotting.py              # HPC sweep post-processing: load -> reshape -> draw -> save
-│   ├── reporting.py                 # Tabular console output for 1D and 2D results
-│   └── runner.py                    # Sweep drivers A-H4; run_pair_1d, run_pair_2d
-│
-├── scripts/                         # Top-level execution entry points (laptop scale)
-│   ├── tutorial.py                  # ⭐ START HERE — one entry point, --dim {1,2,3}
-│   ├── debug_1d.py                  # 1D solver diagnostics: raw (A,b) cases, QSVT dump, kappa tables
-│   ├── debug_2d.py                  # 2D scheme/solver diagnostics, noise and polish studies
-│   ├── debug_3d.py                  # 3D equivalent
-│   ├── example_report.py            # Copy-me template for a small, laptop-scale report
-│   └── archive/                     # Superseded one-off scripts; see its README
-│
-├── tests/                           # Pytest test suite
-│   ├── conftest.py                  # Shared fixtures and tolerance constants
-│   ├── test_problem_setup.py        # 1D matrix assembly, grid, RHS, condition number
-│   ├── test_classical_solvers.py    # Thomas 1D and NumPy reference solvers
-│   ├── test_line_problems.py        # PoissonLine2D/3D operators, BCs, coarsening
-│   ├── test_outer.py                # solvers/outer: schemes, registry, multigrid
-│   ├── test_hhl_1d.py               # HHL 1D solver correctness
-│   ├── test_vqls_1d.py              # VQLS 1D solver correctness
-│   ├── test_qsvt_1d.py              # QSVT 1D block encoding, phase angles, solver correctness
-│   ├── test_het_problem.py          # HET 1D problem assembly and solver compatibility
-│   └── test_integration.py          # End-to-end pipelines, 1D and 2D
-│
-├── results/                         # Auto-generated output artefacts (git-ignored)
-│   ├── sweep_*.csv
-│   ├── qsvt_phase_cache/            # Cached QSP phase angles (see §4.4)
-│   ├── tutorial/                    # Output of scripts/tutorial.py (1D --plot)
-│   ├── debugging/                   # Output of debug_1d.py / debug_2d.py / debug_3d.py
-│   ├── example_report/              # Output of scripts/example_report.py
-│   ├── 1Dhpc_run/                   # Output of the HPC 1D full sweep (see §4)
-│   ├── 2Dhpc_run/                   # Output of the HPC 2D full sweep (see §4.7)
-│   └── 3Dhpc_run/                   # Output of the HPC 3D full sweep (see §4.7)
-│
-├── quantum_linear_solvers/          # Git submodule: TST Hamiltonian simulation (Vázquez et al.)
-│
-├── hpc/                             # Cluster-scale deployment for Imperial CX3 — see hpc/README.md
-│   ├── setup_hpc_env.sh             # One-time environment setup (CPU + GPU venvs) — §4.1
-│   ├── runners/                     # The actual driver code the jobs execute (ordinary Python)
-│   │   ├── run_1d.py                # Full 1D sweep, N=4..64, all solvers (see §4)
-│   │   ├── run_2d.py                # Full 2D sweep (see §4.7)
-│   │   ├── run_3d.py                # Full 3D sweep (see §4.7)
-│   │   ├── precompute_phases.py     # QSVT phase-angle precompute, --dim {1,2} (see §4.4)
-│   │   └── plot_results.py          # Post-processing, --dim {1,2,3}; thin CLI over benchmark/hpc_plotting.py
-│   └── jobs/                        # PBS Pro job scripts (site-specific — see "Adapting to another cluster")
-│       ├── _preflight.sh            # Environment + provenance gate, sourced by every job below
-│       ├── submit_hpc_1D.sh         # PBS job: full 1D sweep, CPU — §4.2
-│       ├── submit_hpc_gpu.sh        # PBS job: full 1D sweep, GPU (L40S / cuStateVec) — §4.3
-│       ├── submit_hpc_2D.sh         # PBS job: full 2D sweep — §4.7
-│       ├── submit_hpc_3D.sh         # PBS job: full 3D sweep — §4.7
-│       ├── submit_hpc_{1D,2D,3D}_4th.sh  # PBS jobs: pentadiagonal sweeps — blocked, see docs/HPC_REPAIR_PLAN.md
-│       ├── submit_{1d,2d,3d}_wave1.sh    # PBS jobs: manifest-driven gap fill — see hpc/README.md
-│       ├── submit_precompute_hpc.sh # PBS job: 1D QSVT phase-angle precompute — §4.4
-│       └── submit_precompute_2D.sh  # PBS job: 2D QSVT phase-angle precompute — §4.4
-│
-├── pytest.ini                       # Pytest configuration
-├── requirements.txt                 # Python environment dependencies
-└── README.md
+|
++-- core/                            # PDE-agnostic shared infrastructure
+|   +-- cases.py                     # 27-case registry (1D/2D/3D); register/get/available/describe
+|   +-- config.py                    # SimConfig1D, SimConfig2D; N must be a power of 2
+|   +-- exact_solutions.py           # Analytical solutions: 1D (fS, fL, fH) and 2D sinusoidal
+|   +-- het_config.py                # HET physical constants; HETConfig, HETPhysicalConfig
+|   +-- het_geometry.py              # Single SPT-100 geometry shared across all dimensions
+|   +-- source_functions.py          # Source functions fS, fL, fH; HET charge-density profiles
+|
++-- problems/                        # Operator assembly and domain discretisation
+|   +-- poisson_1d.py                # 2nd-order 1D TST matrix; PoissonProblem1D
+|   +-- poisson_1d_4th.py            # 4th-order 1D pentadiagonal matrix; PoissonProblem1D4th
+|   +-- poisson_line_2d.py           # 2nd-order 2D line-decomposed problem; PoissonLine2D
+|   +-- poisson_line_2d_4th.py       # 4th-order 2D; j+-2 transverse stencil; boundary closure
+|   +-- poisson_line_3d.py           # 2nd-order 3D line-decomposed problem
+|   +-- poisson_line_3d_4th.py       # 4th-order 3D; full normal-derivative boundary treatment
+|   +-- het_plasma_1d.py             # HET 1D: HETPoissonProblem1D, HETPhysicalProblem1D
+|   +-- het_plasma_2d.py             # HET 2D: thin PoissonLine2D builders
+|
++-- solvers/
+|   +-- backend_factory.py           # Central Aer backend selection (CPU / GPU cuStateVec)
+|   +-- classical/
+|   |   +-- thomas.py                # Thomas tridiagonal direct solver
+|   |   +-- numpy_ref.py             # NumPy reference (debugging)
+|   +-- quantum/
+|   |   +-- result.py                # SolverResult, VQLSSolverResult, QSVTSolverResult
+|   |   +-- hhl_1d.py                # HHL for 2nd-order 1D TST systems
+|   |   +-- hhl_1d_4th.py            # HHL for 4th-order 1D pentadiagonal systems
+|   |   +-- vqls_utils.py            # LCU Pauli decomposition, ansatz, cost function
+|   |   +-- vqls_1d.py               # VQLS 2nd-order solver; VQLSConfig1D
+|   |   +-- vqls_1d_4th.py           # VQLS 4th-order solver
+|   |   +-- vqls_hadamard.py         # Circuit-level Hadamard-test cost evaluation (opt-in)
+|   |   +-- block_encoding.py        # Sz.-Nagy unitary dilation for TST and pentadiagonal A
+|   |   +-- qsp_angles.py            # QSP phase angles via pyqsp / Chebyshev fallback
+|   |   +-- qsvt_1d.py               # QSVT 2nd-order solver; QSVTConfig1D
+|   |   +-- qsvt_1d_4th.py           # QSVT 4th-order solver
+|   +-- outer/                       # Single 2D/3D architecture: strip decomposition
+|       +-- core.py                  # LineProblem2D / InnerSolver protocols; strip_sweep
+|       +-- inner.py                 # Validated (A,b)->x registry; thomas/hhl/vqls/qsvt
+|       +-- stationary.py            # Jacobi / Gauss-Seidel / SOR
+|       +-- multigrid.py             # V-cycle / Full Multigrid (FMG)
+|
++-- benchmark/                       # Evaluation orchestration and reporting
+|   +-- equal_accuracy.py            # Equal-accuracy protocol: matched-residual comparison
+|   +-- sensitivity.py               # OAT sensitivity sweeps across solver parameters
+|   +-- tables.py                    # LaTeX and ASCII table generation for thesis output
+|   +-- hardware.py                  # IBM Quantum hardware adapter (ZNE; opt-in)
+|   +-- metrics.py                   # BenchmarkResult, BenchmarkResult2D, compute_errors
+|   +-- plotting.py                  # Matplotlib figure primitives
+|   +-- reporting.py                 # Tabular console output for 1D and 2D results
+|   +-- runner.py                    # Sweep drivers A-H4; run_pair_1d, run_pair_2d
+|   +-- diagnostics.py               # Comparison-table / study primitives for debug scripts
+|   +-- reference_2d.py              # Fine-mesh FMG reference solution for 2D error metrics
+|   +-- hpc_plotting.py              # HPC sweep post-processing: load -> reshape -> draw -> save
+|   +-- hpc_archive.py               # Legacy on-disk schema for existing HPC run directories
+|   +-- results_io.py                # Publication archive schema (new runs); read + write
+|
++-- scripts/                         # Laptop-scale entry points
+|   +-- tutorial.py                  # START HERE -- --dim {1,2,3}, --inner, --scheme
+|   +-- debug_1d.py                  # 1D diagnostics: raw (A,b) cases, kappa tables, QSVT dump
+|   +-- debug_1d_4th.py              # 4th-order 1D diagnostics; convergence-order verification
+|   +-- debug_2d.py                  # 2D scheme comparison, noise study, polish study
+|   +-- debug_3d.py                  # 3D equivalent of debug_2d.py
+|   +-- example_report.py            # Copy-me template for a small laptop-scale report
+|   +-- gap_analysis.py              # Scans HPC result directories; emits rerun manifests
+|   +-- resource_feasibility_1d.py   # Circuit-depth and qubit feasibility estimates
+|   +-- robustness_sweep_1d.py       # Shot-noise and noise-model robustness sweeps
+|   +-- hhl_shot_overhead.py         # HHL measurement overhead analysis
+|   +-- block_encoding_fidelity.py   # Block-encoding unitarity and fidelity checks
+|   +-- delta_amplification_hardware.py  # Hardware-adapted amplitude amplification
+|   +-- qsvt_2d_line_degree_sweep.py # 2D row-matrix QSVT degree vs N
+|   +-- archive/                     # Superseded scripts; see archive/README.md
+|
++-- tests/                           # Pytest suite: 259 tests, ~26 s
++-- hpc/                             # Cluster deployment for Imperial CX3 -- see hpc/README.md
+|   +-- setup_hpc_env.sh             # One-time env setup: CPU qpde + GPU qpde-gpu venvs
+|   +-- runners/                     # Python driver code (portable)
+|   |   +-- run_1d.py                # Full 1D sweep: N=4..64, all solvers
+|   |   +-- run_2d.py                # Full 2D sweep
+|   |   +-- run_3d.py                # Full 3D sweep
+|   |   +-- precompute_phases.py     # QSVT phase-angle precompute; --dim {1,2}
+|   |   +-- plot_results.py          # Post-processing; --dim {1,2,3}
+|   +-- jobs/                        # PBS Pro job scripts (site-specific)
+|       +-- _preflight.sh            # Git-state and module gate; sourced by every job
+|       +-- submit_hpc_1D.sh         # Full 1D CPU sweep
+|       +-- submit_hpc_gpu.sh        # Full 1D GPU sweep (L40S / cuStateVec)
+|       +-- submit_hpc_2D.sh         # Full 2D sweep
+|       +-- submit_hpc_3D.sh         # Full 3D sweep
+|       +-- submit_hpc_1D_4th.sh     # 4th-order 1D sweep (blocked; see docs/HPC_REPAIR_PLAN.md)
+|       +-- submit_hpc_2D_4th.sh     # 4th-order 2D sweep (blocked; see docs/HPC_REPAIR_PLAN.md)
+|       +-- submit_hpc_3D_4th.sh     # 4th-order 3D sweep (blocked; see docs/HPC_REPAIR_PLAN.md)
+|       +-- submit_{1d,2d,3d}_wave1.sh  # Manifest-driven gap-fill resubmission
+|       +-- submit_precompute_hpc.sh # 1D QSVT phase-angle precompute
+|       +-- submit_precompute_2D.sh  # 2D QSVT phase-angle precompute
+|       +-- submit_precompute_4th.sh # 4th-order phase-angle precompute
+|
++-- docs/
+|   +-- HPC_REPAIR_PLAN.md           # Root causes and fixes for defective HPC pipeline
+|   +-- HPC_OPERATIONAL_ISSUES.md    # Open cluster faults (log visibility, filesystem)
++-- context/                         # Reference material; not part of the repository proper
++-- requirements.txt
++-- pytest.ini
++-- README.md
 ```
 
 ---
 
-## 2. Prerequisites and Installation
+## 2. Prerequisites and installation
 
-This framework requires an isolated Python environment to prevent dependency conflicts between Qiskit quantum information modules, PennyLane variational quantum components, and classical scientific computing libraries.
+Python 3.11 is recommended (3.10 and 3.12 are compatible but untested locally; CX3 uses 3.12.3 via `Python/3.12.3-GCCcore-13.3.0`).
 
-### Supported Python version
-
-Python 3.11 is recommended. Python 3.10 and 3.12 are compatible but untested locally (the CX3 cluster environment in §4 uses 3.12.3 via the `Python/3.12.3-GCCcore-13.3.0` module).
-
-### Step 1 — Clone the repository with the required submodule
+**Clone with submodule**
 
 ```bash
 git clone --recurse-submodules https://github.com/jatf-gt/quantum-pde-solvers.git
 cd quantum-pde-solvers
 ```
 
-> **Note:** If the repository was cloned without the `--recurse-submodules` flag, populate the submodule manually:
->
-> ```bash
-> git submodule update --init --recursive
-> ```
->
-> The `quantum_linear_solvers/` directory must be non-empty before proceeding.
+If cloned without `--recurse-submodules`, run:
 
-### Step 2 — Provision the Conda environment
+```bash
+git submodule update --init --recursive
+```
+
+**Set up the environment**
 
 ```bash
 conda create -n msc_qiskit python=3.11
 conda activate msc_qiskit
-```
-
-### Step 3 — Install dependencies and the local quantum submodule
-
-```bash
 pip install -r requirements.txt
 pip install -e quantum_linear_solvers/
 ```
 
-### Key dependencies
+**Key dependencies**
 
-| Package          | Role                                                             |
-| ---------------- | ---------------------------------------------------------------- |
-| `qiskit` >= 1.0  | Quantum circuit construction and statevector simulation          |
-| `qiskit-aer`     | High-performance statevector backend                             |
-| `pennylane`      | VQLS variational optimisation and automatic differentiation      |
-| `pyqsp`          | QSP phase angle computation for QSVT matrix inversion polynomial |
-| `numpy`, `scipy` | Classical linear algebra and optimisation                        |
-| `openpyxl`       | Excel workbook export for benchmark metrics                      |
-| `matplotlib`     | Result visualisation                                             |
-| `pytest`         | Automated test suite                                             |
+| Package | Purpose |
+| --- | --- |
+| `qiskit >= 1.0` | Circuit construction and statevector simulation |
+| `qiskit-aer` | High-performance Aer backend (CPU and GPU paths) |
+| `pennylane` | VQLS variational optimisation |
+| `pyqsp` | QSP phase-angle computation for QSVT |
+| `numpy`, `scipy` | Classical linear algebra |
+| `matplotlib` | Plotting |
+| `openpyxl` | Excel export for benchmark metrics |
+| `pytest` | Test suite |
 
-> **Qiskit 1.0 compatibility note:** The `quantum_linear_solvers` submodule has been patched to replace the deprecated `QuantumCircuit.isometry()` method with the `Isometry` gate from `qiskit.circuit.library`. This patch is applied to the submodule source directly and requires no action from the user.
+> **Compatibility note.** `quantum_linear_solvers/` has been patched to replace the deprecated `QuantumCircuit.isometry()` with the `Isometry` gate from `qiskit.circuit.library`. This patch is applied to the vendored source and requires no user action. Do not revert it.
+
+Local pinned versions (`qiskit==1.4.5`, `qiskit-aer==0.17.2`, `pennylane==0.45.0`, `pyqsp==0.2.0`) differ from the HPC venv (`qiskit==0.45.3`). The two environments are not required to match.
 
 ---
 
-## 3. Execution Protocols (Local)
+## 3. Local execution
 
-All entry points are located in `scripts/` and are designed to be executed from the repository root. These are the laptop-scale entry points; for larger-$N$ unattended runs on the cluster, see §4. Five files cover the whole local surface — a tutorial, three per-dimension debug drivers, and a copy-me report template — plus `scripts/archive/`, superseded one-off scripts kept for provenance (see its README).
+All scripts run from the repository root. `pytest.ini` sets `pythonpath = .`, so `core`, `problems`, `solvers`, and `benchmark` resolve as top-level packages.
 
-### 3.1 — `tutorial.py`: start here
-
-Solves a Poisson problem in one, two or three dimensions with any combination of solvers and prints a comparison table. For 2D/3D it is a thin front end onto `debug_2d.py`/`debug_3d.py`.
+### 3.1 `tutorial.py` -- start here
 
 ```bash
 python scripts/tutorial.py --dim 2 --N 32
 python scripts/tutorial.py --dim 1 --N 8 --inner all
 python scripts/tutorial.py --dim 2 --N 8 --inner qsvt
-python scripts/tutorial.py --list-cases        # every registered case for --dim
-python scripts/tutorial.py --list-options      # every tunable inner/scheme parameter
+python scripts/tutorial.py --list-cases       # all registered cases for --dim
+python scripts/tutorial.py --list-options     # all tunable inner/scheme parameters
 ```
 
-**Runtime:** seconds for the classical solver; under a minute for one quantum solver at $N \le 16$.
+**Runtime:** seconds for classical; under a minute for one quantum solver at $N \le 16$.
 
-### 3.2 — `debug_1d.py`: 1D solver diagnostics
+### 3.2 `debug_1d.py` -- 2nd-order 1D diagnostics
 
-Runs any of the 11 registered 1D cases (`core/cases.py`, `available(dim=1)`) — including the raw-matrix sub-cases 3b and 3c, which are not `PoissonProblem1D` instances — through the same `(A, b) -> x` inner-solver registry the outer iteration uses per strip.
+Runs any of the 11 registered 1D cases (including raw-matrix sub-cases 3b and 3c) through the inner-solver registry.
 
 ```bash
 python scripts/debug_1d.py --case poisson_1d_fS_hom --N 8
 python scripts/debug_1d.py --case het_1d_3c_neumann --N 16 --inner qsvt
 python scripts/debug_1d.py --dump --case het_1d_3a_linear --N 8 --inner qsvt
-python scripts/debug_1d.py --kappa-table       # kappa(N) vs the O(N^2) theoretical scaling
+python scripts/debug_1d.py --kappa-table      # kappa(N) vs O(N^2) scaling
 ```
 
-### 3.3 — `debug_2d.py` / `debug_3d.py`: 2D/3D outer-scheme diagnostics
+### 3.3 `debug_1d_4th.py` -- 4th-order 1D diagnostics
 
-Compares inner solvers and outer schemes on a line-decomposed problem: scheme comparison table, multigrid hierarchy inspection, inner-solver noise tolerance, and multigrid-then-polish studies. Cases come from `core/cases.py` (`available(dim=2)`/`available(dim=3)`); short aliases (`square`, `het`, `cube`, `slab`) from the original tools still work.
+Verifies $\mathcal{O}(h^4)$ convergence for the pentadiagonal discretisation across all three solvers. Checks boundary closure, condition number, and polynomial degree relative to 2nd-order.
+
+```bash
+python scripts/debug_1d_4th.py --N 8
+python scripts/debug_1d_4th.py --convergence-order --solver qsvt
+```
+
+### 3.4 `debug_2d.py` / `debug_3d.py` -- outer-scheme diagnostics
+
+Compares inner solvers and outer schemes on line-decomposed problems: scheme comparison table, multigrid hierarchy inspection, inner-solver noise tolerance, polish studies.
 
 ```bash
 python scripts/debug_2d.py --case square --N 64
@@ -254,403 +248,377 @@ python scripts/debug_3d.py --case cube --N 16
 python scripts/debug_3d.py --convergence-study --case cube
 ```
 
-> **Runtime note:** a single quantum-solver comparison at $N=8$–16 runs in seconds to a couple of minutes on a laptop, because the outer scheme (default `fmg`) needs a grid-independent number of strip solves rather than the $O(N)$ line-Jacobi sweeps of the originally published scheme. Pass `--scheme jacobi` to reproduce that literature baseline, at correspondingly higher cost.
+Pass `--scheme jacobi` to reproduce the originally published line-Jacobi results at correspondingly higher cost.
 
-### 3.4 — `example_report.py`: copy-me template
+### 3.5 `gap_analysis.py` -- HPC result gap detection
 
-A small, laptop-scale report — one 1D section, one 2D section, one figure each, one CSV — heavily commented to mark exactly which lines to change. Copy it to a new file and edit the `# CHANGE ME` lines to build your own report; see `scripts/archive/run_meeting5.py` for the fuller (but unmaintained) structure this was modelled on.
-
-```bash
-python scripts/example_report.py
-```
-
-**Output:** `results/example_report/report_{1d,2d}.png`, `report_metrics.csv`. Runtime: well under a minute at the shipped defaults.
-
-### 3.5 — Automated test suite
+Scans an HPC result directory and emits a rerun manifest listing configurations whose output `.npz` is absent. This is the only safe way to identify what needs resubmission; without it, a partial sweep and a broken filename convention are indistinguishable.
 
 ```bash
-pytest
+python scripts/gap_analysis.py --dim 2 --results-dir results/2Dhpc_run
 ```
 
-To run only the fast classical tests (under 10 seconds):
+### 3.6 Further diagnostic scripts
+
+| Script | Purpose |
+| --- | --- |
+| `resource_feasibility_1d.py` | Circuit-depth and qubit-count estimates across $N$ and $\kappa$ |
+| `robustness_sweep_1d.py` | Noise-model sensitivity for all three quantum solvers |
+| `hhl_shot_overhead.py` | Post-selection overhead and effective shot count for HHL |
+| `block_encoding_fidelity.py` | Unitarity and fidelity checks for the Sz.-Nagy block encoding |
+| `delta_amplification_hardware.py` | Hardware-adapted amplitude amplification feasibility |
+| `qsvt_2d_line_degree_sweep.py` | QSVT polynomial degree vs $N$ for 2D row matrices |
+| `example_report.py` | Copy-me template for a laptop-scale benchmark report |
+
+### 3.7 Test suite
 
 ```bash
-pytest tests/test_problem_setup.py tests/test_classical_solvers.py
+pytest                         # 259 tests, ~26 s
+pytest -m "not quantum"        # 201 classical tests, ~7 s, no backend needed
+pytest tests/test_outer.py -v  # single file
+pytest tests/test_hhl_1d.py::TestHHL1D::test_agrees_with_thomas_loose -v
 ```
+
+See [Section 8](#8-test-suite) for full coverage details.
 
 ---
 
-## 4. HPC / Cluster Execution (Imperial College CX3)
+## 4. HPC execution (Imperial CX3)
 
-Some configurations — particularly QSVT at large $N$, and any solver across the full $N=4\ldots64$ sweep — are impractical to run to completion on a laptop within a reasonable wall-clock time. This section covers the PBS Pro job infrastructure built for Imperial College's **CX3** HPC cluster to run these unattended, with both CPU and GPU execution paths.
+The HPC surface separates driver code from deployment config: `hpc/runners/` holds ordinary Python (portable to any cluster); `hpc/jobs/` holds PBS Pro submission scripts (CX3-specific). See `hpc/README.md` for the full operational reference.
 
-**Current scope:** this infrastructure drives the **1D full sweep** end-to-end (environment setup → job submission → QSVT phase precompute → post-processing). The **2D equivalent is in progress** — see §4.7.
+> **Before any submission.** `_preflight.sh` blocks execution on a dirty git tree or a missing pentadiagonal module. Ensure the working tree is clean and the submodule is populated.
 
-### 4.1 — One-time environment setup
-
-Run once, from a CX3 login node:
+### 4.1 One-time environment setup
 
 ```bash
 ssh username@login.cx3.hpc.ic.ac.uk
 bash hpc/setup_hpc_env.sh
 ```
 
-This creates **two** separate virtual environments under the RDS home directory (`~/venvs/`, backed by 1 TB permanent quota):
+Creates two venvs under `~/venvs/`:
 
-| Environment          | Path                | Purpose                                                        |
-| --------------------- | ------------------- | ---------------------------------------------------------------- |
-| `qpde`     (CPU)      | `~/venvs/qpde`      | `qiskit==0.45.3`, `qiskit-aer==0.13.3`, `qiskit-algorithms==0.3.0`, NumPy/SciPy/matplotlib/pandas/openpyxl, plus `quantum_linear_solvers` from GitHub |
-| `qpde-gpu` (GPU)      | `~/venvs/qpde-gpu`  | Same stack but with `qiskit-aer-gpu==0.15.1` (CUDA 12 / cuStateVec) in place of `qiskit-aer` — the two packages cannot coexist in one environment |
+| Venv | Contents |
+| --- | --- |
+| `qpde` (CPU) | `qiskit==0.45.3`, `qiskit-aer==0.13.3`, standard scientific stack |
+| `qpde-gpu` (GPU) | Same stack but `qiskit-aer-gpu==0.15.1` (CUDA 12 / cuStateVec) |
 
-`pyqsp` is intentionally **not** in this explicit install list (it's covered separately at job-submission time — see the note in §4.2) so that a missing import doesn't surface hours into a queued job.
+`qiskit-aer` and `qiskit-aer-gpu` cannot coexist in a single environment; the two venvs exist for this reason.
 
-### 4.2 — CPU: full 1D sweep submission
+### 4.2 1D sweep (CPU)
 
 ```bash
 qsub hpc/jobs/submit_hpc_1D.sh
 ```
 
-Runs `hpc/runners/run_1d.py` across $N=4\ldots64$, all cases, all four solvers (Thomas, HHL, VQLS, QSVT).
+Runs `hpc/runners/run_1d.py` over $N=4 \ldots 64$, all cases, all four solvers. Resource: `select=1:ncpus=4:mem=128gb`, `walltime=24:00:00`.
 
-**Resource request:** `select=1:ncpus=4:mem=128gb`, `walltime=24:00:00`.
+**Useful overrides:**
 
-**Useful overrides** (fast validation pass, or skipping the most expensive solver):
 ```bash
-export MAX_N=16
-qsub -v MAX_N hpc/jobs/submit_hpc_1D.sh
-
-export SKIP_QSVT=1
-qsub -v SKIP_QSVT hpc/jobs/submit_hpc_1D.sh
+export MAX_N=16;      qsub -v MAX_N hpc/jobs/submit_hpc_1D.sh
+export SKIP_QSVT=1;   qsub -v SKIP_QSVT hpc/jobs/submit_hpc_1D.sh
 ```
 
-**Monitoring:**
-```bash
-qstat -u $USER
-tail -f results/1Dhpc_run/run.log
-```
+Results write incrementally: each `.npz` is saved as produced; `results_full.json` and `results_summary.csv` are written only on completion. A walltime kill loses the summary but not the per-solution archives.
 
-**Notes:**
-- `--max-workers` is pinned to 4 to match `ncpus`. Aer simulations are already OpenMP-threaded internally, so more worker processes than allocated cores oversubscribes the node rather than speeding it up — if you raise `ncpus`, raise `--max-workers` (and `OMP_NUM_THREADS`) to match.
-- `pyqsp` is checked for at runtime and installed on the fly (`pip install pyqsp==0.2.0`) if missing from the venv.
-- Results write incrementally: each solution `.npz` is saved as it's produced, but `results_full.json` / `results_summary.csv` are only written at the **end** of the run — a job killed on walltime keeps the per-solution files but loses the summary table.
-- On completion, results are copied to permanent storage at `~/qpde-results/1Dhpc_run_<timestamp>/`.
-
-### 4.3 — GPU-accelerated 1D sweep
+### 4.3 1D sweep (GPU)
 
 ```bash
 qsub hpc/jobs/submit_hpc_gpu.sh
 ```
 
-Targets the `gpu72` queue with a single **NVIDIA L40S** (48 GB GDDR6, Ada Lovelace, compute capability 8.9), using `qiskit-aer-gpu`'s cuStateVec backend. Also drives `hpc/runners/run_1d.py`, but forces **serial** execution (`--max-workers 1`) since concurrent worker processes would conflict over the CUDA context.
+Targets the `gpu72` queue with an NVIDIA L40S (48 GB, compute capability 8.9). Executes serially (`--max-workers 1`) to avoid CUDA context conflicts. Resource: `select=1:ncpus=8:mem=64gb:ngpus=1:gpu_type=L40S`, `walltime=24:00:00`.
 
-**Expected speedup over CPU** (per the script's own estimates):
-- $N=8$ QSVT (circuit depth 6,479): ~10–30× → ~7–22 s (vs 222 s on CPU)
-- $N=16$ QSVT (circuit depth 44,567): ~10–50× → feasible (vs hours on CPU)
+Expected speedup over CPU: 10-50x at $N=16$ for QSVT, making previously infeasible $N$ tractable.
 
-**Resource request:** `select=1:ncpus=8:mem=64gb:ngpus=1:gpu_type=L40S`, `walltime=24:00:00`, queue `gpu72`.
+### 4.4 2D and 3D sweeps
 
 ```bash
-export INCLUDE_N64=1
-qsub -v INCLUDE_N64 hpc/jobs/submit_hpc_gpu.sh
+qsub hpc/jobs/submit_hpc_2D.sh
+qsub hpc/jobs/submit_hpc_3D.sh
 ```
 
-Requires the separate `qpde-gpu` venv from §4.1 to be present; the script exits early with setup instructions if it isn't found.
+Mirror the 1D driver's incremental-write behaviour. A walltime kill loses only the summary JSON/CSV.
 
-### 4.4 — QSVT phase-angle precompute
+The 2D and 3D cost profile differs from 1D: a 2D/3D configuration is an outer iteration over many strip solves, so the outer scheme choice matters more than the solver. Use `--scheme fmg` unless reproducing published line-Jacobi results, for which `--scheme jacobi` exists.
 
-QSP phase-angle generation (`pyqsp.PolyOneOverX.generate`) is by far the most expensive part of setting up a QSVT solve at large $N$/condition number, and its cost doesn't parallelise across cores. `hpc/jobs/submit_precompute_hpc.sh` runs this as its own single-threaded batch job (`hpc/runners/precompute_phases.py`) so it survives disconnects and isn't capped by an interactive session's own wall-clock limit, caching results to `results/qsvt_phase_cache/`.
+Phase precompute for the 2D strip operator is cheap: $\kappa_\text{row} \to 3^-$ gives polynomial degrees 30-85 at every $N$. The whole set finishes in minutes; no staging is needed.
 
-The intended usage is a **staged rollout** — small, safe $N$ first, then progressively larger and more exploratory:
+### 4.5 QSVT phase-angle precompute
 
 ```bash
-# Stage 1 — small N, expected safe:
+# Stage 1: safe sizes
 export N_VALUES="4,8,16"
 qsub -v N_VALUES hpc/jobs/submit_precompute_hpc.sh
 
-# Stage 2 — N=32, exploratory, degree-capped, separate job/log:
-export N_VALUES="32"
-export MAX_DEGREE="2000"
+# Stage 2: N=32, exploratory
+export N_VALUES="32"; export MAX_DEGREE="2000"
 qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_hpc.sh
 
-# Stage 3 — N=64, only after Stage 2 is confirmed working:
-export N_VALUES="64"
-export MAX_DEGREE="2000"
+# Stage 3: N=64 only after Stage 2 is confirmed
+export N_VALUES="64"; export MAX_DEGREE="2000"
 qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_hpc.sh
 ```
 
-> **PBS quirk:** pass `N_VALUES` / `MAX_DEGREE` via `qsub -v NAME` (bare name, value taken from the shell's exported variable), **not** `qsub -v NAME=value` — PBS's own `-v` parser splits on commas, which breaks a comma-separated list like `"4,8,16"` if it's embedded directly after an `=`.
+> **PBS quirk.** Pass `N_VALUES` / `MAX_DEGREE` as `qsub -v NAME` (bare name, value from the shell's exported variable). Using `qsub -v NAME=value` breaks PBS's comma-splitting on comma-separated lists.
 
-Each stage writes into the same cache directory, so results accumulate across stages and nothing already cached is re-run. If a stage is killed before finishing, whatever it completed is already safe on disk — just resubmit the same stage.
+Results accumulate in `results/qsvt_phase_cache/` across stages; nothing already cached is recomputed. Resource: single-threaded, `mem=32gb`, `walltime=71:00:00`. $N=32$ and $N=64$ are not guaranteed to finish in one 71 h submission.
 
-**Resource request:** single-threaded, `mem=32gb`, `walltime=71:00:00` (just under CX3's 72h queue cap). $N=32$/$64$ are **not** guaranteed to finish inside one submission.
+The 2D precompute is a separate job (`submit_precompute_2D.sh`) and completes in minutes.
 
-### 4.5 — Post-processing
+The cache key is `(round(kappa, 4), round(epsilon, 8), method, max_degree)`. A condition number differing in the fourth decimal place is a silent cache miss that forces the full phase computation into the sweep. A previous hardcoded 2D table had drifted by up to 0.28 for this reason; $\kappa$ is now derived live from the same problem classes the solvers use.
+
+### 4.6 Post-processing
 
 ```bash
 python hpc/runners/plot_results.py --dim 1 --results-dir results/1Dhpc_run --save-pdf
+python hpc/runners/plot_results.py --dim 2 --results-dir results/2Dhpc_run --save-pdf
+python hpc/runners/plot_results.py --dim 3 --results-dir results/3Dhpc_run --save-pdf
 ```
 
-Reads `results_full.json` and the per-case/per-solver `.npz` solution files and produces:
+1D produces 25 figures (solution profiles, convergence, residual, wall time, HET profiles). 2D and 3D produce 3 scalar-metric figures each. 2D and 3D share a result schema and therefore share their plotting code; 1D does not (its rows carry no `scheme`, `linf_err`, `weighted_cost`, or `err_vs_thomas`).
 
-1. Solution profiles (Thomas vs HHL vs VQLS vs QSVT) with pointwise error, per case
-2. Max relative error vs $N$ (log-log convergence plot, with an $\mathcal{O}(N^{-2})$ reference line)
-3. Residual $\|Au-b\|/\|b\|$ vs $N$
-4. Wall time vs $N$
-5. HET 1D potential profiles and electric-field magnitude (sub-cases 3a/3b/3c)
-6. A combined 2×2 summary figure across the four generic Poisson cases
+The on-disk schema — filename convention, field-name aliases (`u_solver` / `phi_solver` / `phi`) — is declared in `benchmark/results_io.py` for new runs and `benchmark/hpc_archive.py` for the existing HPC run directories. Do not conflate the two: `hpc_archive.py` is read-only and describes data already on disk that cannot be rewritten.
 
-Figures are saved as PNG (always) and PDF (with `--save-pdf`) directly into the results directory.
+### 4.7 4th-order HPC sweeps
 
-### 4.6 — Standalone QSVT diagnostics
+`submit_hpc_1D_4th.sh`, `submit_hpc_2D_4th.sh`, and `submit_hpc_3D_4th.sh` are present but currently blocked. Five defects in the original pipeline have been fixed (see `docs/HPC_REPAIR_PLAN.md`): upstream package divergence, operator truncation, wall-clock cap failure, dirty git state execution, and benchmarking-protocol faults. Submission is gated on `_preflight.sh` confirming a clean tree and a correctly deployed local fork.
 
-`scripts/debug_1d.py --dump` (§3.2) is the debugging counterpart to the HPC sweep: rather than running the full benchmark pipeline, it exercises the QSVT solver directly on one case — the proportionality-recovery diagnostics from `qsvt_1d.py::_qsvt_recovery_diagnostics`, the polynomial degree actually solved, and a node-by-node solution/error dump — on a small, fast case. Useful for isolating a QSVT regression before committing a multi-hour cluster job to it. (Superseded `run_qsvt_debug.py` is kept in `scripts/archive/` for provenance.)
+Gap-fill resubmission for wave-1 manifests uses `submit_{1d,2d,3d}_wave1.sh`.
 
-### 4.7 — 2D and 3D HPC runners
+### 4.8 Monitoring
 
-`hpc/runners/run_2d.py` and `hpc/runners/run_3d.py` mirror the 1D driver, submitted via `hpc/jobs/submit_hpc_2D.sh` and `hpc/jobs/submit_hpc_3D.sh`. Both share the 1D driver's incremental-write behaviour — per-configuration `.npz` output as it is produced — so partial progress survives a walltime kill; only the summary JSON/CSV is lost, and the plotting layer reads the per-solution archives regardless.
+```bash
+qstat -u $USER
+tail -f results/2Dhpc_run/run.log     # may be unreadable; see note below
+tail -f results/2Dhpc_run_pbs.log     # PBS stdout stream; usually readable
+ls -la --time-style=full-iso results/2Dhpc_run/*.npz | tail -5   # vital check
+```
 
-The cost profile differs substantially from the 1D driver. A 1D configuration is a single solve; a 2D or 3D configuration is an outer iteration over many strip solves, so the resource request and the choice of outer scheme matter more than the solver does. Use `--scheme fmg` unless you are specifically reproducing the originally published line-Jacobi results, for which `--scheme jacobi` exists.
-
-Phase-angle precompute for the strip operator is cheap in both dimensions: $\kappa_	ext{row} 	o 3^-$ in 2D and $	o 2^-$ in 3D gives polynomial degrees of 30–85 irrespective of $N$, against the steeply growing 1D degrees. `hpc/jobs/submit_precompute_2D.sh` completes the whole set in minutes and needs no staging, unlike its 1D counterpart (§4.4).
-
-Post-processing for all three dimensions lives in `benchmark/hpc_plotting.py`, with `hpc/runners/plot_results.py --dim {1,2,3}` as the thin command-line wrapper. The on-disk schema itself — the summary format, the archive filename convention and the field-name aliases — is declared once in `benchmark/results_io.py`, which both the readers and (in due course) the runners share.
-
-**2D and 3D share a result schema and therefore share their scalar-metric plots** (convergence, accuracy vs $N$, cost vs $N$, quantum overhead, error decomposition). **1D does not.** Its summary rows carry no `scheme`, `stop_reason`, `linf_err`, `weighted_cost` or `err_vs_thomas` — precisely the fields those plots read — so the 1D entry point calls none of them and has its own parallel implementations in a different visual style. Field visualisation is dimension-specific in all three: profiles in 1D, fields in 2D, orthogonal slices and polar unwrapping in 3D.
-
-`SweepArchive.missing()` reports summary rows whose solution archive is absent, which distinguishes a partial sweep from a broken filename convention; without it both present identically, as a quietly incomplete figure set.
+> **Known issue.** On CX3's network filesystems, `run.log` is sometimes listed by `ls` but unreadable by `tail` due to metadata caching. The `.npz` modification-time check is the reliable progress indicator: if `.npz` mtimes are advancing, the job is doing real work. See `docs/HPC_OPERATIONAL_ISSUES.md` for a full diagnostic sequence.
 
 ---
 
-## 5. Benchmark Sweep Directory
-
-The execution runners in `benchmark/runner.py` sequentially process predefined computational sweeps replicating the primary literature benchmarks.
+## 5. Benchmark sweep catalogue
 
 ### Generic Poisson sweeps
 
-| Sweep | Dimension | Description                                                                            |
-| ----- | --------- | -------------------------------------------------------------------------------------- |
-| A     | 1D        | Homogeneous BCs; source functions fS, fL, fH; $N \in \{8, 16\}$; $\varepsilon = 0.01$    |
-| B     | 1D        | Trotter/VQLS $\varepsilon$ sensitivity; $N = 16$; $\varepsilon \in \{0.1, 0.01, 0.001\}$ |
-| C     | 1D        | Non-homogeneous Dirichlet BCs; fH; $N \in \{16, 32\}$                                    |
-| D     | 1D        | Condition number scaling $\kappa(A) \sim (4/\pi^2)(N+1)^2$; $N \in \{4, 8, 16, 32\}$     |
-| E     | 2D        | Homogeneous BCs; fS, fL, fH; $N \in \{8, 16\}$; $\varepsilon \in \{0.01, 0.5\}$          |
-| F     | 2D        | Non-homogeneous BCs; convergence behaviour under asymmetric conditions                 |
-| G     | 2D        | Row matrix condition number $\kappa(A_\text{row}) \to 3^-$; $N \in \{4, 8, 16, 32\}$     |
+| Sweep | Dim | Description |
+| --- | --- | --- |
+| A | 1D | Homogeneous BCs; sources fS, fL, fH; $N \in \{8, 16\}$; $\varepsilon = 0.01$ |
+| B | 1D | Trotter / VQLS $\varepsilon$ sensitivity; $N = 16$; $\varepsilon \in \{0.1, 0.01, 0.001\}$ |
+| C | 1D | Non-homogeneous Dirichlet BCs; fH; $N \in \{16, 32\}$ |
+| D | 1D | Condition-number scaling $\kappa \sim (4/\pi^2)(N+1)^2$; $N \in \{4, 8, 16, 32\}$ |
+| E | 2D | Homogeneous BCs; fS, fL, fH; $N \in \{8, 16\}$; $\varepsilon \in \{0.01, 0.5\}$ |
+| F | 2D | Non-homogeneous BCs; asymmetric convergence behaviour |
+| G | 2D | Row-matrix condition number $\kappa_\text{row} \to 3^-$; $N \in \{4, 8, 16, 32\}$ |
 
 ### HET plasma sweeps
 
-| Sweep | Description                                                          |
-| ----- | -------------------------------------------------------------------- |
-| H1    | 1D Gaussian profile, homogeneous BCs; $N \in \{4, 8\}$                |
-| H2    | 1D Gaussian profile, physical BCs ($V_d = 300$ V); $N \in \{4, 8\}$   |
-| H3    | 1D all three charge density profiles; $N = 8$; physical BCs          |
-| H4    | Condition number and $\alpha = L^2/\lambda_D^2$ scaling diagnostics   |
+| Sweep | Description |
+| --- | --- |
+| H1 | 1D Gaussian profile; homogeneous BCs; $N \in \{4, 8\}$ |
+| H2 | 1D Gaussian profile; physical BCs ($V_d = 300$ V); $N \in \{4, 8\}$ |
+| H3 | 1D all three charge-density profiles; $N = 8$; physical BCs |
+| H4 | Condition number and $\alpha = L^2/\lambda_D^2$ scaling diagnostics |
 
 ---
 
-## 6. Physical Application: HET Plasma Modelling
+## 6. Physical application: HET plasma
 
 ### Problem formulation
 
-The electrostatic potential $\tilde{\phi}$ in the discharge channel of a Hall Effect Thruster satisfies the non-dimensionalised Poisson equation:
+The electrostatic potential $\tilde{\phi}$ in the discharge channel satisfies:
 
-$$
-\frac{d^2 \tilde{\phi}}{d\tilde{x}^2} = -\alpha \, \delta\tilde{n}(\tilde{x}) \quad \text{(1D axial)}
-$$
+$$\frac{d^2\tilde{\phi}}{d\tilde{x}^2} = -\alpha\,\delta\tilde{n}(\tilde{x}) \qquad \text{(1D axial)}$$
 
-$$
-\frac{\partial^2 \tilde{\phi}}{\partial \tilde{x}^2} + \frac{\partial^2 \tilde{\phi}}{\partial \tilde{y}^2} = -\alpha \, \delta\tilde{n}(\tilde{x}, \tilde{y}) \quad \text{(2D axial-radial)}
-$$
+$$\frac{\partial^2\tilde{\phi}}{\partial\tilde{x}^2} + \frac{\partial^2\tilde{\phi}}{\partial\tilde{y}^2} = -\alpha\,\delta\tilde{n}(\tilde{x},\tilde{y}) \qquad \text{(2D axial-radial)}$$
 
-where $\alpha = L^2 / \lambda_D^2$ is the dimensionless Debye scaling parameter and $\delta\tilde{n} = (n_i - n_e)/n_0$ is the non-dimensional net charge density.
+where $\alpha = L^2/\lambda_D^2$ is the dimensionless Debye scaling parameter and $\delta\tilde{n} = (n_i - n_e)/n_0$ is the non-dimensional net charge density.
 
-### Physical parameters (Boeuf & Garrigues 1998, Table 1)
+### Physical parameters (Boeuf and Garrigues 1998, Table 1)
 
-| Parameter            | Symbol                      | Value                       |
-| -------------------- | --------------------------- | ---------------------------- |
-| Channel length       | $L$                         | 25 mm                       |
-| Discharge voltage    | $V_d$                       | 300 V                        |
-| Electron temperature | $T_e$                       | 20 eV                        |
-| Reference density    | $n_0$                       | $5 \times 10^{17}$ m$^{-3}$  |
-| Debye length         | $\lambda_D$                 | $\approx 128\,\mu$m           |
-| Scaling parameter    | $\alpha = L^2/\lambda_D^2$  | $\approx 38{,}000$            |
+| Parameter | Symbol | Value |
+| --- | --- | --- |
+| Channel length | $L$ | 25 mm |
+| Discharge voltage | $V_d$ | 300 V |
+| Electron temperature | $T_e$ | 20 eV |
+| Reference density | $n_0$ | $5 \times 10^{17}$ m$^{-3}$ |
+| Debye length | $\lambda_D$ | $\approx 128\,\mu$m |
+| Scaling parameter | $\alpha = L^2/\lambda_D^2$ | $\approx 38{,}000$ |
 
-### Charge density profiles
+### Charge-density profiles
 
-Three physically motivated source term profiles are implemented:
+| Key | Profile | Description |
+| --- | --- | --- |
+| `gaussian` | $\delta\tilde{n} = \delta_0\exp\!\bigl(-(\tilde{x}-\tilde{x}_\text{peak})^2/\sigma^2\bigr)$ | Smooth ionisation zone near exit plane |
+| `linear` | $\delta\tilde{n} = \delta_0\,\tilde{x}$ | Uniform space-charge gradient; analytical solution available |
+| `step` | $\delta\tilde{n} = \delta_0\,\mathrm{sign}(\tilde{x}-\tilde{x}_\text{ion})$ | Sharp ionisation front |
 
-| Key        | Profile                                                                                        | Description                                                  |
-| ---------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `gaussian` | $\delta\tilde{n} = \delta_0 \exp\left(-(\tilde{x}-\tilde{x}_\text{peak})^2/\sigma^2\right)$      | Smooth ionisation zone near exit plane                       |
-| `linear`   | $\delta\tilde{n} = \delta_0\,\tilde{x}$                                                          | Uniform space charge gradient; analytical solution available |
-| `step`     | $\delta\tilde{n} = \delta_0\,\mathrm{sign}(\tilde{x} - \tilde{x}_\text{ion})$                    | Sharp ionisation front                                       |
-
-The charge separation amplitude is set to $\delta_0 = \delta_{0,\text{factor}}/\alpha$ (default $\delta_{0,\text{factor}} = 5$) to ensure $\alpha\,\delta_0 = \mathcal{O}(1)$, keeping the space charge contribution a physically realistic small perturbation on the applied voltage $\alpha_\text{bc} = V_d/\phi_0 \approx 15$.
+The charge-separation amplitude is $\delta_0 = \delta_{0,\text{factor}}/\alpha$ (default $\delta_{0,\text{factor}} = 5$), keeping $\alpha\,\delta_0 = \mathcal{O}(1)$.
 
 ### 2D analytical solution
 
-For the sinusoidal source term $f(\tilde{x}, \tilde{y}) = -2\pi^2 \sin(\pi\tilde{x})\sin(\pi\tilde{y})$ with homogeneous Dirichlet boundary conditions, the exact analytical solution is:
+For the sinusoidal source $f(\tilde{x},\tilde{y}) = -2\pi^2\sin(\pi\tilde{x})\sin(\pi\tilde{y})$ with homogeneous Dirichlet boundary conditions:
 
-$$
-\tilde{\phi}(\tilde{x}, \tilde{y}) = \sin(\pi\tilde{x})\,\sin(\pi\tilde{y})
-$$
+$$\tilde{\phi}(\tilde{x},\tilde{y}) = \sin(\pi\tilde{x})\sin(\pi\tilde{y})$$
 
-This manufactured solution enables rigorous quantitative error assessment of all three quantum solvers in two dimensions without dependence on a numerical reference.
-
-### Key results (development benchmarks, $N = 4$–$8$)
-
-- HHL achieves relative errors of 1–5% against the analytical solution for $\varepsilon = 0.01$, consistent with the Trotter approximation error
-- VQLS achieves relative errors of 0.1–2% with COBYLA optimisation (cost $< 10^{-6}$), outperforming HHL at equivalent resolution
-- QSVT achieves near-machine-precision residuals ($\lesssim 10^{-12}$) at $N=4$ with the Sz.-Nagy block encoding and pyqsp phase angles
-- The peak electric field for the physical operating condition ($V_d = 300$ V, Gaussian profile) is of order $10^4$ V/m, in qualitative agreement with Boeuf & Garrigues (1998), Fig. 3
+This manufactured solution allows rigorous error quantification for all three quantum solvers in 2D without a numerical reference.
 
 ---
 
-## 7. Algorithm Summary
+## 7. Algorithm summary
 
-Three quantum linear system algorithms are implemented, each targeting the system $A|x\rangle = |b\rangle$:
+All three algorithms target the linear system $A|x\rangle = |b\rangle$.
 
-### Complexity comparison
+### Complexity at a glance
 
-| Algorithm | Circuit depth                                          | Qubit count                        | Condition number scaling          |
-| --------- | ------------------------------------------------------ | ----------------------------------- | ---------------------------------- |
-| HHL       | $\mathcal{O}(\kappa^2 \log N / \varepsilon)$            | $\mathcal{O}(\log N + \log\kappa)$  | Quadratic in $\kappa$              |
-| VQLS      | $\mathcal{O}(n_\text{layers} \cdot n_\text{qubits})$    | $\mathcal{O}(\log N)$               | Variational (no formal guarantee)  |
-| QSVT      | $\mathcal{O}(\kappa \log(1/\varepsilon))$               | $\mathcal{O}(\log N + 2)$           | Linear in $\kappa$                 |
+| Algorithm | Circuit depth | Qubit count | Condition-number scaling |
+| --- | --- | --- | --- |
+| HHL | $\mathcal{O}(\kappa^2 \log N / \varepsilon)$ | $\mathcal{O}(\log N + \log\kappa)$ | Quadratic in $\kappa$ |
+| VQLS | $\mathcal{O}(n_\text{layers} \cdot n_\text{qubits})$ | $\mathcal{O}(\log N)$ | No formal guarantee |
+| QSVT | $\mathcal{O}(\kappa\log(1/\varepsilon))$ | $\mathcal{O}(\log N + 2)$ | Linear in $\kappa$ |
 
-For the 1D Poisson matrix with $\kappa \sim \mathcal{O}(N^2)$, QSVT achieves a quadratic improvement in condition number dependence over HHL. For the 2D line-Jacobi row matrix with $\kappa_\text{row} \to 3^-$, the QSVT polynomial degree is essentially constant in $N$:
+For the 1D Poisson matrix with $\kappa \sim \mathcal{O}(N^2)$, QSVT achieves a quadratic improvement over HHL. For the 2D row matrix with $\kappa_\text{row} \to 3^-$, the QSVT polynomial degree is essentially constant in $N$:
 
-$$
-d_\text{2D} = \mathcal{O}\left(\kappa_\text{row} \log(1/\varepsilon)\right) \approx \mathcal{O}\left(3\log(1/\varepsilon)\right)
-$$
+$$d_\text{2D} \approx \mathcal{O}\!\left(\kappa_\text{row}\log(1/\varepsilon)\right) \approx \mathcal{O}\!\left(3\log(1/\varepsilon)\right)$$
+
+This degree gap (degree ~939 for the 1D $N=4$ matrix vs ~33 for the 2D row matrix) is why 1D phase precompute requires staged cluster treatment while the 2D precompute finishes in minutes.
 
 ### QSVT block encoding
 
-The block encoding uses the Sz.-Nagy unitary dilation. Given $M = A/\alpha$ with $\|M\|_2 \leq 1$, the $2N \times 2N$ unitary:
+The Sz.-Nagy unitary dilation with $M = A/\alpha$, $\|M\|_2 \le 1$:
 
-$$
-U_A = \begin{pmatrix} M & \sqrt{I - M^2} \\ \sqrt{I - M^2} & -M \end{pmatrix}
-$$
+$$U_A = \begin{pmatrix} M & \sqrt{I - M^2} \\ \sqrt{I - M^2} & -M \end{pmatrix}$$
 
-satisfies $(\langle 0|_\text{anc} \otimes I_N)\, U_A\, (|0\rangle_\text{anc} \otimes I_N) = M = A/\alpha$ exactly, using a single ancilla qubit. The subnormalisation factor $\alpha = \|A\|_2$ (spectral norm) is computed via eigendecomposition.
+satisfies $(\langle 0|_\text{anc} \otimes I_N)\,U_A\,(|0\rangle_\text{anc} \otimes I_N) = M = A/\alpha$ exactly using a single ancilla qubit. $\alpha = \|A\|_2$ via eigendecomposition. This encoding works for both TST (tridiagonal) and pentadiagonal matrices.
 
 ### VQLS cost function
 
-$$
-C(\boldsymbol{\theta}) = 1 - \frac{\left|\langle b \,|\, A \,|\, x(\boldsymbol{\theta})\rangle\right|^2}{\langle x(\boldsymbol{\theta}) \,|\, A^\dagger A \,|\, x(\boldsymbol{\theta})\rangle}
-$$
+$$C(\boldsymbol{\theta}) = 1 - \frac{\left|\langle b\,|\,A\,|\,x(\boldsymbol{\theta})\rangle\right|^2}{\langle x(\boldsymbol{\theta})\,|\,A^\dagger A\,|\,x(\boldsymbol{\theta})\rangle}$$
 
-evaluated via direct statevector arithmetic on the Pauli LCU decomposition of $A$. Optimisation uses COBYLA with a three-stage restart strategy ($\rho_\text{beg} \in \{0.5, 0.1, 0.01\}$).
+Evaluated by direct statevector arithmetic over the Pauli LCU decomposition of $A$ (`vqls_utils.py`). Optimisation uses COBYLA with a three-stage restart ($\rho_\text{beg} \in \{0.5, 0.1, 0.01\}$). Note: the bound $C \ge r^2/\kappa^2$ means a low cost value does not guarantee a low residual; see the equal-accuracy protocol below.
 
-### 2D line-Jacobi decomposition
+`vqls_hadamard.py` provides a circuit-level Hadamard-test implementation of the same cost function for use with shot-based hardware. It is an opt-in extension that does not touch the regression-pinned `vqls_1d.py` path.
 
-$$
-u^{n+1}_{i+1,j} - 4\,u^{n+1}_{i,j} + u^{n+1}_{i-1,j} = h^2 f(x_i, y_j) - \left(u^n_{i,j-1} + u^n_{i,j+1}\right)
-$$
+### 2D line decomposition
 
-Each row sub-problem has a TST matrix with $a = -4$, $b = 1$ and $\kappa(A_\text{row}) \to 3^-$ as $N \to \infty$, far more favourable than the $\mathcal{O}(N^2)$ scaling of the 1D Poisson matrix.
+$$u^{n+1}_{i+1,j} - 4\,u^{n+1}_{i,j} + u^{n+1}_{i-1,j} = h^2 f(x_i,y_j) - \left(u^n_{i,j-1} + u^n_{i,j+1}\right)$$
+
+Each row sub-problem is a TST system with $\kappa_\text{row} \to 3^-$ as $N \to \infty$.
+
+### 4th-order (pentadiagonal) discretisation
+
+The five-point stencil (coefficients $-30, 16, -1$ divided by $12h^2$) gives $\mathcal{O}(h^4)$ truncation error against $\mathcal{O}(h^2)$ for the standard three-point stencil. Practical consequences:
+
+- The same solution accuracy is reached at $N^{1/2}$ grid points, reducing the amplitude-encoded register by one qubit per halving of $N$.
+- $\kappa$ increases by roughly 2.5x over the tridiagonal case at the same $N$, raising QSVT polynomial degree moderately.
+- The block encoding and Pauli LCU decomposition are extended to pentadiagonal structure; the Sz.-Nagy dilation still uses a single ancilla qubit.
+
+**1D boundary closure.** The original even-reflection closure injected an $\mathcal{O}(1)$ consistency error, capping convergence at order 2. The correct formulation adjusts the right-hand side using explicit boundary source data: $b[0] \mathrel{-}= 14\alpha$ and $b[0] \mathrel{+}= h^2 f(0)$. The matrix $A$ remains symmetric, preserving $\kappa$ and validating all cached phase angles.
+
+**2D/3D boundary closure.** The normal second derivative at a boundary face requires tangential components: $\partial^2 u/\partial n^2|_\text{face} = f|_\text{face} - \sum_t \partial^2 u/\partial t^2|_\text{face}$. Tangential terms depend only on Dirichlet data. Using $f$ alone leaves a residual error of $-f_\text{face}/12$ at the boundary row. The updated `poisson_line_2d_4th.py` and `poisson_line_3d_4th.py` implement this rigorously, with the strip sweep extending to $j\pm 2$ transverse stencil coupling.
+
+### Equal-accuracy protocol
+
+A naive comparison at nominally equal precision parameters is methodologically unsound:
+
+1. The VQLS cost $C$ is not the residual $r$. The bound $C \ge r^2/\kappa^2$ means cost $10^{-6}$ guarantees only $r \le \kappa \times 10^{-3}$ ($\approx 0.95\%$ at $\kappa \approx 9.5$, $N=4$).
+2. HHL $\varepsilon$ and Trotter steps are coupled ($n_T = \lceil 1/\varepsilon \rceil$). Reducing $\varepsilon$ changes both QPE resolution and Hamiltonian simulation error simultaneously.
+3. The QSVT residual is not monotone in polynomial degree due to oscillatory Chebyshev approximation error.
+
+`benchmark/equal_accuracy.py` implements the correct protocol: for each solver and each problem $(N, \text{case})$, sweep the primary precision parameter, measure the achieved residual, and select the result whose residual falls within an acceptance band around a shared target $r_\text{target}$. All solvers are then compared at the same achieved accuracy.
+
+`benchmark/sensitivity.py` provides one-at-a-time (OAT) sweeps, restricted to $N \in \{4, 8\}$ to keep total runtime tractable (a full OAT sweep at $N=8$ for QSVT takes $\approx 18$ minutes).
+
+`benchmark/tables.py` generates LaTeX tables (booktabs/siunitx style, directly `\input{}`-able into the thesis) and aligned ASCII tables for HPC log inspection. Table catalogue: `primary_comparison`, `equal_accuracy`, `sensitivity`, `circuit_resources`, `het_application`, `order_comparison`.
+
+### IBM Quantum hardware adapter
+
+`benchmark/hardware.py` provides a thin adapter for submitting benchmark circuits to real IBM Quantum hardware via Qiskit IBM Runtime. Zero-noise extrapolation (ZNE) via `RuntimeEstimatorV2` is supported (noise scaling factors $[1, 2, 3]$, linear extrapolation). Hardware execution is gated behind `ENABLE_HARDWARE_RUN` to prevent accidental job submission. Hardware results supplement the primary statevector benchmark; they do not replace it.
 
 ---
 
-## 8. Test Suite
-
-The automated test suite is located in `tests/` and is executed via `pytest`. Tests verify structural correctness and solver functionality rather than publication-grade accuracy. All quantum solver tests use $N=4$ (2 qubits) to bound individual test runtime.
-
-The suite covers the 1D solvers directly and the 2D/3D solvers through `solvers/outer`, the single outer-iteration architecture. Because every multi-dimensional solve is an outer iteration over 1D strip solves, testing the 1D solvers and the outer layer separately covers the 2D and 3D paths without paying for a full quantum line-relaxation run in the test suite.
-
-### Test file summary
-
-| File                        | Coverage                                                                       | Tests | Approx. runtime |
-| --------------------------- | ------------------------------------------------------------------------------ | ----- | ---------------- |
-| `test_problem_setup.py`     | 1D matrix structure, grid, RHS, config validation, exact solutions             | 41    | $\sim 1$ s      |
-| `test_classical_solvers.py` | Thomas 1D accuracy, NumPy agreement                                             | 9     | $\sim 1$ s      |
-| `test_line_problems.py`     | `PoissonLine2D`/`PoissonLine3D`: operators, Dirichlet absorption, periodicity, conditioning, coarsening | 36 | $\sim 1$ s |
-| `test_outer.py`             | `solvers/outer`: work accounting, stagnation detection, strip sweep, option registry, stationary schemes, multigrid transfer operators and cycles | 84 | $\sim 8$ s |
-| `test_hhl_1d.py`            | HHL 1D solution shape, sign, proportionality recovery                          | 11    | $\sim 8$ s      |
-| `test_vqls_1d.py`           | VQLS cost convergence, parameter shape, reproducibility                        | 15    | $\sim 5$ s      |
-| `test_qsvt_1d.py`           | Block encoding unitarity, QSP angle shape, QSVT solver correctness             | 24    | $\sim 4$ s      |
-| `test_het_problem.py`       | HET config derived quantities, matrix structure, solver compatibility          | 22    | $\sim 4$ s      |
-| `test_integration.py`       | End-to-end pipelines, 1D and 2D, and `BenchmarkResult` consistency             | 17    | $\sim 5$ s      |
-| **Total**                   |                                                                                | **259** | $\sim 31$ s   |
-
-Two properties receive dedicated tests because a silent regression in either would be hard to attribute:
-
-- **Line-Jacobi reproducibility.** `scheme="jacobi"` with `criterion="delta"` must reproduce the original line-Jacobi loop exactly. `test_outer.py` reconstructs that loop from first principles and asserts agreement in the field, the iteration count and the stopping point.
-- **Option validation.** The inner-solver registry must reject unknown keys rather than absorbing them. A registry that silently ignored `max_degrees=500` would let an HPC run cost an order of magnitude more than intended whilst appearing to honour the setting.
-
-### Markers
-
-One marker is defined, `quantum`, applied to every test that builds and simulates a circuit:
+## 8. Test suite
 
 ```bash
-pytest -m "not quantum"     # 193 tests, ~11 s, no quantum backend required
-```
-
-This selects the pure-classical subset: problem assembly, the classical solvers, and the whole outer-iteration layer. It is the fastest meaningful check and the one to run when iterating on 2D/3D solver structure.
-
-There is deliberately no `slow` marker. Every test in the suite completes in under four seconds, so a fast/slow split would carry no information; the earlier marker predated the consolidation onto `solvers/outer` and had become mis-applied to tests taking barely a second.
-
-### Running the tests
-
-```bash
-# Full suite
-pytest
-
-# Pure-classical subset — no quantum backend needed (~11 s)
-pytest -m "not quantum"
-
-# Single test file
-pytest tests/test_qsvt_1d.py -v
-
-# Single test function
+pytest                          # 259 tests, ~26 s
+pytest -m "not quantum"         # 201 classical tests, ~7 s
+pytest tests/test_outer.py -v
 pytest tests/test_hhl_1d.py::TestHHL1D::test_agrees_with_thomas_loose -v
 ```
 
-### Pass/fail criteria
+`quantum` is the only marker; it is applied to every test that builds and simulates a circuit. There is no `slow` marker: every test completes in under six seconds.
 
-Tests verify that solvers:
+### Coverage by file
 
-- Return results of the correct shape and type
-- Produce finite (non-NaN, non-Inf) solution values
-- Agree with the Thomas reference to within a loose tolerance (20% for HHL, 15% for VQLS, 20% for QSVT at $N=4$)
-- Preserve the correct sign of the dominant solution component
-- Raise appropriate exceptions for invalid inputs
+| File | Coverage | Tests | Runtime |
+| --- | --- | --- | --- |
+| `test_problem_setup.py` | 1D matrix structure, grid, RHS, config validation, exact solutions | 41 | ~1 s |
+| `test_classical_solvers.py` | Thomas 1D accuracy, NumPy agreement | 9 | ~1 s |
+| `test_line_problems.py` | `PoissonLine2D/3D`: operators, Dirichlet absorption, periodicity, conditioning, coarsening | 36 | ~1 s |
+| `test_outer.py` | `solvers/outer`: work accounting, stagnation, strip sweep, option registry, stationary schemes, multigrid transfer operators and cycles | 84 | ~8 s |
+| `test_hhl_1d.py` | HHL solution shape, sign, proportionality recovery | 11 | ~8 s |
+| `test_vqls_1d.py` | VQLS cost convergence, parameter shape, reproducibility | 15 | ~5 s |
+| `test_qsvt_1d.py` | Block-encoding unitarity, QSP angle shape, QSVT solver correctness | 24 | ~4 s |
+| `test_het_problem.py` | HET config derived quantities, matrix structure, solver compatibility | 22 | ~4 s |
+| `test_integration.py` | End-to-end pipelines (1D and 2D), `BenchmarkResult` consistency | 17 | ~5 s |
+| **Total** | | **259** | **~26 s** |
+
+### Two load-bearing tests
+
+**Line-Jacobi reproducibility.** `test_outer.py` reconstructs the original line-Jacobi loop from first principles and asserts `scheme="jacobi"` reproduces it exactly (field, iteration count, stopping point). The retired implementation is gone; this test is the only guard on the published 2D figures.
+
+**Option validation.** The inner-solver registry must reject unknown keys, not absorb them silently. A registry that ignored `max_degrees=500` would let an HPC run cost an order of magnitude more than intended while appearing to honour the setting.
+
+### Pass / fail criteria
+
+Tests verify that solvers return results of the correct shape, produce finite values, agree with Thomas to within a loose tolerance (20% for HHL, 15% for VQLS, 20% for QSVT at $N=4$), preserve the correct sign, and raise appropriate exceptions for invalid inputs.
 
 ---
 
-## 9. Methodological Notes
+## 9. Methodological notes
 
 ### Statevector simulation
 
-All quantum circuits are evaluated via deterministic statevector simulation using Qiskit's `Statevector` class from `qiskit.quantum_info`. Shot-noise simulation via stochastic backends is bypassed to establish baseline theoretical algorithmic accuracy, consistent with the methodology of Ghafourpour & Laizet (2025).
+All circuits are evaluated via `qiskit.quantum_info.Statevector` (deterministic, no shot noise), consistent with Ghafourpour and Laizet (2025). This establishes the theoretical algorithmic baseline but cannot capture NISQ noise or shot-based measurement variance; the `hardware.py` adapter addresses the latter for small $N$.
 
 ### HHL solution extraction
 
-The HHL output state is post-selected on the ancilla (flag) qubit being in state $|1\rangle$ and the clock (QPE) register being in state $|0\cdots0\rangle$. The proportionality constant $c$ is recovered against the normalised system $A_\text{norm} = A/\|A\|_2$ to prevent amplification of Trotter approximation errors by the factor $\|b\|/\|A\|_2$, which is large in physically scaled problems (e.g. the HET case where $\|b\| \sim \alpha h^2 \sim 700$).
+The output state is post-selected on the ancilla (flag) qubit being $|1\rangle$ and the QPE clock register being $|0\cdots0\rangle$. The proportionality constant is recovered against the normalised system $A/\|A\|_2$ to prevent Trotter error from being amplified by $\|b\|/\|A\|_2$, which is large in physically scaled problems (for the HET case, $\|b\| \sim \alpha h^2 \sim 700$).
 
-### QSVT block encoding and phase angles
+### QSVT phase angles
 
-The block encoding uses the Sz.-Nagy dilation with $\alpha = \|A\|_2$ (spectral norm), giving $\kappa_\text{eff} = \kappa(A)$ exactly. The QSP phase angles are computed via the `pyqsp` library (`PolyOneOverX.generate(kappa, epsilon)`), which uses an internal degree selection algorithm. For the 1D Poisson matrix at $N=4$ ($\kappa \approx 9.5$, $\varepsilon = 0.05$), pyqsp returns degree $\approx 939$; for the 2D row matrix ($\kappa \approx 2.36$, $\varepsilon = 0.1$), degree $\approx 33$. A Chebyshev-based fallback is provided when pyqsp is unavailable. This degree gap (939 vs 33) is exactly why the 1D phase precompute (§4.4) needs staged, cluster-scale treatment while the 2D row matrix is expected to be comparatively cheap (§4.7).
+`pyqsp.PolyOneOverX.generate(kappa, epsilon)` selects the polynomial degree internally. For the 1D Poisson matrix at $N=4$ ($\kappa \approx 9.5$, $\varepsilon = 0.05$) the degree is ~939; for the 2D row matrix ($\kappa \approx 2.36$, $\varepsilon = 0.1$) the degree is ~33. A Chebyshev-based fallback is provided when `pyqsp` is unavailable. The residual is not monotone in degree; measure it, do not estimate from degree alone.
 
-### 2D QSVT performance optimisation
+### 2D reference solution
 
-The block encoding circuit and QSP phase angles are pre-computed once before the line-Jacobi loop and cached, eliminating $\mathcal{O}(N \times \text{max\_iter})$ redundant computations. Row-level parallelisation via `concurrent.futures.ProcessPoolExecutor` is supported through the `n_workers` parameter in `QSVTConfig2D`, and is recommended for HPC deployment — this is the hook the in-progress 2D HPC runner (§4.7) is expected to use.
+`benchmark/reference_2d.py::fine_mesh_reference` runs an FMG solve on a mesh refined 19x per direction and samples back to the coarse nodes. Its `REFERENCE_TOL = 1e-10` is truncation-limited; tightening it costs ~5x runtime and changes nothing. The previous implementation used line-Jacobi capped at 5000 sweeps, which cannot converge on a $152^2$-$608^2$ mesh; any 2D error metric predating this function was measured against an under-converged ground truth.
+
+### Reproducing the published 2D figures
+
+Three settings are each required and each silently change the numbers if omitted:
+
+1. `scheme="jacobi"` (defaults: `update="jacobi"`, `criterion="delta"`)
+2. `patience=max_iter+1` to disable stagnation detection, which otherwise truncates the non-converging residual histories that Section IV F of Ghafourpour and Laizet (2025) sets out to show
+3. `inner_options={"epsilon": max(cfg.epsilon, 0.1)}` for HHL, reproducing the 10-step Trotter cap; without it an $\varepsilon=0.01$ sweep costs 10x more for no accuracy gain
 
 ### Physical hardware viability
 
-Extracting the full solution vector at each step of the 2D line-Jacobi cycle requires $\mathcal{O}(N)$ quantum state tomography operations per iteration and is not physically realisable on near-term quantum hardware. This framework is therefore strictly a theoretical simulator study of algorithmic behaviour, Hamiltonian scaling, and quantum error propagation.
+Extracting the full solution vector at each line-Jacobi step requires $\mathcal{O}(N)$ quantum state tomography operations per iteration. This is not realisable on near-term hardware. The framework is therefore a theoretical simulator study of algorithmic behaviour, Hamiltonian scaling, and quantum error propagation; hardware experiments are supplementary.
 
 ---
 
 ## 10. References
 
-1. Ghafourpour, L. & Laizet, S. (2025). Applicability of solving the one- and two-dimensional Poisson equations with the quantum Harrow-Hassidim-Lloyd algorithm. *Physical Review Applied*, 24, 024032.
-2. Harrow, A. W., Hassidim, A. & Lloyd, S. (2009). Quantum algorithm for linear systems of equations. *Physical Review Letters*, 103, 150502.
-3. Bravo-Prieto, C., LaRose, R., Cerezo, M., Subasi, Y., Cincio, L. & Coles, P. J. (2023). Variational quantum linear solver. *Quantum*, 7, 1188.
-4. Gilyen, A., Su, Y., Low, G. H. & Wiebe, N. (2019). Quantum singular value transformation and beyond: exponential improvements for quantum matrix arithmetics. *Proceedings of the 51st Annual ACM STOC*, pp. 193–204.
-5. Martyn, J. M., Rossi, Z. M., Tan, A. K. & Chuang, I. L. (2021). Grand unification of quantum algorithms. *PRX Quantum*, 2, 040203.
-6. Vazquez, A. C., Hiptmair, R. & Woerner, S. (2022). Enhancing the quantum linear systems algorithm using Richardson extrapolation. *ACM Transactions on Quantum Computing*, 3, 1.
-7. Boeuf, J. P. & Garrigues, L. (1998). Low frequency oscillations in a stationary plasma thruster. *Journal of Applied Physics*, 84(7), 3541–3554.
-8. Brearley, P. & Laizet, S. (2024). Quantum algorithm for solving the advection equation using Hamiltonian simulation. *Physical Review A*, 110, 012430.
-9. Over, P., Bengoechea, S., Brearley, P., Laizet, S. & Rung, T. (2025). Quantum algorithm for the advection-diffusion equation by direct block encoding of the time-marching operator. *Physical Review A*, 112, L010401.
-10. Tennie, F., Laizet, S., Lloyd, S. & Magri, L. (2025). Quantum computing for nonlinear differential equations and turbulence. *Nature Reviews Physics*, 7, 220–230.
+1. Ghafourpour, L. and Laizet, S. (2025). Applicability of solving the one- and two-dimensional Poisson equations with the quantum Harrow-Hassidim-Lloyd algorithm. *Physical Review Applied*, 24, 024032.
+2. Harrow, A. W., Hassidim, A. and Lloyd, S. (2009). Quantum algorithm for linear systems of equations. *Physical Review Letters*, 103, 150502.
+3. Bravo-Prieto, C., LaRose, R., Cerezo, M., Subasi, Y., Cincio, L. and Coles, P. J. (2023). Variational quantum linear solver. *Quantum*, 7, 1188.
+4. Gilyen, A., Su, Y., Low, G. H. and Wiebe, N. (2019). Quantum singular value transformation and beyond: exponential improvements for quantum matrix arithmetics. *Proceedings of the 51st Annual ACM STOC*, pp. 193-204.
+5. Martyn, J. M., Rossi, Z. M., Tan, A. K. and Chuang, I. L. (2021). Grand unification of quantum algorithms. *PRX Quantum*, 2, 040203.
+6. Vazquez, A. C., Hiptmair, R. and Woerner, S. (2022). Enhancing the quantum linear systems algorithm using Richardson extrapolation. *ACM Transactions on Quantum Computing*, 3, 1.
+7. Boeuf, J. P. and Garrigues, L. (1998). Low frequency oscillations in a stationary plasma thruster. *Journal of Applied Physics*, 84(7), 3541-3554.
+8. Brearley, P. and Laizet, S. (2024). Quantum algorithm for solving the advection equation using Hamiltonian simulation. *Physical Review A*, 110, 012430.
+9. Over, P., Bengoechea, S., Brearley, P., Laizet, S. and Rung, T. (2025). Quantum algorithm for the advection-diffusion equation by direct block encoding of the time-marching operator. *Physical Review A*, 112, L010401.
+10. Tennie, F., Laizet, S., Lloyd, S. and Magri, L. (2025). Quantum computing for nonlinear differential equations and turbulence. *Nature Reviews Physics*, 7, 220-230.
