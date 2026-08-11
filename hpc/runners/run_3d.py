@@ -93,6 +93,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from core import cases
 from core import het_geometry as geom
+from problems.poisson_line_3d_4th import PoissonLine3D4th
 from solvers.outer import (InnerConfig, available_inner,
                            available_schemes, build_hierarchy, describe_inner,
                            describe_scheme, get_inner, resolve_options, solve)
@@ -394,7 +395,8 @@ def _azimuthal_mode_amplitude(phi: np.ndarray, m: int) -> float:
 def case_cube(N: int):
     """Canonical 3-D Poisson verification case; see poisson_3d_triple_sin_cube."""
     built = cases.get("poisson_3d_triple_sin_cube").build(N)
-    return built.problem, built.exact, built.f_values, "3D_Poisson_TripleSin_cube", 0
+    return (built.problem, built.exact, built.f_values,
+            "3D_Poisson_TripleSin_cube", 0, built.f_faces)
 
 
 # ── Section 2: HET channel MMS, azimuthally periodic ──────────────────────────
@@ -402,7 +404,8 @@ def case_cube(N: int):
 def case_het_mms(N: int, m: int = 1):
     """Manufactured solution on the unwrapped SPT-100 channel; see het_3d_mms_spt100."""
     built = cases.get("het_3d_mms_spt100").build(N)
-    return built.problem, built.exact, built.f_values, "3D_HET_MMS_SPT100", m
+    return (built.problem, built.exact, built.f_values,
+            "3D_HET_MMS_SPT100", m, built.f_faces)
 
 
 # ── Section 3: HET rotating spoke ─────────────────────────────────────────────
@@ -410,7 +413,8 @@ def case_het_mms(N: int, m: int = 1):
 def case_spoke(N: int, m: int = SPOKE_MODE_M, eps: float = SPOKE_EPSILON):
     """Rotating-spoke potential structure; see het_3d_rotating_spoke."""
     built = cases.get("het_3d_rotating_spoke").build(N)
-    return built.problem, built.exact, built.f_values, "3D_HET_RotatingSpoke_SPT100", m
+    return (built.problem, built.exact, built.f_values,
+            "3D_HET_RotatingSpoke_SPT100", m, built.f_faces)
 
 
 # ── Section 4: realistic SPT-100 discharge ────────────────────────────────────
@@ -418,7 +422,8 @@ def case_spoke(N: int, m: int = SPOKE_MODE_M, eps: float = SPOKE_EPSILON):
 def case_discharge(N: int, m: int = SPOKE_MODE_M):
     """Realistic SPT-100 discharge Poisson solve; see het_3d_discharge_spt100."""
     built = cases.get("het_3d_discharge_spt100").build(N)
-    return built.problem, built.exact, built.f_values, "3D_HET_Discharge_SPT100", m
+    return (built.problem, built.exact, built.f_values,
+            "3D_HET_Discharge_SPT100", m, built.f_faces)
 
 
 # ── Section 5: Laplace equation, BC-driven ────────────────────────────────────
@@ -426,7 +431,8 @@ def case_discharge(N: int, m: int = SPOKE_MODE_M):
 def case_laplace(N: int):
     """Harmonic, BC-driven case; see poisson_3d_laplace_bc_driven."""
     built = cases.get("poisson_3d_laplace_bc_driven").build(N)
-    return built.problem, built.exact, built.f_values, "3D_Laplace_BCdriven_cube", 0
+    return (built.problem, built.exact, built.f_values,
+            "3D_Laplace_BCdriven_cube", 0, built.f_faces)
 
 
 # ── Section 6: localised Gaussian sources ─────────────────────────────────────
@@ -434,7 +440,8 @@ def case_laplace(N: int):
 def case_gaussian(N: int):
     """Two opposite-sign Gaussian blobs; see poisson_3d_two_gaussian_cube."""
     built = cases.get("poisson_3d_two_gaussian_cube").build(N)
-    return built.problem, built.exact, built.f_values, "3D_Poisson_TwoGaussian_cube", 0
+    return (built.problem, built.exact, built.f_values,
+            "3D_Poisson_TwoGaussian_cube", 0, built.f_faces)
 
 
 # ── Section 7: high-wavenumber Fourier mode ───────────────────────────────────
@@ -442,7 +449,8 @@ def case_gaussian(N: int):
 def case_highmode(N: int):
     """High-wavenumber eigenmode (n,m,l)=(2,3,4); see poisson_3d_high_mode_n2m3l4."""
     built = cases.get("poisson_3d_high_mode_n2m3l4").build(N)
-    return built.problem, built.exact, built.f_values, "3D_Poisson_HighMode_n2m3l4", 0
+    return (built.problem, built.exact, built.f_values,
+            "3D_Poisson_HighMode_n2m3l4", 0, built.f_faces)
 
 
 SECTIONS = {"section1": case_cube, "section2": case_het_mms,
@@ -484,8 +492,17 @@ class SweepConfig:
         cap = QSVT_MAX_DEGREE_3D.get(N)
         cfg["qsvt"] = {} if cap is None else {"max_degree": cap}
         cfg["vqls"] = {}
+        # The fourth-order registry entries are distinct solvers and need their
+        # own sections: InnerConfig.for_solver keys on the name solve() is given,
+        # so an absent section silently drops the sweep's epsilon and degree cap.
+        cfg["hhl_4th"] = dict(cfg["hhl"])
+        cfg["qsvt_4th"] = dict(cfg["qsvt"])
         for solver, opts in (self.inner_options or {}).items():
             cfg.setdefault(solver, {}).update(opts)
+            # -I hhl.epsilon=... must reach whichever HHL this sweep runs.
+            alias = f"{solver}_4th"
+            if alias in cfg:
+                cfg.setdefault(alias, {}).update(opts)
         return cfg
 
     def scheme_kwargs(self, scheme: str) -> dict:
@@ -653,101 +670,77 @@ def _estimate_case(case_id, N, prob, cfg: SweepConfig) -> None:
                  s.upper(), secs, secs / 3600.0)
 
 
-def _run_4th_order_solver_3d(problem, inner: str, cfg: SweepConfig, N: int) -> 'OuterResult':
-    from scripts.debug_3d_4th import jacobi_3d_4th
-    from solvers.outer.multigrid_4th import fmg_3d_4th, sor_3d_4th
-    from solvers.outer.core import OuterResult, WorkLog
-    import io, contextlib
-    
-    t0 = time.perf_counter()
-    with contextlib.redirect_stdout(io.StringIO()):
-        effective_scheme = cfg.scheme
-        if (N <= 4 or any(problem.periodic)) and cfg.scheme in ("fmg", "multigrid"):
-            effective_scheme = "sor"
-            
-        if effective_scheme in ("fmg", "multigrid"):
-            phi, history = fmg_3d_4th(
-                N=N,
-                f_vals=problem.f,
-                dx=problem.spacings[0],
-                dy=problem.spacings[1],
-                dz=problem.spacings[2],
-                bc_lo=problem.bc_lo,
-                bc_hi=problem.bc_hi,
-                periodic=problem.periodic,
-                inner=inner,
-                inner_kwargs=cfg.inner_config(N).get(inner, {}),
-                tol=cfg.tol,
-                max_cycles=cfg.scheme_options.get("max_cycles", 30),
-            )
-            iters = len(history)
-            converged = (history[-1] < cfg.tol) if history else False
-            scheme_name = f"{effective_scheme}-4th"
-            omega_used = 1.0
-        elif effective_scheme == "sor":
-            omega = cfg.scheme_options.get("omega", 1.8)
-            phi, history = sor_3d_4th(
-                N=N,
-                f_vals=problem.f,
-                dx=problem.spacings[0],
-                dy=problem.spacings[1],
-                dz=problem.spacings[2],
-                bc_lo=problem.bc_lo,
-                bc_hi=problem.bc_hi,
-                periodic=problem.periodic,
-                inner=inner,
-                inner_kwargs=cfg.inner_config(N).get(inner, {}),
-                tol=cfg.tol,
-                max_iter=cfg.scheme_options.get("max_iter", 500),
-                omega=omega,
-            )
-            iters = len(history)
-            converged = (history[-1] < cfg.tol) if history else False
-            scheme_name = f"line-sor-4th (fallback)" if cfg.scheme in ("fmg", "multigrid") else "line-sor-4th"
-            omega_used = omega
-        else:
-            phi, iters, converged, history = jacobi_3d_4th(
-                N=N,
-                f_vals=problem.f,
-                dx=problem.spacings[0],
-                dy=problem.spacings[1],
-                dz=problem.spacings[2],
-                bc_lo=problem.bc_lo,
-                bc_hi=problem.bc_hi,
-                periodic=problem.periodic,
-                inner=inner,
-                inner_kwargs=cfg.inner_config(N).get(inner, {}),
-                u_exact=np.zeros_like(problem.f), 
-                u_thomas=np.zeros_like(problem.f), 
-                tol=cfg.tol,
-                max_iter=cfg.scheme_options.get("max_iter", 500),
-                print_every=999999,
-            )
-            scheme_name = "line-jacobi-4th"
-            omega_used = 1.0
-            
-    wall = time.perf_counter() - t0
-    
-    w = WorkLog()
-    w.add(N, N * iters)
-    
-    return OuterResult(
-        u=phi,
-        scheme=scheme_name,
-        inner=inner,
-        converged=converged,
-        n_outer=iters,
-        residual=history[-1] if history else float("nan"),
-        residual_history=history,
-        work=w,
-        wall_time_s=wall,
-        stop_reason="tol_met" if converged else "max_iter",
-        diagnostics={"update": effective_scheme, "omega": omega_used, "final_delta": history[-1] if history else float("nan")}
+# ── Fourth order ──────────────────────────────────────────────────────────────
+# Under --order 4 the runner selects a different problem object and then takes
+# the ordinary solve() path. The retired 4th-order branch carried its own
+# iteration loop, and in consequence the fourth-order sweeps silently lost the
+# wall-clock cap, stagnation detection, level_kappas and every inner_*
+# diagnostic, and counted work as w.add(N, N*iters) against 2-D's w.add(N,
+# iters) - mutually inconsistent, and both wrong. All of that is inherited here.
+
+#: Registry names of the inner solvers that must change with the order. Thomas
+#: is absent because its entry already falls back to a dense solve on a
+#: pentadiagonal matrix, and VQLS because it decomposes the complete matrix into
+#: Paulis and was never affected by the truncation.
+_INNER_BY_ORDER_4: dict[str, str] = {"hhl": "hhl_4th", "qsvt": "qsvt_4th"}
+
+
+def _inner_for_order(solver: str, order: int) -> str:
+    """
+    The inner-solver registry name to use at this discretisation order.
+
+    Parameters
+    ----------
+    solver : str
+        Solver as named on the command line, e.g. ``"hhl"``.
+    order : {2, 4}
+        Spatial discretisation order.
+
+    Returns
+    -------
+    str
+        Registry name, e.g. ``"hhl_4th"`` at order 4.
+    """
+    return _INNER_BY_ORDER_4.get(solver, solver) if order == 4 else solver
+
+
+def _to_4th_order_3d(problem, f_faces=None) -> PoissonLine3D4th:
+    """
+    Re-discretises an assembled 3-D case at fourth order.
+
+    The continuous problem is unchanged - same box, same source samples, same
+    boundary data, same periodicity - so only the operator and the boundary
+    closure differ.
+
+    Parameters
+    ----------
+    problem : PoissonLine3D
+        The second-order problem built by the case registry.
+    f_faces : tuple, optional
+        ``(lo, hi)`` per-axis source values *on* the faces, as
+        ``BuiltCase.f_faces`` carries them, with None for a periodic axis.
+        Required data for the fourth-order closure; where a case does not
+        supply them the problem class extrapolates from the interior, which is
+        O(h⁴) and order-preserving but inaccurate for a sharply peaked source
+        at coarse N.
+
+    Returns
+    -------
+    PoissonLine3D4th
+        The same case at fourth order.
+    """
+    lo, hi = f_faces if f_faces is not None else (None, None)
+    return PoissonLine3D4th(
+        problem.f, lengths=problem.lengths, periodic=problem.periodic,
+        bc_lo=problem.bc_lo, bc_hi=problem.bc_hi,
+        f_lo=lo, f_hi=hi,
     )
 
 
 def _run_case(section: str, N: int, cfg: SweepConfig, results: list) -> None:
-    prob, phi_ref, f_vals, case_id, mode_m = SECTIONS[section](N)
+    prob, phi_ref, f_vals, case_id, mode_m, f_faces = SECTIONS[section](N)
+    if cfg.order == 4:
+        prob = _to_4th_order_3d(prob, f_faces)
     inner_cfg = cfg.inner_config(N)
 
     if cfg.estimate_only:
@@ -779,11 +772,8 @@ def _run_case(section: str, N: int, cfg: SweepConfig, results: list) -> None:
         "x".join(map(str, lv.problem.shape)) for lv in levels))
 
     # ── classical reference ───────────────────────────────────────────────────
-    if cfg.order == 4:
-        res_T = _run_4th_order_solver_3d(prob, "thomas", cfg, N)
-    else:
-        res_T = solve(prob, inner="thomas", scheme=scheme,
-                      inner_options=inner_cfg, **kw)
+    res_T = solve(prob, inner="thomas", scheme=scheme,
+                  inner_options=inner_cfg, **kw)
     phi_T = res_T.u
     # Every per-solver line is tagged with [case N=..]. This is not cosmetic:
     # each worker process opens its own handle to the shared log file (see
@@ -817,11 +807,8 @@ def _run_case(section: str, N: int, cfg: SweepConfig, results: list) -> None:
     # ── quantum solvers ───────────────────────────────────────────────────────
     for solver_name in cfg.solvers:
         try:
-            if cfg.order == 4:
-                res_q = _run_4th_order_solver_3d(prob, solver_name, cfg, N)
-            else:
-                res_q = solve(prob, inner=solver_name, scheme=scheme,
-                              inner_options=inner_cfg, **kw)
+            res_q = solve(prob, inner=_inner_for_order(solver_name, cfg.order),
+                          scheme=scheme, inner_options=inner_cfg, **kw)
         except Exception as exc:
             log.error("    [%s N=%d] %-6s FAILED: %s",
                       case_id, N, solver_name.upper(), exc, exc_info=True)

@@ -79,6 +79,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from core import cases
 from core import het_geometry as geom
 from problems.poisson_line_2d import PoissonLine2D
+from problems.poisson_line_2d_4th import PoissonLine2D4th
 from solvers.outer import (InnerConfig, available_inner,available_schemes,
                            build_hierarchy, describe_inner, describe_scheme,
                            get_inner, resolve_options, solve)
@@ -397,8 +398,20 @@ class SweepConfig:
         cap = QSVT_MAX_DEGREE_2D.get(N)
         cfg["qsvt"] = {} if cap is None else {"max_degree": cap}
         cfg["vqls"] = {}
+        # The fourth-order registry entries are distinct solvers, so they need
+        # their own sections: `InnerConfig.for_solver` keys on the name that
+        # `solve()` is given, and an absent section means the sweep's epsilon
+        # and degree cap are silently not applied.
+        cfg["hhl_4th"] = dict(cfg["hhl"])
+        cfg["qsvt_4th"] = dict(cfg["qsvt"])
         for solver, opts in (self.inner_options or {}).items():
             cfg.setdefault(solver, {}).update(opts)
+            # An option given for "hhl" is meant for whichever HHL this sweep
+            # runs; requiring the user to know the registry alias would make
+            # -I hhl.epsilon=0.1 silently ineffective under --order 4.
+            alias = f"{solver}_4th"
+            if alias in cfg:
+                cfg.setdefault(alias, {}).update(opts)
         return cfg
 
     def scheme_kwargs(self, scheme: Optional[str] = None) -> dict:
@@ -565,110 +578,93 @@ def _estimate_case(case_id, N, problem, cfg: SweepConfig) -> None:
                  s.upper(), secs, secs / 3600.0)
 
 
-def _run_4th_order_solver_2d(problem: PoissonLine2D, inner: str, cfg: SweepConfig, N: int) -> 'OuterResult':
-    from scripts.debug_2d_4th import jacobi_2d_4th
-    from solvers.outer.multigrid_4th import fmg_2d_4th, sor_2d_4th
-    from solvers.outer.core import OuterResult, WorkLog
-    import io, contextlib
-    
-    t0 = time.perf_counter()
-    with contextlib.redirect_stdout(io.StringIO()):
-        effective_scheme = cfg.scheme
-        if N <= 4 and cfg.scheme in ("fmg", "multigrid"):
-            effective_scheme = "sor"
-            
-        if effective_scheme in ("fmg", "multigrid"):
-            phi, history = fmg_2d_4th(
-                N=N,
-                f_vals=problem.f,
-                dx=problem.dx,
-                dy=problem.dy,
-                bc_x0=problem.bc_x0,
-                bc_x1=problem.bc_x1,
-                bc_y0=problem.bc_y0,
-                bc_y1=problem.bc_y1,
-                inner=inner,
-                inner_kwargs=cfg.inner_config(N).get(inner, {}),
-                tol=cfg.tol,
-                max_cycles=cfg.scheme_options.get("max_cycles", 30),
-            )
-            iters = len(history)
-            converged = (history[-1] < cfg.tol) if history else False
-            scheme_name = f"{effective_scheme}-4th"
-            omega_used = 1.0
-        elif effective_scheme == "sor":
-            omega = cfg.scheme_options.get("omega", 1.8)
-            phi, history = sor_2d_4th(
-                N=N,
-                f_vals=problem.f,
-                dx=problem.dx,
-                dy=problem.dy,
-                bc_x0=problem.bc_x0,
-                bc_x1=problem.bc_x1,
-                bc_y0=problem.bc_y0,
-                bc_y1=problem.bc_y1,
-                inner=inner,
-                inner_kwargs=cfg.inner_config(N).get(inner, {}),
-                tol=cfg.tol,
-                max_iter=cfg.scheme_options.get("max_iter", 5000),
-                omega=omega,
-            )
-            iters = len(history)
-            converged = (history[-1] < cfg.tol) if history else False
-            scheme_name = f"line-sor-4th (fallback)"
-            omega_used = omega
-        else:
-            phi, iters, converged, history = jacobi_2d_4th(
-                N=N,
-                f_vals=problem.f,
-                dx=problem.dx,
-                dy=problem.dy,
-                bc_x0=problem.bc_x0,
-                bc_x1=problem.bc_x1,
-                bc_y0=problem.bc_y0,
-                bc_y1=problem.bc_y1,
-                inner=inner,
-                inner_kwargs=cfg.inner_config(N).get(inner, {}),
-                u_exact=np.zeros_like(problem.f), 
-                u_thomas=np.zeros_like(problem.f), 
-                tol=cfg.tol,
-                max_iter=cfg.scheme_options.get("max_iter", 5000),
-                print_every=999999,
-            )
-            scheme_name = "line-jacobi-4th"
-            omega_used = 1.0
-            
-    wall = time.perf_counter() - t0
-    
-    w = WorkLog()
-    w.add(N, iters)
-    
-    return OuterResult(
-        u=phi,
-        scheme=scheme_name,
-        inner=inner,
-        converged=converged,
-        n_outer=iters,
-        residual=history[-1] if history else float("nan"),
-        residual_history=history,
-        work=w,
-        wall_time_s=wall,
-        stop_reason="tol_met" if converged else "max_iter",
-        diagnostics={"update": effective_scheme, "omega": omega_used, "final_delta": history[-1] if history else float("nan")}
+# ── Fourth order ──────────────────────────────────────────────────────────────
+# Under --order 4 the runner selects a different problem object and then takes
+# the ordinary solve() path. It does NOT carry its own iteration loop: the
+# retired 4th-order branch did, and in consequence the fourth-order sweeps
+# silently lost the wall-clock cap, stagnation detection, the true per-solve
+# work accounting, level_kappas and every inner_* diagnostic, and reported a
+# fallback by encoding it into the scheme string. All of that is inherited here.
+
+#: Registry names of the inner solvers that must change with the order. The
+#: second-order HHL and QSVT entry points reconstruct their operator from
+#: A[0,0] and A[0,1] alone and now raise on a wider band rather than truncating
+#: it; the fourth-order entries block encode A in full via the Sz.-Nagy
+#: dilation. Thomas is absent because its registry entry already falls back to a
+#: dense solve on a pentadiagonal matrix, and VQLS because it decomposes the
+#: complete matrix into Paulis and was never affected.
+_INNER_BY_ORDER_4: dict[str, str] = {"hhl": "hhl_4th", "qsvt": "qsvt_4th"}
+
+
+def _inner_for_order(solver: str, order: int) -> str:
+    """
+    The inner-solver registry name to use at this discretisation order.
+
+    Parameters
+    ----------
+    solver : str
+        Solver as named on the command line, e.g. ``"hhl"``.
+    order : {2, 4}
+        Spatial discretisation order.
+
+    Returns
+    -------
+    str
+        Registry name, e.g. ``"hhl_4th"`` at order 4.
+    """
+    return _INNER_BY_ORDER_4.get(solver, solver) if order == 4 else solver
+
+
+def _to_4th_order_2d(problem: PoissonLine2D,
+                     f_faces=None) -> PoissonLine2D4th:
+    """
+    Re-discretises an assembled 2-D case at fourth order.
+
+    The continuous problem is unchanged - same domain, same source samples,
+    same Dirichlet data - so only the operator and the boundary closure differ.
+
+    Parameters
+    ----------
+    problem : PoissonLine2D
+        The second-order problem built by the case registry.
+    f_faces : tuple, optional
+        ``(lo, hi)`` per-axis source values *on* the faces, as
+        ``BuiltCase.f_faces`` carries them. Required data for the fourth-order
+        closure; where a case does not supply them the problem class
+        extrapolates from the interior, which is O(h⁴) and order-preserving but
+        inaccurate for a sharply peaked source at coarse N.
+
+    Returns
+    -------
+    PoissonLine2D4th
+        The same case at fourth order.
+    """
+    lo, hi = f_faces if f_faces is not None else ((None, None), (None, None))
+    return PoissonLine2D4th(
+        problem.f, Lx=problem.Lx, Ly=problem.Ly,
+        bc_x0=problem.bc_x0, bc_x1=problem.bc_x1,
+        bc_y0=problem.bc_y0, bc_y1=problem.bc_y1,
+        f_x0=lo[0], f_x1=hi[0], f_y0=lo[1], f_y1=hi[1],
     )
 
 
-
-
 def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
-              results: list, problem: PoissonLine2D) -> None:
+              results: list, problem: PoissonLine2D, f_faces=None) -> None:
     """
     Run the Thomas reference and every requested quantum solver on one case.
 
     `problem` is the already-assembled PoissonLine2D from the case registry
     (core/cases.py), which has the boundary data baked in - this function no
     longer reconstructs it from bc_x0/bc_x1/bc_y0/bc_y1 arguments.
+
+    Under ``--order 4`` it is re-discretised here, once, and everything
+    downstream - the hierarchy, the scheme, the work accounting, the recorded
+    row - is the ordinary second-order code path operating on a different
+    problem object. `f_faces` carries the source on the four faces, which the
+    fourth-order boundary closure requires; see `_to_4th_order_2d`.
     """
+    if cfg.order == 4:
+        problem = _to_4th_order_2d(problem, f_faces)
     kappa = problem.kappa_row()
     inner_cfg = cfg.inner_config(N)
     kw = cfg.scheme_kwargs()
@@ -700,11 +696,8 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
                    N, N, effective_scheme)
 
     # ── classical reference ───────────────────────────────────────────────────
-    if cfg.order == 4:
-        res_T = _run_4th_order_solver_2d(problem, "thomas", cfg, N)
-    else:
-        res_T = solve(problem, inner="thomas", scheme=effective_scheme,
-                      inner_options=inner_cfg, **scheme_kw)
+    res_T = solve(problem, inner="thomas", scheme=effective_scheme,
+                  inner_options=inner_cfg, **scheme_kw)
     phi_T = res_T.u
     log.info("    %-6s %5d outer  %8d solves  err=%8.4f%%  %7.2fs  %s",
              "Thomas", res_T.n_outer, res_T.work.total,
@@ -740,11 +733,9 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
     # ── quantum solvers ───────────────────────────────────────────────────────
     for solver_name in cfg.solvers:
         try:
-            if cfg.order == 4:
-                res_q = _run_4th_order_solver_2d(problem, solver_name, cfg, N)
-            else:
-                res_q = solve(problem, inner=solver_name, scheme=effective_scheme,
-                              inner_options=inner_cfg, **scheme_kw)
+            res_q = solve(problem, inner=_inner_for_order(solver_name, cfg.order),
+                          scheme=effective_scheme,
+                          inner_options=inner_cfg, **scheme_kw)
         except Exception as exc:
             log.error("    %-6s FAILED: %s", solver_name.upper(), exc,
                       exc_info=True)
@@ -773,7 +764,8 @@ def run_section1(N, cfg, results):
     X, Y = built.coords
     dx, dy = built.spacings
     _run_case("2D_Poisson_sin_hom", N, X, Y, dx, dy,
-              built.f_values, built.exact, cfg, results, built.problem)
+              built.f_values, built.exact, cfg, results, built.problem,
+              built.f_faces)
 
 
 def run_section2(N, cfg, results):
@@ -783,7 +775,8 @@ def run_section2(N, cfg, results):
     dx, dy = built.spacings
     log.info("    Fourier reference: N_fine=%d, N_modes=%d", N_FINE, N_FOURIER_MODES)
     _run_case("2D_Poisson_TwoGaussian_PlasmaNet", N, X, Y, dx, dy,
-              built.f_values, built.exact, cfg, results, built.problem)
+              built.f_values, built.exact, cfg, results, built.problem,
+              built.f_faces)
 
 
 def run_section3(N, cfg, results):
@@ -792,7 +785,8 @@ def run_section3(N, cfg, results):
     X, Y = built.coords
     dx, dy = built.spacings
     _run_case("2D_Poisson_SingleMode_n1m1", N, X, Y, dx, dy,
-              built.f_values, built.exact, cfg, results, built.problem)
+              built.f_values, built.exact, cfg, results, built.problem,
+              built.f_faces)
 
 
 def run_section4(N, cfg, results):
@@ -801,7 +795,8 @@ def run_section4(N, cfg, results):
     Z, R = built.coords
     dz, dr = built.spacings
     _run_case("2D_HET_MMS_SPT100", N, Z, R, dz, dr,
-              built.f_values, built.exact, cfg, results, built.problem)
+              built.f_values, built.exact, cfg, results, built.problem,
+              built.f_faces)
 
 
 def run_section5(N, cfg, results):
@@ -810,7 +805,8 @@ def run_section5(N, cfg, results):
     X, Y = built.coords
     dx, dy = built.spacings
     _run_case("2D_HET_Sin_MeetingReport", N, X, Y, dx, dy,
-              built.f_values, built.exact, cfg, results, built.problem)
+              built.f_values, built.exact, cfg, results, built.problem,
+              built.f_faces)
 
 
 SECTIONS = {"section1": run_section1, "section2": run_section2,
