@@ -5,66 +5,65 @@
 #  Runs `hpc/runners/run_2d.py --order 4` over sections 1-5 at N = 4, 8, 16,
 #  for Thomas, HHL, VQLS and QSVT.
 #
-#  ####################################################################
-#  #  THIS JOB REFUSES TO RUN. The 2-D 4th-order operator is wrong.   #
-#  ####################################################################
+#  Readiness
+#  ---------
+#  This job was gated until 2026-08-12 and is now submittable. Three defects
+#  invalidated every 4th-order 2-D result produced before that date, and this
+#  script must not be run against a clone predating any of their fixes:
 #
-#  Why it is gated
-#  ---------------
-#  `solvers/outer/multigrid_4th.py` carries its own boundary closure, separate
-#  from the one corrected in 1-D by Phase 4a, and it is wrong in two ways:
+#    Phase 2       HHL and QSVT reconstructed their operator from A[0,0] and
+#                  A[0,1] alone, discarding the +-2 band and solving a
+#                  TRIDIAGONAL system. Both entry points now raise rather than
+#                  truncate, and the 4th-order path block encodes A in full via
+#                  the Sz.-Nagy dilation.
 #
-#    * `build_strip_matrix_4th` folds the ghost node into A[0,1] += -1. That is
-#      an EVEN reflection, appropriate to a Neumann condition and not to the
-#      Dirichlet data these cases carry; the odd reflection belongs on the
-#      diagonal, A[0,0] += 1.
-#    * `_build_rhs_strip` still writes the 18*alpha form. Substituting the ghost
-#      into the row-0 stencil gives 16*alpha from the boundary node and
-#      -2*alpha from the ghost, i.e. 14*alpha; the implementation sums them with
-#      the same sign.
+#    Phase 4b      The 2-D closure in solvers/outer/multigrid_4th.py folded the
+#                  ghost node into A[0,1] -- an EVEN reflection, wrong for
+#                  Dirichlet data -- and wrote 18*alpha where the row-0 stencil
+#                  gives 14*alpha. Measured order 0.88. Replaced by
+#                  problems/poisson_line_2d_4th.py, fourth order in BOTH
+#                  directions: the mixed design (4th along the strip, 2nd
+#                  transverse) is capped at order 2 by construction.
 #
-#  Measured convergence order against a manufactured solution is 0.88, where 4
-#  is intended. A sweep submitted now would spend its walltime producing rows
-#  that are not 4th-order accurate and would have to be discarded in full.
+#    Phase 4b,     The ghost reflection needs the second derivative NORMAL to
+#    second        the face. In 1-D the PDE makes that the source itself, so
+#    defect        poisson_1d_4th is right to use f(0); in 2-D
+#                  d2u/dn2 = f - the tangential second derivative of the
+#                  Dirichlet data. Using f alone leaves each boundary row
+#                  carrying a residual of exactly -f_face/12 and caps the scheme
+#                  at order 2. Invisible on sin(pi x) sin(pi y).
 #
-#  A second, independent bound applies even once the closure is fixed. The mixed
-#  design -- 4th order along the strip, 2nd order transverse -- is capped at
-#  order 2 by construction, measured 1.95 with a correct strip operator, because
-#  `strip_sweep` hardcoded the transverse coupling as 1/h^2 at j+-1. Step 1 of
-#  Phase 4b (90d76f1) extended `strip_sweep` to consult the optional
-#  `transverse_terms` and `row_matrix_for` hooks; step 2 -- the
-#  `problems/poisson_line_2d_4th.py` class that supplies them -- is not written.
+#  Measured order by dense direct solve, against manufactured solutions:
 #
-#  A third: `max_wall_s` is parsed, accepted and silently discarded in the
-#  4th-order 2-D path (R3). `_run_4th_order_solver_2d` never reads it, so the
-#  run proceeds to its max_iter bound and is terminated by PBS. Passing
-#  `-S max_wall_s=...` here buys nothing until Phase 4b removes that path in
-#  favour of the ordinary `solve()` call.
+#      solution              order 2   order 4
+#      exp(x+y)                1.96      3.87
+#      cos(2x) + y^2           1.95      3.90
+#      sin(pi x) sin(pi y)     1.95      3.91
+#      x^3 + y^3             machine-exact (both)
 #
-#  What has to land before the gate is lifted
-#  ------------------------------------------
-#    1. `problems/poisson_line_2d_4th.py` (and the 3-D twin), supplying
-#       `transverse_terms` and `row_matrix_for`; removal of
-#       `solvers/outer/multigrid_4th.py` and `_run_4th_order_solver_2d`.
-#    2. Verified order ~4 in 2-D on a solution that is NOT odd about the
-#       boundaries and one with non-zero Dirichlet data. The historical blind
-#       spot is -sin(pi x)/pi^2, which is odd about both boundaries and on which
-#       even the defective closure is accidentally exact.
-#    3. The 2nd-order numbers unchanged: SOR 33/66/130, FMG 3 cycles, legacy
-#       Jacobi 26/73, and the 15-configuration outer baseline byte-for-byte.
-#    4. `hpc/jobs/submit_precompute_2D.sh` extended to order 4 -- currently
-#       `precompute_phases.build_targets` raises on `--dim 2 --order 4`, because
-#       a key written against an operator about to change is a silent miss.
+#  Phases: TWO distinct strip operators per resolution
+#  --------------------------------------------------
+#  The odd reflection at a transverse boundary folds the ghost node onto the
+#  strip's own diagonal, so the strips adjacent to y=0 and y=Ly carry
+#  A_row + c_y*I and hence a different kappa. Both are requested during a sweep
+#  and both need a cache entry; precomputing only the interior one leaves 2/N of
+#  the strip solves computing their phases inline. The count is two whatever N
+#  is, so the cache stays small: 12 entries covers both domains at N=4,8,16 and
+#  computes in under four seconds.
 #
-#  See docs/HPC_REPAIR_PLAN.md, Phase 4b.
+#      export DIM=2; qsub -v DIM hpc/jobs/submit_precompute_4th.sh
 #
-#  Override
-#  --------
-#  `ALLOW_BROKEN_4TH_CLOSURE=1` proceeds anyway. It exists for a deliberate
-#  diagnostic run -- measuring the defect, not benchmarking against it. Rows so
-#  produced must not enter the thesis archive.
+#  The guard below refuses to run QSVT unless every one of those keys is present.
 #
-#    qsub -v ALLOW_BROKEN_4TH_CLOSURE hpc/jobs/submit_hpc_2D_4th.sh
+#  Usage
+#  -----
+#    qsub hpc/jobs/submit_hpc_2D_4th.sh
+#
+#    export N_VALUES="4,8"; qsub -v N_VALUES hpc/jobs/submit_hpc_2D_4th.sh
+#    export SOLVERS="vqls,qsvt"; qsub -v SOLVERS hpc/jobs/submit_hpc_2D_4th.sh
+#
+#  Comma-separated values must be passed as `qsub -v NAME` (bare name, value from
+#  the exported shell variable); `-v NAME=value` breaks on PBS's comma splitting.
 #
 #  Monitor:
 #    qstat -u $USER
@@ -72,7 +71,7 @@
 #                                                   # from the login node: OI-1
 # ============================================================================
 
-#PBS -l walltime=24:00:00
+#PBS -l walltime=48:00:00
 #PBS -l select=1:ncpus=4:mem=128gb
 #PBS -N quantum_pde_2D_4th
 #PBS -o results/2Dhpc_run_4th/pbs_stdout.log
@@ -100,48 +99,6 @@ if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
 fi
 cd "${REPO_ROOT}" || exit 1
 
-# ── Correctness gate ─────────────────────────────────────────────────────────
-# Placed before the module loads so that a mistaken submission costs seconds of
-# queue time and nothing else.
-ALLOW_BROKEN_4TH_CLOSURE="${ALLOW_BROKEN_4TH_CLOSURE:-0}"
-# The gate tests what the RUNNER does, not what exists on disk.
-# problems/poisson_line_2d_4th.py is written and verified (order 3.87 on
-# exp(x+y), machine-exact on a cubic), but run_2d.py's --order 4 branch still
-# dispatches to _run_4th_order_solver_2d, which imports the defective
-# solvers/outer/multigrid_4th. Keying this check on the existence of the new
-# class would therefore open the gate whilst the sweep still ran the old code.
-if grep -q "multigrid_4th" hpc/runners/run_2d.py 2>/dev/null \
-   && [ "${ALLOW_BROKEN_4TH_CLOSURE}" != "1" ]; then
-    echo ""
-    echo "REFUSING TO RUN: run_2d.py still dispatches to the defective closure."
-    echo ""
-    echo "  hpc/runners/run_2d.py imports solvers/outer/multigrid_4th, whose"
-    echo "  closure applies an even reflection (A[0,1] += -1) to Dirichlet data"
-    echo "  and writes 18*alpha where the row-0 stencil gives 14*alpha. Measured"
-    echo "  convergence order is 0.88, where 4 is intended: every row this job"
-    echo "  produced would have to be discarded."
-    echo ""
-    echo "  The replacement, problems/poisson_line_2d_4th.py, is written and"
-    echo "  verified. What remains is Phase 4b's second half: point run_2d.py's"
-    echo "  --order 4 branch at PoissonLine2D4th and delete"
-    echo "  _run_4th_order_solver_2d together with multigrid_4th.py. This gate"
-    echo "  clears itself when that import is gone."
-    echo ""
-    echo "  See docs/HPC_REPAIR_PLAN.md Phase 4b, and the header of this script"
-    echo "  for the remaining gates."
-    echo ""
-    echo "  ALLOW_BROKEN_4TH_CLOSURE=1 overrides this, for a deliberate"
-    echo "  diagnostic run only."
-    exit 2
-fi
-if [ "${ALLOW_BROKEN_4TH_CLOSURE}" = "1" ]; then
-    echo ""
-    echo "WARNING: ALLOW_BROKEN_4TH_CLOSURE=1. The 2-D 4th-order closure is"
-    echo "         first-order accurate. These rows are a measurement of the"
-    echo "         defect, not a benchmark, and must not enter the archive."
-    echo ""
-fi
-
 module load tools/prod
 module load Python/3.12.3-GCCcore-13.3.0
 
@@ -157,6 +114,17 @@ source "${VENV_PATH}/bin/activate"
 # failed with ModuleNotFoundError.
 ORDER=4 bash hpc/jobs/_preflight.sh || exit 1
 
+# The retired path is gone; a clone that still carries it predates Phase 4b and
+# would produce order-0.88 rows. Cheap to check, and it is the one thing that
+# distinguishes a correct 4th-order sweep from a wasted one.
+if [ -f "solvers/outer/multigrid_4th.py" ]; then
+    echo "ERROR: solvers/outer/multigrid_4th.py is present, so this clone predates"
+    echo "       Phase 4b. Its closure is an even reflection applied to Dirichlet"
+    echo "       data with the 18*alpha error, measured order 0.88."
+    echo "       Pull before submitting."
+    exit 1
+fi
+
 RESULTS_SUBDIR="results/2Dhpc_run_4th"
 mkdir -p "${RESULTS_SUBDIR}"
 
@@ -169,6 +137,7 @@ WORKERS="${WORKERS:-4}"
 SCHEME="${SCHEME:-fmg}"
 TOL="${TOL:-}"
 MAX_OUTER="${MAX_OUTER:-}"
+ALLOW_INLINE_PHASES="${ALLOW_INLINE_PHASES:-0}"
 
 echo ""
 echo "  N_VALUES  : ${N_VALUES}"
@@ -176,6 +145,63 @@ echo "  SECTIONS  : ${SECTIONS}"
 echo "  SOLVERS   : ${SOLVERS}"
 echo "  SCHEME    : ${SCHEME}"
 echo "  WORKERS   : ${WORKERS}"
+
+# ── QSVT phase-cache coverage ────────────────────────────────────────────────
+# Every distinct strip operator, not one per resolution. A miss does not fail:
+# the phases are computed inline instead, which is the expensive
+# non-parallelisable step this cache exists to remove.
+case ",${SOLVERS}," in
+  *,qsvt,*)
+    echo ""
+    echo "------------------------------------------------------------"
+    echo "  QSVT phase-cache coverage (2-D, order 4)"
+    echo "------------------------------------------------------------"
+    python3 - "${N_VALUES}" "${ALLOW_INLINE_PHASES}" <<'PY' || exit 1
+import sys
+
+sys.path.insert(0, ".")
+sys.path.insert(0, "hpc/runners")
+
+import run_2d
+import precompute_phases as pp
+import solvers.quantum.qsp_angles as qa
+
+n_values = sorted({int(t) for t in sys.argv[1].split(",") if t.strip()})
+allow = sys.argv[2].strip() == "1"
+epsilon = round(run_2d.HHL_EPSILON_DEFAULT, 8)
+
+targets = pp.build_targets(2, n_values, "all", 4)
+
+print(f"  {'strip family':>18} {'N':>5} {'kappa':>12} {'key':>8} {'cached':>8}")
+print("  " + "-" * 56)
+
+missing = []
+for label, N, kappa in targets:
+    cap = run_2d.QSVT_MAX_DEGREE_2D.get(N)
+    tag = cap if cap is not None else -1
+    cached = qa._load_disk((round(kappa, 4), epsilon, "auto", tag)) is not None
+    print(f"  {label:>18} {N:>5} {kappa:>12.4f} {'d' + str(tag):>8} "
+          f"{str(cached):>8}")
+    if not cached:
+        missing.append(f"{label} N={N}")
+
+if not missing:
+    print(f"\n  All {len(targets)} distinct strip operators are cached.")
+    sys.exit(0)
+
+print(f"\n  No precomputed phases for: {', '.join(missing)}")
+if allow:
+    print("  ALLOW_INLINE_PHASES=1: proceeding. Those strips will compute their")
+    print("  phases inline, on the critical path of the sweep.")
+    sys.exit(0)
+
+print("  Run:  export DIM=2; qsub -v DIM hpc/jobs/submit_precompute_4th.sh")
+print("  It completes in seconds. Or set ALLOW_INLINE_PHASES=1, or drop qsvt")
+print("  from SOLVERS.")
+sys.exit(1)
+PY
+    ;;
+esac
 
 OPT_ARGS=""
 [ -n "${TOL}" ]       && OPT_ARGS="${OPT_ARGS} --tol ${TOL}"

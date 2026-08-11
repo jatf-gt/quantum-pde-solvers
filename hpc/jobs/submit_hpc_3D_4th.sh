@@ -5,62 +5,55 @@
 #  Runs `hpc/runners/run_3d.py --order 4` over sections 1-7 at N = 4, 8, for
 #  Thomas, HHL, VQLS and QSVT.
 #
-#  ####################################################################
-#  #  THIS JOB REFUSES TO RUN. The 3-D 4th-order operator is wrong.   #
-#  ####################################################################
+#  Readiness
+#  ---------
+#  This job was gated until 2026-08-12 and is now submittable. The defects that
+#  invalidated every earlier 4th-order 3-D result are recorded in the header of
+#  submit_hpc_2D_4th.sh, which 3-D shared in full: the +-2 band truncated by the
+#  quantum entry points; the even reflection and the 18*alpha error in the
+#  shared closure; and the use of f on the face where the closure needs the
+#  second derivative NORMAL to it, which in more than one dimension is f less
+#  the tangential second derivatives of the Dirichlet data. The replacement is
+#  problems/poisson_line_3d_4th.py, fourth order along every axis rather than
+#  along the strip alone.
 #
-#  Why it is gated
-#  ---------------
-#  3-D shares `solvers/outer/multigrid_4th.py` with 2-D and inherits the same
-#  defective boundary closure, uncorrected by the Phase 4a fix applied in 1-D:
+#  Measured order by dense direct solve, against manufactured solutions:
 #
-#    * `build_strip_matrix_4th` folds the ghost node into A[0,1] += -1 -- an
-#      EVEN reflection, appropriate to Neumann and not to the Dirichlet data
-#      these cases carry. The odd reflection belongs on the diagonal.
-#    * `_build_rhs_strip` writes 18*alpha where the row-0 stencil gives
-#      14*alpha, summing the boundary and ghost contributions with the same sign.
+#      solution                          order 2   order 4
+#      exp(x+y+z)                          1.99      3.84
+#      triple sin                          1.98      3.98
+#      exp(x+y) cos(2 pi z), periodic        --      4.12
+#      x^3 + y^3 + z^3                   machine-exact (both)
 #
-#  Measured convergence order is 0.88, where 4 is intended.
+#  Phases: up to FOUR distinct strip operators per resolution
+#  ---------------------------------------------------------
+#  The odd reflection at a transverse boundary folds the ghost node onto the
+#  strip's own diagonal, so a strip carries A_row + c_d*I for each transverse
+#  boundary it touches. With two Dirichlet transverse axes that is four distinct
+#  operators -- none, axis 1, axis 2, both -- and with the azimuthally periodic
+#  HET slab it is two, a periodic axis having no boundary. All are requested
+#  during a sweep and all need a cache entry. The count is independent of N: 15
+#  entries covers both domains at N=4,8,16 and computes in under three seconds.
 #
-#  Even with a correct strip operator the mixed design -- 4th order along the
-#  strip, 2nd order transverse -- is capped at order 2 by construction (measured
-#  1.95), because `strip_sweep` coupled only j+-1 at 1/h^2. Step 1 of Phase 4b
-#  (90d76f1) extended `strip_sweep` to consult the optional `transverse_terms`
-#  and `row_matrix_for` hooks; step 2 -- `problems/poisson_line_3d_4th.py`,
-#  which supplies them -- is not written. Note that the transverse operator's
-#  diagonal differs on the boundary-adjacent strips, so there are TWO distinct
-#  strip matrices rather than one: two block encodings and two phase sets, not N.
+#      export DIM=3; qsub -v DIM hpc/jobs/submit_precompute_4th.sh
 #
-#  `max_wall_s` is also parsed, accepted and silently discarded in the 4th-order
-#  3-D path (R3): `_run_4th_order_solver_3d` never reads it, so the run proceeds
-#  to its max_iter bound and is terminated by PBS. This matters more in 3-D than
-#  anywhere else -- a sweep costs N^2 strip solves per outer iteration.
+#  The guard below refuses to run QSVT unless every one of those keys is present.
 #
-#  The 3-D work accounting is separately wrong: 2-D records `w.add(N, iters)`
-#  against 3-D's `w.add(N, N*iters)`. The two are mutually inconsistent and both
-#  incorrect; Phase 4b removes this path in favour of the instrumented
-#  `strip_sweep`, which fixes it as a side effect.
+#  Cost
+#  ----
+#  A 3-D sweep costs N^2 strip solves per outer iteration, so it is the most
+#  expensive of the three by a wide margin. N is capped at 8 by default for that
+#  reason; raise it deliberately, having read an --estimate first.
 #
-#  What has to land before the gate is lifted
-#  ------------------------------------------
-#    1. `problems/poisson_line_3d_4th.py` supplying `transverse_terms` and
-#       `row_matrix_for`; removal of `solvers/outer/multigrid_4th.py` and
-#       `_run_4th_order_solver_3d`.
-#    2. Verified order ~4 in 3-D on a solution NOT odd about the boundaries and
-#       one with non-zero Dirichlet data.
-#    3. The 2nd-order numbers unchanged: SOR and FMG at the recorded iteration
-#       counts, and the 15-configuration outer baseline byte-for-byte.
-#    4. A 3-D order-4 phase precompute. `precompute_phases.py` accepts
-#       `--dim 1|2` only; 3-D has never had one, its strip kappa being ~2.
+#  Usage
+#  -----
+#    qsub hpc/jobs/submit_hpc_3D_4th.sh
 #
-#  See docs/HPC_REPAIR_PLAN.md, Phase 4b.
+#    export N_VALUES="4"; qsub -v N_VALUES hpc/jobs/submit_hpc_3D_4th.sh
+#    export SOLVERS="vqls,qsvt"; qsub -v SOLVERS hpc/jobs/submit_hpc_3D_4th.sh
 #
-#  Override
-#  --------
-#  `ALLOW_BROKEN_4TH_CLOSURE=1` proceeds anyway, for a deliberate diagnostic run
-#  measuring the defect. Rows so produced must not enter the thesis archive.
-#
-#    qsub -v ALLOW_BROKEN_4TH_CLOSURE hpc/jobs/submit_hpc_3D_4th.sh
+#  Comma-separated values must be passed as `qsub -v NAME` (bare name, value from
+#  the exported shell variable); `-v NAME=value` breaks on PBS's comma splitting.
 #
 #  Monitor:
 #    qstat -u $USER
@@ -68,7 +61,7 @@
 #                                                   # from the login node: OI-1
 # ============================================================================
 
-#PBS -l walltime=24:00:00
+#PBS -l walltime=48:00:00
 #PBS -l select=1:ncpus=4:mem=128gb
 #PBS -N quantum_pde_3D_4th
 #PBS -o results/3Dhpc_run_4th/pbs_stdout.log
@@ -96,49 +89,6 @@ if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
 fi
 cd "${REPO_ROOT}" || exit 1
 
-# ── Correctness gate ─────────────────────────────────────────────────────────
-# Before the module loads, so a mistaken submission costs seconds and nothing else.
-ALLOW_BROKEN_4TH_CLOSURE="${ALLOW_BROKEN_4TH_CLOSURE:-0}"
-# The gate tests what the RUNNER does, not what exists on disk.
-# problems/poisson_line_3d_4th.py is written and verified (order 3.84 on
-# exp(x+y+z), machine-exact on a cubic, 4.12 with a periodic azimuthal axis),
-# but run_3d.py's --order 4 branch still dispatches to
-# _run_4th_order_solver_3d, which imports the defective
-# solvers/outer/multigrid_4th. Keying this check on the existence of the new
-# class would therefore open the gate whilst the sweep still ran the old code.
-if grep -q "multigrid_4th" hpc/runners/run_3d.py 2>/dev/null \
-   && [ "${ALLOW_BROKEN_4TH_CLOSURE}" != "1" ]; then
-    echo ""
-    echo "REFUSING TO RUN: run_3d.py still dispatches to the defective closure."
-    echo ""
-    echo "  hpc/runners/run_3d.py imports solvers/outer/multigrid_4th, whose"
-    echo "  closure applies an even reflection (A[0,1] += -1) to Dirichlet data"
-    echo "  and writes 18*alpha where the row-0 stencil gives 14*alpha. Measured"
-    echo "  convergence order is 0.88, where 4 is intended: every row this job"
-    echo "  produced would have to be discarded -- at N^2 strip solves per outer"
-    echo "  iteration."
-    echo ""
-    echo "  The replacement, problems/poisson_line_3d_4th.py, is written and"
-    echo "  verified. What remains is Phase 4b's second half: point run_3d.py's"
-    echo "  --order 4 branch at PoissonLine3D4th and delete"
-    echo "  _run_4th_order_solver_3d together with multigrid_4th.py. This gate"
-    echo "  clears itself when that import is gone."
-    echo ""
-    echo "  See docs/HPC_REPAIR_PLAN.md Phase 4b, and the header of this script"
-    echo "  for the remaining gates."
-    echo ""
-    echo "  ALLOW_BROKEN_4TH_CLOSURE=1 overrides this, for a deliberate"
-    echo "  diagnostic run only."
-    exit 2
-fi
-if [ "${ALLOW_BROKEN_4TH_CLOSURE}" = "1" ]; then
-    echo ""
-    echo "WARNING: ALLOW_BROKEN_4TH_CLOSURE=1. The 3-D 4th-order closure is"
-    echo "         first-order accurate. These rows are a measurement of the"
-    echo "         defect, not a benchmark, and must not enter the archive."
-    echo ""
-fi
-
 module load tools/prod
 module load Python/3.12.3-GCCcore-13.3.0
 
@@ -154,6 +104,16 @@ source "${VENV_PATH}/bin/activate"
 # failed with ModuleNotFoundError.
 ORDER=4 bash hpc/jobs/_preflight.sh || exit 1
 
+# The retired path is gone; a clone that still carries it predates Phase 4b and
+# would produce order-0.88 rows -- at N^2 strip solves per outer iteration.
+if [ -f "solvers/outer/multigrid_4th.py" ]; then
+    echo "ERROR: solvers/outer/multigrid_4th.py is present, so this clone predates"
+    echo "       Phase 4b. Its closure is an even reflection applied to Dirichlet"
+    echo "       data with the 18*alpha error, measured order 0.88."
+    echo "       Pull before submitting."
+    exit 1
+fi
+
 RESULTS_SUBDIR="results/3Dhpc_run_4th"
 mkdir -p "${RESULTS_SUBDIR}"
 
@@ -166,6 +126,7 @@ WORKERS="${WORKERS:-4}"
 SCHEME="${SCHEME:-fmg}"
 TOL="${TOL:-}"
 MAX_OUTER="${MAX_OUTER:-}"
+ALLOW_INLINE_PHASES="${ALLOW_INLINE_PHASES:-0}"
 
 echo ""
 echo "  N_VALUES  : ${N_VALUES}"
@@ -173,6 +134,63 @@ echo "  SECTIONS  : ${SECTIONS}"
 echo "  SOLVERS   : ${SOLVERS}"
 echo "  SCHEME    : ${SCHEME}"
 echo "  WORKERS   : ${WORKERS}"
+
+# ── QSVT phase-cache coverage ────────────────────────────────────────────────
+# Every distinct strip operator, not one per resolution. A miss does not fail:
+# the phases are computed inline instead, on the critical path of a sweep that
+# already costs N^2 strip solves per outer iteration.
+case ",${SOLVERS}," in
+  *,qsvt,*)
+    echo ""
+    echo "------------------------------------------------------------"
+    echo "  QSVT phase-cache coverage (3-D, order 4)"
+    echo "------------------------------------------------------------"
+    python3 - "${N_VALUES}" "${ALLOW_INLINE_PHASES}" <<'PY' || exit 1
+import sys
+
+sys.path.insert(0, ".")
+sys.path.insert(0, "hpc/runners")
+
+import run_3d
+import precompute_phases as pp
+import solvers.quantum.qsp_angles as qa
+
+n_values = sorted({int(t) for t in sys.argv[1].split(",") if t.strip()})
+allow = sys.argv[2].strip() == "1"
+epsilon = round(run_3d.HHL_EPSILON_DEFAULT, 8)
+
+targets = pp.build_targets(3, n_values, "all", 4)
+
+print(f"  {'strip family':>18} {'N':>5} {'kappa':>12} {'key':>8} {'cached':>8}")
+print("  " + "-" * 56)
+
+missing = []
+for label, N, kappa in targets:
+    cap = run_3d.QSVT_MAX_DEGREE_3D.get(N)
+    tag = cap if cap is not None else -1
+    cached = qa._load_disk((round(kappa, 4), epsilon, "auto", tag)) is not None
+    print(f"  {label:>18} {N:>5} {kappa:>12.4f} {'d' + str(tag):>8} "
+          f"{str(cached):>8}")
+    if not cached:
+        missing.append(f"{label} N={N}")
+
+if not missing:
+    print(f"\n  All {len(targets)} distinct strip operators are cached.")
+    sys.exit(0)
+
+print(f"\n  No precomputed phases for: {', '.join(missing)}")
+if allow:
+    print("  ALLOW_INLINE_PHASES=1: proceeding. Those strips will compute their")
+    print("  phases inline, on the critical path of the sweep.")
+    sys.exit(0)
+
+print("  Run:  export DIM=3; qsub -v DIM hpc/jobs/submit_precompute_4th.sh")
+print("  It completes in seconds. Or set ALLOW_INLINE_PHASES=1, or drop qsvt")
+print("  from SOLVERS.")
+sys.exit(1)
+PY
+    ;;
+esac
 
 OPT_ARGS=""
 [ -n "${TOL}" ]       && OPT_ARGS="${OPT_ARGS} --tol ${TOL}"
