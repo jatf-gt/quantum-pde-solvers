@@ -104,19 +104,31 @@ cd "${REPO_ROOT}" || exit 1
 # Placed before the module loads so that a mistaken submission costs seconds of
 # queue time and nothing else.
 ALLOW_BROKEN_4TH_CLOSURE="${ALLOW_BROKEN_4TH_CLOSURE:-0}"
-if [ ! -f "problems/poisson_line_2d_4th.py" ] && [ "${ALLOW_BROKEN_4TH_CLOSURE}" != "1" ]; then
+# The gate tests what the RUNNER does, not what exists on disk.
+# problems/poisson_line_2d_4th.py is written and verified (order 3.87 on
+# exp(x+y), machine-exact on a cubic), but run_2d.py's --order 4 branch still
+# dispatches to _run_4th_order_solver_2d, which imports the defective
+# solvers/outer/multigrid_4th. Keying this check on the existence of the new
+# class would therefore open the gate whilst the sweep still ran the old code.
+if grep -q "multigrid_4th" hpc/runners/run_2d.py 2>/dev/null \
+   && [ "${ALLOW_BROKEN_4TH_CLOSURE}" != "1" ]; then
     echo ""
-    echo "REFUSING TO RUN: the 2-D 4th-order boundary closure is incorrect."
+    echo "REFUSING TO RUN: run_2d.py still dispatches to the defective closure."
     echo ""
-    echo "  problems/poisson_line_2d_4th.py does not exist, so this sweep would"
-    echo "  fall through to solvers/outer/multigrid_4th.py, whose closure applies"
-    echo "  an even reflection (A[0,1] += -1) to Dirichlet data and writes"
-    echo "  18*alpha where the row-0 stencil gives 14*alpha. Measured convergence"
-    echo "  order is 0.88, where 4 is intended: every row this job produced would"
-    echo "  have to be discarded."
+    echo "  hpc/runners/run_2d.py imports solvers/outer/multigrid_4th, whose"
+    echo "  closure applies an even reflection (A[0,1] += -1) to Dirichlet data"
+    echo "  and writes 18*alpha where the row-0 stencil gives 14*alpha. Measured"
+    echo "  convergence order is 0.88, where 4 is intended: every row this job"
+    echo "  produced would have to be discarded."
     echo ""
-    echo "  See docs/HPC_REPAIR_PLAN.md Phase 4b for the outstanding work, and"
-    echo "  the header of this script for the four gates that must be cleared."
+    echo "  The replacement, problems/poisson_line_2d_4th.py, is written and"
+    echo "  verified. What remains is Phase 4b's second half: point run_2d.py's"
+    echo "  --order 4 branch at PoissonLine2D4th and delete"
+    echo "  _run_4th_order_solver_2d together with multigrid_4th.py. This gate"
+    echo "  clears itself when that import is gone."
+    echo ""
+    echo "  See docs/HPC_REPAIR_PLAN.md Phase 4b, and the header of this script"
+    echo "  for the remaining gates."
     echo ""
     echo "  ALLOW_BROKEN_4TH_CLOSURE=1 overrides this, for a deliberate"
     echo "  diagnostic run only."
