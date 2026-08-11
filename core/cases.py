@@ -89,7 +89,7 @@ Boeuf & Garrigues, J. Appl. Phys. 84(7), 3541-3554 (1998) — the HET plasma
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Sequence
 
 import numpy as np
 
@@ -143,6 +143,21 @@ class BuiltCase:
         it must extrapolate from the interior samples, which is asymptotically
         adequate but inaccurate on a sharply peaked source at the coarse
         resolutions the fourth-order sweep uses.
+    f_faces : tuple or None
+        The 2D/3D counterpart of `f_boundary`: the source evaluated *on* the
+        domain faces, as ``(lo, hi)`` with one entry per axis. In 2D
+        ``lo = (f_x0, f_y0)`` and ``hi = (f_x1, f_y1)``, each a length-N array
+        over the interior nodes of the other axis; in 3D each entry is a 2D
+        array over the face. Entries are None where the case cannot supply
+        them.
+
+        Required by the fourth-order closures of ``problems.poisson_line_2d_4th``
+        and ``problems.poisson_line_3d_4th`` — but note that what those classes
+        need is ∂²u/∂n² on the face, and in more than one dimension that is
+        *not* the source: ∇²u = f gives ∂²u/∂n² = f − Σ_t ∂²u/∂t², the
+        tangential terms being second derivatives of the Dirichlet data. The
+        classes perform that subtraction themselves, so what belongs here is
+        the plain source, exactly as in 1D.
     """
 
     coords:   tuple[np.ndarray, ...]
@@ -154,6 +169,7 @@ class BuiltCase:
     problem:  Any = None
     kappa:    Optional[float] = None
     f_boundary: Optional[tuple[float, float]] = None
+    f_faces:  Optional[tuple] = None
 
 
 # ── Case Declaration ──────────────────────────────────────────────────────────
@@ -423,6 +439,92 @@ def _f_boundary_1d(
     """
     edges = np.asarray(source(np.array([0.0, 1.0])), dtype=float)
     return (float(edges[0]), float(edges[1]))
+
+
+def _f_faces_2d(
+    source: Callable[[np.ndarray, np.ndarray], np.ndarray],
+    x: np.ndarray,
+    y: np.ndarray,
+    Lx: float,
+    Ly: float,
+) -> tuple[tuple[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]:
+    """
+    Evaluates a 2D source term on the four domain faces.
+
+    The 2D counterpart of `_f_boundary_1d`, required by the fourth-order
+    ghost-node closure of ``problems.poisson_line_2d_4th``. The second-order
+    discretisation does not use these values.
+
+    Each face is sampled at the *interior* nodes of the tangential axis, which
+    is the grid the closure's correction is applied on. The corners are not
+    sampled: no boundary row references them.
+
+    Parameters
+    ----------
+    source : callable
+        f(X, Y), the same callable the interior samples are drawn from.
+    x, y : np.ndarray
+        Length-N interior coordinates along each axis.
+    Lx, Ly : float
+        Domain extents [m].
+
+    Returns
+    -------
+    tuple
+        ``((f_x0, f_y0), (f_x1, f_y1))``, matching `BuiltCase.f_faces`.
+    """
+    zeros_x, zeros_y = np.zeros_like(x), np.zeros_like(y)
+    return (
+        (np.asarray(source(zeros_y, y), dtype=float),
+         np.asarray(source(x, zeros_x), dtype=float)),
+        (np.asarray(source(zeros_y + Lx, y), dtype=float),
+         np.asarray(source(x, zeros_x + Ly), dtype=float)),
+    )
+
+
+def _f_faces_3d(
+    source: Callable[..., np.ndarray],
+    axes: Sequence[np.ndarray],
+    lengths: Sequence[float],
+    periodic: Sequence[bool],
+) -> tuple[tuple, tuple]:
+    """
+    Evaluates a 3D source term on the six domain faces.
+
+    The 3D counterpart of `_f_faces_2d`. A periodic axis has no faces, so its
+    entries are None and the fourth-order closure never consults them.
+
+    Parameters
+    ----------
+    source : callable
+        f(X, Y, Z), the same callable the interior samples are drawn from.
+    axes : Sequence[np.ndarray]
+        Per-axis node coordinates, as used to build the interior grid.
+    lengths : Sequence[float]
+        Domain extent per axis [m].
+    periodic : Sequence[bool]
+        Per-axis periodicity.
+
+    Returns
+    -------
+    tuple
+        ``(lo, hi)``, each a length-3 tuple whose entry for axis d is the source
+        on that face — a 2D array over the other two axes, in their original
+        order — or None for a periodic axis.
+    """
+    lo: list = [None, None, None]
+    hi: list = [None, None, None]
+    for ax in range(3):
+        if periodic[ax]:
+            continue
+        others = [d for d in range(3) if d != ax]
+        G0, G1 = np.meshgrid(axes[others[0]], axes[others[1]], indexing="ij")
+        for end, store in ((0.0, lo), (float(lengths[ax]), hi)):
+            args: list = [None, None, None]
+            args[ax] = np.full(G0.shape, end)
+            args[others[0]], args[others[1]] = G0, G1
+            store[ax] = np.asarray(source(*args), dtype=float)
+    return (tuple(lo), tuple(hi))
 
 
 def _tst(N: int) -> np.ndarray:
@@ -1164,6 +1266,7 @@ def _line_2d(
         coords=(X, Y), spacings=(dx, dy), f_values=f,
         exact=None if exact is None else exact(X, Y),
         problem=prob, kappa=prob.kappa_row(),
+        f_faces=_f_faces_2d(source, X[:, 0], Y[0, :], Lx, Ly),
     )
 
 
@@ -1339,6 +1442,8 @@ def _build_het_2d_bg(N: int) -> BuiltCase:
         spacings=(cfg.L_x / (N + 1), cfg.L_y / (N + 1)),
         f_values=cfg.poisson_source_at(X, Y),
         exact=None, problem=prob, kappa=prob.kappa_row(),
+        f_faces=_f_faces_2d(cfg.poisson_source_at, X[:, 0], Y[0, :],
+                            cfg.L_x, cfg.L_y),
     )
 
 
@@ -1578,7 +1683,8 @@ def _het_grid_3d(N: int):
     return tuple(np.meshgrid(z, r, s, indexing="ij")), (dz, dr, ds)
 
 
-def _line_3d(coords, spacings, f, exact, lengths, periodic, **kw) -> BuiltCase:
+def _line_3d(coords, spacings, f, exact, lengths, periodic,
+             source=None, **kw) -> BuiltCase:
     """
     Wraps assembled 3D field data into a `BuiltCase`.
 
@@ -1596,6 +1702,12 @@ def _line_3d(coords, spacings, f, exact, lengths, periodic, **kw) -> BuiltCase:
         Domain extents per axis.
     periodic : tuple of bool
         Per-axis periodicity.
+    source : callable, optional
+        f(X, Y, Z), the same callable `f` was sampled from. Given, the source is
+        additionally evaluated on the six faces and recorded in
+        `BuiltCase.f_faces` for the fourth-order closure. Callers should pass
+        the identical callable they built `f` with rather than a transcription
+        of it, so the two cannot drift apart.
     **kw
         Passed to `PoissonLine3D`, principally ``bc_lo`` and ``bc_hi``.
 
@@ -1609,19 +1721,30 @@ def _line_3d(coords, spacings, f, exact, lengths, periodic, **kw) -> BuiltCase:
     from problems.poisson_line_3d import PoissonLine3D
 
     prob = PoissonLine3D(f, lengths=lengths, periodic=periodic, **kw)
+    faces = None
+    if source is not None:
+        axes = (coords[0][:, 0, 0], coords[1][0, :, 0], coords[2][0, 0, :])
+        faces = _f_faces_3d(source, axes, lengths, periodic)
     return BuiltCase(
         coords=coords, spacings=spacings, f_values=f, exact=exact,
-        problem=prob, kappa=prob.kappa_row(),
+        problem=prob, kappa=prob.kappa_row(), f_faces=faces,
     )
 
 
 def _build_cube_3d(N: int) -> BuiltCase:
     """Triple-sin manufactured solution on the unit cube."""
     (X, Y, Z), h, _ = _cube_grid(N)
+
+    # Grouped exactly as the original expression was - the sines multiplied
+    # together first, then scaled - because floating-point multiplication is
+    # not associative and this source feeds a published sweep.
+    def src(x, y, z):
+        return (-3.0 * np.pi**2) * (np.sin(np.pi * x) * np.sin(np.pi * y)
+                                    * np.sin(np.pi * z))
+
     phi = np.sin(np.pi * X) * np.sin(np.pi * Y) * np.sin(np.pi * Z)
-    f = -3.0 * np.pi**2 * phi
-    return _line_3d((X, Y, Z), (h, h, h), f, phi,
-                    (1.0, 1.0, 1.0), (False, False, False))
+    return _line_3d((X, Y, Z), (h, h, h), src(X, Y, Z), phi,
+                    (1.0, 1.0, 1.0), (False, False, False), source=src)
 
 
 def _build_het_3d_mms(N: int, m: int = 1) -> BuiltCase:
@@ -1646,13 +1769,20 @@ def _build_het_3d_mms(N: int, m: int = 1) -> BuiltCase:
     BuiltCase
     """
     (Zg, Rg, Sg), sp = _het_grid_3d(N)
+    lap = -geom.PHI_0 * np.pi**2 * (1.0 / geom.L_Z**2 + 1.0 / geom.L_R**2
+                                    + 4.0 * m**2 / geom.L_S**2)
+
+    def src(z, r, s):
+        return lap * (np.sin(np.pi * z / geom.L_Z)
+                      * np.sin(np.pi * r / geom.L_R)
+                      * np.cos(2.0 * np.pi * m * s / geom.L_S))
+
     profile = (np.sin(np.pi * Zg / geom.L_Z) * np.sin(np.pi * Rg / geom.L_R)
                * np.cos(2.0 * np.pi * m * Sg / geom.L_S))
     phi = geom.PHI_0 * profile
-    lap = -geom.PHI_0 * np.pi**2 * (1.0 / geom.L_Z**2 + 1.0 / geom.L_R**2
-                                    + 4.0 * m**2 / geom.L_S**2)
-    return _line_3d((Zg, Rg, Sg), sp, lap * profile, phi,
-                    (geom.L_Z, geom.L_R, geom.L_S), (False, False, True))
+    return _line_3d((Zg, Rg, Sg), sp, src(Zg, Rg, Sg), phi,
+                    (geom.L_Z, geom.L_R, geom.L_S), (False, False, True),
+                    source=src)
 
 
 def _build_het_3d_spoke(N: int) -> BuiltCase:
@@ -1682,14 +1812,21 @@ def _build_het_3d_spoke(N: int) -> BuiltCase:
     """
     m, eps = geom.SPOKE_MODE_M, geom.SPOKE_EPSILON
     (Zg, Rg, Sg), sp = _het_grid_3d(N)
+
+    def src(z, r, s):
+        b = np.sin(np.pi * z / geom.L_Z) * np.sin(np.pi * r / geom.L_R)
+        a = np.cos(2.0 * np.pi * m * s / geom.L_S)
+        return geom.PHI_0 * b * (
+            -(np.pi**2 / geom.L_Z**2 + np.pi**2 / geom.L_R**2)
+            * (1.0 + eps * a)
+            - eps * (2.0 * np.pi * m / geom.L_S) ** 2 * a)
+
     base = np.sin(np.pi * Zg / geom.L_Z) * np.sin(np.pi * Rg / geom.L_R)
     azim = np.cos(2.0 * np.pi * m * Sg / geom.L_S)
     phi = geom.PHI_0 * base * (1.0 + eps * azim)
-    f = geom.PHI_0 * base * (
-        -(np.pi**2 / geom.L_Z**2 + np.pi**2 / geom.L_R**2) * (1.0 + eps * azim)
-        - eps * (2.0 * np.pi * m / geom.L_S) ** 2 * azim)
-    return _line_3d((Zg, Rg, Sg), sp, f, phi,
-                    (geom.L_Z, geom.L_R, geom.L_S), (False, False, True))
+    return _line_3d((Zg, Rg, Sg), sp, src(Zg, Rg, Sg), phi,
+                    (geom.L_Z, geom.L_R, geom.L_S), (False, False, True),
+                    source=src)
 
 
 def _build_het_3d_discharge(N: int) -> BuiltCase:
@@ -1726,11 +1863,14 @@ def _build_het_3d_discharge(N: int) -> BuiltCase:
     sigma_z = 0.12 * geom.L_Z
     n0      = 1.0e16              # peak net charge-carrier density [m⁻³]
 
-    n_diff = (n0 * np.exp(-((Zg - z_acc) ** 2) / (2.0 * sigma_z**2))
-              * np.sin(np.pi * Rg / geom.L_R)
-              * (1.0 + geom.SPOKE_EPSILON
-                 * np.cos(2.0 * np.pi * m * Sg / geom.L_S)))
-    f = -(_Q_E_DRIVER * n_diff) / _EPS0_DRIVER
+    def src(z, r, s):
+        n_d = (n0 * np.exp(-((z - z_acc) ** 2) / (2.0 * sigma_z**2))
+               * np.sin(np.pi * r / geom.L_R)
+               * (1.0 + geom.SPOKE_EPSILON
+                  * np.cos(2.0 * np.pi * m * s / geom.L_S)))
+        return -(_Q_E_DRIVER * n_d) / _EPS0_DRIVER
+
+    f = src(Zg, Rg, Sg)
 
     bc_anode    = np.full((N, N), geom.V_ANODE)      # face z = 0,   shape (r, s)
     bc_cathode  = np.full((N, N), geom.V_CATHODE)    # face z = L_z
@@ -1740,6 +1880,7 @@ def _build_het_3d_discharge(N: int) -> BuiltCase:
     return _line_3d(
         (Zg, Rg, Sg), sp, f, None,
         (geom.L_Z, geom.L_R, geom.L_S), (False, False, True),
+        source=src,
         bc_lo=(bc_anode, bc_wall_in, 0.0),
         bc_hi=(bc_cathode, bc_wall_out, 0.0),
     )
@@ -1778,6 +1919,7 @@ def _build_laplace_3d(N: int) -> BuiltCase:
     face_xy = np.sin(np.pi * p)[:, None] * np.sin(np.pi * p)[None, :]
     return _line_3d((X, Y, Z), (h, h, h), f, phi,
                     (1.0, 1.0, 1.0), (False, False, False),
+                    source=lambda x, y, z: np.zeros_like(x),
                     bc_hi=(0.0, 0.0, face_xy))
 
 
@@ -1850,7 +1992,7 @@ def _build_gaussian_3d(N: int) -> BuiltCase:
              _gauss_phi_3d(A, B, ones))
     return _line_3d((X, Y, Z), (h, h, h), f, phi,
                     (1.0, 1.0, 1.0), (False, False, False),
-                    bc_lo=bc_lo, bc_hi=bc_hi)
+                    source=_gauss_src_3d, bc_lo=bc_lo, bc_hi=bc_hi)
 
 
 def _build_highmode_3d(N: int) -> BuiltCase:
@@ -1882,11 +2024,18 @@ def _build_highmode_3d(N: int) -> BuiltCase:
     """
     n, m, l = 2, 3, 4
     (X, Y, Z), h, _ = _cube_grid(N)
+
+    # Grouped as the original was: the scalar prefactor formed first, then
+    # applied to the product of sines. Not associative in floating point.
+    def src(x, y, z):
+        return (-np.pi**2 * (n * n + m * m + l * l)) * (
+            np.sin(n * np.pi * x) * np.sin(m * np.pi * y)
+            * np.sin(l * np.pi * z))
+
     phi = (np.sin(n * np.pi * X) * np.sin(m * np.pi * Y)
            * np.sin(l * np.pi * Z))
-    f = -np.pi**2 * (n * n + m * m + l * l) * phi
-    return _line_3d((X, Y, Z), (h, h, h), f, phi,
-                    (1.0, 1.0, 1.0), (False, False, False))
+    return _line_3d((X, Y, Z), (h, h, h), src(X, Y, Z), phi,
+                    (1.0, 1.0, 1.0), (False, False, False), source=src)
 
 
 # ── 3D Generic Poisson Cases ──────────────────────────────────────────────────
