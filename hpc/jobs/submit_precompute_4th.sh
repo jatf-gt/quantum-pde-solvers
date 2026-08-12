@@ -47,8 +47,11 @@
 #  uncapped run is recorded as the tag `d-1`. run_1d.py asks for the cap given by
 #  QSVT_MAX_DEGREE_BY_N at the resolution being solved:
 #
-#      N = 4, 8, 16   ->  None   ->  tag d-1     (uncapped)
-#      N = 32, 64     ->  5000   ->  tag d5000
+#      N = 4, 8       ->  None   ->  tag d-1     (uncapped)
+#      N = 16, 32, 64 ->  5000   ->  tag d5000
+#
+#  At order 2 the boundary sits one resolution higher, N=16 being uncapped
+#  there: the pentadiagonal operator crosses the solver's degree limit first.
 #
 #  run_2d.py and run_3d.py do the same through QSVT_MAX_DEGREE_{2D,3D}, whose cap
 #  above N=16 is 500 rather than 5000. The guard reads whichever table applies to
@@ -92,9 +95,13 @@
 #    export N_VALUES="4,8"
 #    qsub -v N_VALUES hpc/jobs/submit_precompute_4th.sh
 #
-#    # Stage 2 -- N=16, uncapped. Only once stage 1 has completed.
-#    export N_VALUES="16"
-#    qsub -v N_VALUES hpc/jobs/submit_precompute_4th.sh
+#    # Stage 2 -- N=16, CAPPED at 5000. Not uncapped: the pentadiagonal operator
+#    # needs degree 19375 there, against the angle solver's sanity limit of 15000,
+#    # so an uncapped solve is REFUSED outright and writes nothing. The
+#    # tridiagonal operator needs 14177 and passes just under, which is why the
+#    # 2nd-order cache has an uncapped N=16 entry and this one cannot.
+#    export N_VALUES="16" MAX_DEGREE="5000"
+#    qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_4th.sh
 #
 #    # Stage 3 -- N=32, capped at 5000 to match QSVT_MAX_DEGREE_BY_N. Exploratory:
 #    # kappa = 586.8 and completion within 71 h is not guaranteed. Required only if
@@ -298,33 +305,60 @@ tag_written = int(raw_cap) if raw_cap else -1
 # table that drifts, and a drifted degree tag is a silent cache miss.
 if dim == 1:
     import run_1d
-    caps, fallback = run_1d.QSVT_MAX_DEGREE_BY_N, run_1d.QSVT_MAX_DEGREE_FALLBACK
+    # Order-aware: the pentadiagonal operator crosses the angle solver's degree
+    # sanity limit at N=16, where the tridiagonal one passes just under it.
+    def cap_for(N):
+        return run_1d.qsvt_max_degree(N, 4)
 elif dim == 2:
     import run_2d
-    caps, fallback = run_2d.QSVT_MAX_DEGREE_2D, None
+    def cap_for(N):
+        return run_2d.QSVT_MAX_DEGREE_2D.get(N)
 else:
     import run_3d
-    caps, fallback = run_3d.QSVT_MAX_DEGREE_3D, None
+    def cap_for(N):
+        return run_3d.QSVT_MAX_DEGREE_3D.get(N)
 
 # Every distinct strip operator, not one per resolution: in 2-D and 3-D at order
 # 4 the boundary-adjacent strips carry their own kappa and their own cache entry.
 targets = pp.build_targets(dim, n_values, "all", 4)
 
-print(f"  {'strip family':>18} {'N':>5} {'kappa':>12} {'solver key':>12} "
-      f"{'this job':>10} {'cached':>8}")
-print("  " + "-" * 74)
+print(f"  {'strip family':>18} {'N':>5} {'kappa':>12} {'degree':>8} "
+      f"{'solver key':>11} {'this job':>9} {'cached':>7}")
+print("  " + "-" * 82)
 
 runner = {1: "run_1d.py", 2: "run_2d.py", 3: "run_3d.py"}[dim]
 
 mismatched = []
+impossible = []
 for label, N, kappa in targets:
-    cap = caps.get(N, fallback)
+    cap = cap_for(N)
     tag_solver = cap if cap is not None else -1
+    est = qa.polynomial_degree_estimate(kappa, epsilon)
     cached = qa._load_disk((round(kappa, 4), epsilon, "auto", tag_solver)) is not None
-    print(f"  {label:>18} {N:>5} {kappa:>12.4f} {'d' + str(tag_solver):>12} "
-          f"{'d' + str(tag_written):>10} {str(cached):>8}")
+    print(f"  {label:>18} {N:>5} {kappa:>12.4f} {est:>8} "
+          f"{'d' + str(tag_solver):>11} {'d' + str(tag_written):>9} "
+          f"{str(cached):>7}")
     if tag_solver != tag_written and (N, tag_solver) not in mismatched:
         mismatched.append((N, tag_solver))
+    # An uncapped entry above the solver's sanity limit cannot be produced at
+    # all: compute_inversion_angles refuses it outright, in milliseconds. The
+    # precompute would record a failure and write nothing while appearing to
+    # run, and the sweep would then miss and fall back to a reduced degree. So
+    # this is caught here rather than discovered in the log.
+    if tag_written == -1 and est > qa._DEGREE_SANITY_LIMIT and N not in impossible:
+        impossible.append(N)
+
+if impossible:
+    print()
+    print(f"  ABORTING: an uncapped solve is impossible at N={impossible}.")
+    print("  The estimated degree exceeds the angle solver's sanity limit of "
+          f"{qa._DEGREE_SANITY_LIMIT}, so")
+    print("  compute_inversion_angles refuses it outright and this job would")
+    print("  write nothing while appearing to run.")
+    print()
+    print("  Set MAX_DEGREE to the cap the runner requests for those")
+    print("  resolutions, and run them as a stage separate from the uncapped ones.")
+    sys.exit(1)
 
 if mismatched:
     print()

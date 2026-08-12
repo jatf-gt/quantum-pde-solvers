@@ -26,8 +26,8 @@
 #                       Dirichlet data. Both corrections are right-hand-side
 #                       only, so A, kappa and the phase-cache keys are unchanged.
 #
-#  The 2-D and 3-D closures are NOT fixed (measured order 0.88); their scripts
-#  refuse to run for that reason. See docs/HPC_REPAIR_PLAN.md, Phase 4b.
+#  The 2-D and 3-D closures were fixed on 2026-08-12 (Phase 4b) and their
+#  scripts are submittable too.
 #
 #  Scope
 #  -----
@@ -36,10 +36,16 @@
 #  correspondingly lower than the 2nd-order sweep's, which is expected and not a
 #  gap.
 #
-#  N = 32 is deliberately NOT in the default scope. It requires stage 3 of
-#  hpc/jobs/submit_precompute_4th.sh (kappa = 586.8, capped at degree 5000),
+#  N = 32 is deliberately NOT in the default scope. It requires the last stage
+#  of hpc/jobs/submit_precompute_4th.sh (kappa = 586.8, capped at degree 5000),
 #  which is exploratory and not guaranteed to complete. Raise N_VALUES only once
 #  that cache entry exists -- the guard below will refuse otherwise.
+#
+#  Note that N=16 needs a CAPPED precompute at order 4, unlike order 2: the
+#  pentadiagonal operator needs degree 19375 there against the angle solver's
+#  sanity limit of 15000, so an uncapped entry cannot be produced at all.
+#  run_1d.qsvt_max_degree(N, order) is the single source of truth for the cap,
+#  and this guard reads it rather than restating it.
 #
 #  Usage
 #  -----
@@ -122,7 +128,7 @@ echo "  HHL_TIMEOUT_S   : ${HHL_TIMEOUT_S}"
 # ── QSVT phase-cache coverage ────────────────────────────────────────────────
 # The phase angles are the expensive, non-parallelisable stage of QSVT, and the
 # cache key includes the degree tag: uncapped entries are recorded as d-1 and
-# run_1d.py requests exactly the cap in QSVT_MAX_DEGREE_BY_N. A miss does not
+# run_1d.py requests exactly the cap that qsvt_max_degree gives. A miss does not
 # fail -- _resolve_qsvt_max_degree quietly drops to min(5000, int(15*kappa)) and
 # the sweep proceeds at reduced polynomial accuracy -- so it must be checked
 # here rather than discovered in the results.
@@ -151,7 +157,7 @@ print("  " + "-" * 38)
 
 missing = []
 for N in n_values:
-    cap = run_1d.QSVT_MAX_DEGREE_BY_N.get(N, run_1d.QSVT_MAX_DEGREE_FALLBACK)
+    cap = run_1d.qsvt_max_degree(N, 4)
     tag = cap if cap is not None else -1
     kappa = pp.kappa_1d(N, 4)
     cached = qa._load_disk((round(kappa, 4), epsilon, "auto", tag)) is not None

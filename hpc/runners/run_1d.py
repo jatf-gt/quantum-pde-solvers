@@ -219,6 +219,53 @@ QSVT_MAX_DEGREE_BY_N: dict[int, Optional[int]] = {
     4: None, 8: None, 16: None,
     32: 5000, 64: 5000,
 }
+
+# The same table for --order 4, which differs at exactly one resolution.
+#
+# The cap is not a matter of taste there: `qsp_angles.compute_inversion_angles`
+# REFUSES an uncapped solve whose estimated degree exceeds its sanity limit of
+# 15,000, and the pentadiagonal operator crosses that limit at N=16. Required
+# degree at epsilon=0.01:
+#
+#      N     kappa (order 4)   degree    uncapped solve
+#      4         11.9477         1101    permitted
+#      8         42.1378         4573    permitted
+#      16       154.5126        19375    REFUSED  (order 2 is 14177: under it)
+#      32       586.8093        83761    REFUSED
+#
+# Leaving N=16 as None therefore asks for a cache entry that cannot be
+# computed: the precompute records it as a failure in seconds, and the sweep
+# then misses and falls back to a reduced degree. Order 2 is untouched -- it
+# passes just under the limit at N=16, which is why this never surfaced before.
+QSVT_MAX_DEGREE_BY_N_ORDER4: dict[int, Optional[int]] = {
+    4: None, 8: None,
+    16: 5000, 32: 5000, 64: 5000,
+}
+
+
+def qsvt_max_degree(N: int, order: int = 2) -> Optional[int]:
+    """
+    The QSP degree cap this sweep requests at resolution `N`.
+
+    Single source of truth for both the solver and
+    `hpc/runners/precompute_phases.py`: the cap forms part of the phase-cache
+    key, so a value restated anywhere else is a silent cache miss waiting to
+    happen.
+
+    Parameters
+    ----------
+    N : int
+        Resolution.
+    order : {2, 4}
+        Spatial discretisation order.
+
+    Returns
+    -------
+    int or None
+        The cap, or None for an uncapped solve (cache tag ``d-1``).
+    """
+    table = QSVT_MAX_DEGREE_BY_N_ORDER4 if order == 4 else QSVT_MAX_DEGREE_BY_N
+    return table.get(N, QSVT_MAX_DEGREE_FALLBACK)
 # Cheap cap for any kappa that has NO precomputed entry (checked dynamically
 # below, not hardcoded per case) -- e.g. sub-case 3c, whose Neumann row gives
 # it a different kappa than the standard TST matrix at the same N (confirmed
@@ -734,7 +781,8 @@ def _run_vqls(A: np.ndarray, b: np.ndarray, N: int
         return None, float("nan"), 0.0, False, float("nan"), -1, -1
 
 
-def _resolve_qsvt_max_degree(kappa: float, epsilon: float, N: int) -> Optional[int]:
+def _resolve_qsvt_max_degree(kappa: float, epsilon: float, N: int,
+                             order: int = 2) -> Optional[int]:
     """
     Use the precomputed phases if they exist for this exact kappa; otherwise
     fall back to a cheap cap rather than skip QSVT or risk an expensive/
@@ -748,7 +796,7 @@ def _resolve_qsvt_max_degree(kappa: float, epsilon: float, N: int) -> Optional[i
     """
     import solvers.quantum.qsp_angles as qsp_angles
 
-    candidate = QSVT_MAX_DEGREE_BY_N.get(N, QSVT_MAX_DEGREE_FALLBACK)
+    candidate = qsvt_max_degree(N, order)
     key = (round(kappa, 4), round(epsilon, 8), "auto",
            candidate if candidate is not None else -1)
     if qsp_angles._load_disk(key) is not None:
@@ -782,7 +830,7 @@ def _build_qsvt_config(max_degree: Optional[int]):
 def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int, kappa: float,
               time_limit: Optional[float], order: int = 2,
               ) -> tuple[Optional[np.ndarray], float, float, bool, int, int, Optional[int]]:
-    max_deg = _resolve_qsvt_max_degree(kappa, HHL_EPSILON, N)
+    max_deg = _resolve_qsvt_max_degree(kappa, HHL_EPSILON, N, order)
 
     if N > QSVT_MAX_N:
         log.info("    QSVT: skipping N=%d > QSVT_MAX_N=%d", N, QSVT_MAX_N)
