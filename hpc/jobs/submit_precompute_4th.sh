@@ -103,9 +103,15 @@
 #    qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_4th.sh
 #
 #    # 2-D and 3-D -- minutes, not hours. Both domains, every distinct strip
-#    # operator, over the resolutions the sweeps actually reach.
+#    # operator. Defaults cover N = 4, 8, 16, uncapped.
 #    export DIM="2"; qsub -v DIM hpc/jobs/submit_precompute_4th.sh
 #    export DIM="3"; qsub -v DIM hpc/jobs/submit_precompute_4th.sh
+#
+#    # 2-D at N = 32, 64. A SEPARATE invocation, because the runner caps the
+#    # degree at 500 above N=16 and the cap is part of the cache key: a run
+#    # mixing capped and uncapped resolutions is refused by the guard.
+#    export DIM="2" N_VALUES="32,64" MAX_DEGREE="500"
+#    qsub -v DIM,N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_4th.sh
 #
 #    # Confirm the keys before committing to a long job (computes nothing):
 #    python3 hpc/runners/precompute_phases.py --dim 1 --order 4 \
@@ -164,6 +170,49 @@ if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
 fi
 cd "${REPO_ROOT}" || { echo "ERROR: cannot cd to ${REPO_ROOT}"; exit 1; }
 
+# ── Exit verdict ─────────────────────────────────────────────────────────────
+# Every early exit in this job -- a dirty tree caught by _preflight.sh, a
+# degree-tag mismatch caught by the cache-key guard -- prints its reason to
+# STDOUT and returns non-zero, so the PBS .err file stays empty and the job
+# looks from the outside exactly like one that ran and wrote nothing. It also
+# takes the same 10-30 s either way, that being the cost of importing qiskit,
+# so the wall time does not distinguish them. This trap makes the difference
+# unmissable, and reports how many cache entries were actually added.
+
+_cache_count () { ls -1 results/qsvt_phase_cache 2>/dev/null | wc -l | tr -d " "; }
+CACHE_BEFORE="$(_cache_count)"
+
+final_report () {
+    local rc=$1
+    local after
+    after="$(_cache_count)"
+    echo ""
+    echo "============================================================"
+    if [ "${rc}" -ne 0 ]; then
+        echo "  JOB ABORTED (exit ${rc}) - NOTHING WAS COMPUTED"
+        echo "  Cache entries unchanged: ${CACHE_BEFORE}"
+        echo ""
+        echo "  The reason is printed ABOVE, in this file (stdout). The .err"
+        echo "  file is empty because these checks do not write to stderr."
+        echo "  Search for:  PREFLIGHT FAILED    (dirty tree, missing module)"
+        echo "               ABORTING            (degree-tag mismatch)"
+    else
+        echo "  Cache entries: ${CACHE_BEFORE} before, ${after} after, "
+        echo "                 $((after - CACHE_BEFORE)) added"
+        if [ "${after}" -eq "${CACHE_BEFORE}" ]; then
+            echo ""
+            echo "  NOTHING NEW WAS WRITTEN, and that is a complete result, not"
+            echo "  a failure: every key requested was already cached. See the"
+            echo "  'already cached, skipping' lines above. The 2-D and 3-D"
+            echo "  order-4 sets at N <= 16 are committed to the repository, so"
+            echo "  those jobs are no-ops on a fresh clone."
+        fi
+    fi
+    echo "  finished $(date)"
+    echo "============================================================"
+}
+trap 'final_report $?' EXIT
+
 if [ "${PBS_O_WORKDIR:-${REPO_ROOT}}" != "${REPO_ROOT}" ]; then
     echo "NOTE: submitted from ${PBS_O_WORKDIR}, not the repository root"
     echo "      (${REPO_ROOT}). The PBS stdout/stderr logs are under the former."
@@ -202,9 +251,14 @@ python3 -c "import pyqsp" || {
 mkdir -p results/qsvt_phase_cache
 
 DIM="${DIM:-1}"
+# Every default stops at N=16. The runners cap the QSVT degree above that
+# (QSVT_MAX_DEGREE_* switches from None to 5000 in 1-D, 500 in 2-D/3-D), the cap
+# is part of the cache key, and one invocation writes one tag -- so a default
+# spanning the boundary would abort on the guard every time it was run without
+# arguments. N >= 32 is a deliberate second stage; see Usage.
 case "${DIM}" in
   1) N_VALUES="${N_VALUES:-4,8}" ;;
-  2) N_VALUES="${N_VALUES:-4,8,16,32,64}" ;;
+  2) N_VALUES="${N_VALUES:-4,8,16}" ;;
   3) N_VALUES="${N_VALUES:-4,8,16}" ;;
   *) echo "ERROR: DIM must be 1, 2 or 3; got ${DIM}"; exit 1 ;;
 esac
