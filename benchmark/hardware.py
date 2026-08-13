@@ -236,6 +236,8 @@ def estimate_hardware_feasibility(
     solver: str,
     kappa: float,
     epsilon: float = 0.01,
+    n_layers: Optional[int] = None,
+    polynomial_degree: Optional[int] = None,
 ) -> dict:
     """
     Estimate whether a given (solver, N) configuration is feasible on
@@ -261,13 +263,31 @@ def estimate_hardware_feasibility(
         Condition number of the system matrix.
     epsilon : float
         Precision parameter.
+    n_layers : int, optional
+        VQLS ansatz depth actually used. The estimate is dominated by this and
+        an assumed value is not a small approximation: the sweeps run
+        n_layers = max(6, 2n+2), between 6 and 14 over N = 4...64, against the
+        baseline of 2 assumed when it is not supplied. Pass the recorded value
+        wherever one exists.
+    polynomial_degree : int, optional
+        QSVT degree actually solved for. Supersedes the degree implied by kappa
+        and epsilon, which ignores any cap the run applied and so overstates the
+        circuit whenever the sweep capped it.
 
     Returns
     -------
     dict
         Feasibility assessment with keys:
         'feasible' (bool), 'estimated_depth' (int), 'estimated_qubits' (int),
-        'limiting_factor' (str), 'notes' (str).
+        'estimated_two_qubit' (int), 'limiting_factor' (str), 'notes' (str).
+
+    Notes
+    -----
+    'estimated_two_qubit' is reported alongside the depth because two-qubit gates
+    dominate the error budget on superconducting hardware by roughly an order of
+    magnitude; a depth figure counting single-qubit rotations equally understates
+    the constraint. It is the quantity `hpc/runners/make_tables.py` judges against
+    a gate budget.
     """
     n_qubits_log = int(np.ceil(np.log2(N)))
 
@@ -277,19 +297,32 @@ def estimate_hardware_feasibility(
         # Rough depth estimate: O(kappa^2 / epsilon) Trotter steps
         n_trotter = max(1, int(np.ceil(1.0 / epsilon)))
         depth_est = n_trotter * n_qubits_log * 10   # ~10 gates per Trotter step per qubit
+        # QPE contributes controlled evolutions on every clock qubit, and the
+        # eigenvalue inversion a controlled rotation per clock state.
+        two_qubit_est = n_trotter * n_qubits_log * n_clock
         limiting = "circuit_depth" if depth_est > 100 else "none"
 
     elif solver == "vqls":
         n_qubits_total = n_qubits_log
-        n_layers = 2   # baseline
+        # The hardware-efficient ansatz carries one entangling gate per adjacent
+        # qubit pair per layer, so the two-qubit count is (n-1) per layer and the
+        # depth is dominated by the same structure. Defaulting n_layers to 2 when
+        # the caller knows the real value understates the circuit by up to 7x at
+        # the depths this sweep actually runs.
+        n_layers = 2 if n_layers is None else int(n_layers)
         depth_est = n_layers * n_qubits_log * 3   # ~3 gates per qubit per layer
+        two_qubit_est = n_layers * max(0, n_qubits_log - 1)
         limiting = "none" if depth_est <= 100 else "circuit_depth"
 
     elif solver == "qsvt":
         n_qubits_total = n_qubits_log + 1   # +1 ancilla
         # Polynomial degree ~ 13 * kappa * ln(kappa / epsilon)
-        degree_est = int(13 * kappa * np.log(kappa / epsilon))
+        degree_est = (int(13 * kappa * np.log(kappa / epsilon))
+                      if polynomial_degree is None else int(polynomial_degree))
         depth_est = degree_est * 4   # ~4 gates per polynomial degree
+        # Each QSP iterate applies the block encoding once; the controlled
+        # rotation between iterates is the two-qubit cost.
+        two_qubit_est = degree_est * 2
         limiting = "circuit_depth" if depth_est > 100 else "none"
 
     else:
@@ -304,9 +337,10 @@ def estimate_hardware_feasibility(
     )
 
     return {
-        "feasible":          feasible,
-        "estimated_depth":   depth_est,
-        "estimated_qubits":  n_qubits_total,
-        "limiting_factor":   limiting,
-        "notes":             notes,
+        "feasible":            feasible,
+        "estimated_depth":     depth_est,
+        "estimated_qubits":    n_qubits_total,
+        "estimated_two_qubit": two_qubit_est,
+        "limiting_factor":     limiting,
+        "notes":               notes,
     }

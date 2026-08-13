@@ -122,8 +122,12 @@ def _dict_to_benchmark_result(d: dict) -> BenchmarkResult:
                 "" if fname in ("case_id", "solver", "source_fn") else 0.0
             )
 
+    # Reconstructed from the flattened circuit_* columns above, so any value
+    # already carried under this key is stale and is replaced rather than merged.
+    # The assignment previously stood immediately BEFORE a pop of the same key,
+    # which removed it again and left the constructor without a required
+    # argument -- every read of an equal-accuracy or sensitivity archive raised.
     d_clean["circuit_metrics"] = cm
-    d_clean.pop("circuit_metrics", None)   # remove if already present
 
     try:
         result = BenchmarkResult(**{

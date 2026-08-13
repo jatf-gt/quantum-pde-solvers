@@ -571,12 +571,18 @@ def console_primary_comparison(
 
             if show_circuit and row.circuit_metrics:
                 cm = row.circuit_metrics
+                # Formatted through _fmt_int rather than directly: a solver that
+                # timed out or was skipped records no circuit at all, and a
+                # partially populated CircuitMetrics is the normal case when rows
+                # are read back from an archive whose sweep predates a given
+                # column. Direct formatting raises on None instead of printing a
+                # dash, which took the whole table down for one absent entry.
                 buf.write(
                     f"  {N:>4}  {row.kappa:>8.2f}  "
                     f"{_solver_label(solver):<8}  "
                     f"{err_str:>10}  "
                     f"{_fmt_sci(row.residual):>10}  "
-                    f"{cm.depth_opt1:>8,}  {cm.n_qubits:>4}  "
+                    f"{_fmt_int(cm.depth_opt1):>8}  {_fmt_int(cm.n_qubits):>4}  "
                     f"{_fmt_time(row.wall_time_s):>10}\n"
                 )
             else:
