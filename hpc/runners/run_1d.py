@@ -65,6 +65,7 @@ import concurrent.futures
 import csv
 import dataclasses
 import fnmatch
+import functools
 import json
 import logging
 import os
@@ -237,9 +238,41 @@ QSVT_MAX_DEGREE_BY_N: dict[int, Optional[int]] = {
 # computed: the precompute records it as a failure in seconds, and the sweep
 # then misses and falls back to a reduced degree. Order 2 is untouched -- it
 # passes just under the limit at N=16, which is why this never surfaced before.
+#
+# Cap VALUE, as distinct from whether to cap at all
+# ------------------------------------------------
+# A cap is not merely a cost bound: the capped and uncapped paths construct
+# DIFFERENT polynomials (`qsp_angles._target_reduced_coefs`). Uncapped defers to
+# `pyqsp.PolyOneOverX.generate`, which targets a prescribed epsilon; capped fits
+# the truncated Chebyshev expansion of 1/x directly at the requested degree. At
+# equal degree the capped fit is the more accurate of the two, and it is reached
+# without paying PolyOneOverX's O(kappa^2 log(kappa/epsilon)) construction, so
+# raising a cap buys accuracy at a cost that is polynomial in the degree alone.
+#
+# Accuracy tracks the ratio degree/kappa. Measured on the order-2 1-D sweep, the
+# usable threshold sits between 11 (sound) and 2.9 (degraded):
+#
+#      N     kappa      degree   degree/kappa   best rel. L2
+#      16    116.5       19289        166         3.0e-05
+#      32    440.7        5001         11.3       5.1e-06
+#      64   1711.7        5001          2.9       4.4e-02   <- wall
+#
+# Applying that to order 4 with a cap of 14999 -- one below the sanity limit,
+# which is the largest value `compute_inversion_angles` will accept:
+#
+#      N=16, kappa 154.5  -> ratio 97.1   (5000 would give 32.4: also sound)
+#      N=32, kappa 586.8  -> ratio 25.6   (5000 would give  8.5: BELOW the wall)
+#
+# N=32 is therefore the resolution that requires the larger cap; N=16 is carried
+# at the same value so that both stages of hpc/jobs/submit_precompute_4th.sh
+# share one cache tag (d14999) and cannot be staged inconsistently.
+#
+# N=4 and N=8 stay uncapped: their entries are already computed and committed
+# (results/qsvt_phase_cache/k11p9477_*, k42p1378_*, both tag d-1), and moving
+# them would discard that work to change a ratio that is already ~150.
 QSVT_MAX_DEGREE_BY_N_ORDER4: dict[int, Optional[int]] = {
     4: None, 8: None,
-    16: 5000, 32: 5000, 64: 5000,
+    16: 14999, 32: 14999, 64: 14999,
 }
 
 
@@ -387,6 +420,63 @@ class RunResult:
     # ── Reproducibility ───────────────────────────────────────────────────────
     random_seed:    Optional[int] = None
 
+    # ── Benchmarking-framework metrics (Phase 8) ──────────────────────────────
+    # Fields declared by `benchmark/results_io.BenchmarkResult` that this schema
+    # did not previously carry. They are appended rather than replacing anything,
+    # so `benchmark/hpc_archive.py`, `scripts/gap_analysis.py` and
+    # `benchmark/hpc_plotting.py` -- all of which read this file by field name --
+    # continue to read existing archives unchanged.
+
+    # Which discretisation produced the row. Previously recoverable only from the
+    # results DIRECTORY name, so a 2nd- and a 4th-order row were indistinguishable
+    # once merged, and `--append` keys on (case, solver, N) alone.
+    discretisation_order: Optional[int] = None
+
+    # Error decomposition. The total error against the analytical solution is the
+    # sum of a discretisation part, shared by every solver on that mesh, and an
+    # algorithmic part specific to the solver:
+    #
+    #     err_disc = ||u_thomas - u_exact|| / ||u_exact||     (mesh, not solver)
+    #     err_alg  = ||u_solver - u_thomas|| / ||u_thomas||   (solver, not mesh)
+    #
+    # Reporting only the total conflates the two, which makes an order-2 against
+    # order-4 comparison unreadable: raising the order reduces err_disc while
+    # leaving err_alg governed by kappa, and that separation is the result.
+    err_disc:       Optional[float] = None
+    err_alg:        Optional[float] = None
+
+    # Residual of the best-fit scalar rescaling of the solver's output onto the
+    # reference, i.e. min over s of ||s*u - u_ref|| / ||u_ref||. The quantum
+    # solvers return a normalised state and recover the constant separately, so a
+    # large `max_rel_err` with a SMALL value here is a scale-recovery fault, while
+    # a large value in both is a genuinely wrong solution. Sub-case 3c is the
+    # standing example: its recovered constant diverges with N.
+    proportionality_residual: Optional[float] = None
+
+    # Phase-angle lookup or generation time, separated from the solve it precedes.
+    # A cache miss relocates hours of angle generation into `wall_time_s`, where it
+    # is indistinguishable from an expensive solve; measured at 10829 s mean for
+    # 1-D order 4 at N=32 against ~150 s for the solve itself.
+    phase_lookup_time_s: Optional[float] = None
+
+    # QSVT block-encoding subnormalisation alpha = ||A||_2, and the angle-generation
+    # method actually used. Both are carried by QSVTSolverResult and were discarded.
+    qsvt_alpha:         Optional[float] = None
+    qsvt_angle_method:  Optional[str]   = None
+
+    # VQLS optimiser diagnostics carried by VQLSSolverResult and discarded. The
+    # circuit-evaluation count is the honest cost measure for a variational method,
+    # for which wall time is dominated by the classical optimiser.
+    vqls_n_evaluations:     Optional[int]  = None
+    vqls_optimiser_success: Optional[bool] = None
+
+    # Trotter step count, coupled to hhl_epsilon as n_T = ceil(1/epsilon). Recorded
+    # explicitly because the equal-accuracy protocol treats the pair as one knob.
+    hhl_trotter_steps:  Optional[int] = None
+
+    # Execution backend, so a CPU and a GPU row are separable after the fact.
+    backend_name:       Optional[str] = None
+
 
 # ── Logging helpers ───────────────────────────────────────────────────────────
 
@@ -449,7 +539,113 @@ def _accuracy_fields(u: np.ndarray, u_ref: Optional[np.ndarray]) -> dict:
         "max_abs_err": _max_abs_err(u, u_ref),
         "rel_l2_err":  _rel_l2_err(u, u_ref),
         "rms_err":     _rms_err(u, u_ref),
+        "proportionality_residual": _proportionality_residual(u, u_ref),
     }
+
+
+def _proportionality_residual(u: np.ndarray,
+                              u_ref: np.ndarray) -> Optional[float]:
+    """
+    Relative residual after the best-fit scalar rescaling of `u` onto `u_ref`.
+
+    Computes min over s of ‖s·u − u_ref‖₂ / ‖u_ref‖₂, whose minimiser is the least
+    squares coefficient s* = ⟨u, u_ref⟩ / ⟨u, u⟩.
+
+    The quantum solvers prepare a normalised state and recover the physical scale
+    separately (`prop_const`), so the two failure modes are distinct and this
+    separates them: a large `rel_l2_err` alongside a small value here means the
+    solution direction is right and only the recovered constant is wrong, whereas
+    a large value in both means the solve itself is wrong.
+
+    Parameters
+    ----------
+    u : np.ndarray
+        Length-N solver solution.
+    u_ref : np.ndarray
+        Length-N reference solution.
+
+    Returns
+    -------
+    float or None
+        The rescaled relative residual, or None where it is undefined (either
+        vector identically zero, or a non-finite entry present).
+    """
+    u   = np.asarray(u,     dtype=float)
+    ref = np.asarray(u_ref, dtype=float)
+    if u.shape != ref.shape or not (np.all(np.isfinite(u))
+                                    and np.all(np.isfinite(ref))):
+        return None
+    uu       = float(u @ u)
+    ref_norm = float(np.linalg.norm(ref))
+    if uu <= 0.0 or ref_norm <= 0.0:
+        return None
+    s = float(u @ ref) / uu
+    return float(np.linalg.norm(s * u - ref) / ref_norm)
+
+
+@functools.lru_cache(maxsize=1)
+def _backend_name() -> Optional[str]:
+    """
+    Identity of the Aer backend this process executes on, e.g. ``aer_simulator``
+    with device ``CPU`` or ``GPU``.
+
+    Memoised because every recorded row queries it while the answer is fixed for
+    the lifetime of the worker process, and because backend construction is not
+    free. Failures are swallowed: an unidentifiable backend must degrade to an
+    unset field, never abort a solve that has already succeeded.
+
+    Returns
+    -------
+    str or None
+        ``"<backend name> (<device>)"``, or None if the backend cannot be queried.
+    """
+    try:
+        backend = get_aer_backend(prefer_gpu=_USE_GPU)
+        device  = backend.options.device
+        return f"{backend.name} ({device})"
+    except Exception:  # pragma: no cover - diagnostic field only
+        return None
+
+
+def _error_split(u:       Optional[np.ndarray],
+                 u_thomas: Optional[np.ndarray],
+                 u_exact:  Optional[np.ndarray]) -> dict:
+    """
+    Decompose the total error into its discretisation and algorithmic parts.
+
+    On a given mesh the error of a quantum solve against the analytical solution
+    carries two independent contributions:
+
+        err_disc = ‖u_thomas − u_exact‖₂ / ‖u_exact‖₂
+        err_alg  = ‖u_solver − u_thomas‖₂ / ‖u_thomas‖₂
+
+    `err_disc` is a property of the mesh and the stencil, identical for every
+    solver at that N; `err_alg` isolates what the solver itself contributed. The
+    separation is what makes an order-2 against order-4 comparison legible —
+    raising the order suppresses err_disc as O(h⁴) rather than O(h²) while leaving
+    err_alg governed by κ — and it cannot be recovered from the total alone.
+
+    Parameters
+    ----------
+    u : np.ndarray or None
+        Length-N solver solution. None for a failed solve.
+    u_thomas : np.ndarray or None
+        Length-N classical reference on the same mesh.
+    u_exact : np.ndarray or None
+        Length-N analytical solution, where the case has one.
+
+    Returns
+    -------
+    dict
+        Any subset of ``{"err_disc", "err_alg"}`` that is defined, for splatting
+        into RunResult(...). Empty when neither can be formed.
+    """
+    out: dict = {}
+    if u_thomas is not None and u_exact is not None:
+        out["err_disc"] = _rel_l2_err(u_thomas, u_exact)
+    if u is not None and u_thomas is not None:
+        out["err_alg"] = _rel_l2_err(u, u_thomas)
+    return out
 
 
 # ── Solution archiving ────────────────────────────────────────────────────────
@@ -498,6 +694,9 @@ def _record(
     wall:          float,
     converged:     bool,
     notes:         str = "",
+    u_thomas:      Optional[np.ndarray] = None,
+    u_exact:       Optional[np.ndarray] = None,
+    order:         int = 2,
     **extra,
 ) -> None:
     """
@@ -511,12 +710,25 @@ def _record(
 
     `u=None` records a failure row with no solution archived.
     """
+    # The discretisation order and the backend identity are properties of the run
+    # rather than of the solve, so they are recorded on a failure row too: a row
+    # that timed out is still evidence about that order on that backend.
+    provenance: dict = {
+        "discretisation_order": order,
+        "backend_name":         _backend_name(),
+    }
+
     if u is None:
+        # err_disc is a property of the mesh, not of the failed solver, so it is
+        # still well defined here and is recorded rather than dropped.
+        failure_extra = dict(provenance)
+        failure_extra.update(_error_split(None, u_thomas, u_exact))
+        failure_extra.update(extra)
         results.append(RunResult(
             case=case_id, solver=solver, N=N, kappa=kappa,
             max_rel_err=None, max_abs_err=None, residual=None,
             wall_time_s=wall, converged=False,
-            notes=notes or "solver_error", **extra,
+            notes=notes or "solver_error", **failure_extra,
         ))
         return
 
@@ -528,7 +740,9 @@ def _record(
         "max_rel_err": None,
         "max_abs_err": None,
     }
+    kwargs.update(provenance)
     kwargs.update(_accuracy_fields(u, u_ref))
+    kwargs.update(_error_split(u, u_thomas, u_exact))
     kwargs.update(extra)
 
     results.append(RunResult(
@@ -738,11 +952,16 @@ def _run_hhl(A: np.ndarray, b: np.ndarray, N: int,
 
 
 def _run_vqls(A: np.ndarray, b: np.ndarray, N: int
-              ) -> tuple[Optional[np.ndarray], float, float, bool, float, int, int]:
+              ) -> tuple[Optional[np.ndarray], float, float, bool, float, int, int,
+                         dict]:
     """
     VQLS via the validated project module solvers/quantum/vqls_1d.py.
 
-    Returns (u, residual, wall_s, converged, final_cost, n_layers, n_restarts).
+    Returns (u, residual, wall_s, converged, final_cost, n_layers, n_restarts,
+    extras). `extras` carries the optimiser diagnostics that VQLSSolverResult
+    computes and this boundary previously discarded; the circuit-evaluation count
+    in particular is the honest cost measure for a variational method, whose wall
+    time is dominated by the classical optimiser rather than by circuit work.
     """
     try:
         from solvers.quantum.vqls_1d import vqls_solve_system, VQLSConfig1D
@@ -772,13 +991,27 @@ def _run_vqls(A: np.ndarray, b: np.ndarray, N: int
                 final_cost, N,
             )
 
+        extras = {
+            "vqls_n_evaluations":     _opt_int(getattr(result, "n_circuit_evals", None)),
+            "vqls_optimiser_success": bool(result.optimiser_success),
+        }
         return (result.u, _relative_residual(A, result.u, b), wall,
                 bool(result.optimiser_success), final_cost,
-                n_layers, n_restarts)
+                n_layers, n_restarts, extras)
 
     except Exception as exc:
         log.warning("    VQLS failed: %s", exc)
-        return None, float("nan"), 0.0, False, float("nan"), -1, -1
+        return None, float("nan"), 0.0, False, float("nan"), -1, -1, {}
+
+
+def _opt_int(value) -> Optional[int]:
+    """Coerce a solver-supplied count to int, or None when absent/non-numeric."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _resolve_qsvt_max_degree(kappa: float, epsilon: float, N: int,
@@ -829,12 +1062,21 @@ def _build_qsvt_config(max_degree: Optional[int]):
 
 def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int, kappa: float,
               time_limit: Optional[float], order: int = 2,
-              ) -> tuple[Optional[np.ndarray], float, float, bool, int, int, Optional[int]]:
+              ) -> tuple[Optional[np.ndarray], float, float, bool, int, int,
+                         Optional[int], dict]:
+    """
+    QSVT via the project module, returning the solve plus its recorded internals.
+
+    The trailing dict carries the metrics `benchmark/results_io.BenchmarkResult`
+    declares and `QSVTSolverResult` already computes -- subnormalisation α = ‖A‖₂,
+    effective κ, angle method, cache state and phase lookup time -- which were
+    previously discarded at this boundary. It is splatted straight into `_record`.
+    """
     max_deg = _resolve_qsvt_max_degree(kappa, HHL_EPSILON, N, order)
 
     if N > QSVT_MAX_N:
         log.info("    QSVT: skipping N=%d > QSVT_MAX_N=%d", N, QSVT_MAX_N)
-        return None, float("nan"), 0.0, False, -1, -1, max_deg
+        return None, float("nan"), 0.0, False, -1, -1, max_deg, {}
 
     try:
         # Dispatched on order: the 2nd-order entry point block encodes the operator
@@ -847,6 +1089,15 @@ def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int, kappa: float,
             from solvers.quantum.qsvt_1d import qsvt_solve_system as _qsvt_entry
 
         cfg = _build_qsvt_config(max_deg)
+
+        # Phase generation is timed separately from the solve it precedes. On a
+        # cache hit it is milliseconds; on a miss it can exceed the solve by two
+        # orders of magnitude, and folded into one number the two are
+        # indistinguishable -- which is how a 10829 s mean angle generation at
+        # order 4, N=32 was read as an expensive solve.
+        t_phase0 = time.perf_counter()
+        phases_cached = _qsvt_phases_are_cached(kappa, HHL_EPSILON, max_deg)
+        t_phase = time.perf_counter() - t_phase0
 
         t0 = time.perf_counter()
         result = _qsvt_entry(A, b, config=cfg)
@@ -862,11 +1113,67 @@ def _run_qsvt(A: np.ndarray, b: np.ndarray, N: int, kappa: float,
         degree = getattr(result, "degree", getattr(result, "polynomial_degree", -1))
         depth  = getattr(result, "circuit_depth", -1)
 
-        return u, _relative_residual(A, u, b), wall, converged, int(degree), int(depth), max_deg
+        extras = {
+            "qsvt_alpha":          _opt_float(getattr(result, "alpha", None)),
+            "qsvt_kappa_eff":      _opt_float(getattr(result, "kappa_effective", None)),
+            "qsvt_angle_method":   getattr(cfg, "angle_method", None),
+            "qsvt_phases_cached":  phases_cached,
+            "phase_lookup_time_s": t_phase,
+        }
+        return (u, _relative_residual(A, u, b), wall, converged,
+                int(degree), int(depth), max_deg, extras)
 
     except Exception as exc:
         log.warning("    QSVT failed: %s", exc)
-        return None, float("nan"), 0.0, False, -1, -1, max_deg
+        return None, float("nan"), 0.0, False, -1, -1, max_deg, {}
+
+
+def _opt_float(value) -> Optional[float]:
+    """Coerce a solver-supplied scalar to float, or None when absent/non-numeric."""
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _qsvt_phases_are_cached(kappa: float, epsilon: float,
+                            max_degree: Optional[int]) -> Optional[bool]:
+    """
+    Whether the phase-angle set this solve will request is already on disk.
+
+    Reports the state of the cache BEFORE the solve runs, so that a row can be
+    read as "this wall time includes angle generation" or not. The key is
+    reconstructed through `qsp_angles` itself rather than by formatting a filename
+    here, since the key is (round(κ,4), round(ε,8), method, max_degree) and a
+    restatement of that convention is precisely the drift the single-source rule
+    in `qsvt_max_degree` exists to prevent.
+
+    Parameters
+    ----------
+    kappa : float
+        Condition number the solver will present.
+    epsilon : float
+        Target approximation error.
+    max_degree : int or None
+        Degree cap requested; None is stored under the tag ``d-1``.
+
+    Returns
+    -------
+    bool or None
+        True/False for a hit/miss, or None when the cache cannot be inspected.
+    """
+    try:
+        from solvers.quantum import qsp_angles
+
+        key = (round(float(kappa), 4), round(float(epsilon), 8), "auto",
+               max_degree if max_degree is not None else -1)
+        if key in qsp_angles._PHASE_CACHE:
+            return True
+        return qsp_angles._cache_key_to_filename(key).exists()
+    except Exception:  # pragma: no cover - diagnostic field only
+        return None
 
 
 # ── Run selection ─────────────────────────────────────────────────────────────
@@ -1017,6 +1324,7 @@ def _run_all_solvers(
     _record(results, all_solutions, case_id, "Thomas", N, kappa,
             x, u_T, ref_for_thomas, A, b, res_T, t_T, True,
             notes="" if ref_for_thomas is not None else "reference_no_exact",
+            u_thomas=u_T, u_exact=u_exact, order=order,
             wall_time_mean_s=t_T_mean, wall_time_std_s=t_T_std,
             n_timing_repeats=THOMAS_TIMING_REPEATS)
 
@@ -1040,12 +1348,17 @@ def _run_all_solvers(
         _record(results, all_solutions, case_id, "HHL", N, kappa,
                 x, u_H, u_ref, A, b, res_H, t_H, conv_H,
                 notes=";".join(filter(None, (ref_note, note_H))),
+                u_thomas=u_T, u_exact=u_exact, order=order,
                 n_qubits=n_data_qubits, hhl_epsilon=HHL_EPSILON,
+                # n_T = ceil(1/epsilon) couples the Trotter count to the QPE
+                # precision; the equal-accuracy protocol treats them as one knob,
+                # so the derived value is recorded rather than left implicit.
+                hhl_trotter_steps=int(np.ceil(1.0 / HHL_EPSILON)),
                 hhl_scale_c=c_H if u_H is not None else None)
 
     # ── VQLS ──────────────────────────────────────────────────────────────────
     if sel.wants_solver("vqls"):
-        u_V, res_V, t_V, conv_V, cost_V, lay_V, res_ct_V = _run_vqls(A, b, N)
+        u_V, res_V, t_V, conv_V, cost_V, lay_V, res_ct_V, extra_V = _run_vqls(A, b, N)
         if u_V is not None:
             if u_ref is not None:
                 log.info("    VQLS    MaxRelErr=%7.3f%%  Residual=%.3e  Time=%.3fs  "
@@ -1055,15 +1368,16 @@ def _run_all_solvers(
                          res_V, t_V, cost_V)
         _record(results, all_solutions, case_id, "VQLS", N, kappa,
                 x, u_V, u_ref, A, b, res_V, t_V, conv_V, notes=ref_note,
+                u_thomas=u_T, u_exact=u_exact, order=order,
                 n_qubits=n_data_qubits, vqls_final_cost=cost_V,
                 vqls_n_layers=lay_V if u_V is not None else None,
                 vqls_n_restarts=res_ct_V if u_V is not None else None,
-                random_seed=VQLS_SEED)
+                random_seed=VQLS_SEED, **extra_V)
 
     # ── QSVT ──────────────────────────────────────────────────────────────────
     if not sel.wants_solver("qsvt"):
         return
-    u_Q, res_Q, t_Q, conv_Q, deg_Q, dep_Q, cap_Q = _run_qsvt(
+    u_Q, res_Q, t_Q, conv_Q, deg_Q, dep_Q, cap_Q, extra_Q = _run_qsvt(
         A, b, N, kappa, QSVT_TIME_LIMIT_S, order=order)
 
     if u_Q is not None and u_ref is not None:
@@ -1073,10 +1387,11 @@ def _run_all_solvers(
     _record(results, all_solutions, case_id, "QSVT", N, kappa,
             x, u_Q, u_ref, A, b, res_Q, t_Q, conv_Q,
             notes=ref_note or ("skipped_or_failed" if u_Q is None else ""),
+            u_thomas=u_T, u_exact=u_exact, order=order,
             n_qubits=n_data_qubits,
             circuit_depth=dep_Q if u_Q is not None else None,
             qsvt_degree=deg_Q if u_Q is not None else None,
-            qsvt_max_degree=cap_Q)
+            qsvt_max_degree=cap_Q, **extra_Q)
 
 
 # ── Discretisation order ──────────────────────────────────────────────────────

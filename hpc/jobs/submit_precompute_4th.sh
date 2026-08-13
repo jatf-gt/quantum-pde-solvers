@@ -95,18 +95,24 @@
 #    export N_VALUES="4,8"
 #    qsub -v N_VALUES hpc/jobs/submit_precompute_4th.sh
 #
-#    # Stage 2 -- N=16, CAPPED at 5000. Not uncapped: the pentadiagonal operator
+#    # Stage 2 -- N=16, CAPPED at 14999. Not uncapped: the pentadiagonal operator
 #    # needs degree 19375 there, against the angle solver's sanity limit of 15000,
 #    # so an uncapped solve is REFUSED outright and writes nothing. The
 #    # tridiagonal operator needs 14177 and passes just under, which is why the
 #    # 2nd-order cache has an uncapped N=16 entry and this one cannot.
-#    export N_VALUES="16" MAX_DEGREE="5000"
+#    export N_VALUES="16" MAX_DEGREE="14999"
 #    qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_4th.sh
 #
-#    # Stage 3 -- N=32, capped at 5000 to match QSVT_MAX_DEGREE_BY_N. Exploratory:
-#    # kappa = 586.8 and completion within 71 h is not guaranteed. Required only if
-#    # the 1-D order-4 sweep is to be run beyond N=16.
-#    export N_VALUES="32" MAX_DEGREE="5000"
+#    # Stage 3 -- N=32, capped at 14999 to match QSVT_MAX_DEGREE_BY_N_ORDER4.
+#    # Exploratory: kappa = 586.8 and completion within 71 h is not guaranteed.
+#    # Required only if the 1-D order-4 sweep is to be run beyond N=16.
+#    #
+#    # 14999 rather than 5000 because the cap sets the polynomial's accuracy, not
+#    # just its cost: at kappa 586.8 a cap of 5000 gives degree/kappa = 8.5, below
+#    # the ratio ~11 at which the order-2 sweep still held accuracy, whereas 14999
+#    # gives 25.6. Both stages share the tag d14999 so they cannot be staged
+#    # inconsistently -- see the cap-value note in run_1d.py.
+#    export N_VALUES="32" MAX_DEGREE="14999"
 #    qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_4th.sh
 #
 #    # 2-D and 3-D -- minutes, not hours. Both domains, every distinct strip

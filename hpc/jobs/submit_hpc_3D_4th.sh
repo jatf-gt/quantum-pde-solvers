@@ -127,6 +127,14 @@ SCHEME="${SCHEME:-fmg}"
 TOL="${TOL:-}"
 MAX_OUTER="${MAX_OUTER:-}"
 ALLOW_INLINE_PHASES="${ALLOW_INLINE_PHASES:-0}"
+# Per-case wall-clock bound on the outer iteration, forwarded to the scheme as
+# -S max_wall_s. Without it a single non-converging case consumes the whole PBS
+# walltime and the remaining resolutions are never attempted -- the failure mode
+# recorded as defect 3 in docs/HPC_REPAIR_PLAN.md. The runner honours the cap and
+# records stop_reason="wall_time_exceeded", which the gap analysis reads as a
+# terminal measurement rather than a defect. 16 h matches the 2nd-order sweep,
+# whose worst sound N=16 case measured 15.0 h.
+MAX_WALL_S="${MAX_WALL_S:-57600}"
 
 echo ""
 echo "  N_VALUES  : ${N_VALUES}"
@@ -216,6 +224,7 @@ run_step () {
         --solvers "${SOLVERS}" \
         --scheme "${SCHEME}" \
         --max-workers "${WORKERS}" \
+        -S "max_wall_s=${MAX_WALL_S}" \
         ${OPT_ARGS}
     local rc=$?
     echo "STEP N=${nval} finished $(date) exit=${rc}"
