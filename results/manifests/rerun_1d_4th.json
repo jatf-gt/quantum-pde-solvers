@@ -1,0 +1,742 @@
+{
+  "rerun": [
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.6981346309185028e-05,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 4.957403531298041,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 1.73400944378227,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.07096278015524149,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.6901252567768097e-05,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 8.709175126627088,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 117.53761464171112,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.258861280977726,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 3.120116889476776e-05,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 33.2006163392216,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 268.8561815554276,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 1.1257275184616446,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    }
+  ],
+  "keep": [
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.714991569519043e-05
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.955691646784544
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 9.062237346544862
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.1498522674664855
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.788100391626358e-05
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 9.988096358254552
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 115.04161999188364
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.25985501147806644
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 3.1570903956890106e-05
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 29.709667587652802
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 278.4836337324232
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 1.346123281866312
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.794060856103897e-05
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.8510055476799607
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 1.7623985512182117
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.06969701312482357
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.720113843679428e-05
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 10.906368656083941
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 124.13438360858709
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.26882618851959705
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 3.094132989645004e-05
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 30.18853697925806
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 282.57318192347884
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 1.1577890384942293
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.7281232178211212e-05
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 14.325016675516963
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.3837051894515753
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 1.938293277285993
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.7830712497234344e-05
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 19.914549166336656
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 123.84562912862748
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 22.459029517136514
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 3.087148070335388e-05
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 30.688229729421437
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 258.51799179054797
+    },
+    {
+      "case": "1D_Poisson_fS_hom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 295.8972565624863
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.7340836822986603e-05
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 14.522036578506231
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 4.0104857217520475
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 1.8746464578434825
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.830103039741516e-05
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 9.568178988993168
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 124.33116929419339
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 22.345714962109923
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 3.1400471925735474e-05
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 29.919315787032247
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 271.9052648283541
+    },
+    {
+      "case": "1D_Poisson_fS_nonhom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 295.46682859398425
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.739112824201584e-05
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 14.033912418410182
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 7.471318234689534
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 1.8659455869346857
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.7921050786972046e-05
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 11.509370308369398
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 114.90238579083234
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 21.947760722599924
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 3.24910506606102e-05
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 29.721427137963474
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 272.853698246181
+    },
+    {
+      "case": "HET_1D_3a_linear_hom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 292.0416289381683
+    }
+  ],
+  "drift": [
+    "1D_Poisson_fH_hom",
+    "1D_Poisson_fL_hom",
+    "1D_Poisson_fS_hom",
+    "1D_Poisson_fS_nonhom",
+    "HET_1D_3a_linear_hom",
+    "HET_1D_3b_gaussian_Vd300"
+  ],
+  "n_rows_recorded": 96,
+  "orphan_archives": {
+    "stale": [],
+    "unexplained": []
+  },
+  "generated": "2026-08-13T12:41:14+00:00",
+  "dim": 1,
+  "results_dir": "results/1Dhpc_run_4th",
+  "strict": false,
+  "expected": {
+    "cases": [
+      "1D_Poisson_fH_hom",
+      "1D_Poisson_fL_hom",
+      "1D_Poisson_fS_hom",
+      "1D_Poisson_fS_nonhom",
+      "HET_1D_3a_linear_hom",
+      "HET_1D_3b_gaussian_Vd300",
+      "HET_1D_3c_gaussian_NeumannDirichlet"
+    ],
+    "n_values": [
+      4,
+      8,
+      16
+    ],
+    "solvers": [
+      "Thomas",
+      "HHL",
+      "VQLS",
+      "QSVT"
+    ]
+  }
+}
