@@ -74,6 +74,7 @@ import argparse
 import concurrent.futures
 import csv
 import dataclasses
+import functools
 import json
 import logging
 import multiprocessing as mp
@@ -313,6 +314,24 @@ class RunResult3D:
     s_per_strip_solve: Optional[float] = None
     solves_per_digit:  Optional[float] = None
 
+    # ── benchmarking-framework provenance (Phase 8) ───────────────────────────
+    # Which discretisation produced the row. Previously recoverable only from the
+    # results DIRECTORY name, so a 2nd- and a 4th-order row were indistinguishable
+    # once merged -- and `--append` supersedes on (case, solver, N), in which the
+    # order does not appear, so an order-4 row would silently displace its
+    # order-2 counterpart were both ever written to one directory.
+    #
+    # The error decomposition `benchmark/results_io.BenchmarkResult` calls
+    # err_disc/err_alg is already carried above, under the names
+    # err_thomas_vs_exact and err_vs_thomas; it is not duplicated here.
+    discretisation_order: Optional[int] = None
+
+    # Trotter step count, coupled to the HHL epsilon as n_T = ceil(1/epsilon).
+    hhl_trotter_steps:    Optional[int] = None
+
+    # Execution backend, so a CPU and a GPU row are separable after the fact.
+    backend_name:         Optional[str] = None
+
 
 # ── Logging helpers ───────────────────────────────────────────────────────────
 
@@ -550,10 +569,45 @@ def _save_solution_3d(case, solver, N, prob, phi, phi_ref, f_vals,
     np.savez_compressed(fname, **arrays)
 
 
+@functools.lru_cache(maxsize=1)
+def _backend_name() -> Optional[str]:
+    """
+    Identity of the Aer backend this process executes on, e.g. ``aer_simulator``
+    with device ``CPU`` or ``GPU``.
+
+    Memoised because every recorded row queries it while the answer is fixed for
+    the lifetime of the worker process, and because backend construction is not
+    free. Failures are swallowed: an unidentifiable backend must degrade to an
+    unset field, never abort a sweep whose solves have already succeeded.
+
+    Returns
+    -------
+    str or None
+        ``"<backend name> (<device>)"``, or None if the backend cannot be queried.
+    """
+    try:
+        from solvers.backend_factory import get_aer_backend
+
+        backend = get_aer_backend()
+        return f"{backend.name} ({backend.options.device})"
+    except Exception:  # pragma: no cover - diagnostic field only
+        return None
+
+
 def _record(results, case_id, solver_name, N, prob, res, phi_ref, f_vals,
             phi_thomas, mode_m, cfg: SweepConfig, notes: str = "") -> None:
     label = SOLVER_LABEL.get(solver_name, solver_name.upper())
     shape_s = "x".join(str(n) for n in prob.shape)
+
+    # Provenance is a property of the run rather than of the solve, so it is
+    # recorded on a failure row too: a row that failed is still evidence about
+    # that discretisation on that backend.
+    provenance = {
+        "discretisation_order": cfg.order,
+        "backend_name":         _backend_name(),
+        "hhl_trotter_steps":    (int(np.ceil(1.0 / HHL_EPSILON_DEFAULT))
+                                 if label == "HHL" else None),
+    }
 
     if res is None:
         results.append(RunResult3D(
@@ -561,7 +615,7 @@ def _record(results, case_id, solver_name, N, prob, res, phi_ref, f_vals,
             n_unknowns=int(np.prod(prob.shape)), kappa_row=prob.kappa_row(),
             max_rel_err=None, max_abs_err=None, residual=None,
             wall_time_s=0.0, converged=False, n_outer=0,
-            notes=notes or "solver_error", scheme=cfg.scheme))
+            notes=notes or "solver_error", scheme=cfg.scheme, **provenance))
         return
 
     phi = res.u
@@ -640,7 +694,7 @@ def _record(results, case_id, solver_name, N, prob, res, phi_ref, f_vals,
         peak_E_field=peak_E, peak_E_rel_err=peak_E_err, peak_E_axial=peak_Ez,
         azimuthal_mode_amp=amp, azimuthal_mode_rel_err=amp_err,
         s_per_strip_solve=(res.wall_time_s / total) if total else None,
-        solves_per_digit=per_digit))
+        solves_per_digit=per_digit, **provenance))
 
     if cfg.save_solutions:
         _save_solution_3d(case_id, label, N, prob, phi, phi_ref, f_vals,
