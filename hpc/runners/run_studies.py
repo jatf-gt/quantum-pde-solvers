@@ -113,6 +113,39 @@ DEFAULT_CASES: tuple[str, ...] = (
     "het_1d_3a_linear",
 )
 
+# 2-D and 3-D scope. Two cases each rather than three, and one resolution: an
+# outer iteration performs N (or N²) inner solves, so a single grid point here
+# costs what an entire 1-D sweep does. One smooth manufactured case and one HET
+# application case per dimension is enough to show whether the parameter response
+# carries over from 1-D, which is the question these studies answer in 2-D/3-D.
+DEFAULT_CASES_2D: tuple[str, ...] = (
+    "poisson_2d_sin_pi",
+    "het_2d_mms_spt100",
+)
+DEFAULT_CASES_3D: tuple[str, ...] = (
+    "poisson_3d_triple_sin_cube",
+    "het_3d_mms_spt100",
+)
+
+DEFAULT_CASES_BY_DIM: dict[int, tuple[str, ...]] = {
+    1: DEFAULT_CASES, 2: DEFAULT_CASES_2D, 3: DEFAULT_CASES_3D,
+}
+
+# Default resolution per dimension.
+#
+# N=8 in 2-D and 3-D is the SMALLEST the default scheme admits, not merely a
+# choice: FMG needs at least two grid levels, and a 4×4 (or 4×4×4) problem cannot
+# be coarsened, so N=4 raises before any solve. Dropping to N=4 requires
+# `--scheme sor`, which is a different outer iteration from the one the primary
+# sweep records and would make the studies non-comparable with it. N=8 with FMG
+# is preferred over N=4 with SOR for that reason.
+DEFAULT_N_BY_DIM: dict[int, tuple[int, ...]] = {1: (8,), 2: (8,), 3: (8,)}
+
+# Output directory per dimension, so a 2-D study cannot overwrite a 1-D one.
+RESULTS_DIR_BY_DIM: dict[int, str] = {
+    1: "1Dstudies", 2: "2Dstudies", 3: "3Dstudies",
+}
+
 # HPC case identifiers, matching what run_1d.py records, so a studies row can be
 # joined to its primary-sweep counterpart without a lookup table.
 CASE_ID: dict[str, str] = {
@@ -122,6 +155,11 @@ CASE_ID: dict[str, str] = {
     "poisson_1d_fS_nonhom": "1D_Poisson_fS_nonhom",
     "het_1d_3a_linear":   "HET_1D_3a_linear_hom",
     "het_1d_3b_gaussian_Vd300": "HET_1D_3b_gaussian_Vd300",
+    "poisson_2d_sin_pi":  "2D_Poisson_sin_hom",
+    "poisson_2d_single_mode_n1m1": "2D_Poisson_SingleMode_n1m1",
+    "het_2d_mms_spt100":  "2D_HET_MMS_SPT100",
+    "poisson_3d_triple_sin_cube": "3D_Poisson_TripleSin_cube",
+    "het_3d_mms_spt100":  "3D_HET_MMS_SPT100",
 }
 
 # N = 8 by default. Large enough that κ (32.2 at order 2) is not degenerate and
@@ -208,6 +246,85 @@ def _build(case_key: str, N: int, order: int) -> dict:
         "source_fn": case_key,
         "alpha_bc": 0.0, "beta_bc": 0.0,
         "discretisation_order": order,
+    }
+
+
+def _build_outer(case_key: str, N: int, order: int, scheme: str,
+                 scheme_options: dict) -> dict:
+    """
+    Assemble one 2-D or 3-D case and its classical reference field.
+
+    The reference is obtained from an outer solve with ``inner="thomas"`` rather
+    than from a direct classical solve of a global operator. There is no global
+    operator to solve: `solvers/outer` decomposes the domain into strips and
+    couples them iteratively. Using the same scheme, tolerance and iteration
+    count for the reference is also what makes the comparison isolate the INNER
+    solver — any difference attributable to the outer iteration is common to both
+    and cancels.
+
+    Parameters
+    ----------
+    case_key : str
+        Registry key in `core.cases`.
+    N : int
+        Resolution per direction.
+    order : {2, 4}
+        Spatial discretisation order.
+    scheme : str
+        Outer scheme, e.g. "fmg".
+    scheme_options : dict
+        Forwarded to `solve`, e.g. ``max_wall_s``.
+
+    Returns
+    -------
+    dict
+        Keyword arguments common to both outer study entry points.
+
+    Raises
+    ------
+    RuntimeError
+        If the classical reference solve does not converge, leaving nothing
+        trustworthy to measure the quantum solves against.
+    """
+    from solvers.outer import solve
+
+    built = cases.get(case_key).build(N)
+    problem = built.problem
+
+    if order == 4:
+        # Re-discretisation is delegated to the runners' own helpers rather than
+        # repeated here. The 4th-order closure needs the face source samples
+        # (`f_faces`) because the ghost reflection requires ∂²u/∂n² on the face,
+        # which in more than one dimension is NOT f alone but f minus the
+        # tangential curvature of the Dirichlet data. A second implementation of
+        # that is precisely the drift these studies must not introduce, since
+        # their whole purpose is to be comparable with the primary sweep.
+        is_3d = len(getattr(problem, "shape", (0, 0))) == 3
+        if is_3d:
+            from hpc.runners.run_3d import _to_4th_order_3d as _to_4th
+        else:
+            from hpc.runners.run_2d import _to_4th_order_2d as _to_4th
+        problem = _to_4th(problem, getattr(built, "f_faces", None))
+
+    ref = solve(problem, inner="thomas", scheme=scheme, **scheme_options)
+    if not ref.converged:
+        raise RuntimeError(
+            f"classical reference did not converge for {case_key} at N={N} "
+            f"(stop_reason={ref.stop_reason}); the quantum rows would have "
+            f"nothing sound to be measured against.")
+
+    exact = None if built.exact is None else np.asarray(built.exact, dtype=float)
+    return {
+        "problem": problem,
+        "u_thomas": np.asarray(ref.u, dtype=float),
+        "u_exact": exact,
+        "case_id": CASE_ID.get(case_key, case_key),
+        "N": N,
+        "kappa": float(problem.kappa_row()),
+        "source_fn": case_key,
+        "discretisation_order": order,
+        "scheme": scheme,
+        "scheme_options": scheme_options,
     }
 
 
@@ -366,6 +483,83 @@ def run_sensitivity(bundle: dict, solvers: tuple[str, ...]) -> dict[str, list]:
     return out
 
 
+def run_equal_accuracy_outer(bundle: dict, solvers: tuple[str, ...],
+                             r_target: float) -> list:
+    """
+    Equal-accuracy sweep over the requested solvers for one 2-D or 3-D case.
+
+    One entry point serves all three solvers, where 1-D needs three, because every
+    solver reaches the outer layer through the same `solve()` signature and
+    differs only in which `inner_options` key carries its precision knob.
+
+    Parameters
+    ----------
+    bundle : dict
+        As returned by `_build_outer`.
+    solvers : tuple of str
+        Subset of ('hhl', 'vqls', 'qsvt').
+    r_target : float
+        Common outer-residual target.
+
+    Returns
+    -------
+    list of EqualAccuracyResult
+        One entry per solver that completed.
+    """
+    out = []
+    for name in solvers:
+        t0 = time.perf_counter()
+        try:
+            res = ea.sweep_outer_equal_accuracy(
+                solver=name, r_target=r_target, **bundle)
+        except Exception as exc:
+            log.warning("    equal-accuracy %s FAILED: %s", name.upper(), exc)
+            continue
+        out.append(res)
+        log.info("    equal-accuracy %-5s in_band=%-5s calls=%-3d  %.1fs",
+                 name.upper(), res.in_band, res.n_solver_calls,
+                 time.perf_counter() - t0)
+    return out
+
+
+def run_sensitivity_outer(bundle: dict,
+                          solvers: tuple[str, ...]) -> dict[str, list]:
+    """
+    One-at-a-time sensitivity sweeps for one 2-D or 3-D case.
+
+    Parameters swept are read from `sensitivity.OUTER_SENSITIVITY_GRIDS` rather
+    than restated here, so adding one there is picked up without an edit.
+
+    Parameters
+    ----------
+    bundle : dict
+        As returned by `_build_outer`.
+    solvers : tuple of str
+        Subset of ('hhl', 'vqls', 'qsvt').
+
+    Returns
+    -------
+    dict
+        Solver name -> list of SensitivitySweepResult, one per parameter.
+    """
+    out: dict[str, list] = {}
+    for name in solvers:
+        for param in sens.OUTER_SENSITIVITY_GRIDS[name]:
+            t0 = time.perf_counter()
+            try:
+                res = sens.sensitivity_sweep_outer(
+                    solver=name, param_name=param, **bundle)
+            except Exception as exc:
+                log.warning("    sensitivity %s/%s FAILED: %s",
+                            name.upper(), param, exc)
+                continue
+            out.setdefault(name, []).append(res)
+            log.info("    sensitivity  %-5s %-12s calls=%-3d  %.1fs",
+                     name.upper(), param, res.n_solver_calls,
+                     time.perf_counter() - t0)
+    return out
+
+
 # ── Metadata ──────────────────────────────────────────────────────────────────
 
 def _git(*args: str) -> str:
@@ -393,6 +587,9 @@ def _metadata(args, case_keys, n_values, solvers) -> dict:
         "numpy":     np.__version__,
         "pbs_jobid": os.environ.get("PBS_JOBID"),
         "study":     args.study,
+        "dim":       args.dim,
+        "scheme":    args.scheme if args.dim > 1 else None,
+        "max_wall_s": args.max_wall_s if args.dim > 1 else None,
         "order":     args.order,
         "cases":     list(case_keys),
         "n_values":  list(n_values),
@@ -414,6 +611,11 @@ def _metadata(args, case_keys, n_values, solvers) -> dict:
                               "vqls": sens.VQLS_BASELINE,
                               "qsvt": sens.QSVT_BASELINE},
             },
+            # The 2-D/3-D grids are separate: the knob is an inner_options entry
+            # there, and the values are smaller because each grid point is a full
+            # outer solve rather than a single 1-D solve.
+            "equal_accuracy_outer": ea.OUTER_EQUAL_ACCURACY_GRIDS,
+            "sensitivity_outer":    sens.OUTER_SENSITIVITY_GRIDS,
         },
         "git_commit": _git("rev-parse", "HEAD"),
         "git_dirty":  bool(_git("status", "--porcelain")),
@@ -423,17 +625,31 @@ def _metadata(args, case_keys, n_values, solvers) -> dict:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main() -> int:
+    global RESULTS_DIR
+
     parser = argparse.ArgumentParser(
-        description="Equal-accuracy and sensitivity studies for the 1-D solvers.")
+        description="Equal-accuracy and sensitivity studies for the solvers.")
     parser.add_argument("--study", choices=("equal-accuracy", "sensitivity", "both"),
                         default="both")
+    parser.add_argument("--dim", type=int, choices=(1, 2, 3), default=1,
+                        help="Spatial dimension (default: 1). In 2-D and 3-D the "
+                             "parameter drives an inner_options entry and the "
+                             "measured quantity is the outer residual.")
     parser.add_argument("--order", type=int, choices=(2, 4), default=2)
-    parser.add_argument("--n-values", default=",".join(str(n) for n in DEFAULT_N),
-                        help=f"Resolutions (default: {DEFAULT_N[0]}).")
-    parser.add_argument("--cases", default=",".join(DEFAULT_CASES),
-                        help="Registry keys, comma-separated.")
+    parser.add_argument("--n-values", default=None,
+                        help="Resolutions. Default is per-dimension: "
+                             "8 in 1-D and 2-D, 4 in 3-D.")
+    parser.add_argument("--cases", default=None,
+                        help="Registry keys, comma-separated. Default is "
+                             "per-dimension; see DEFAULT_CASES_BY_DIM.")
     parser.add_argument("--solvers", default=",".join(SOLVERS),
                         help="Subset of hhl,vqls,qsvt.")
+    parser.add_argument("--scheme", default="fmg",
+                        help="Outer scheme, 2-D/3-D only (default: fmg).")
+    parser.add_argument("--max-wall-s", type=float, default=None,
+                        help="Per-solve outer wall-clock bound, 2-D/3-D only. "
+                             "Each grid point is a full outer solve, so without "
+                             "this one non-converging point can consume the job.")
     parser.add_argument("--r-target", type=float, default=ea.DEFAULT_R_TARGET,
                         help="Equal-accuracy residual target "
                              f"(default: {ea.DEFAULT_R_TARGET:g}).")
@@ -441,9 +657,16 @@ def main() -> int:
                         help="Suffix distinguishing this invocation's outputs.")
     args = parser.parse_args()
 
-    n_values = [int(v) for v in args.n_values.split(",") if v.strip()]
+    # Output directory is per-dimension, resolved before the archive is opened so
+    # that a 2-D study cannot overwrite a 1-D one.
+    RESULTS_DIR = Path("results") / RESULTS_DIR_BY_DIM[args.dim]
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    n_default = ",".join(str(n) for n in DEFAULT_N_BY_DIM[args.dim])
+    n_values = [int(v) for v in (args.n_values or n_default).split(",") if v.strip()]
     solvers = tuple(s.strip().lower() for s in args.solvers.split(",") if s.strip())
-    case_keys = [c.strip() for c in args.cases.split(",") if c.strip()]
+    case_default = ",".join(DEFAULT_CASES_BY_DIM[args.dim])
+    case_keys = [c.strip() for c in (args.cases or case_default).split(",") if c.strip()]
 
     dropped = [c for c in case_keys if c in EXCLUDED_CASES]
     case_keys = [c for c in case_keys if c not in EXCLUDED_CASES]
@@ -457,13 +680,21 @@ def main() -> int:
     if not case_keys:
         parser.error("no cases left to run")
 
+    scheme_options: dict = {}
+    if args.max_wall_s is not None:
+        scheme_options["max_wall_s"] = args.max_wall_s
+
     log.info("=" * 78)
-    log.info("  1-D PARAMETER STUDIES  -  study=%s  order=%d", args.study, args.order)
+    log.info("  %d-D PARAMETER STUDIES  -  study=%s  order=%d",
+             args.dim, args.study, args.order)
     log.info("=" * 78)
     log.info("  Cases    : %s", ", ".join(case_keys))
     log.info("  N values : %s", n_values)
     log.info("  Solvers  : %s", ", ".join(solvers))
     log.info("  r_target : %g", args.r_target)
+    if args.dim > 1:
+        log.info("  Scheme   : %s", args.scheme)
+        log.info("  Sch opts : %s", scheme_options or "(none)")
     log.info("  Output   : %s", RESULTS_DIR.resolve())
 
     archive = SweepArchive(RESULTS_DIR, run_tag=args.run_tag)
@@ -478,16 +709,25 @@ def main() -> int:
             log.info("-" * 78)
             log.info("  %s   N=%d", case_key, N)
             try:
-                bundle = _build(case_key, N, args.order)
+                if args.dim == 1:
+                    bundle = _build(case_key, N, args.order)
+                else:
+                    bundle = _build_outer(case_key, N, args.order,
+                                          args.scheme, scheme_options)
             except Exception as exc:
                 log.error("    assembly FAILED: %s -- skipping.", exc)
                 continue
             log.info("    kappa=%.4f", bundle["kappa"])
 
+            equal_accuracy = (run_equal_accuracy if args.dim == 1
+                              else run_equal_accuracy_outer)
+            sensitivity = (run_sensitivity if args.dim == 1
+                           else run_sensitivity_outer)
+
             if args.study in ("equal-accuracy", "both"):
-                ea_all.extend(run_equal_accuracy(bundle, solvers, args.r_target))
+                ea_all.extend(equal_accuracy(bundle, solvers, args.r_target))
             if args.study in ("sensitivity", "both"):
-                for name, sweeps in run_sensitivity(bundle, solvers).items():
+                for name, sweeps in sensitivity(bundle, solvers).items():
                     sens_all.setdefault(name, []).extend(sweeps)
 
             # Written after every case rather than once at the end, so that a
