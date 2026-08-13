@@ -317,7 +317,11 @@ def sweep_hhl_equal_accuracy(
     EqualAccuracyResult
         Sweep result with best BenchmarkResult and all intermediate results.
     """
-    from solvers.quantum.hhl_1d import hhl_solve_system, HHLConfig1D
+    # `hhl_solve_system` takes epsilon positionally and returns the plain tuple
+    # (u, raw_state, prop_const); there is no HHLConfig1D in this codebase. An
+    # earlier draft of this module assumed a config object and an attribute-bearing
+    # result, matching neither, so the HHL half of the protocol raised on import.
+    from solvers.quantum.hhl_1d import hhl_solve_system
 
     results: list[BenchmarkResult] = []
     t_sweep_start = time.perf_counter()
@@ -327,22 +331,21 @@ def sweep_hhl_equal_accuracy(
             "  HHL equal-accuracy sweep: N=%d  epsilon=%.4f  r_target=%.2e",
             N, eps, r_target,
         )
-        cfg = HHLConfig1D(epsilon=eps)
-
         try:
             t0 = time.perf_counter()
-            solver_result = hhl_solve_system(A, b, config=cfg)
+            u_sol, raw_state, _prop_const = hhl_solve_system(A, b, eps)
             wall = time.perf_counter() - t0
 
-            u_sol = np.array(solver_result.solution)
+            u_sol = np.array(u_sol)
             n_trotter = int(np.ceil(1.0 / eps))
 
             # Proportionality recovery residual (HHL-specific)
-            Ax_raw = A @ solver_result.raw_state
+            raw_state = np.asarray(raw_state, dtype=float)
+            Ax_raw = A @ raw_state
             c_val  = float(
                 np.dot(b, Ax_raw) / (np.dot(Ax_raw, Ax_raw) + 1.0e-300)
             )
-            prop_residual = compute_residual(A, c_val * solver_result.raw_state, b)
+            prop_residual = compute_residual(A, c_val * raw_state, b)
 
             rec = _build_base_result(
                 case_id=case_id, solver="hhl", N=N, kappa=kappa,
@@ -360,14 +363,10 @@ def sweep_hhl_equal_accuracy(
             rec.sensitivity_param = "epsilon"
             rec.sensitivity_value = eps
 
-            if extract_circuits and hasattr(solver_result, "circuit"):
-                try:
-                    rec.circuit_metrics = extract_circuit_metrics(
-                        solver_result.circuit, optimisation_level=1
-                    )
-                except Exception as e:
-                    log.warning("  Circuit metric extraction failed: %s", e)
-
+            # `hhl_solve_system` returns only (u, raw_state, prop_const), so there
+            # is no circuit object to measure here; the other two solvers return a
+            # result carrying one. Circuit metrics for HHL come from the primary
+            # sweep, which records them per row.
             results.append(rec)
             log.info(
                 "    residual=%.4e  max_rel_err_vs_exact=%s%%  time=%.2fs",
@@ -472,7 +471,7 @@ def sweep_vqls_equal_accuracy(
             solver_result = vqls_solve_system(A, b, config=cfg)
             wall = time.perf_counter() - t0
 
-            u_sol = np.array(solver_result.solution)
+            u_sol = np.array(solver_result.u)
 
             rec = _build_base_result(
                 case_id=case_id, solver="vqls", N=N, kappa=kappa,
@@ -539,7 +538,7 @@ def sweep_vqls_equal_accuracy(
                 solver_result = vqls_solve_system(A, b, config=cfg)
                 wall = time.perf_counter() - t0
 
-                u_sol = np.array(solver_result.solution)
+                u_sol = np.array(solver_result.u)
                 rec = _build_base_result(
                     case_id=case_id, solver="vqls", N=N, kappa=kappa,
                     source_fn=source_fn, alpha_bc=alpha_bc, beta_bc=beta_bc,
@@ -649,7 +648,7 @@ def sweep_qsvt_equal_accuracy(
             solver_result = qsvt_solve_system(A, b, config=cfg)
             wall = time.perf_counter() - t_phase_start
 
-            u_sol = np.array(solver_result.solution)
+            u_sol = np.array(solver_result.u)
 
             # Proportionality recovery residual (QSVT-specific)
             prop_residual = None

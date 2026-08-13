@@ -194,7 +194,11 @@ def sensitivity_sweep_hhl(
     ValueError
         If param_name is not a recognised HHL sensitivity parameter.
     """
-    from solvers.quantum.hhl_1d import hhl_solve_system, HHLConfig1D
+    # `hhl_solve_system` takes epsilon positionally and returns the plain tuple
+    # (u, raw_state, prop_const); there is no HHLConfig1D in this codebase. An
+    # earlier draft assumed a config object and an attribute-bearing result,
+    # matching neither, so this sweep raised on import.
+    from solvers.quantum.hhl_1d import hhl_solve_system
 
     if param_name not in HHL_SENSITIVITY_GRIDS:
         raise ValueError(
@@ -216,25 +220,24 @@ def sensitivity_sweep_hhl(
             "  HHL sensitivity: N=%d  %s=%.4g  (baseline=%s)",
             N, param_name, val, baseline,
         )
-        cfg = HHLConfig1D(**cfg_kwargs)
+        eps_val = float(cfg_kwargs["epsilon"])
 
         try:
             t0 = time.perf_counter()
-            solver_result = hhl_solve_system(A, b, config=cfg)
+            u_sol, raw_state, _prop_const = hhl_solve_system(A, b, eps_val)
             wall = time.perf_counter() - t0
 
-            u_sol = np.array(solver_result.solution)
-            n_trotter = int(np.ceil(1.0 / cfg.epsilon))
+            u_sol = np.array(u_sol)
+            n_trotter = int(np.ceil(1.0 / eps_val))
 
             prop_residual = None
-            if hasattr(solver_result, "raw_state"):
-                Ax_raw = A @ solver_result.raw_state
+            if raw_state is not None:
+                raw_state = np.asarray(raw_state, dtype=float)
+                Ax_raw = A @ raw_state
                 c_val  = float(
                     np.dot(b, Ax_raw) / (np.dot(Ax_raw, Ax_raw) + 1.0e-300)
                 )
-                prop_residual = compute_residual(
-                    A, c_val * solver_result.raw_state, b
-                )
+                prop_residual = compute_residual(A, c_val * raw_state, b)
 
             rec = _build_base_result(
                 case_id=case_id, solver="hhl", N=N, kappa=kappa,
@@ -246,20 +249,16 @@ def sensitivity_sweep_hhl(
                 backend_name=backend_name, hardware_run=hardware_run,
                 backend_shots=backend_shots,
             )
-            rec.hhl_epsilon = cfg.epsilon
+            rec.hhl_epsilon = eps_val
             rec.hhl_trotter_steps = n_trotter
             rec.proportionality_residual = prop_residual
             rec.sensitivity_param = param_name
             rec.sensitivity_value = float(val)
 
-            if extract_circuits and hasattr(solver_result, "circuit"):
-                try:
-                    rec.circuit_metrics = extract_circuit_metrics(
-                        solver_result.circuit, optimisation_level=1
-                    )
-                except Exception as e:
-                    log.warning("  Circuit metric extraction failed: %s", e)
-
+            # `hhl_solve_system` returns only (u, raw_state, prop_const), so there
+            # is no circuit object to measure here; the other two solvers return a
+            # result carrying one. Circuit metrics for HHL come from the primary
+            # sweep, which records them per row.
             results.append(rec)
             log.info(
                 "    residual=%.4e  err_vs_exact=%s%%  time=%.2fs",
@@ -342,6 +341,15 @@ def sensitivity_sweep_vqls(
             "  VQLS sensitivity: N=%d  %s=%s  (baseline=%s)",
             N, param_name, val, baseline,
         )
+        # `VQLSConfig1D` names the optimiser tolerance `tol`. It is called
+        # `cobyla_tol` throughout this module, and in the recorded parameter name,
+        # because `tol` alone is ambiguous once a row is read next to a residual
+        # tolerance or an outer-iteration tolerance -- so the descriptive name is
+        # kept in the study and translated to the constructor's name here rather
+        # than renamed at either end.
+        cfg_kwargs = dict(cfg_kwargs)
+        if "cobyla_tol" in cfg_kwargs:
+            cfg_kwargs["tol"] = cfg_kwargs.pop("cobyla_tol")
         cfg = VQLSConfig1D(**cfg_kwargs)
 
         try:
@@ -349,7 +357,7 @@ def sensitivity_sweep_vqls(
             solver_result = vqls_solve_system(A, b, config=cfg)
             wall = time.perf_counter() - t0
 
-            u_sol = np.array(solver_result.solution)
+            u_sol = np.array(solver_result.u)
 
             rec = _build_base_result(
                 case_id=case_id, solver="vqls", N=N, kappa=kappa,
@@ -473,7 +481,7 @@ def sensitivity_sweep_qsvt(
             solver_result = qsvt_solve_system(A, b, config=cfg)
             wall = time.perf_counter() - t0
 
-            u_sol = np.array(solver_result.solution)
+            u_sol = np.array(solver_result.u)
 
             prop_residual = None
             if hasattr(solver_result, "raw_state") and solver_result.raw_state is not None:
