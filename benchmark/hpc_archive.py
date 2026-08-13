@@ -602,3 +602,131 @@ def save_solution(
     path = results_dir / solution_filename(case, solver, N, dim)
     np.savez_compressed(path, **arrays)
     return path
+
+
+# ── Adaptation to the typed benchmarking framework ────────────────────────────
+
+def _num(value: Any) -> Optional[float]:
+    """Coerce to float, returning None for absent or non-numeric entries."""
+    if value is None:
+        return None
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if np.isnan(out) else out
+
+
+def _int(value: Any) -> Optional[int]:
+    """Coerce to int, returning None for absent or non-numeric entries."""
+    num = _num(value)
+    return None if num is None else int(num)
+
+
+def rows_to_benchmark_results(rows: list[dict], dim: int = 1,
+                              order: Optional[int] = None) -> list:
+    """
+    Adapt recorded sweep rows to the typed `BenchmarkResult` the tables consume.
+
+    Two schemas meet here and neither can be changed to suit the other. The rows
+    on disk are the contract fixed by sweeps that already cost hundreds of hours;
+    `benchmark/metrics.BenchmarkResult` is the framework's own type, which
+    `benchmark/tables.py` is written against. This function is the seam, and it
+    exists so that neither the archives nor the table layer has to know about the
+    other's field names.
+
+    Three differences are reconciled:
+
+    - **Naming.** The archives record `max_rel_err` against whichever reference
+      the case had, plus `err_vs_thomas` in 2-D/3-D; the framework separates
+      `..._vs_exact` from `..._vs_thomas` explicitly. Where a row carries only
+      the combined figure it is reported against exact, which is what the 1-D
+      sweep measured it against.
+    - **Units.** 2-D and 3-D rows record errors as percentages, 1-D as fractions.
+      The framework's convention is percent, so 1-D values are scaled here and
+      the 2-D/3-D ones are passed through.
+    - **Structure.** Circuit metrics are flat columns in the archives and a
+      nested `CircuitMetrics` in the framework. Absent columns become None rather
+      than zero: a missing measurement and a measured zero are different claims.
+
+    Parameters
+    ----------
+    rows : list of dict
+        Rows as returned by `SweepArchive.rows()`.
+    dim : {1, 2, 3}
+        Spatial dimension the rows came from, which selects the error-field
+        convention above.
+    order : int, optional
+        Discretisation order to stamp on rows that predate the
+        `discretisation_order` column. Rows carrying it keep their own value.
+
+    Returns
+    -------
+    list of BenchmarkResult
+        One per input row, in the same order.
+    """
+    from benchmark.metrics import BenchmarkResult, CircuitMetrics
+
+    scale = 1.0 if dim > 1 else 100.0   # 1-D stores fractions, 2-D/3-D percent
+    out: list = []
+
+    for row in rows:
+        n_qubits = _int(row.get("n_qubits"))
+        depth = _int(row.get("circuit_depth"))
+        depth_t = _int(row.get("circuit_depth_t")) or _int(row.get("qsvt_depth"))
+        n_cx = _int(row.get("n_gates_2q"))
+
+        # A CircuitMetrics with every field None carries no information and would
+        # render as a row of dashes; None says plainly that nothing was measured.
+        metrics = None
+        if any(v is not None for v in (n_qubits, depth, depth_t, n_cx)):
+            metrics = CircuitMetrics(
+                n_qubits=n_qubits, depth_raw=depth,
+                depth_opt0=depth, depth_opt1=depth_t or depth,
+                n_cx_gates=n_cx, transpile_time_s=None, optimisation_level=1,
+            )
+
+        err_thomas = _num(row.get("err_vs_thomas"))
+        err_exact = _num(row.get("max_rel_err"))
+        if err_exact is not None:
+            err_exact *= scale
+
+        out.append(BenchmarkResult(
+            case_id=row.get("case"),
+            solver=str(row.get("solver", "")).lower(),
+            N=_int(row.get("N")),
+            discretisation_order=_int(row.get("discretisation_order")) or order,
+            kappa=_num(row.get("kappa")) or _num(row.get("kappa_row")),
+            source_fn=row.get("case"),
+            alpha_bc=None, beta_bc=None,
+            residual=_num(row.get("residual")),
+            max_rel_err_vs_exact=err_exact,
+            max_abs_err_vs_exact=_num(row.get("max_abs_err")),
+            max_rel_err_vs_thomas=err_thomas,
+            max_abs_err_vs_thomas=None,
+            err_disc=_num(row.get("err_disc"))
+                     or _num(row.get("err_thomas_vs_exact")),
+            err_alg=_num(row.get("err_alg")) or err_thomas,
+            proportionality_residual=_num(row.get("proportionality_residual")),
+            wall_time_s=_num(row.get("wall_time_s")) or 0.0,
+            phase_lookup_time_s=_num(row.get("phase_lookup_time_s")),
+            circuit_metrics=metrics,
+            hhl_epsilon=_num(row.get("hhl_epsilon")),
+            hhl_trotter_steps=_int(row.get("hhl_trotter_steps")),
+            vqls_n_layers=_int(row.get("vqls_n_layers")),
+            vqls_n_restarts=_int(row.get("vqls_n_restarts")),
+            vqls_cost_final=_num(row.get("vqls_final_cost")),
+            vqls_n_evaluations=_int(row.get("vqls_n_evaluations")),
+            vqls_converged=row.get("vqls_optimiser_success"),
+            qsvt_polynomial_degree=_int(row.get("qsvt_degree")),
+            qsvt_max_degree_cap=_int(row.get("qsvt_max_degree")),
+            qsvt_subnormalisation=_num(row.get("qsvt_alpha")),
+            qsvt_kappa_eff=_num(row.get("qsvt_kappa_eff")),
+            qsvt_angle_method=row.get("qsvt_angle_method"),
+            qsvt_phase_from_cache=row.get("qsvt_phases_cached"),
+            sensitivity_param=None, sensitivity_value=None, r_target=None,
+            backend_name=row.get("backend_name"),
+            hardware_run=False,
+        ))
+
+    return out
