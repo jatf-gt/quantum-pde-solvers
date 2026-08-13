@@ -155,12 +155,13 @@ def _build_base_result(
     beta_bc: float,
     discretisation_order: int,
     u_solver: np.ndarray,
-    A: np.ndarray,
-    b: np.ndarray,
     u_thomas: np.ndarray,
     u_exact: Optional[np.ndarray],
     wall_time_s: float,
     r_target: Optional[float],
+    A: Optional[np.ndarray] = None,
+    b: Optional[np.ndarray] = None,
+    residual: Optional[float] = None,
     backend_name: str = "aer_statevector",
     hardware_run: bool = False,
     backend_shots: Optional[int] = None,
@@ -172,16 +173,44 @@ def _build_base_result(
     vector, never from solver parameters. It is the single point of truth
     for metric computation in this framework.
 
+    The residual may be supplied either as an assembled system, via ``A`` and
+    ``b``, or directly as a precomputed scalar. Both routes exist because the
+    1-D solvers own a dense operator while the 2-D and 3-D ones never assemble
+    one: `solvers/outer` applies the stencil matrix-free and reports the outer
+    residual on `OuterResult`. Requiring ``(A, b)`` there would mean fabricating
+    an N²×N² dense system — 16.8 M entries at N=64 — solely to recompute a number
+    already in hand. The invariant that matters is unaffected: every metric is
+    still measured from the solution, never inferred from solver parameters.
+
     Parameters
     ----------
-    u_solver : np.ndarray, shape (N,)
-        Solution vector returned by the quantum solver.
-    u_thomas : np.ndarray, shape (N,)
-        Thomas algorithm reference solution (always available).
-    u_exact : np.ndarray or None, shape (N,)
-        Analytical solution, if available.
+    u_solver : np.ndarray
+        Solution returned by the quantum solver; length-N in 1-D, an (N, N) or
+        (N, N, N) field in 2-D/3-D.
+    u_thomas : np.ndarray
+        Classical reference on the same mesh, same shape as `u_solver`.
+    u_exact : np.ndarray or None
+        Analytical solution where the case has one, same shape.
+    A : np.ndarray, optional
+        NxN system matrix. Required only when `residual` is not given.
+    b : np.ndarray, optional
+        Length-N right-hand side. Required only when `residual` is not given.
+    residual : float, optional
+        Precomputed relative residual ‖Au − b‖/‖b‖. Takes precedence over
+        ``(A, b)``.
+
+    Raises
+    ------
+    ValueError
+        If neither `residual` nor both of `A` and `b` are supplied.
     """
-    residual = compute_residual(A, u_solver, b)
+    if residual is None:
+        if A is None or b is None:
+            raise ValueError(
+                "_build_base_result needs either a precomputed `residual` or "
+                "both `A` and `b`; received neither."
+            )
+        residual = compute_residual(A, u_solver, b)
 
     # Accuracy vs exact (only where analytical solution exists)
     if u_exact is not None:
@@ -726,6 +755,213 @@ def sweep_qsvt_equal_accuracy(
 
     return EqualAccuracyResult(
         solver="qsvt",
+        r_target=r_target,
+        band_factor=band_factor,
+        in_band=in_band,
+        best_result=best,
+        all_results=results,
+        n_solver_calls=len(results),
+        total_sweep_time_s=total_time,
+        notes=notes,
+    )
+
+# ── Equal accuracy in 2-D and 3-D ─────────────────────────────────────────────
+
+# The inner-solver option each solver's precision knob is spelled as, in the
+# registry `solvers/outer/inner.py` validates against. The registry rejects an
+# unknown key rather than ignoring it, so a name that drifts from this mapping
+# fails loudly at the first solve rather than silently sweeping nothing.
+OUTER_PRECISION_KNOB: dict[str, str] = {
+    "hhl":  "epsilon",
+    "vqls": "n_layers",
+    "qsvt": "max_degree",
+}
+
+# Grids for the knobs above, ordered highest-accuracy first so that the first
+# in-band result is also the most economical one meeting the target. These mirror
+# the 1-D grids, except that VQLS is swept on n_layers alone: in 2-D and 3-D each
+# outer iteration performs N (or N²) inner solves, so a two-dimensional
+# layer/restart grid would multiply an already expensive sweep by four.
+OUTER_EQUAL_ACCURACY_GRIDS: dict[str, list] = {
+    "hhl":  [0.1, 0.05, 0.01, 0.005],
+    "vqls": [1, 2, 3, 4, 5],
+    "qsvt": [None, 500, 200, 100, 50],
+}
+
+
+def sweep_outer_equal_accuracy(
+    problem,
+    u_thomas: np.ndarray,
+    u_exact: Optional[np.ndarray],
+    case_id: str,
+    N: int,
+    kappa: float,
+    source_fn: str,
+    discretisation_order: int,
+    solver: str,
+    scheme: str = "fmg",
+    grid: Optional[list] = None,
+    r_target: float = DEFAULT_R_TARGET,
+    band_factor: float = DEFAULT_BAND_FACTOR,
+    scheme_options: Optional[dict] = None,
+    backend_name: str = "aer_statevector",
+) -> EqualAccuracyResult:
+    """
+    Equal-accuracy sweep for one solver on a 2-D or 3-D line problem.
+
+    The 1-D entry points above each drive a solver directly on an assembled
+    ``(A, b)``. In 2-D and 3-D there is no assembled operator: the domain is
+    decomposed into strips and `solvers.outer.solve` runs an outer iteration
+    whose inner solves are 1-D. The precision knob is therefore not a solver
+    argument but an `inner_options` entry, and the residual to compare against
+    `r_target` is the OUTER residual after convergence — the quantity that
+    actually characterises the coupled scheme, and the one `OuterResult` reports
+    without any dense operator being formed.
+
+    One function serves all three solvers here, where 1-D needs three, because
+    every solver reaches the outer layer through the same `solve()` signature and
+    differs only in which `inner_options` key carries its knob.
+
+    Parameters
+    ----------
+    problem : LineProblem2D
+        Assembled problem satisfying the 2-D/3-D protocol.
+    u_thomas : np.ndarray
+        Classical reference field on the same mesh, from an identical outer solve
+        with ``inner="thomas"``, so that the comparison isolates the inner solver
+        rather than the scheme.
+    u_exact : np.ndarray or None
+        Analytical field where the case has one.
+    case_id, N, kappa, source_fn, discretisation_order
+        Recorded on every row, as in the 1-D sweeps. `kappa` is the strip
+        condition number κ_row, not that of any global operator.
+    solver : {'hhl', 'vqls', 'qsvt'}
+        Inner solver to sweep.
+    scheme : str
+        Outer scheme, passed through to `solve`.
+    grid : list, optional
+        Values for this solver's knob. Defaults to `OUTER_EQUAL_ACCURACY_GRIDS`.
+    r_target : float
+        Common outer-residual target.
+    band_factor : float
+        Acceptance band, r ∈ [r_target/band_factor, r_target·band_factor].
+    scheme_options : dict, optional
+        Forwarded to `solve` as keyword scheme options, e.g. ``max_wall_s``.
+
+    Returns
+    -------
+    EqualAccuracyResult
+        Best in-band result and every intermediate one.
+
+    Raises
+    ------
+    ValueError
+        If `solver` is not one of the three swept here.
+    RuntimeError
+        If no grid point produced a usable result.
+    """
+    from solvers.outer import solve
+
+    if solver not in OUTER_PRECISION_KNOB:
+        raise ValueError(
+            f"solver must be one of {sorted(OUTER_PRECISION_KNOB)}, "
+            f"received {solver!r}.")
+
+    knob = OUTER_PRECISION_KNOB[solver]
+    values = grid if grid is not None else OUTER_EQUAL_ACCURACY_GRIDS[solver]
+    scheme_options = dict(scheme_options or {})
+
+    # The outer tolerance IS the equal-accuracy target here, and setting it is what
+    # makes the protocol mean anything in more than one dimension.
+    #
+    # The outer iteration drives the residual to whatever tolerance it is given,
+    # largely independently of the inner solver's precision, because inner error
+    # is re-annihilated on the next sweep. Left at its default, every grid point
+    # converges to the same residual and the comparison is vacuous: measured at
+    # N=8 on the sinusoid, QSVT returned 6.2852e-09 at max_degree 500, 200, 100
+    # AND 50, while the wall time fell from 154.6 s to 15.7 s.
+    #
+    # Fixing the outer tolerance at r_target instead turns the question into the
+    # one worth asking: given that every configuration reaches the same accuracy,
+    # what does each COST to get there -- and at which point does the inner solver
+    # become too imprecise for the outer iteration to reach the target at all,
+    # which then shows up as a non-converged row rather than a larger residual.
+    scheme_options.setdefault("tol", r_target)
+
+    results: list[BenchmarkResult] = []
+    t_sweep_start = time.perf_counter()
+
+    for val in values:
+        log.info("  %s equal-accuracy (outer): N=%d  %s=%s  r_target=%.2e",
+                 solver.upper(), N, knob, val, r_target)
+        # A None entry means "no cap": the option is omitted rather than passed
+        # as None, since the registry validates values as well as keys.
+        inner_options = {} if val is None else {knob: val}
+
+        try:
+            t0 = time.perf_counter()
+            res = solve(problem, inner=solver, scheme=scheme,
+                        inner_options=inner_options, **scheme_options)
+            wall = time.perf_counter() - t0
+
+            rec = _build_base_result(
+                case_id=case_id, solver=solver, N=N, kappa=kappa,
+                source_fn=source_fn, alpha_bc=0.0, beta_bc=0.0,
+                discretisation_order=discretisation_order,
+                u_solver=np.asarray(res.u), u_thomas=u_thomas, u_exact=u_exact,
+                residual=res.residual, wall_time_s=wall, r_target=r_target,
+                backend_name=backend_name,
+            )
+            rec.sensitivity_param = knob
+            rec.sensitivity_value = None if val is None else float(val)
+            if solver == "hhl":
+                rec.hhl_epsilon = float(val)
+                rec.hhl_trotter_steps = int(np.ceil(1.0 / float(val)))
+            elif solver == "vqls":
+                rec.vqls_n_layers = int(val)
+                rec.vqls_cost_final = res.diagnostics.get("final_cost_mean")
+            else:
+                rec.qsvt_max_degree_cap = val
+                degree = res.diagnostics.get("polynomial_degree_mean")
+                rec.qsvt_polynomial_degree = (None if degree is None
+                                              else int(degree))
+
+            results.append(rec)
+            log.info("    outer residual=%.4e  n_outer=%d  stop=%s  time=%.1fs",
+                     res.residual, res.n_outer, res.stop_reason, wall)
+
+        except Exception as exc:
+            log.warning("  %s failed at %s=%s: %s", solver.upper(), knob, val, exc)
+
+    if not results:
+        raise RuntimeError(
+            f"{solver.upper()} equal-accuracy sweep produced no valid results "
+            f"for case_id={case_id}, N={N}.")
+
+    total_time = time.perf_counter() - t_sweep_start
+
+    # Selection differs from the 1-D protocol, and must. There, each grid point
+    # lands at a different residual and the best is the one nearest the target.
+    # Here the outer tolerance pins every converged point to the same residual, so
+    # "nearest the target" would pick arbitrarily among ties; the meaningful
+    # answer is the CHEAPEST configuration that still reaches the target. Points
+    # that failed to reach it are excluded rather than ranked, their inner solver
+    # being too imprecise for the outer iteration to close -- which is itself the
+    # result being sought, and is recorded on the row.
+    reached = [r for r in results
+               if r.residual is not None and r.residual <= r_target * band_factor]
+    in_band = bool(reached)
+    best = (min(reached, key=lambda r: r.wall_time_s) if reached
+            else min(results, key=lambda r: (r.residual is None, r.residual or 0.0)))
+    notes = "" if in_band else (
+        f"no configuration reached r_target: best residual = "
+        f"{best.residual:.4e}, target = {r_target:.2e}")
+    if in_band and len(reached) < len(results):
+        notes = (f"{len(results) - len(reached)} of {len(results)} "
+                 f"configuration(s) did not reach r_target")
+
+    return EqualAccuracyResult(
+        solver=solver,
         r_target=r_target,
         band_factor=band_factor,
         in_band=in_band,

@@ -628,3 +628,148 @@ def run_all_sensitivity_sweeps(
         all_results.append(result)
 
     return all_results
+
+# ── Sensitivity in 2-D and 3-D ────────────────────────────────────────────────
+
+# Parameters swept per solver, identically named as in the `solvers/outer/inner.py`
+# registry. The registry rejects an unknown key rather than ignoring it; therefore,
+# a parameter name deviating from this mapping causes a failure at the initial
+# solve rather than executing a null sweep. `cobyla_tol` is specified as `tol` here
+# for consistency.
+OUTER_SENSITIVITY_GRIDS: dict[str, dict[str, list]] = {
+    "hhl":  {"epsilon": [0.1, 0.05, 0.01, 0.005]},
+    "vqls": {"n_layers": [1, 2, 3, 4, 5],
+             "n_restarts": [1, 2, 3, 5]},
+    "qsvt": {"max_degree": [50, 100, 200, 500, None]},
+}
+
+
+def sensitivity_sweep_outer(
+    problem,
+    u_thomas: np.ndarray,
+    u_exact: Optional[np.ndarray],
+    case_id: str,
+    N: int,
+    kappa: float,
+    source_fn: str,
+    discretisation_order: int,
+    solver: str,
+    param_name: str,
+    scheme: str = "fmg",
+    param_values: Optional[list] = None,
+    scheme_options: Optional[dict] = None,
+    backend_name: str = "aer_statevector",
+) -> SensitivitySweepResult:
+    """
+    One-at-a-time sensitivity sweep for one solver on a 2-D or 3-D line problem.
+
+    The 1-D sweeps vary a solver config and re-solve an assembled ``(A, b)``. Here
+    the parameter is an `inner_options` entry and the quantity measured is the
+    outer residual after convergence, because the inner solver is executed once per
+    strip per outer iteration, and the study focuses on this coupled behaviour.
+    No dense operator is formed at any point.
+
+    The baseline is implicit rather than declared: all options other than the one
+    swept remain unset; consequently, each inner solver executes using its default
+    parameters. That is the configuration the primary sweep records, which ensures
+    the sensitivity curve is comparable against it.
+
+    Parameters
+    ----------
+    problem : LineProblem2D
+        Assembled problem satisfying the 2-D/3-D protocol.
+    u_thomas : np.ndarray
+        Classical reference field from an identical outer solve with
+        ``inner="thomas"``, isolating the inner solver from the scheme.
+    u_exact : np.ndarray or None
+        Analytical field where the case has one.
+    case_id, N, kappa, source_fn, discretisation_order
+        Recorded on every row. `kappa` is the strip condition number κ_row.
+    solver : {'hhl', 'vqls', 'qsvt'}
+        Inner solver to sweep.
+    param_name : str
+        Option to vary; must appear in `OUTER_SENSITIVITY_GRIDS[solver]`.
+    scheme : str
+        Outer scheme, passed through to `solve`.
+    param_values : list, optional
+        Values to sweep. Defaults to the declared grid.
+    scheme_options : dict, optional
+        Forwarded to `solve`, e.g. ``max_wall_s``.
+
+    Returns
+    -------
+    SensitivitySweepResult
+        One BenchmarkResult per grid point that completed.
+
+    Raises
+    ------
+    ValueError
+        If `solver` or `param_name` is not one this function sweeps.
+    """
+    from benchmark.equal_accuracy import _build_base_result
+    from solvers.outer import solve
+
+    if solver not in OUTER_SENSITIVITY_GRIDS:
+        raise ValueError(
+            f"solver must be one of {sorted(OUTER_SENSITIVITY_GRIDS)}, "
+            f"received {solver!r}.")
+    grids = OUTER_SENSITIVITY_GRIDS[solver]
+    if param_name not in grids:
+        raise ValueError(
+            f"Unknown {solver.upper()} sensitivity parameter {param_name!r}. "
+            f"Valid options: {list(grids)}")
+
+    values = param_values if param_values is not None else grids[param_name]
+    scheme_options = dict(scheme_options or {})
+
+    results: list[BenchmarkResult] = []
+    t_start = time.perf_counter()
+
+    for val in values:
+        log.info("  %s sensitivity (outer): N=%d  %s=%s",
+                 solver.upper(), N, param_name, val)
+        # A None entry means "unset": the option is omitted rather than passed as
+        # None, since the registry validates values as well as keys.
+        inner_options = {} if val is None else {param_name: val}
+
+        try:
+            t0 = time.perf_counter()
+            res = solve(problem, inner=solver, scheme=scheme,
+                        inner_options=inner_options, **scheme_options)
+            wall = time.perf_counter() - t0
+
+            rec = _build_base_result(
+                case_id=case_id, solver=solver, N=N, kappa=kappa,
+                source_fn=source_fn, alpha_bc=0.0, beta_bc=0.0,
+                discretisation_order=discretisation_order,
+                u_solver=np.asarray(res.u), u_thomas=u_thomas, u_exact=u_exact,
+                residual=res.residual, wall_time_s=wall, r_target=None,
+                backend_name=backend_name,
+            )
+            rec.sensitivity_param = param_name
+            rec.sensitivity_value = None if val is None else float(val)
+            if solver == "vqls":
+                rec.vqls_cost_final = res.diagnostics.get("final_cost_mean")
+            elif solver == "qsvt":
+                degree = res.diagnostics.get("polynomial_degree_mean")
+                rec.qsvt_polynomial_degree = (None if degree is None
+                                              else int(degree))
+
+            results.append(rec)
+            log.info("    outer residual=%.4e  n_outer=%d  stop=%s  time=%.1fs",
+                     res.residual, res.n_outer, res.stop_reason, wall)
+
+        except Exception as exc:
+            log.warning("  %s failed at %s=%s: %s",
+                        solver.upper(), param_name, val, exc)
+
+    return SensitivitySweepResult(
+        solver=solver,
+        param_name=param_name,
+        param_values=list(values),
+        results=results,
+        baseline_config={"scheme": scheme, "inner": solver,
+                         "note": "all other options at inner-solver defaults"},
+        n_solver_calls=len(results),
+        total_sweep_time_s=time.perf_counter() - t_start,
+    )

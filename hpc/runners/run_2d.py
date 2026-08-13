@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-run_2d.py
-=========
 Full 2-D HPC benchmark sweep for the quantum linear solvers (HHL, VQLS, QSVT)
 against the classical Thomas reference.
 

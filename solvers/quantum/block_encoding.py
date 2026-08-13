@@ -69,25 +69,54 @@ from qiskit.quantum_info import Operator
 _N_ANCILLA_BE = 1
 
 # Relative tolerance on max|A - A†| / max|A| before A is rejected as non-Hermitian.
-# Loose enough to admit a matrix assembled in floating point from a symmetric
-# stencil, which accumulates round-off asymmetry of order the machine epsilon times
-# the number of accumulated terms; tight enough to reject a genuinely asymmetric
-# operator, such as a one-sided boundary row that was intended to be symmetrised.
+# Sufficient to accommodate a matrix assembled in floating-point arithmetic from a symmetric
+# stencil, which accumulates round-off asymmetry of order the machine epsilon multiplied by
+# the number of accumulated terms; sufficiently stringent to reject a genuinely asymmetric
+# operator, such as a one-sided boundary row intended to be symmetrised.
 _HERMITIAN_TOL = 1e-10
 
 # Absolute tolerance below which ‖A‖₂ is treated as zero. Subnormalising by a value
 # at this scale would amplify round-off into the block encoding without limit.
 _ZERO_MATRIX_TOL = 1e-14
 
-# Relative tolerance on entries outside the tridiagonal band, used by
-# `assert_tridiagonal`. Set well above round-off but far below any physically
+# Relative tolerance on entries outside the tridiagonal band, enforced by
+# `assert_tridiagonal`. Established well above round-off but significantly below any physically
 # meaningful stencil coefficient: the 4th-order operator's ±2 band is 1/12 of its
-# main diagonal, some eleven orders of magnitude above this threshold, so the guard
-# cannot mistake a real band for numerical noise in either direction.
+# main diagonal, roughly eleven orders of magnitude above this threshold, ensuring the guard
+# does not conflate a structural band with numerical noise.
 _BAND_TOL = 1e-12
 
 
 # ── Public Interface ──────────────────────────────────────────────────────────
+
+def is_toeplitz_tridiagonal(A: np.ndarray) -> bool:
+    """
+    Whether A is exactly what a reconstruction from ``A[0,0]`` and ``A[0,1]`` gives.
+
+    That reconstruction requires two properties, and callers have historically
+    checked only the first: the matrix must carry no band beyond |i−j| ≤ 1, AND
+    each of those three diagonals must be constant. A tridiagonal operator with a
+    varying diagonal — a boundary-modified stencil such as the Neumann sub-case 3c
+    — is silently replaced by a uniform one, which is the same corruption as a
+    discarded ±2 band arriving by a different route.
+
+    Parameters
+    ----------
+    A : np.ndarray, shape (N, N)
+        Candidate operator.
+
+    Returns
+    -------
+    bool
+        True when the two-scalar fast path reproduces A to within `_BAND_TOL`
+        relative to max|A|; False when the dense encoding is required.
+    """
+    try:
+        assert_tridiagonal(A, "probe")
+    except ValueError:
+        return False
+    return True
+
 
 def assert_tridiagonal(A: np.ndarray, solver: str) -> None:
     """
@@ -140,6 +169,37 @@ def assert_tridiagonal(A: np.ndarray, solver: str) -> None:
             f"system solved. For the 4th-order pentadiagonal operator use the "
             f"order-4 solver ({solver.lower()}_4th), which block encodes A in full "
             f"via build_dense_block_encoding."
+        )
+
+    # Being within the band is necessary but not sufficient. The reconstruction
+    # is Toeplitz — one scalar per diagonal — so a tridiagonal matrix whose
+    # diagonals are not constant is corrupted just as completely as a wider
+    # stencil, and by exactly the same mechanism.
+    #
+    # This is not hypothetical. Sub-case 3c carries a Neumann row at x=0 whose
+    # halved form gives A[0,0] = -1 against -2 everywhere else. Reconstruction
+    # from A[0,0] therefore built tridiag(1, -1, 1) — a uniformly shifted
+    # operator, not the Neumann one — and HHL and QSVT solved that instead, at
+    # every N and every degree, returning ~100 % error against 3c's true
+    # solution while matching the surrogate's solution to machine precision.
+    # The band check above passes 3c cleanly, which is why this went unseen.
+    deviation = 0.0
+    for k in (-1, 0, 1):
+        diag = np.diag(A, k)
+        if diag.size > 1:
+            deviation = max(deviation,
+                            float(np.max(np.abs(diag - diag[0]))))
+
+    if deviation / scale > _BAND_TOL:
+        raise ValueError(
+            f"{solver} received a tridiagonal matrix that is not Toeplitz: "
+            f"max deviation along a diagonal / max|A| = {deviation / scale:.3e}. "
+            f"This code path reconstructs the operator from A[0,0] and A[0,1] "
+            f"alone, which assumes every diagonal is constant, so a varying "
+            f"diagonal would be silently replaced by its first entry and a "
+            f"different system solved. Boundary-modified operators such as the "
+            f"Neumann sub-case 3c fall here. Use build_dense_block_encoding, "
+            f"which encodes A in full at identical asymptotic cost."
         )
 
 
@@ -201,7 +261,7 @@ def build_tst_block_encoding(
     eigs  = np.linalg.eigvalsh(A)
     alpha = float(np.max(np.abs(eigs)))
 
-    # Normalised matrix: M = A / alpha, ||M||_2 = 1.
+    # Normalised matrix: M = A / alpha, ‖M‖₂ = 1.
     M = A / alpha
 
     return _assemble_dilation_circuit(M, alpha, name="BlockEnc_TST")
@@ -461,7 +521,7 @@ def _sznagy_dilation(M: np.ndarray) -> np.ndarray:
     N   = M.shape[0]
     I   = np.eye(N)
 
-    # Compute i * sqrt(I - M^2) via eigendecomposition.
+    # Compute i√(I − M²) via eigendecomposition.
     # Since M is Hermitian and ||M||_2 <= 1, all eigenvalues of I - M^2
     # are non-negative, so the square root is real and PSD.
     ImM2     = I - M @ M
@@ -469,7 +529,7 @@ def _sznagy_dilation(M: np.ndarray) -> np.ndarray:
     eigs_pos = np.clip(eigs, 0.0, None)
     sqrtImM2 = V @ np.diag(np.sqrt(eigs_pos)) @ V.conj().T
 
-    # Assemble the 2N x 2N Wx-convention dilation.
+    # Assemble the 2N × 2N Wx-convention dilation.
     # Both diagonal blocks are +M (not M and -M as in the Rx convention).
     # Off-diagonal blocks carry a factor of i.
     U = np.zeros((2 * N, 2 * N), dtype=complex)
