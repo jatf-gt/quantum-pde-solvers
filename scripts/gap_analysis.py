@@ -67,6 +67,23 @@ RUNNER_FOR_DIM: dict[int, str] = {
     3: "hpc/runners/run_3d.py",
 }
 
+CASES_UNSUPPORTED_AT_ORDER_4: frozenset[str] = frozenset({
+    "HET_1D_3c_gaussian_NeumannDirichlet",
+})
+"""
+Cases a 4th-order sweep does not attempt, and which must therefore not be reported
+as outstanding when one is analysed.
+
+``PoissonProblem1D4th`` implements no Neumann closure, so sub-case 3c is skipped by
+``run_1d.py --order 4`` by design. The case list is recovered by scanning the runner
+source for identifier literals, which cannot see a runtime exclusion, so without
+this the analysis reports one phantom row per solver per resolution — 12 of the 24
+entries in a 1-D order-4 manifest, all of them uncomputable.
+
+Exclusions belong here rather than in ``--cases`` at the call site: a hand-written
+case list is exactly the hand-maintained scope this module exists to replace.
+"""
+
 CASE_ID_PREFIXES: tuple[str, ...] = ("1D_", "2D_", "3D_", "HET_1D_")
 """
 Prefixes marking a string literal in a runner as a recorded case identifier.
@@ -547,6 +564,12 @@ def main() -> None:
     parser.add_argument("--cases", default=None,
                         help="Override the case list; defaults to those discovered "
                              "in the corresponding runner module.")
+    parser.add_argument("--order", type=int, choices=(2, 4), default=2,
+                        help="Discretisation order of the sweep being analysed "
+                             "(default: 2). At order 4 the cases the runner does "
+                             "not implement are dropped from the expected set, "
+                             "which otherwise reports them as missing rows that "
+                             "cannot be produced.")
     parser.add_argument("--show-keep", type=int, default=10,
                         help="How many of the costliest sound rows to list.")
     parser.add_argument("--strict", action="store_true",
@@ -567,10 +590,19 @@ def main() -> None:
     cases = (_parse_list(args.cases)
              or merge_case_ids(discover_case_ids(runner), observed))
 
+    # An explicit --cases list is taken as given; the order-4 exclusion applies only
+    # to the discovered set, which is what cannot see a runtime skip.
+    excluded: list[str] = []
+    if args.order == 4 and not args.cases:
+        excluded = sorted(set(cases) & CASES_UNSUPPORTED_AT_ORDER_4)
+        cases = [c for c in cases if c not in CASES_UNSUPPORTED_AT_ORDER_4]
+
     print()
     print("=" * 78)
-    print(f"  GAP ANALYSIS  -  {args.dim}D  -  {args.results_dir}")
+    print(f"  GAP ANALYSIS  -  {args.dim}D  -  order {args.order}  -  {args.results_dir}")
     print(f"  cases from {runner} + recorded rows: {len(cases)}")
+    if excluded:
+        print(f"  excluded at order 4 (unimplemented): {', '.join(excluded)}")
     print(f"  N={n_values}  solvers={solvers}")
     print("=" * 78)
     manifest = analyse(archive, cases, n_values, solvers, strict=args.strict,
@@ -578,9 +610,11 @@ def main() -> None:
     manifest.update({
         "generated":   datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "dim":         args.dim,
+        "order":       args.order,
         "results_dir": str(args.results_dir),
         "strict":      args.strict,
-        "expected":    {"cases": cases, "n_values": n_values, "solvers": solvers},
+        "expected":    {"cases": cases, "n_values": n_values, "solvers": solvers,
+                        "excluded_unimplemented": excluded},
     })
 
     _print_report(manifest, args.show_keep)

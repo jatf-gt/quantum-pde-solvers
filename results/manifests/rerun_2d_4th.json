@@ -585,9 +585,10 @@
     "stale": [],
     "unexplained": []
   },
-  "generated": "2026-08-12T12:21:59+00:00",
+  "generated": "2026-08-13T12:58:49+00:00",
   "dim": 2,
-  "results_dir": "results/2Dhpc_run_4th",
+  "order": 4,
+  "results_dir": "results\\2Dhpc_run_4th",
   "strict": false,
   "expected": {
     "cases": [
@@ -607,6 +608,7 @@
       "HHL",
       "VQLS",
       "QSVT"
-    ]
+    ],
+    "excluded_unimplemented": []
   }
 }

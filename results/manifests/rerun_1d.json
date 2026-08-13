@@ -5,7 +5,7 @@
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 3.45306470990181e-05,
+      "wall_time_s": 3.5220757126808167e-05,
       "reasons": [
         "stale_geometry"
       ]
@@ -15,7 +15,7 @@
       "solver": "HHL",
       "N": 4,
       "flags": [],
-      "wall_time_s": 52.47053480613977,
+      "wall_time_s": 16.296430408023298,
       "reasons": [
         "stale_geometry"
       ]
@@ -25,7 +25,7 @@
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 1.3990909243002534,
+      "wall_time_s": 1.7443517856299877,
       "reasons": [
         "stale_geometry"
       ]
@@ -35,7 +35,7 @@
       "solver": "QSVT",
       "N": 4,
       "flags": [],
-      "wall_time_s": 0.49755160231143236,
+      "wall_time_s": 0.451839747838676,
       "reasons": [
         "stale_geometry"
       ]
@@ -45,7 +45,7 @@
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 4.1221268475055695e-05,
+      "wall_time_s": 4.0821731090545654e-05,
       "reasons": [
         "stale_geometry"
       ]
@@ -55,7 +55,7 @@
       "solver": "HHL",
       "N": 8,
       "flags": [],
-      "wall_time_s": 42.365342303179204,
+      "wall_time_s": 18.471883327700198,
       "reasons": [
         "stale_geometry"
       ]
@@ -65,7 +65,7 @@
       "solver": "VQLS",
       "N": 8,
       "flags": [],
-      "wall_time_s": 102.02021352294832,
+      "wall_time_s": 98.26680422201753,
       "reasons": [
         "stale_geometry"
       ]
@@ -75,7 +75,7 @@
       "solver": "QSVT",
       "N": 8,
       "flags": [],
-      "wall_time_s": 3.006369486451149,
+      "wall_time_s": 2.0760295018553734,
       "reasons": [
         "stale_geometry"
       ]
@@ -85,7 +85,7 @@
       "solver": "Thomas",
       "N": 16,
       "flags": [],
-      "wall_time_s": 6.0381367802619934e-05,
+      "wall_time_s": 5.679205060005188e-05,
       "reasons": [
         "stale_geometry"
       ]
@@ -95,7 +95,7 @@
       "solver": "HHL",
       "N": 16,
       "flags": [],
-      "wall_time_s": 91.81330690626055,
+      "wall_time_s": 58.99662406742573,
       "reasons": [
         "stale_geometry"
       ]
@@ -108,7 +108,7 @@
         "not_converged",
         "large_error_vs_exact"
       ],
-      "wall_time_s": 252.48799229599535,
+      "wall_time_s": 203.57893945556134,
       "reasons": [
         "stale_geometry"
       ]
@@ -118,7 +118,7 @@
       "solver": "QSVT",
       "N": 16,
       "flags": [],
-      "wall_time_s": 16.53385934047401,
+      "wall_time_s": 8.475092380307615,
       "reasons": [
         "stale_geometry"
       ]
@@ -128,7 +128,7 @@
       "solver": "Thomas",
       "N": 32,
       "flags": [],
-      "wall_time_s": 9.677279740571976e-05,
+      "wall_time_s": 8.848309516906738e-05,
       "reasons": [
         "stale_geometry"
       ]
@@ -137,59 +137,55 @@
       "case": "HET_1D_3b_gaussian_Vd300",
       "solver": "HHL",
       "N": 32,
+      "flags": [],
+      "wall_time_s": 3262.6883385321125,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 402.0435722284019,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 2.482350147329271,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 0.0001576840877532959,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 64,
       "flags": [
         "solver_timeout",
         "not_converged",
         "no_error_metric"
       ],
-      "wall_time_s": 3600.1581904571503,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "VQLS",
-      "N": 32,
-      "flags": [
-        "not_converged",
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 498.9836773686111,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "QSVT",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 4.017453631386161,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "Thomas",
-      "N": 64,
-      "flags": [],
-      "wall_time_s": 0.00017693545669317245,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "HHL",
-      "N": 64,
-      "flags": [
-        "solver_timeout",
-        "not_converged",
-        "no_error_metric"
-      ],
-      "wall_time_s": 3600.210390395485,
+      "wall_time_s": 5400.179866584018,
       "reasons": [
         "stale_geometry"
       ]
@@ -202,7 +198,7 @@
         "not_converged",
         "large_error_vs_exact"
       ],
-      "wall_time_s": 885.2237091567367,
+      "wall_time_s": 806.6939564319327,
       "reasons": [
         "stale_geometry"
       ]
@@ -212,7 +208,7 @@
       "solver": "QSVT",
       "N": 64,
       "flags": [],
-      "wall_time_s": 3.2873442387208343,
+      "wall_time_s": 2.768478959798813,
       "reasons": [
         "stale_geometry"
       ]
@@ -224,7 +220,7 @@
       "flags": [
         "not_converged"
       ],
-      "wall_time_s": 778.6407250231132,
+      "wall_time_s": 399.341141612269,
       "reasons": [
         "solver_error",
         "no_error_metric"
@@ -237,7 +233,7 @@
       "flags": [
         "not_converged"
       ],
-      "wall_time_s": 742.8967653969303,
+      "wall_time_s": 796.330203496851,
       "reasons": [
         "solver_error",
         "no_error_metric"
@@ -1065,7 +1061,7 @@
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 4.2650848627090454e-05
+      "wall_time_s": 4.615075886249542e-05
     },
     {
       "case": "HET_1D_3c_gaussian_NeumannDirichlet",
@@ -1126,7 +1122,7 @@
       "solver": "Thomas",
       "N": 32,
       "flags": [],
-      "wall_time_s": 9.863264858722687e-05
+      "wall_time_s": 9.37124714255333e-05
     },
     {
       "case": "HET_1D_3c_gaussian_NeumannDirichlet",
@@ -1191,8 +1187,9 @@
     "stale": [],
     "unexplained": []
   },
-  "generated": "2026-08-10T14:09:43+00:00",
+  "generated": "2026-08-13T12:58:48+00:00",
   "dim": 1,
+  "order": 2,
   "results_dir": "results\\1Dhpc_run",
   "strict": false,
   "expected": {
@@ -1217,6 +1214,7 @@
       "HHL",
       "VQLS",
       "QSVT"
-    ]
+    ],
+    "excluded_unimplemented": []
   }
 }

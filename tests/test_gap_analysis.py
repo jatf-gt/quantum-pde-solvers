@@ -216,7 +216,17 @@ def test_legacy_budget_describes_the_existing_archive():
     timed_out = [r for r in rows
                  if r["solver"] == "HHL" and (r.get("wall_time_s") or 0) >= 3600.0]
     assert timed_out, "no timed-out HHL rows found; the constant's premise is gone"
+
+    # The archive now holds rows from two budgets: the original 3600 s sweep and the
+    # wave-1 resubmission at 5400 s. Both are sound, so the invariant is checked
+    # against whichever budget a row was produced under rather than against 3600 s
+    # alone -- a row landing just above ANY budget in use is what makes the
+    # wall-clock inference sound, and pinning the assertion to one of them merely
+    # dates the test to the sweep that happened to run first.
+    known_budgets = (3600.0, 5400.0)
     for row in timed_out:
-        # Every one sits just above the budget, never far beyond it - which is what
-        # makes the wall-clock inference sound for these rows.
-        assert 3600.0 <= row["wall_time_s"] < 3660.0, row
+        wall = row["wall_time_s"]
+        budget = max((b for b in known_budgets if wall >= b), default=None)
+        assert budget is not None, row
+        # Just above its budget, never far beyond it.
+        assert budget <= wall < budget + 60.0, row
