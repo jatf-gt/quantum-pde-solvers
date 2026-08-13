@@ -60,7 +60,7 @@ from typing import Optional
 
 # `pytest.ini` sets `pythonpath = .`, but a bare `python3 hpc/runners/make_tables.py`
 # puts `hpc/runners/` on sys.path[0] rather than the repository root. Resolving the
-# root from `__file__` makes the invocation directory irrelevant.
+# root from `__file__` decouples the import path from the invocation directory.
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -160,7 +160,7 @@ def hardware_feasibility_rows(results: list, budget: int) -> list[dict]:
     rows: list[dict] = []
     for r in results:
         if r.solver == "thomas":
-            continue                      # classical; no circuit to judge
+            continue                      # The Thomas algorithm is a classical solver; it generates no quantum circuit.
 
         n_two_qubit: Optional[int] = None
         source = "estimated"
@@ -170,7 +170,7 @@ def hardware_feasibility_rows(results: list, budget: int) -> list[dict]:
         elif cm is not None and cm.depth_opt1 is not None:
             n_two_qubit, source = cm.depth_opt1, "measured (depth, upper bound)"
         else:
-            # The estimate is fed whatever the row DID record. Its VQLS branch
+            # The estimate is supplied with whatever circuit data the row recorded. Its VQLS branch
             # otherwise assumes a 2-layer ansatz against the 6-14 the sweeps run,
             # understating the circuit by up to 7x, and its QSVT branch infers a
             # degree from kappa that ignores any cap the run applied.
@@ -250,7 +250,21 @@ def latex_hardware_feasibility(rows: list[dict], budget: int) -> str:
 
 
 def console_hardware_feasibility(rows: list[dict], budget: int) -> str:
-    """Aligned plain-text rendering of `hardware_feasibility_rows`."""
+    """
+    Generate an aligned plain-text rendering of the hardware feasibility assessment.
+
+    Parameters
+    ----------
+    rows : list of dict
+        As returned by `hardware_feasibility_rows`.
+    budget : int
+        Two-qubit gate budget, reported in the table header.
+
+    Returns
+    -------
+    str
+        Formatted ASCII table.
+    """
     sep = "  " + "-" * 90
     out = [sep,
            f"  HARDWARE FEASIBILITY  -  two-qubit gate budget = {budget:,}",
@@ -274,12 +288,25 @@ def console_hardware_feasibility(rows: list[dict], budget: int) -> str:
 
 def load_sweep(results_dir: Path, dim: int, order: int) -> list:
     """
-    Read one sweep archive and adapt it to typed results.
+    Read one sweep archive and adapt it to typed BenchmarkResult objects.
 
-    Returns an empty list rather than raising when the directory holds no
-    summary: several (dimension, order) combinations are legitimately absent at
-    any given time, and a missing sweep should skip its tables rather than abort
-    every other table in the run.
+    Returns an empty list rather than raising when the directory holds no summary,
+    because several (dimension, order) combinations are legitimately absent at any
+    given time; a missing sweep should skip its tables rather than abort the run.
+
+    Parameters
+    ----------
+    results_dir : Path
+        Sweep output directory.
+    dim : int
+        Spatial dimension, selecting the error-field convention in the adapter.
+    order : int
+        Discretisation order stamped on rows that predate the column.
+
+    Returns
+    -------
+    list of BenchmarkResult
+        Adapted rows, or an empty list if the directory holds no summary.
     """
     if not (results_dir / "results_full.json").exists():
         log.info("  %-28s no results_full.json; skipped", str(results_dir))
@@ -371,7 +398,7 @@ def main() -> int:
         r_target=r_target,
     )
 
-    # ── Hardware feasibility ──────────────────────────────────────────────────
+    # ── Hardware feasibility ──────────────────────────────────────────────────────
     budget = two_qubit_budget(args.two_qubit_error, args.success_target)
     hw_rows = hardware_feasibility_rows(primary, budget)
 
@@ -389,7 +416,7 @@ def main() -> int:
         encoding="utf-8")
     written.append(hw_json)
 
-    # ── Console rendering ─────────────────────────────────────────────────────
+    # ── Console rendering ─────────────────────────────────────────────────────────
     console = [T.console_primary_comparison(primary)]
     if ea_results:
         console.append(T.console_equal_accuracy(ea_results, r_target))

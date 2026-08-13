@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-run_3d.py
-=========
 Full 3-D HPC benchmark sweep for the quantum linear solvers (HHL, VQLS, QSVT)
 against the classical Thomas reference, on the line-decomposed 3-D Poisson
 problem.
@@ -9,11 +7,12 @@ problem.
 Relationship to the 2-D runner
 ------------------------------
 Deliberately its near-twin: same CLI, same metrics, same result schema, same
-two-phase submission pattern.  Nothing about the quantum solvers changed to
-support 3-D - a 3-D problem decomposes into the same tridiagonal strips as a
-2-D one, so hhl_1d / vqls_1d / qsvt_1d are used unmodified on log2(N0)
-qubits with the existing TST block encoding.  What is new is the problem
-class (problems/poisson_line_3d.py) and the geometry of the test cases.
+two-phase submission pattern.  The quantum solver modules are unmodified
+relative to the 2-D runner: a 3-D problem decomposes into the same
+tridiagonal strips as a 2-D one, so hhl_1d / vqls_1d / qsvt_1d are used
+unmodified on log2(N0) qubits with the existing TST block encoding.  The
+distinguishing elements are the problem class (problems/poisson_line_3d.py)
+and the geometry of the test cases.
 
 Work scaling, and why 3-D is expensive
 --------------------------------------

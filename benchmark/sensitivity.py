@@ -631,10 +631,11 @@ def run_all_sensitivity_sweeps(
 
 # ── Sensitivity in 2-D and 3-D ────────────────────────────────────────────────
 
-# Parameters swept per solver, spelled as the `solvers/outer/inner.py` registry
-# names them. The registry rejects an unknown key rather than ignoring it, so a
-# name drifting from this mapping fails at the first solve rather than sweeping
-# nothing. `cobyla_tol` is `tol` here for the same reason.
+# Parameters swept per solver, identically named as in the `solvers/outer/inner.py`
+# registry. The registry rejects an unknown key rather than ignoring it; therefore,
+# a parameter name deviating from this mapping causes a failure at the initial
+# solve rather than executing a null sweep. `cobyla_tol` is specified as `tol` here
+# for consistency.
 OUTER_SENSITIVITY_GRIDS: dict[str, dict[str, list]] = {
     "hhl":  {"epsilon": [0.1, 0.05, 0.01, 0.005]},
     "vqls": {"n_layers": [1, 2, 3, 4, 5],
@@ -664,14 +665,14 @@ def sensitivity_sweep_outer(
 
     The 1-D sweeps vary a solver config and re-solve an assembled ``(A, b)``. Here
     the parameter is an `inner_options` entry and the quantity measured is the
-    OUTER residual after convergence, since the inner solver is exercised once per
-    strip per outer iteration and it is the coupled behaviour that the study is
-    about. No dense operator is formed at any point.
+    outer residual after convergence, because the inner solver is executed once per
+    strip per outer iteration, and the study focuses on this coupled behaviour.
+    No dense operator is formed at any point.
 
-    The baseline is implicit rather than declared: every option other than the one
-    swept is left unset, so each inner solver runs at its own default. That is the
-    configuration the primary sweep records, which is what makes a sensitivity
-    curve comparable against it.
+    The baseline is implicit rather than declared: all options other than the one
+    swept remain unset; consequently, each inner solver executes using its default
+    parameters. That is the configuration the primary sweep records, which ensures
+    the sensitivity curve is comparable against it.
 
     Parameters
     ----------

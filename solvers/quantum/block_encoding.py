@@ -69,21 +69,21 @@ from qiskit.quantum_info import Operator
 _N_ANCILLA_BE = 1
 
 # Relative tolerance on max|A - A†| / max|A| before A is rejected as non-Hermitian.
-# Loose enough to admit a matrix assembled in floating point from a symmetric
-# stencil, which accumulates round-off asymmetry of order the machine epsilon times
-# the number of accumulated terms; tight enough to reject a genuinely asymmetric
-# operator, such as a one-sided boundary row that was intended to be symmetrised.
+# Sufficient to accommodate a matrix assembled in floating-point arithmetic from a symmetric
+# stencil, which accumulates round-off asymmetry of order the machine epsilon multiplied by
+# the number of accumulated terms; sufficiently stringent to reject a genuinely asymmetric
+# operator, such as a one-sided boundary row intended to be symmetrised.
 _HERMITIAN_TOL = 1e-10
 
 # Absolute tolerance below which ‖A‖₂ is treated as zero. Subnormalising by a value
 # at this scale would amplify round-off into the block encoding without limit.
 _ZERO_MATRIX_TOL = 1e-14
 
-# Relative tolerance on entries outside the tridiagonal band, used by
-# `assert_tridiagonal`. Set well above round-off but far below any physically
+# Relative tolerance on entries outside the tridiagonal band, enforced by
+# `assert_tridiagonal`. Established well above round-off but significantly below any physically
 # meaningful stencil coefficient: the 4th-order operator's ±2 band is 1/12 of its
-# main diagonal, some eleven orders of magnitude above this threshold, so the guard
-# cannot mistake a real band for numerical noise in either direction.
+# main diagonal, roughly eleven orders of magnitude above this threshold, ensuring the guard
+# does not conflate a structural band with numerical noise.
 _BAND_TOL = 1e-12
 
 
@@ -261,7 +261,7 @@ def build_tst_block_encoding(
     eigs  = np.linalg.eigvalsh(A)
     alpha = float(np.max(np.abs(eigs)))
 
-    # Normalised matrix: M = A / alpha, ||M||_2 = 1.
+    # Normalised matrix: M = A / alpha, ‖M‖₂ = 1.
     M = A / alpha
 
     return _assemble_dilation_circuit(M, alpha, name="BlockEnc_TST")
@@ -521,7 +521,7 @@ def _sznagy_dilation(M: np.ndarray) -> np.ndarray:
     N   = M.shape[0]
     I   = np.eye(N)
 
-    # Compute i * sqrt(I - M^2) via eigendecomposition.
+    # Compute i√(I − M²) via eigendecomposition.
     # Since M is Hermitian and ||M||_2 <= 1, all eigenvalues of I - M^2
     # are non-negative, so the square root is real and PSD.
     ImM2     = I - M @ M
@@ -529,7 +529,7 @@ def _sznagy_dilation(M: np.ndarray) -> np.ndarray:
     eigs_pos = np.clip(eigs, 0.0, None)
     sqrtImM2 = V @ np.diag(np.sqrt(eigs_pos)) @ V.conj().T
 
-    # Assemble the 2N x 2N Wx-convention dilation.
+    # Assemble the 2N × 2N Wx-convention dilation.
     # Both diagonal blocks are +M (not M and -M as in the Rx convention).
     # Off-diagonal blocks carry a factor of i.
     U = np.zeros((2 * N, 2 * N), dtype=complex)

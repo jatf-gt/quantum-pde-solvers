@@ -14,7 +14,7 @@ hhl_solve_system(A, b, eps) :
 
 Hamiltonian simulation is provided by the vendored `quantum_linear_solvers`
 implementation of the TST evolution operator (Vázquez et al.), and all circuits
-are evaluated by deterministic statevector simulation — there is no shot noise.
+are evaluated by deterministic statevector simulation; no shot noise is introduced by the measurement process.
 """
 from __future__ import annotations
 

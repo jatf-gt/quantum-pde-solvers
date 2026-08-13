@@ -486,15 +486,16 @@ class SweepArchive:
         """
         Iterates (solver, rows) for one case from a case-solver grouping.
 
-        Every vs-N plot repeated the same inner filter — loop the whole
-        grouping, skip keys whose case does not match — in four places.
+        This consolidates an inner filter previously duplicated across four
+        vs-N plot implementations, which iterated the entire grouping and
+        excluded keys with mismatched cases.
 
         Solvers are yielded in **lexical** order, not the canonical
         `SOLVER_ORDER`. That is deliberate: the call sites this replaces
         iterate `sorted(grouped.items())`, which sorts by the (case, solver)
         key and therefore alphabetically. Imposing the canonical order here
         would reorder every legend and line in the existing 2-D and 3-D
-        figures — a restyling, not a refactor. Use `group_by_case_N`, which
+        figures — a restyling, not a refactoring. Use `group_by_case_N`, which
         does sort canonically, where column order matters.
 
         Parameters
@@ -677,7 +678,8 @@ def rows_to_benchmark_results(rows: list[dict], dim: int = 1,
         n_cx = _int(row.get("n_gates_2q"))
 
         # A CircuitMetrics with every field None carries no information and would
-        # render as a row of dashes; None says plainly that nothing was measured.
+        # render as a row of dashes; assigning None explicitly indicates that no
+        # measurements were recorded.
         metrics = None
         if any(v is not None for v in (n_qubits, depth, depth_t, n_cx)):
             metrics = CircuitMetrics(

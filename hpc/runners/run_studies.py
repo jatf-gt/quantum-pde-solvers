@@ -76,8 +76,8 @@ import numpy as np
 
 # `pytest.ini` sets `pythonpath = .`, but a bare `python3 hpc/runners/run_studies.py`
 # puts `hpc/runners/` on sys.path[0] rather than the repository root. Resolving the
-# root from `__file__` makes the invocation directory irrelevant, matching every
-# other module under `hpc/runners/`.
+# root from `__file__` decouples the import path from the invocation directory,
+# consistent with every other module under `hpc/runners/`.
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -163,9 +163,10 @@ CASE_ID: dict[str, str] = {
 }
 
 # N = 8 by default. Large enough that κ (32.2 at order 2) is not degenerate and
-# the solvers are genuinely separated, small enough that a 34-solve VQLS grid is
-# minutes rather than hours. The studies answer a question about parameters, and
-# the parameter response does not change qualitatively with resolution.
+# the solvers are genuinely separated, small enough that a 34-solve VQLS grid remains
+# computationally tractable within a single HPC job allocation. The studies answer a
+# question about parameters, and the parameter response does not change qualitatively
+# with resolution.
 DEFAULT_N: tuple[int, ...] = (8,)
 
 SOLVERS: tuple[str, ...] = ("hhl", "vqls", "qsvt")
@@ -733,7 +734,8 @@ def main() -> int:
             # Written after every case rather than once at the end, so that a
             # walltime kill loses only the case in flight. This mirrors the
             # incremental per-solution writes in the primary runners, and for the
-            # same reason: the summary is the expensive thing to lose.
+            # same reason: a walltime kill should discard at most one case, not the
+            # entirety of accumulated results.
             if ea_all:
                 archive.write_equal_accuracy(ea_all)
             for name, sweeps in sens_all.items():

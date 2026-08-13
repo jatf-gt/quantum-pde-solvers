@@ -2,7 +2,7 @@
 On-disk persistence layer for the benchmarking framework.
 
 Schema contract
-───────────────
+---------------
 All benchmark output is written to a structured directory tree:
 
   results/<run_tag>/
@@ -22,14 +22,14 @@ at the top level of each JSON record (CircuitMetrics is flattened with a
 spreadsheet without nested parsing.
 
 Backward compatibility
-──────────────────────
+----------------------
 The reader functions accept both the new BenchmarkResult schema (this
 module) and the legacy schema from earlier runner versions. Legacy fields
 are mapped to their new equivalents where possible; unmapped fields are
 silently ignored.
 
 References
-──────────
+----------
   Ghafourpour & Laizet (2025) Phys. Rev. Applied 24, 024032.
 """
 
@@ -52,8 +52,9 @@ from benchmark.sensitivity import SensitivitySweepResult
 
 
 # ── Legacy field aliases ──────────────────────────────────────────────────────
-# Maps old field names (from earlier runner versions) to new field names.
-# Used in _dict_to_benchmark_result to maintain backward compatibility.
+# The following mapping reconciles field names introduced in earlier runner
+# versions with their current equivalents. Applied during deserialisation to
+# maintain backward compatibility with pre-existing archives.
 
 _LEGACY_ALIASES: dict[str, str] = {
     "max_rel_err":           "max_rel_err_vs_exact",
@@ -85,12 +86,12 @@ def _dict_to_benchmark_result(d: dict) -> BenchmarkResult:
     Handles both the current schema and legacy schemas from earlier runner
     versions via _LEGACY_ALIASES.
     """
-    # Apply legacy aliases
+    # Resolve legacy field aliases to their current equivalents.
     for old, new in _LEGACY_ALIASES.items():
         if old in d and new not in d:
             d[new] = d.pop(old)
 
-    # Reconstruct CircuitMetrics from flattened fields
+    # Reconstruct the CircuitMetrics object from the flattened circuit_* columns.
     cm = None
     circuit_fields = {
         k[len("circuit_"):]: v
@@ -103,16 +104,19 @@ def _dict_to_benchmark_result(d: dict) -> BenchmarkResult:
         except TypeError:
             cm = None
 
-    # Remove flattened circuit fields from d before passing to BenchmarkResult
+    # Strip the flattened circuit_* keys from the working dictionary; the
+    # reconstructed CircuitMetrics object is injected below.
     d_clean = {k: v for k, v in d.items() if not k.startswith("circuit_")}
 
-    # Fill missing optional fields with None
+    # Populate absent optional fields with None to satisfy the dataclass
+    # constructor.
     all_fields = BenchmarkResult.__dataclass_fields__
     for fname in all_fields:
         if fname not in d_clean:
             d_clean[fname] = None
 
-    # Enforce required non-optional fields
+    # Assign sentinel values to required non-optional fields that are absent,
+    # preventing constructor rejection of malformed records.
     for fname in ("case_id", "solver", "N", "discretisation_order",
                   "kappa", "source_fn", "alpha_bc", "beta_bc",
                   "residual", "max_rel_err_vs_thomas",
@@ -175,7 +179,7 @@ class SweepArchive:
 
     def write_primary(self, results: list[BenchmarkResult]) -> None:
         """Write primary BenchmarkResult list to JSON and CSV."""
-        # JSON
+        # Serialise to JSON.
         json_path = self.root / "results_full.json"
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(
@@ -183,7 +187,7 @@ class SweepArchive:
                 f, indent=2, default=str,
             )
 
-        # CSV
+        # Write the flat CSV representation.
         csv_path = self.root / "results_summary.csv"
         if results:
             rows = [_benchmark_result_to_dict(r) for r in results]

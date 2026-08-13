@@ -42,9 +42,9 @@ from solvers.quantum.block_encoding import (
 #     8   113.5     800        7.0          4.2e-04             34.6 s
 #     8   113.5    1200       10.6          9.8e-06             78.6 s
 #
-# reproducing the threshold near 11 seen across the order-2 sweep. 400 at N=4
+# This reproduces the threshold near 11 seen across the order-2 sweep; 400 at N=4
 # sits comfortably above it. N=8 is not exercised for QSVT: it would need ~1200
-# to clear the threshold, at 79 s, and it tests nothing the N=4 case does not.
+# to clear the threshold, at 79 s, and it verifies nothing beyond what the N=4 case already establishes.
 _MAX_DEGREE = 400
 
 _TOEPLITZ_CASES = (
@@ -74,7 +74,7 @@ def _rel_l2(u: np.ndarray, ref: np.ndarray) -> float:
 
 @pytest.mark.parametrize("case_key", _TOEPLITZ_CASES)
 def test_generic_cases_are_toeplitz(case_key):
-    """Every case the two-scalar path was validated on must still take it."""
+    """Every case validated against the two-scalar path must continue to satisfy the Toeplitz predicate."""
     A, _, _, _ = _built(case_key, 8)
     assert is_toeplitz_tridiagonal(A)
 
@@ -123,8 +123,7 @@ def test_qsvt_solves_the_neumann_case():
     u = np.asarray(res.u, dtype=float)
 
     assert _rel_l2(u, u_classical) < 1e-4
-    # Having solved the right operator, the remaining error against the
-    # analytical solution is the mesh's, not the solver's.
+    # With the correct operator encoded, the residual error relative to the analytical solution reflects only the discretisation error, not the solver.
     assert _rel_l2(u, exact) == pytest.approx(_rel_l2(u_classical, exact),
                                               rel=1e-2)
 
@@ -140,7 +139,7 @@ def test_hhl_solves_the_neumann_case():
 
     N=4 only. The general `NumPyMatrix` evolution is dense, so N=8 costs 29 s
     against 1.1 s here and demonstrates nothing further — the surrogate was
-    wrong at every N, and one resolution pins that it no longer is.
+    wrong at every N, and one resolution is sufficient to establish that the defect is resolved.
     """
     from solvers.quantum.hhl_1d import hhl_solve_system
 
