@@ -202,8 +202,17 @@ COST_T8: dict[str, float] = {"thomas": 2.0e-5, "hhl": 1.36,
 # lower than the 2-D asymptote of 3, so the required QSVT degree is if
 # anything smaller than in 2-D.  d = ceil(13 kappa ln(kappa/eps)) gives ~135
 # at kappa=2, eps=0.01 - well under this cap at every N here.
+#
+# Every N the sweep may be asked for must appear here. A miss on .get(N) returns
+# None, which does not mean "no cap needed" but selects a different construction:
+# uncapped defers to pyqsp.PolyOneOverX.generate, targeting a prescribed epsilon,
+# where capped fits the truncated Chebyshev expansion of 1/x directly -- cheaper,
+# and at equal degree more accurate. An unlisted N degrades silently to the worse
+# path. N = 128 is listed so that a QSVT-only run at that resolution, which the
+# bounded kappa_line makes tractable when HHL and VQLS are long past their limit,
+# does not have to be preceded by an edit here.
 QSVT_MAX_DEGREE_3D: dict[int, Optional[int]] = {
-    4: None, 8: None, 16: None, 32: 500, 64: 500}
+    4: None, 8: None, 16: None, 32: 500, 64: 500, 128: 500}
 
 HHL_EPSILON_DEFAULT: float = 0.01
 

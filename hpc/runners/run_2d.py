@@ -202,8 +202,20 @@ COST_T8: dict[str, float] = {
 # QSVT polynomial degree caps.  kappa(A_row) stays ~2-3 on every grid and on
 # every multigrid level, so the required degree is modest; the cap is a safety
 # ceiling for the large-N runs rather than an accuracy control.
+#
+# Every N the sweep may be asked for must appear here. `_resolve` below reads the
+# table with .get(N), whose miss returns None -- and None does not mean "no cap
+# needed", it selects a DIFFERENT construction: `qsp_angles._target_reduced_coefs`
+# defers an uncapped request to pyqsp.PolyOneOverX.generate, which targets a
+# prescribed epsilon at cost O(kappa^2 log(kappa/epsilon)), where a capped request
+# fits the truncated Chebyshev expansion of 1/x directly and is both cheaper and,
+# at equal degree, more accurate. An unlisted N therefore degrades silently to the
+# slower and less accurate path. N = 128 and 256 are listed for that reason, not
+# because kappa_row grows: it is bounded above by 3 and the natural degree stays
+# near 72 at every resolution, which is precisely what makes QSVT the only solver
+# in this benchmark that can reach those meshes at all.
 QSVT_MAX_DEGREE_2D: dict[int, Optional[int]] = {
-    4: None, 8: None, 16: None, 32: 500, 64: 500,
+    4: None, 8: None, 16: None, 32: 500, 64: 500, 128: 500, 256: 500,
 }
 
 HHL_EPSILON_DEFAULT: float = 0.01
