@@ -89,6 +89,35 @@ _BAND_TOL = 1e-12
 
 # ── Public Interface ──────────────────────────────────────────────────────────
 
+def is_toeplitz_tridiagonal(A: np.ndarray) -> bool:
+    """
+    Whether A is exactly what a reconstruction from ``A[0,0]`` and ``A[0,1]`` gives.
+
+    That reconstruction requires two properties, and callers have historically
+    checked only the first: the matrix must carry no band beyond |i−j| ≤ 1, AND
+    each of those three diagonals must be constant. A tridiagonal operator with a
+    varying diagonal — a boundary-modified stencil such as the Neumann sub-case 3c
+    — is silently replaced by a uniform one, which is the same corruption as a
+    discarded ±2 band arriving by a different route.
+
+    Parameters
+    ----------
+    A : np.ndarray, shape (N, N)
+        Candidate operator.
+
+    Returns
+    -------
+    bool
+        True when the two-scalar fast path reproduces A to within `_BAND_TOL`
+        relative to max|A|; False when the dense encoding is required.
+    """
+    try:
+        assert_tridiagonal(A, "probe")
+    except ValueError:
+        return False
+    return True
+
+
 def assert_tridiagonal(A: np.ndarray, solver: str) -> None:
     """
     Rejects a matrix carrying any band beyond the tridiagonal.
@@ -140,6 +169,37 @@ def assert_tridiagonal(A: np.ndarray, solver: str) -> None:
             f"system solved. For the 4th-order pentadiagonal operator use the "
             f"order-4 solver ({solver.lower()}_4th), which block encodes A in full "
             f"via build_dense_block_encoding."
+        )
+
+    # Being within the band is necessary but not sufficient. The reconstruction
+    # is Toeplitz — one scalar per diagonal — so a tridiagonal matrix whose
+    # diagonals are not constant is corrupted just as completely as a wider
+    # stencil, and by exactly the same mechanism.
+    #
+    # This is not hypothetical. Sub-case 3c carries a Neumann row at x=0 whose
+    # halved form gives A[0,0] = -1 against -2 everywhere else. Reconstruction
+    # from A[0,0] therefore built tridiag(1, -1, 1) — a uniformly shifted
+    # operator, not the Neumann one — and HHL and QSVT solved that instead, at
+    # every N and every degree, returning ~100 % error against 3c's true
+    # solution while matching the surrogate's solution to machine precision.
+    # The band check above passes 3c cleanly, which is why this went unseen.
+    deviation = 0.0
+    for k in (-1, 0, 1):
+        diag = np.diag(A, k)
+        if diag.size > 1:
+            deviation = max(deviation,
+                            float(np.max(np.abs(diag - diag[0]))))
+
+    if deviation / scale > _BAND_TOL:
+        raise ValueError(
+            f"{solver} received a tridiagonal matrix that is not Toeplitz: "
+            f"max deviation along a diagonal / max|A| = {deviation / scale:.3e}. "
+            f"This code path reconstructs the operator from A[0,0] and A[0,1] "
+            f"alone, which assumes every diagonal is constant, so a varying "
+            f"diagonal would be silently replaced by its first entry and a "
+            f"different system solved. Boundary-modified operators such as the "
+            f"Neumann sub-case 3c fall here. Use build_dense_block_encoding, "
+            f"which encodes A in full at identical asymptotic cost."
         )
 
 

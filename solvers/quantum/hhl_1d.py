@@ -26,12 +26,15 @@ from quantum_linear_solvers.linear_solvers.hhl import HHL
 from quantum_linear_solvers.linear_solvers.matrices.tridiagonal_toeplitz import (
     TridiagonalToeplitz,
 )
+from quantum_linear_solvers.linear_solvers.matrices.numpy_matrix import (
+    NumPyMatrix,
+)
 from qiskit.quantum_info import Statevector
 
 from core.execution import default_executor, hhl_spec
 
 from problems.poisson_1d import PoissonProblem1D
-from solvers.quantum.block_encoding import assert_tridiagonal
+from solvers.quantum.block_encoding import is_toeplitz_tridiagonal
 from solvers.quantum.result import SolverResult
 
 
@@ -118,10 +121,18 @@ def hhl_solve_system(
     N = len(b)
 
     # ── Phase 0: Structural Precondition ──────────────────────────────────────
-    # `TridiagonalToeplitz` below is constructed from A[0,0] and A[0,1] only, so any
-    # wider band would be discarded without trace and a different system solved.
-    # Refuse rather than truncate; see `assert_tridiagonal`.
-    assert_tridiagonal(A, "HHL")
+    # `TridiagonalToeplitz` is constructed from A[0,0] and A[0,1] only, so any wider
+    # band -- or any diagonal that is not constant -- would be discarded without
+    # trace and a different system solved. Where that reconstruction is exact the
+    # Toeplitz operator is kept, because its Hamiltonian simulation is the
+    # structured one the published figures were produced with; where it is not, the
+    # general `NumPyMatrix` simulation encodes A in full.
+    #
+    # The distinction is not academic. Sub-case 3c's halved Neumann row gives
+    # A[0,0] = -1 against -2 elsewhere, so the reconstruction silently built a
+    # uniformly shifted operator and HHL returned ~100 % error at every N while
+    # appearing entirely healthy. See `is_toeplitz_tridiagonal`.
+    use_toeplitz = is_toeplitz_tridiagonal(A)
 
     # ── Phase 1: Spectral Normalisation ───────────────────────────────────────
     A_norm_factor = float(np.linalg.norm(A, ord=2))
@@ -135,19 +146,34 @@ def hhl_solve_system(
         )
 
     b_norm = b / b_norm_factor
-    a_norm = A[0, 0] / A_norm_factor       # Principal diagonal of normalised A
-    b_off  = A[0, 1] / A_norm_factor       # Off-diagonal of normalised A
 
     # ── Phase 2: Operator Construction ────────────────────────────────────────
     num_qubits    = int(np.log2(N))
     trotter_steps = max(1, int(np.ceil(1.0 / epsilon)))
 
-    matrix = TridiagonalToeplitz(
-        num_state_qubits=num_qubits,
-        main_diag=a_norm,
-        off_diag=b_off,
-        trotter_steps=trotter_steps,
-    )
+    if use_toeplitz:
+        a_norm = A[0, 0] / A_norm_factor   # Principal diagonal of normalised A
+        b_off  = A[0, 1] / A_norm_factor   # Off-diagonal of normalised A
+        matrix = TridiagonalToeplitz(
+            num_state_qubits=num_qubits,
+            main_diag=a_norm,
+            off_diag=b_off,
+            trotter_steps=trotter_steps,
+        )
+    else:
+        # `NumPyMatrix` exponentiates the supplied operator directly rather than
+        # exploiting a banded structure, so it accepts any Hermitian A at the cost
+        # of a denser evolution circuit. A is normalised by ‖A‖₂ exactly as in the
+        # Toeplitz branch, so every downstream stage -- the QPE register sizing, the
+        # post-selection, the proportionality recovery below -- is unchanged.
+        #
+        # It exposes `tolerance` where TridiagonalToeplitz exposes `trotter_steps`;
+        # the two are the same knob seen from opposite ends, since the Toeplitz
+        # branch derives its step count as n_T = ceil(1/epsilon). Passing epsilon
+        # directly keeps the two branches driven by one parameter. `evolution_time`
+        # is left at the shared default of 1.0 rather than restated, so the branches
+        # cannot drift apart on a value neither of them varies.
+        matrix = NumPyMatrix(A / A_norm_factor, tolerance=epsilon)
 
     # ── Phase 3: Algorithm Execution ──────────────────────────────────────────
     hhl = HHL()

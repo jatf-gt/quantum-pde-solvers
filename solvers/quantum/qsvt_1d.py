@@ -98,6 +98,7 @@ from solvers.quantum.block_encoding import (
     assert_tridiagonal,
     build_dense_block_encoding,
     build_tst_block_encoding,
+    is_toeplitz_tridiagonal,
     _N_ANCILLA_BE,
 )
 from solvers.quantum.qsp_angles import (
@@ -201,7 +202,7 @@ def qsvt_solve_system(
     A        : np.ndarray,
     b        : np.ndarray,
     config   : QSVTConfig1D = DEFAULT_QSVT_CONFIG,
-    encoding : str = "tst",
+    encoding : str = "auto",
 ) -> QSVTSolverResult:
     """
     Solve the linear system Au = b using QSVT on raw NumPy arrays.
@@ -220,13 +221,20 @@ def qsvt_solve_system(
         Right-hand side vector.
     config : QSVTConfig1D
         Solver hyperparameters.
-    encoding : {"tst", "dense"}
+    encoding : {"auto", "tst", "dense"}
         Which block-encoding constructor to use.
 
-        ``"tst"`` (default) rebuilds the operator from ``A[0,0]`` and ``A[0,1]``.
-        Retained as the default because it reproduces the published 2nd-order
-        figures bit-for-bit, and guarded by `assert_tridiagonal` so that a wider
-        stencil raises instead of being silently truncated.
+        ``"auto"`` (default) selects ``"tst"`` when A is a Toeplitz tridiagonal
+        matrix and ``"dense"`` otherwise. Every operator the 2nd-order sweep was
+        previously run on is Toeplitz, so this reproduces the published figures
+        bit-for-bit while extending the solver to boundary-modified operators —
+        the Neumann sub-case 3c above all, whose halved row gives A[0,0] = −1
+        against −2 elsewhere and which the ``"tst"`` path silently replaced with a
+        uniformly shifted surrogate.
+
+        ``"tst"`` rebuilds the operator from ``A[0,0]`` and ``A[0,1]``, and is
+        guarded by `assert_tridiagonal` so that a wider stencil, or a diagonal
+        that is not constant, raises instead of being silently truncated.
 
         ``"dense"`` block encodes A in full via `build_dense_block_encoding`, at
         identical asymptotic cost. Required for the 4th-order pentadiagonal
@@ -254,9 +262,9 @@ def qsvt_solve_system(
         If phase angle computation fails or solution extraction yields
         an all-zero vector.
     """
-    if encoding not in ("tst", "dense"):
+    if encoding not in ("auto", "tst", "dense"):
         raise ValueError(
-            f"encoding must be 'tst' or 'dense', received {encoding!r}.")
+            f"encoding must be 'auto', 'tst' or 'dense', received {encoding!r}.")
     N = len(b)
     n = int(np.log2(N))
 
@@ -303,11 +311,22 @@ def qsvt_solve_system(
     eigs_for_alpha = np.linalg.eigvalsh(A)
     alpha          = float(np.max(np.abs(eigs_for_alpha)))
 
+    if encoding == "auto":
+        # The two-scalar reconstruction is exact only for a Toeplitz tridiagonal
+        # operator. Where it is not applicable, falling back to the dense encoding
+        # is strictly better than refusing: it costs the same asymptotically and
+        # leaves every downstream stage untouched, since alpha is computed from the
+        # eigenvalues of the supplied A either way. Operators that ARE Toeplitz keep
+        # the "tst" path, so the published 2nd-order figures still reproduce
+        # bit-for-bit.
+        encoding = "tst" if is_toeplitz_tridiagonal(A) else "dense"
+
     if encoding == "dense":
         be_circuit, alpha_check = build_dense_block_encoding(A)
     else:
-        # Given A[0,0] and A[0,1] only, so any wider band would be discarded
-        # without trace and a different system solved. Refuse rather than truncate.
+        # Given A[0,0] and A[0,1] only, so any wider band -- or any diagonal that
+        # is not constant -- would be discarded without trace and a different
+        # system solved. Refuse rather than truncate.
         assert_tridiagonal(A, "QSVT")
         be_circuit, alpha_check = build_tst_block_encoding(
             N, float(A[0, 0]), float(A[0, 1]))
