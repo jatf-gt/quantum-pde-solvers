@@ -47,14 +47,14 @@
 #  uncapped run is recorded as the tag `d-1`. run_1d.py asks for the cap given by
 #  QSVT_MAX_DEGREE_BY_N at the resolution being solved:
 #
-#      N = 4, 8       ->  None   ->  tag d-1     (uncapped)
-#      N = 16, 32, 64 ->  5000   ->  tag d5000
+#      N = 4, 8       ->  None   ->  tag d-1      (uncapped)
+#      N = 16, 32, 64 ->  14999  ->  tag d14999
 #
 #  At order 2 the boundary sits one resolution higher, N=16 being uncapped
 #  there: the pentadiagonal operator crosses the solver's degree limit first.
 #
 #  run_2d.py and run_3d.py do the same through QSVT_MAX_DEGREE_{2D,3D}, whose cap
-#  above N=16 is 500 rather than 5000. The guard reads whichever table applies to
+#  above N=16 is 500 rather than 14999. The guard reads whichever table applies to
 #  DIM rather than restating any of them here.
 #
 #  Passing --max-degree 5000 at N = 4, 8 or 16 therefore writes an entry under a
@@ -265,7 +265,7 @@ mkdir -p results/qsvt_phase_cache
 
 DIM="${DIM:-1}"
 # Every default stops at N=16. The runners cap the QSVT degree above that
-# (QSVT_MAX_DEGREE_* switches from None to 5000 in 1-D, 500 in 2-D/3-D), the cap
+# (QSVT_MAX_DEGREE_* switches from None to 14999 in 1-D, 500 in 2-D/3-D), the cap
 # is part of the cache key, and one invocation writes one tag -- so a default
 # spanning the boundary would abort on the guard every time it was run without
 # arguments. N >= 32 is a deliberate second stage; see Usage.
@@ -377,8 +377,8 @@ if mismatched:
     print("  the phases inline, at whatever degree its own fallback allows, having")
     print("  ignored this entire computation.")
     print()
-    print("  Fix: match MAX_DEGREE to the runner's table over the N in scope --")
-    print("  1-D: unset for N <= 16, 5000 for N >= 32.")
+    print(f"  Fix: match MAX_DEGREE to the runner's table over the N in scope --")
+    print("  1-D order-4: unset for N <= 8 (uncapped), 14999 for N >= 16.")
     print("  2-D/3-D: unset for N <= 16, 500 for N >= 32.")
     print("  Capped and uncapped resolutions cannot share one invocation.")
     sys.exit(1)
