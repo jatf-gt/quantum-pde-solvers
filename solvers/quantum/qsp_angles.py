@@ -51,10 +51,26 @@ solver's basin of attraction; it is worse than doing nothing.
 
 Iteration count is essentially degree-independent for this problem (5–6
 iterations from degree ~500 to ~4000 in the logged runs, and the same 6 at
-degree 1181), so there is no iteration count left to save. What does grow with
-degree is the per-iteration cost (`gen_jacobian`, ~O(d^2.5) empirically) and the
-memory (O(d²)), neither of which a warm start addresses. Capping `max_degree` is
-the only lever that helps at large κ; see below.
+degree 1181) **when using the uncapped PolyOneOverX.generate() path**. What
+does grow with degree is the per-iteration cost (`gen_jacobian`, ~O(d^2.5)
+empirically) and the memory (O(d²)). Capping `max_degree` is the only lever
+that helps at large κ; see below.
+
+CRITICAL: the 5–6 iteration claim does NOT extend to the capped path
+(`_fit_capped_reduced_coefs`). PolyOneOverX.generate() returns a polynomial
+that is analytically guaranteed to satisfy the QSP realizability conditions,
+placing the coef/2 initial guess in the Newton basin of attraction. The capped
+Chebyshev least-squares fit carries no such guarantee. At degree/κ < 11 (the
+accuracy degradation threshold documented in session notes §3) the approximation
+is too poor to produce a useful initial guess, and Newton diverges or oscillates
+rather than converging. At degree=14999 each Newton iteration costs ~12–23 min
+(empirically, from CX3 timing of N=16/32 at the same degree), so maxiter=100
+non-converging iterations amounts to 20–38 h per epsilon, all before a single
+cache file is written. This is the root cause of the N=64 order-4 precompute
+hanging without output. The fix is stagnation-based early stopping in
+`_newton_solve` (patience=5 for the capped path): exits in at most 6 non-
+improving steps, matching the normal convergence iteration count and capping
+the per-epsilon cost at ~2 h rather than ~38 h.
 
 Degree capping
 --------------
@@ -388,11 +404,12 @@ def _target_reduced_coefs(
 
 
 def _newton_solve(
-    reduced_coefs      : np.ndarray,
-    parity             : int,
-    crit               : float = 1e-12,
-    maxiter            : int   = 100,
-    init_reduced_phases: Optional[np.ndarray] = None,
+    reduced_coefs       : np.ndarray,
+    parity              : int,
+    crit                : float = 1e-12,
+    maxiter             : int   = 100,
+    init_reduced_phases : Optional[np.ndarray] = None,
+    stagnation_patience : int   = 8,
 ) -> tuple[np.ndarray, float, int]:
     """
     Reimplementation of pyqsp.sym_qsp_opt.newton_solver's loop, but with
@@ -401,7 +418,44 @@ def _newton_solve(
     SymmetricQSPProtocol throughout, so full-phase reconstruction is
     always pyqsp's own (correct) implementation -- never hand-rolled.
 
-    Returns (full_phases, final_err, n_iter).
+    Parameters
+    ----------
+    reduced_coefs : np.ndarray
+        Parity-folded Chebyshev coefficients of the target polynomial.
+    parity : int
+        Parity of the target polynomial (0 = even, 1 = odd).
+    crit : float
+        Convergence criterion on the L1 residual norm.
+    maxiter : int
+        Hard upper bound on Newton iterations.
+    init_reduced_phases : np.ndarray or None
+        Initial guess for the reduced phase sequence. Defaults to
+        ``reduced_coefs / 2``, the same starting point used by pyqsp's
+        own newton_solver and shown to converge in 5–6 iterations for
+        polynomials produced by PolyOneOverX.generate().
+    stagnation_patience : int
+        Maximum number of consecutive iterations for which the L1
+        residual does not strictly improve before the solver exits early.
+        For quadratic Newton convergence (error reducing by ~100× per
+        step) this threshold is never reached. For the capped-path case
+        where the polynomial approximation is in the degradation regime
+        (degree / κ < 11), the solve may diverge or oscillate; the
+        patience cap prevents the worst-case 100-iteration catastrophe
+        (~38 h at degree 14999) by exiting after a handful of
+        non-improving steps. Set to ``maxiter`` to disable.
+
+    Returns
+    -------
+    best_phases : np.ndarray
+        Full phase angles corresponding to the iteration with the lowest
+        residual seen during the solve. Returning the *best-seen* rather
+        than the *final* phases means that a diverging Newton step cannot
+        corrupt the result beyond what was achieved at the best iterate.
+    best_err : float
+        L1 residual at ``best_phases``.
+    n_iter : int
+        Total number of Newton iterations executed (including post-best
+        iterations that triggered the stagnation exit).
     """
     from pyqsp.sym_qsp_opt import SymmetricQSPProtocol
 
@@ -411,25 +465,65 @@ def _newton_solve(
     qsp = SymmetricQSPProtocol(reduced_phases=init_reduced_phases, parity=parity)
     curr_iter = 0
     err = float("inf")
+
+    # Track the best residual and corresponding phases seen across all
+    # iterations. A diverging Newton step may leave qsp.full_phases in a
+    # worse state than a prior iterate; returning the best-seen phases
+    # ensures the caller always receives the most accurate result found.
+    best_err    = float("inf")
+    best_phases = np.asarray(qsp.full_phases, dtype=float).copy()
+    stall_count = 0
+
     while True:
         Fval, DFval = qsp.gen_jacobian()
         res = Fval - reduced_coefs
         err = float(np.linalg.norm(res, ord=1))
         curr_iter += 1
+
+        if err < best_err:
+            best_err    = err
+            best_phases = np.asarray(qsp.full_phases, dtype=float).copy()
+            stall_count = 0
+        else:
+            stall_count += 1
+
         lin_sol = np.linalg.solve(DFval, res)
         qsp.update_reduced_phases(qsp.reduced_phases - lin_sol)
-        if curr_iter >= maxiter or err < crit:
+
+        if curr_iter >= maxiter or best_err < crit or stall_count >= stagnation_patience:
             break
-    return qsp.full_phases, err, curr_iter
+
+    return best_phases, best_err, curr_iter
 
 
 def _compute(
     kappa: float, epsilon: float, max_degree: Optional[int],
 ) -> tuple[np.ndarray, int]:
-    """Solve for the QSP phases at the given (possibly capped) degree."""
+    """
+    Solve for the QSP phases at the given (possibly capped) degree.
+
+    The stagnation patience passed to the Newton solver is set tighter
+    for the capped path (max_degree is not None) than for the uncapped
+    path.  The uncapped path uses PolyOneOverX.generate(), whose output
+    is analytically guaranteed to satisfy the QSP realizability
+    conditions and always converges in 5–6 iterations from the
+    coef/2 initial guess.  The capped path fits the polynomial via
+    least-squares and carries no such guarantee; at degree/κ < 11 the
+    fit quality is poor and the Newton solve may diverge or oscillate
+    rather than converge, running all maxiter=100 iterations at
+    ~12–23 min each (empirically, from degree-14999 timing on CX3).
+    A patience of 5 exits in at most 5+1 non-improving steps -- the
+    same count at which quadratic convergence has already reached
+    machine precision -- capping the per-epsilon cost at ~2 h rather
+    than ~38 h.
+    """
     reduced_coefs, parity, degree = _target_reduced_coefs(kappa, epsilon, max_degree)
 
-    full_phases, err, n_iter = _newton_solve(reduced_coefs, parity)
+    # Tighter stagnation budget for the capped (approximate) path.
+    stagnation_patience = 5 if max_degree is not None else 8
+    full_phases, err, n_iter = _newton_solve(
+        reduced_coefs, parity, stagnation_patience=stagnation_patience,
+    )
 
     if err > 1e-8:
         warnings.warn(
