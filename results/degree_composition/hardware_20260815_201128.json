@@ -1,0 +1,57 @@
+{
+  "timestamp_utc": "2026-08-15T20:11:28.916104+00:00",
+  "hardware": true,
+  "backend": "ibm_kingston",
+  "Nx": 4,
+  "kappa_row": 2.3585701736362874,
+  "shots": 2048,
+  "resilience_level": 1,
+  "rows": [
+    {
+      "degree": 0,
+      "two_qubit_gates": 0,
+      "transpiled_depth": 3,
+      "fidelity": 1.0141483926060404,
+      "fidelity_std_err": 0.0037648459378874094,
+      "job_id": "da0c7350vrcc73bq9lg0",
+      "quantum_seconds": null
+    },
+    {
+      "degree": 1,
+      "two_qubit_gates": 37,
+      "transpiled_depth": 154,
+      "fidelity": 0.921846405331723,
+      "fidelity_std_err": 0.006049690938514334,
+      "job_id": "da0c8q0b1g9c73a9m16g",
+      "quantum_seconds": null
+    },
+    {
+      "degree": 3,
+      "two_qubit_gates": 111,
+      "transpiled_depth": 443,
+      "fidelity": 0.7920585994952467,
+      "fidelity_std_err": 0.006457608918183359,
+      "job_id": "da0cavf2sl0c73bmu51g",
+      "quantum_seconds": null
+    },
+    {
+      "degree": 5,
+      "two_qubit_gates": 185,
+      "transpiled_depth": 738,
+      "fidelity": 0.6520388067552476,
+      "fidelity_std_err": 0.007565139196533486,
+      "job_id": "da0cbbgb1g9c73a9m3lg",
+      "quantum_seconds": null
+    },
+    {
+      "degree": 7,
+      "two_qubit_gates": 259,
+      "transpiled_depth": 1027,
+      "fidelity": 0.49470073708719237,
+      "fidelity_std_err": 0.0075080228926255885,
+      "job_id": "da0cdi7o3ppc73alb1f0",
+      "quantum_seconds": null
+    }
+  ],
+  "total_quantum_seconds": 0.0
+}

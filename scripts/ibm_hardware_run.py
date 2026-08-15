@@ -363,7 +363,7 @@ def main() -> None:
     path = args.out / f"{tag}_{record['job_id'][:8]}.json"
     path.write_text(json.dumps(record, indent=2))
     print(f"\nSaved: {path}")
-    print("\nNext: feed this delta into the outer-scheme analysis --")
+    print("\nNext step: feeding this delta into the outer-scheme analysis --")
     print(f"  python scripts/delta_amplification_hardware.py "
           f"--delta {record['delta']:.4f}")
 
