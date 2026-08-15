@@ -1105,16 +1105,16 @@ register(Case(
 # exact and closed-form, and the discrete Poisson solve is expected to
 # reproduce phi to O(h^2).
 #
-# Read directly off Fig. 5(a): the transition centres close to x = 3.5 cm out
+# Extracted from Fig. 5(a): the transition centres near x = 3.5 cm out
 # of d = 4 cm (x-tilde = 0.875), consistent with the independently stated
 # ionisation-zone location, "the maximum ion production occurs at x ~ 3 cm,
-# i.e., the entrance to the acceleration region" (p. 3547) sitting just
-# upstream of it, and the peak field is ~2-2.5e4 V/m. The logistic width
-# below (w = 0.054) is chosen to hit that peak field magnitude; this is not a
-# least-squares fit to pixel data extracted from the scan, since the paper's
-# own authors note that "it is difficult to exhibit meaningful quantitative
-# comparisons" (p. 3547) for exactly this reason — the fit is anchored to the
-# figure's reported shape and the peak-field order of magnitude, not to
+# i.e., the entrance to the acceleration region" (p. 3547) located immediately
+# upstream, and the peak field is ~2-2.5e4 V/m. The logistic width
+# below (w = 0.054) is chosen to match that peak field magnitude; this is not a
+# least-squares fit to pixel data extracted from the scan, since the original
+# authors state that "it is difficult to exhibit meaningful quantitative
+# comparisons" (p. 3547) due to data extraction limits. The fit is anchored to the
+# figure's reported shape and the peak-field order of magnitude, rather than
 # individually digitised points.
 #
 # One consequence of the fit is not a defect: phi(x-tilde=1) comes out to

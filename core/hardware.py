@@ -475,9 +475,9 @@ def hardware_estimate_batch(
         backend_name      = context.backend.name,
         backend_version   = _backend_version(context.backend),
         is_local_testing  = context.is_local_testing,
-        # None in local-testing mode: the option genuinely has no effect
-        # there (see HardwareContext.estimator), so recording the
-        # configured value would misrepresent what actually happened.
+        # Assigned None during local-testing mode: this configuration option
+        # is non-functional in that context (see HardwareContext.estimator),
+        # hence recording a nominal value would misrepresent execution conditions.
         resilience_level  = None if context.is_local_testing else context.resilience_level,
         shots             = shots,
         wall_time_s       = wall_time,

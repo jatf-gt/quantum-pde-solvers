@@ -13,17 +13,16 @@ not one noisy executor trying to do both at once:
 *   **Gate noise** (this module's ``NoiseExecutor``) is modelled via Aer's
     ``density_matrix`` simulation method with a ``NoiseModel`` attached. This
     computes the *exact* mixed state reachable under the given noise
-    channel — no shot variance, no sampling error. It answers "how much does
-    the *algorithm's output* degrade at this error rate", cleanly separated
-    from "how many shots would I need". This is the right tool for the
-    parametric depolarising sweep and for a fake-backend (real calibration
-    data) comparison.
+    channel — no shot variance, no sampling error. It formally addresses the
+    sensitivity of the algorithm's output to a prescribed error rate, decoupled
+    from sampling overhead. This mechanism underpins the parametric depolarising
+    sweep and fake-backend (real calibration data) comparisons.
 
 *   **Shot statistics** (this module's ``sample_postselection``) is modelled
-    via genuine measurement and repeated shots. It answers "how many runs
-    does it actually take to get one accepted sample", which is a sampling
-    question with no meaningful "exact" answer — the whole point is the
-    variance. This is the right tool for the HHL 1/κ² shot-overhead study.
+    via genuine measurement and repeated shots. It rigorously quantifies the
+    execution overhead required to yield an accepted sample, fundamentally
+    evaluating statistical variance rather than an exact expectation value.
+    This mechanism underpins the HHL 1/κ² shot-overhead study.
 
 Solution-vector reconstruction under noise, and its real limitation
 ---------------------------------------------------------------------

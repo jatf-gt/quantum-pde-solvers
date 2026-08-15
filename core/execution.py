@@ -10,17 +10,17 @@ prescribed state. Until now that final step was performed inline in two
 places — ``hhl_1d._extract_solution`` and ``qsvt_1d._extract_solution`` —
 each calling ``Statevector(circuit).data`` directly and slicing the result.
 
-Exact statevector slicing is the correct thing to do on a simulator and it
-is what every number in the thesis baseline rests on. It is, however, not a
-thing a quantum computer can do. On hardware the same operation becomes:
+Exact statevector slicing is optimal for classical simulation and forms the basis
+for all baseline results in the thesis. It is, however, physically unrealisable on
+quantum hardware. On physical devices, the equivalent operation is:
 
     prepare → measure ancillas → discard shots that failed post-selection
             → reconstruct the surviving data-register amplitudes by tomography
 
-which is a different computation with a different cost and a different error
-model. This module names that operation once, so that the simulator and the
-device are two implementations of a single interface rather than two
-unrelated code paths.
+This represents a distinct computational process with associated costs and error
+models. This module abstracts the operation, enabling the simulator and the
+device to act as two implementations of a unified interface rather than
+independent code paths.
 
 The post-selection seam
 -----------------------
