@@ -26,37 +26,56 @@ from conftest import HHL_REL_ERROR_TOL, VQLS_REL_ERROR_TOL, VQLS_COST_TOL
 class TestHETConfig:
 
     def test_debye_length_formula(self, het_cfg_N4_linear_hom):
-        """λ_D = sqrt(ε_0 k_B T_e / (e² n_0)) — verify against manual calc."""
+        """
+        Validates the analytical derivation of the Debye length against physical parameters.
+        
+        Confirms λ_D = sqrt(ε_0 k_B T_e / (e² n_0)).
+        """
         cfg   = het_cfg_N4_linear_hom
         T_e_J = cfg.T_e_eV * EV_TO_J
         expected_lambda_D = np.sqrt(EPS_0 * T_e_J / (E_CHARGE**2 * cfg.n_0))
         assert cfg.lambda_D == pytest.approx(expected_lambda_D, rel=1e-8)
 
     def test_alpha_formula(self, het_cfg_N4_linear_hom):
-        """α = (L/λ_D)² — verify."""
+        """
+        Ensures the non-dimensional scaling parameter α is computed accurately.
+        
+        Confirms α = (L/λ_D)².
+        """
         cfg = het_cfg_N4_linear_hom
         expected_alpha = (cfg.L / cfg.lambda_D)**2
         assert cfg.alpha == pytest.approx(expected_alpha, rel=1e-8)
 
     def test_phi_0_equals_T_e_eV(self, het_cfg_N4_linear_hom):
-        """φ_0 = k_B T_e / e = T_e [eV] in volts."""
+        """
+        Confirms that the base potential normalization correctly aligns with the electron temperature.
+        
+        Evaluates φ_0 = k_B T_e / e = T_e [eV] in volts.
+        """
         cfg = het_cfg_N4_linear_hom
         assert cfg.phi_0 == pytest.approx(cfg.T_e_eV, rel=1e-8)
 
     def test_alpha_bc_formula(self):
-        """α_bc = V_discharge / φ_0."""
+        """
+        Validates the normalization of the boundary condition scalar against the characteristic potential.
+        
+        Checks α_bc = V_discharge / φ_0.
+        """
         cfg = HETConfig(N=4, epsilon=0.01, rho_profile="linear",
                         V_discharge=300.0, T_e_eV=20.0)
         assert cfg.alpha_bc == pytest.approx(300.0 / 20.0, rel=1e-8)
 
     def test_homogeneous_bc_gives_zero_alpha_bc(self, het_cfg_N4_linear_hom):
+        """Ensures that homogeneous boundary conditions translate correctly to a null boundary forcing term."""
         assert het_cfg_N4_linear_hom.alpha_bc == pytest.approx(0.0, abs=1e-10)
 
     def test_invalid_N_raises(self):
+        """Confirms that spatial resolutions not conforming to power-of-two requirements induce failure."""
         with pytest.raises(ValueError, match="power of 2"):
             HETConfig(N=5, epsilon=0.01, rho_profile="linear")
 
     def test_invalid_T_e_raises(self):
+        """Validates error emission upon instantiation with physically invalid electron temperature inputs."""
         with pytest.raises(ValueError, match="T_e_eV"):
             HETConfig(N=4, epsilon=0.01, rho_profile="linear", T_e_eV=-1.0)
 
@@ -64,17 +83,24 @@ class TestHETConfig:
 class TestHETPoissonProblem1D:
 
     def test_matrix_is_tst(self, het_problem_N4_linear):
-        """HET matrix must be the same TST as the generic Poisson matrix."""
+        """
+        Validates that the discrete operator correctly assembles as a tridiagonal symmetric Toeplitz matrix.
+        
+        Confirms parity with the generic Poisson differential operator.
+        """
         A = het_problem_N4_linear.A
         assert np.allclose(np.diag(A),    -2.0)
         assert np.allclose(np.diag(A, 1),  1.0)
         assert np.allclose(np.diag(A, -1), 1.0)
 
     def test_rhs_length(self, het_problem_N4_linear):
+        """Ensures that the assembled source vector aligns with the interior domain degrees of freedom."""
         assert len(het_problem_N4_linear.b) == 4
 
     def test_kappa_matches_generic_poisson(self, het_problem_N4_linear):
-        """κ(A) must match the generic 1D Poisson matrix (same TST)."""
+        """
+        Confirms that the condition number scales identically to the generic Poisson baseline.
+        """
         from core.config import SimConfig1D
         from problems.poisson_1d import PoissonProblem1D
         prob_generic = PoissonProblem1D(SimConfig1D(N=4, epsilon=0.01, source_fn="fS"))
@@ -83,7 +109,9 @@ class TestHETPoissonProblem1D:
         )
 
     def test_analytical_solution_satisfies_bcs(self, het_problem_N4_linear):
-        """Analytical solution must satisfy u(0)=u(1)=0 for homogeneous BCs."""
+        """
+        Validates the formal compliance of the analytical reference solution against imposed boundary domains.
+        """
         u_exact = het_problem_N4_linear.analytical_solution()
         assert u_exact is not None
         # The analytical solution is evaluated at interior nodes.
@@ -99,8 +127,9 @@ class TestHETPoissonProblem1D:
 
     def test_analytical_solution_satisfies_pde(self, het_problem_N4_linear):
         """
-        Thomas solution of the discretised system must match the analytical
-        solution to O(h²) accuracy.
+        Ensures the discrete numerical solution converges asymptotically towards the analytical truth.
+        
+        Checks that second-order finite difference formulations match continuous results to O(h²).
         """
         prob    = het_problem_N4_linear
         u_exact = prob.analytical_solution()
@@ -110,11 +139,11 @@ class TestHETPoissonProblem1D:
         assert max_err < 0.1, f"Thomas vs analytical: max_err={max_err:.4f}"
 
     def test_no_analytical_solution_for_gaussian(self, het_problem_N4_gaussian):
-        """Gaussian profile has no closed-form solution — must return None."""
+        """Confirms the correct absence of closed-form representations for complex density profiles."""
         assert het_problem_N4_gaussian.analytical_solution() is None
 
     def test_no_analytical_solution_for_nonzero_bc(self):
-        """Non-zero BCs: analytical solution not implemented — returns None."""
+        """Validates that non-homogeneous boundary instances correctly suppress analytical baseline expectations."""
         cfg  = HETConfig(N=4, epsilon=0.01, rho_profile="linear",
                          V_discharge=300.0)
         prob = HETPoissonProblem1D(cfg)
@@ -124,7 +153,9 @@ class TestHETPoissonProblem1D:
 class TestHETPhysicalProblem:
 
     def test_density_profile_bounds(self, het_physical_problem_N4):
-        """Density profile must lie in [n_min, 1.0]."""
+        """
+        Ensures that generated physical density profiles remain strictly bounded within expected normalized limits.
+        """
         cfg = het_physical_problem_N4.config
         n   = het_physical_problem_N4.n_profile
         assert np.all(n >= cfg.n_min - 1e-10)
@@ -132,8 +163,9 @@ class TestHETPhysicalProblem:
 
     def test_delta_0_physically_small(self, het_physical_cfg_N4):
         """
-        δ_0 must be of order 1/α to ensure the space charge is a small
-        perturbation on the applied voltage.  Check α·δ_0 << α_bc.
+        Validates the perturbative scale of space charge relative to the primary potential discharge.
+        
+        Confirms that the background plasma contributes modestly compared to the imposed boundary potential.
         """
         cfg = het_physical_cfg_N4
         space_charge_contribution = cfg.alpha * cfg.delta_0
@@ -143,6 +175,7 @@ class TestHETPhysicalProblem:
         )
 
     def test_electric_field_shape(self, het_physical_problem_N4):
+        """Confirms that electric field extraction maps robustly to the spatial domain configuration."""
         prob    = het_physical_problem_N4
         u_dummy = np.zeros(prob.config.N)
         x_full, E = prob.electric_field(u_dummy)
@@ -151,8 +184,7 @@ class TestHETPhysicalProblem:
 
     def test_electric_field_order_of_magnitude(self, het_physical_problem_N4):
         """
-        Peak electric field should be of order V_d/L for a near-linear
-        potential profile.  Check it is within a factor of 5 of V_d/L.
+        Ensures that computed electric field gradients align reasonably with anticipated macro-scale bounds.
         """
         prob     = het_physical_problem_N4
         cfg      = prob.config
@@ -174,6 +206,7 @@ class TestHETSolverCompatibility:
     """
 
     def test_hhl_runs_on_het_linear(self, het_problem_N4_linear):
+        """Validates that the HHL formulation reliably produces finite results on HET structures."""
         prob = het_problem_N4_linear
         u, _, c = hhl_solve_system(prob.A, prob.b, prob.config.epsilon)
         assert u.shape == (4,)
@@ -181,6 +214,7 @@ class TestHETSolverCompatibility:
         assert np.all(np.isfinite(u))
 
     def test_hhl_agrees_with_thomas_on_het(self, het_problem_N4_linear):
+        """Confirms relative congruity between quantum linear solving and classical reference targets."""
         prob     = het_problem_N4_linear
         u_thomas = thomas_solve_system(prob.A, prob.b)
         u_hhl, _, _ = hhl_solve_system(prob.A, prob.b, prob.config.epsilon)
@@ -190,6 +224,7 @@ class TestHETSolverCompatibility:
         )
 
     def test_vqls_runs_on_het_linear(self, het_problem_N4_linear, vqls_cfg_fast):
+        """Validates continuous operation and structural soundness of the VQLS workflow on HET matrices."""
         prob = het_problem_N4_linear
         r    = vqls_solve_system(prob.A, prob.b, vqls_cfg_fast)
         assert r.u.shape == (4,)
@@ -197,6 +232,7 @@ class TestHETSolverCompatibility:
         assert np.all(np.isfinite(r.u))
 
     def test_vqls_cost_converges_on_het(self, het_problem_N4_linear, vqls_cfg_fast):
+        """Ensures that variational cost topologies accurately decay within prescribed structural parameters."""
         prob = het_problem_N4_linear
         r    = vqls_solve_system(prob.A, prob.b, vqls_cfg_fast)
         assert r.final_cost < VQLS_COST_TOL, (

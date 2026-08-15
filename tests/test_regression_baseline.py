@@ -134,9 +134,10 @@ def _provenance() -> Dict[str, Any]:
 
 # -- Canonical cases -----------------------------------------------------------
 #
-# Deliberately small. This suite must run in the time a person will actually
-# wait for, or it stops being run and stops protecting anything. Broader
-# coverage belongs in the benchmark scripts; this is a tripwire.
+# Deliberately restricted in scale. This suite is calibrated to execute within
+# a latency bound acceptable for pre-commit verification; if it exceeds this,
+# it loses utility as an active safeguard. Comprehensive coverage belongs in
+# the benchmark scripts; this serves exclusively as an integration tripwire.
 
 CASES_1D = [
     # (case_id, N, source_fn, solver)
@@ -196,6 +197,10 @@ def _maybe_float(v):
                          ids=[c[0] for c in CASES_1D])
 def test_1d_solver_output_unchanged(case_id, N, source_fn, solver,
                                     baseline, updating, record_property):
+    """
+    Validates that the 1D solver output remains consistent with the established baseline.
+    Ensures structural quantities remain exact while permitting bounded stochastic variation for VQLS algorithms.
+    """
     actual = _solve_1d(N, source_fn, solver)
 
     if updating:
@@ -246,7 +251,7 @@ def test_1d_solver_output_unchanged(case_id, N, source_fn, solver,
 #
 # Transcribed from logged runs predating this file. They pin the legacy Jacobi
 # path, which the 2026-08-07 outer-solver rewrite was required to reproduce
-# exactly, and they are the reason we know that rewrite was safe.
+# identically, confirming the structural safety of that refactoring.
 
 EXPECTED_OUTER = {
     #  N : (iterations, final_delta, tol)
@@ -259,11 +264,8 @@ EXPECTED_OUTER = {
 @pytest.mark.parametrize("N", sorted(EXPECTED_OUTER))
 def test_legacy_jacobi_iteration_count_unchanged(N):
     """
-    The legacy Jacobi outer loop must still terminate where it always did.
-
-    Iteration count is a sharper instrument than solution error here: it is an
-    integer, so it cannot drift quietly, and it responds to any change in the
-    stopping test, the strip ordering or the update rule.
+    Validates that the legacy Jacobi outer loop terminates at the historical iteration count.
+    Iteration count provides a discrete measure that is highly sensitive to changes in the stopping criterion, strip ordering, or update rule.
     """
     from solvers.outer import solve
     from problems.poisson_line_2d import PoissonLine2D

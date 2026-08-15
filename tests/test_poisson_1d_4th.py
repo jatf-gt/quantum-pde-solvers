@@ -96,19 +96,17 @@ class TestOrderOfConvergence:
 
     def test_sinusoid_homogeneous(self):
         """
-        The historical regression case: odd about both boundaries.
-
-        This one passed even with the defective closure, so it is pinned to
-        guard against a fix that trades the boundary rows for the interior.
+        Validates the convergence rate on a sinusoid homogeneous about both boundaries.
+        Ensures that the historically successful regression case is not compromised by
+        corrections to the boundary rows.
         """
         assert _observed_order(_f_sin, _u_sin, 0.0, 0.0) == pytest.approx(4.0, abs=0.15)
 
     def test_cubic_isolates_the_boundary_closure(self):
         """
-        The five-point stencil is exact on cubics, so the *only* possible source
-        of error is the boundary closure. The defective implementation returned
-        second order here; a correct closure must return the exact solution to
-        round-off.
+        Confirms the exactness of the boundary closure by evaluating a cubic solution.
+        Because the interior five-point stencil is exact for cubics, any residual error 
+        is attributable strictly to the boundary implementation.
         """
         for N in RESOLUTIONS:
             u_h, x, _ = _solve(N, _f_cubic, 0.0, 0.0,
@@ -118,19 +116,18 @@ class TestOrderOfConvergence:
 
     def test_non_zero_dirichlet_data(self):
         """
-        u = eˣ with u(0) = 1, u(1) = e. The 18α defect made this diverge — the
-        measured order was −0.01, i.e. no convergence at all — so this is the
-        test that would have caught it.
+        Validates the convergence of the scheme under non-zero Dirichlet boundary data.
+        Ensures that previous boundary defects, which completely inhibited convergence, 
+        are definitively resolved.
         """
         order = _observed_order(_f_exp, _u_exp, 1.0, float(np.e))
         assert order == pytest.approx(4.0, abs=0.2)
 
     def test_extrapolated_boundary_source_preserves_order(self):
         """
-        Where a case cannot supply f(0)/f(1) the class extrapolates them. The
-        extrapolant is cubic and hence O(h⁴) accurate, so the order must
-        survive; a linear or constant fallback would not do, since the term
-        carries an O(1) weight in the boundary row.
+        Confirms that cubic extrapolation of missing boundary source values preserves the 
+        fourth-order accuracy of the numerical scheme. Ensures that the fallback method 
+        supplies sufficient accuracy for the boundary rows.
         """
         order = _observed_order(_f_exp, _u_exp, 1.0, float(np.e),
                                 supply_boundary=False)
@@ -144,12 +141,9 @@ class TestBoundaryRowConsistency:
     @pytest.mark.parametrize("N", RESOLUTIONS)
     def test_boundary_rows_are_not_o1_inconsistent(self, N):
         """
-        Residual of the exact solution, A·u_exact − b, normalised by ‖b‖∞.
-
-        The signature of the 18α defect is an O(1) residual confined to rows 0
-        and N−1 whilst every interior row sits at machine precision — 4α at the
-        near boundary and 4β at the far one. Both boundary rows must now sit at
-        the truncation level of the scheme.
+        Verifies that the residual of the exact solution at the boundary rows remains 
+        at the truncation level of the numerical scheme. Confirms the elimination of 
+        O(1) inconsistencies previously present in the boundary nodes.
         """
         x = np.arange(1, N + 1) / (N + 1)
         alpha, beta = 1.0, float(np.e)
@@ -165,12 +159,9 @@ class TestBoundaryRowConsistency:
 
     def test_correction_is_right_hand_side_only(self):
         """
-        `A` must not depend on the Dirichlet data or on the boundary source.
-
-        This is what keeps κ(A) — and therefore the QSVT phase-angle cache keys
-        and `hpc/jobs/submit_precompute_4th.sh` — valid across the fix. It is
-        also what preserves the symmetry that `build_dense_block_encoding` and
-        `PentadiagonalToeplitz` both require.
+        Validates that the assembly matrix remains independent of Dirichlet and boundary source data.
+        Ensures the structural symmetry and condition number of the operator are preserved, keeping 
+        quantum phase-angle caches valid.
         """
         base = PoissonProblem1D4th(N=16, source_fn="fS")
         moved = PoissonProblem1D4th(N=16, source_fn="fS",
@@ -187,19 +178,26 @@ class TestBoundaryRowConsistency:
 class TestBoundarySourceResolution:
 
     def test_evaluated_exactly_from_source_fn(self):
-        """f_S(x) = sin(πx) vanishes at both boundaries."""
+        """
+        Confirms that the analytical source function is evaluated exactly at the boundaries.
+        Validates the precise vanishing behaviour of the specific sinusoidal case.
+        """
         prob = PoissonProblem1D4th(N=8, source_fn="fS")
         assert prob.f_boundary[0] == pytest.approx(0.0, abs=1e-15)
         assert prob.f_boundary[1] == pytest.approx(0.0, abs=1e-15)
 
     def test_explicit_values_take_precedence(self):
+        """
+        Verifies that explicitly supplied boundary values supersede internally evaluated defaults.
+        Ensures precise control over the boundary parameters during initialisation.
+        """
         prob = PoissonProblem1D4th(N=8, f_vals=np.zeros(8), f_boundary=(2.0, -3.0))
         assert prob.f_boundary == (2.0, -3.0)
 
     def test_extrapolation_is_exact_on_cubics(self):
         """
-        The fallback extrapolant is cubic, so it must reproduce a cubic source
-        exactly — the property that makes it O(h⁴) accurate in general.
+        Confirms that the cubic extrapolation fallback exactly reproduces cubic source functions.
+        Validates the theoretical O(h^4) accuracy guarantee of the extrapolation process.
         """
         N = 16
         x = np.arange(1, N + 1) / (N + 1)
@@ -232,22 +230,28 @@ class TestCaseRegistryBoundarySource:
         "het_1d_3b_gaussian_Vd300",
     ])
     def test_populated_for_the_1d_sweep_cases(self, name):
+        """
+        Validates that boundary closure values are correctly populated across all registered 1D sweep cases.
+        Ensures structural integrity of the parameters fed into the fourth-order problem class.
+        """
         built = cases.get(name).build(8)
         assert built.f_boundary is not None
         assert len(built.f_boundary) == 2
         assert all(np.isfinite(v) for v in built.f_boundary)
 
     def test_matches_the_analytical_source(self):
-        """f_L(x) = 10x, so the boundary values are 0 and 10 exactly."""
+        """
+        Confirms that the registered boundary values precisely match their analytical source counterparts.
+        Validates correct propagation of source definitions from the case registry.
+        """
         built = cases.get("poisson_1d_fL_hom").build(8)
         assert built.f_boundary[0] == pytest.approx(0.0)
         assert built.f_boundary[1] == pytest.approx(10.0)
 
     def test_gaussian_boundary_values_are_not_negligible(self):
         """
-        Guards the reason `f_boundary` was threaded through the registry at all:
-        were these values small relative to the peak, extrapolation would have
-        sufficed and the added field would be dead weight.
+        Verifies that specific non-negligible boundary values are accurately retained without 
+        relying on extrapolation. Ensures that highly peaked phenomena are bounded correctly.
         """
         built = cases.get("het_1d_3b_gaussian_Vd300").build(16)
         peak = float(np.max(np.abs(built.f_values)))

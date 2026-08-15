@@ -45,7 +45,11 @@ from conftest import VQLS_COST_TOL
 class TestFullPipeline1D:
 
     def test_thomas_pipeline(self, problem_1d_N4_fS):
-        """Thomas: problem → solve → compute_errors → BenchmarkResult."""
+        """
+        Validates the complete 1D Thomas pipeline from problem instantiation 
+        through solution to metric computation. Confirms the benchmark result 
+        accurately reflects deterministic solver characteristics.
+        """
         sr = thomas_solve(problem_1d_N4_fS)
         br = compute_errors(problem_1d_N4_fS, sr)
         assert isinstance(br, BenchmarkResult)
@@ -55,7 +59,11 @@ class TestFullPipeline1D:
 
     @pytest.mark.quantum
     def test_hhl_pipeline(self, problem_1d_N4_fS):
-        """HHL: problem → solve → compute_errors → BenchmarkResult."""
+        """
+        Validates the complete 1D HHL quantum pipeline. Confirms that the solver 
+        produces valid finite residuals and successfully propagates data into the 
+        final benchmark schema.
+        """
         sr = hhl_solve(problem_1d_N4_fS)
         br = compute_errors(problem_1d_N4_fS, sr)
         assert isinstance(br, BenchmarkResult)
@@ -65,7 +73,11 @@ class TestFullPipeline1D:
 
     @pytest.mark.quantum
     def test_vqls_pipeline(self, problem_1d_N4_fS, vqls_cfg_fast):
-        """VQLS: problem → solve → compute_errors → BenchmarkResult."""
+        """
+        Validates the complete 1D VQLS quantum pipeline using a fast configuration. 
+        Ensures the solver identifies correctly and constructs a well-formed 
+        reporting object.
+        """
         sr = vqls_solve(problem_1d_N4_fS, config=vqls_cfg_fast)
         br = compute_errors(problem_1d_N4_fS, sr)
         assert isinstance(br, BenchmarkResult)
@@ -73,10 +85,9 @@ class TestFullPipeline1D:
 
     def test_benchmark_result_fields_consistent(self, problem_1d_N4_fS):
         """
-        BenchmarkResult fields must be internally consistent:
-          - max_abs_error >= avg_abs_error
-          - rel_error and abs_error have the same length as the solution
-          - max_rel_error >= avg_rel_error
+        Confirms internal consistency across computed benchmark metrics, ensuring 
+        maximum errors strictly bound average errors and that vector fields match 
+        the discrete mesh dimension.
         """
         sr = thomas_solve(problem_1d_N4_fS)
         br = compute_errors(problem_1d_N4_fS, sr)
@@ -88,9 +99,9 @@ class TestFullPipeline1D:
     @pytest.mark.quantum
     def test_hhl_better_than_random(self, problem_1d_N4_fS):
         """
-        HHL solution must be closer to Thomas than a random vector of
-        the same norm.  This is a basic sanity check that the solver
-        is doing something useful.
+        Ensures that the HHL solution exhibits meaningful convergence by comparing 
+        its error relative to Thomas against the error of a random vector of 
+        equivalent norm.
         """
         u_thomas = thomas_solve(problem_1d_N4_fS).u
         u_hhl    = hhl_solve(problem_1d_N4_fS).u
@@ -108,7 +119,11 @@ class TestFullPipeline1D:
 
     @pytest.mark.quantum
     def test_three_source_functions_all_pass(self, vqls_cfg_fast):
-        """All three source functions must produce valid results for all solvers."""
+        """
+        Validates that all configured 1D source functions (`fS`, `fL`, `fH`) 
+        yield finite, well-defined solutions across all classical and quantum 
+        solvers.
+        """
         for fn_key in ("fS", "fL", "fH"):
             cfg  = SimConfig1D(N=4, epsilon=0.01, source_fn=fn_key)
             prob = PoissonProblem1D(cfg)
@@ -125,7 +140,11 @@ class TestFullPipeline1D:
 class TestBenchmarkMetrics:
 
     def test_compute_errors_homogeneous_has_exact(self, problem_1d_N4_fS):
-        """Homogeneous BC problems must have u_exact populated."""
+        """
+        Confirms that benchmark metric generation correctly propagates analytical 
+        solutions for problems with homogeneous boundaries, populating relative 
+        error fields.
+        """
         sr = thomas_solve(problem_1d_N4_fS)
         br = compute_errors(problem_1d_N4_fS, sr)
         assert br.u_exact is not None
@@ -133,7 +152,10 @@ class TestBenchmarkMetrics:
         assert br.max_rel_error is not None
 
     def test_compute_errors_nonhomogeneous_no_exact(self, problem_1d_N4_nonhom):
-        """Non-homogeneous BC problems have no analytical solution."""
+        """
+        Ensures that non-homogeneous boundary problems correctly omit the 
+        analytical exact solution and dependent relative error metrics.
+        """
         sr = thomas_solve(problem_1d_N4_nonhom)
         br = compute_errors(problem_1d_N4_nonhom, sr)
         assert br.u_exact is None
@@ -141,11 +163,9 @@ class TestBenchmarkMetrics:
 
     def test_thomas_zero_error_against_itself(self, problem_1d_N4_fS):
         """
-        When Thomas is used as both the solver and the u_thomas reference,
-        the absolute error against itself must be identically zero.
-        This test uses a non-homogeneous BC problem so that u_exact is None
-        and abs_error is computed against u_thomas rather than the analytical
-        solution.
+        Validates that computing errors using the solver output as the reference 
+        yields an exact zero absolute error, confirming the error calculation 
+        mechanism is intrinsically sound.
         """
         from core.config import SimConfig1D
         cfg  = SimConfig1D(N=4, epsilon=0.01, source_fn="fS", alpha=0.5, beta=-0.5)
@@ -166,6 +186,10 @@ class TestFullPipeline2D:
     """
 
     def test_thomas_pipeline(self, square_2d_N8):
+        """
+        Validates the end-to-end execution of a 2D Thomas scheme, from problem 
+        definition through nested iterative solution to final reporting metrics.
+        """
         problem, _ = square_2d_N8
         result = outer_solve(problem, inner="thomas", scheme="fmg",
                              tol=1e-10, max_cycles=50, patience=51)
@@ -180,7 +204,11 @@ class TestFullPipeline2D:
         assert np.all(np.isfinite(br.u_solver))
 
     def test_reference_populates_the_error_fields(self, square_2d_N8):
-        """With a reference supplied, both error families must be computed."""
+        """
+        Ensures that supplying a reference analytical solution in 2D benchmarking 
+        correctly triggers the calculation of all absolute and relative error 
+        families.
+        """
         problem, u_exact = square_2d_N8
         result = outer_solve(problem, inner="thomas", scheme="fmg",
                              tol=1e-10, max_cycles=50, patience=51)
@@ -195,6 +223,11 @@ class TestFullPipeline2D:
         assert br.max_rel_error >= br.avg_rel_error
 
     def test_absent_reference_leaves_relative_errors_undefined(self, square_2d_N8):
+        """
+        Confirms that omitting a reference solution safely degrades the 2D metrics, 
+        leaving relative error fields explicitly undefined rather than producing 
+        artefacts.
+        """
         problem, _ = square_2d_N8
         result = outer_solve(problem, inner="thomas", scheme="fmg",
                              tol=1e-10, max_cycles=50, patience=51)
@@ -208,6 +241,10 @@ class TestFullPipeline2D:
         assert br.max_abs_error == pytest.approx(0.0)
 
     def test_zero_error_against_itself(self, square_2d_N8):
+        """
+        Validates that cross-evaluating a 2D solver result against itself produces 
+        a zero maximum absolute error, verifying metric stability.
+        """
         problem, _ = square_2d_N8
         result = outer_solve(problem, inner="thomas", scheme="fmg",
                              tol=1e-10, max_cycles=50, patience=51)
@@ -218,9 +255,9 @@ class TestFullPipeline2D:
 
     def test_grid_matches_the_problem_mesh(self, square_2d_N8):
         """
-        The coordinates carried into the reporting layer are reconstructed from
-        the LineProblem2D protocol alone, so they must agree with the problem's
-        own mesh — otherwise every contour plot would be silently offset.
+        Confirms that the coordinate grid reconstructed in the reporting layer 
+        exactly mirrors the mesh originating from the protocol, preventing 
+        silent translational offsets in visualisations.
         """
         problem, _ = square_2d_N8
         result = outer_solve(problem, inner="thomas", scheme="fmg",
@@ -235,9 +272,9 @@ class TestFullPipeline2D:
 
     def test_outer_result_fields_are_carried_across(self, square_2d_N8):
         """
-        compute_errors_2d adapts an OuterResult onto the reporting schema. The
-        mapping is not identity — n_outer becomes iterations, residual_history
-        becomes iteration_errors — so it is asserted explicitly.
+        Validates the projection mapping between the `OuterResult` structure and 
+        the legacy reporting metrics, ensuring convergence state and iteration 
+        histories are preserved.
         """
         problem, _ = square_2d_N8
         result = outer_solve(problem, inner="thomas", scheme="jacobi",
@@ -253,6 +290,10 @@ class TestFullPipeline2D:
         assert len(br.iteration_errors) == br.iterations
 
     def test_config_is_propagated_for_reporting(self, square_2d_N8):
+        """
+        Ensures that the input configuration object is correctly attached to the 
+        final reporting model, maintaining provenance for downstream analysis.
+        """
         problem, _ = square_2d_N8
         cfg = Config2D(N=8, source_fn="fH", epsilon=0.03, bc_x0=0.5)
         result = outer_solve(problem, inner="thomas", scheme="fmg",
@@ -265,9 +306,9 @@ class TestFullPipeline2D:
 
     def test_every_scheme_reaches_the_same_field(self, square_2d_N8):
         """
-        The outer scheme is a tuning parameter, not a physical choice: all of
-        them must converge to the same discrete solution, differing only in the
-        work required to reach it.
+        Verifies that disparate iterative schemes (Jacobi, SOR, FMG) ultimately 
+        converge to the identical stationary discrete solution, confirming that 
+        scheme choice strictly governs convergence rate rather than physics.
         """
         problem, _ = square_2d_N8
         fields = {}

@@ -120,6 +120,10 @@ class TestStatevectorExecutorEquivalence:
         (2, 2, 1),   # minimal
     ])
     def test_hhl_extraction_is_bit_identical(self, n_b, n_l, n_anc):
+        """
+        Validates that the refactored StatevectorExecutor replicates the original HHL data extraction algorithm exactly.
+        Ensures that no historical results were altered by the abstraction.
+        """
         qc       = _random_hhl_circuit(n_b, n_l, n_anc, seed=20260807)
         expected = _original_hhl_extraction(qc, n_b)
         actual, record = StatevectorExecutor().extract(qc, hhl_spec(qc, n_b))
@@ -133,6 +137,10 @@ class TestStatevectorExecutorEquivalence:
 
     @pytest.mark.parametrize("n", [2, 3, 4, 5, 6])
     def test_qsvt_extraction_is_bit_identical(self, n):
+        """
+        Confirms that QSVT solution extraction precisely matches the legacy implementation for standard single-ancilla deployments.
+        Safeguards the continuity of reported error rates.
+        """
         # n_a is fixed at the production value: the Sz.-Nagy dilation of a
         # Hermitian matrix needs exactly one ancilla.
         from solvers.quantum.block_encoding import _N_ANCILLA_BE
@@ -193,6 +201,10 @@ class TestPostSelectionProbability:
     """
 
     def test_probability_matches_accepted_born_weight(self):
+        """
+        Validates that the computed post-selection probability exactly matches the sum of the Born weights of the accepted basis states.
+        Confirms physical correctness of the simulated amplitude decay.
+        """
         qc   = _random_hhl_circuit(2, 3, 1, seed=99)
         spec = hhl_spec(qc, 2)
         sv   = Statevector(qc).data
@@ -206,6 +218,10 @@ class TestPostSelectionProbability:
         assert record.postselect_probability == pytest.approx(expected, rel=1e-12)
 
     def test_shot_overhead_is_reciprocal(self):
+        """
+        Ensures that the reported shot overhead is calculated as the exact reciprocal of the post-selection probability.
+        Maintains consistency with standard quantum resource estimation models.
+        """
         qc = _random_qsvt_circuit(3, 1, seed=1234)
         _, record = StatevectorExecutor().extract(qc, qsvt_spec(3, 1))
         assert record.shot_overhead == pytest.approx(
@@ -213,6 +229,10 @@ class TestPostSelectionProbability:
         )
 
     def test_unconditioned_spec_accepts_everything(self):
+        """
+        Confirms that an empty condition set corresponds to a unit success probability.
+        Validates the degenerate case of deterministic circuit outputs.
+        """
         qc = _random_qsvt_circuit(3, 0, seed=5)
         spec = PostSelectSpec(n_data=3, conditions=(), component="real")
         _, record = StatevectorExecutor().extract(qc, spec)
@@ -225,18 +245,34 @@ class TestPostSelectSpecValidation:
     """Invalid specifications must fail loudly at construction, not silently."""
 
     def test_rejects_condition_on_data_register(self):
+        """
+        Ensures that attempting to post-select on the primary data register raises a ValueError.
+        Protects against conceptually invalid post-selection schemas.
+        """
         with pytest.raises(ValueError, match="collides with the data register"):
             PostSelectSpec(n_data=3, conditions=((1, 0),))
 
     def test_rejects_unknown_component(self):
+        """
+        Validates that invalid quadrature component specifications are rejected immediately.
+        Prevents silent fallbacks during amplitude extraction.
+        """
         with pytest.raises(ValueError, match="component must be"):
             PostSelectSpec(n_data=2, component="magnitude")
 
     def test_rejects_non_binary_required_bit(self):
+        """
+        Confirms that bit states specified for post-selection must be strictly binary.
+        Maintains the semantic integrity of the conditioning mask.
+        """
         with pytest.raises(ValueError, match="must be 0 or 1"):
             PostSelectSpec(n_data=2, conditions=((3, 2),))
 
     def test_mask_and_target(self):
+        """
+        Validates the correct internal construction of bitwise masks and target values from condition specifications.
+        Ensures accurate application of the logical filter.
+        """
         spec = PostSelectSpec(n_data=2, conditions=((2, 0), (3, 1), (4, 1)))
         assert spec.mask   == 0b11100
         assert spec.target == 0b11000
@@ -244,6 +280,10 @@ class TestPostSelectSpecValidation:
         assert not spec.accepts(0b11100 | 0b01)
 
     def test_hhl_spec_rejects_mismatched_register(self):
+        """
+        Ensures that HHL-specific builders fail when the circuit dimensions disagree with the provided data width.
+        Prevents misalignment between generation and extraction.
+        """
         qc = _random_hhl_circuit(2, 3, 1, seed=1)
         with pytest.raises(ValueError, match="does not match num_qubits"):
             hhl_spec(qc, num_qubits=3)
@@ -255,9 +295,17 @@ class TestDefaultExecutor:
     """The default must be exact, and any override must be strictly scoped."""
 
     def test_default_is_statevector(self):
+        """
+        Confirms that the fallback simulation environment is strictly statevector-based.
+        Ensures deterministic, exact outcomes by default.
+        """
         assert default_executor().mode == "statevector"
 
     def test_context_manager_restores_previous(self):
+        """
+        Validates that the execution context manager reliably reverts to the previous executor upon normal exit.
+        Maintains global state cleanliness across test isolation boundaries.
+        """
         original = default_executor()
         sentinel = StatevectorExecutor(diagnostics=False)
         with execution_context(sentinel):
@@ -265,6 +313,10 @@ class TestDefaultExecutor:
         assert default_executor() is original
 
     def test_context_manager_restores_on_exception(self):
+        """
+        Ensures that the execution context manager reverts state even when an exception is raised within its block.
+        Prevents persistent pollution of the global executor.
+        """
         original = default_executor()
         with pytest.raises(RuntimeError):
             with execution_context(StatevectorExecutor(diagnostics=False)):
@@ -279,6 +331,10 @@ class TestNullExtraction:
     """A null post-selected subspace must raise, not return zeros."""
 
     def test_raises_on_empty_subspace(self):
+        """
+        Validates that attempting to extract a solution from a probability-zero subspace raises an explicit exception.
+        Prevents the silent propagation of meaningless zero vectors.
+        """
         # |0...0> on every qubit: the HHL flag is never |1>, so nothing survives.
         qc = QuantumCircuit(
             QuantumRegister(2, "b"),

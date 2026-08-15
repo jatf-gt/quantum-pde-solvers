@@ -24,20 +24,35 @@ from conftest import THOMAS_RESIDUAL_TOL
 class TestThomasSolve1D:
 
     def test_residual_near_machine_precision(self, problem_1d_N4_fS):
+        """
+        Validates that the Thomas algorithm reduces the discrete residual to near machine precision.
+        Confirms the exactness of the direct solve.
+        """
         r = thomas_solve(problem_1d_N4_fS)
         assert r.euclidean_residual < THOMAS_RESIDUAL_TOL
 
     def test_solution_shape(self, problem_1d_N4_fS):
+        """
+        Ensures that the output solution array strictly matches the dimensions of the input discrete domain.
+        Prevents shape mismatch errors.
+        """
         r = thomas_solve(problem_1d_N4_fS)
         assert r.u.shape == (4,)
 
     def test_solver_label(self, problem_1d_N4_fS):
+        """
+        Confirms that the solver result correctly identifies its origin algorithm.
+        Assures proper logging and metrics tracking.
+        """
         r = thomas_solve(problem_1d_N4_fS)
         assert r.solver == "Thomas"
 
     @pytest.mark.parametrize("fn_key", ["fS", "fL", "fH"])
     def test_matches_exact_solution(self, fn_key):
-        """Thomas solution should match the analytical solution to ~h²."""
+        """
+        Validates that the Thomas algorithm's solution converges to the analytical continuous solution within expected truncation error bounds.
+        Confirms physical accuracy.
+        """
         from core.config import SimConfig1D
         from problems.poisson_1d import PoissonProblem1D
         cfg  = SimConfig1D(N=4, epsilon=0.01, source_fn=fn_key)
@@ -49,19 +64,28 @@ class TestThomasSolve1D:
         assert max_err < 0.05, f"{fn_key}: max_err={max_err:.4f}"
 
     def test_nonhomogeneous_bcs(self, problem_1d_N4_nonhom):
-        """Thomas should still achieve machine precision with non-zero BCs."""
+        """
+        Ensures that the Thomas algorithm maintains solver precision when subjected to non-homogeneous boundary conditions.
+        Validates the boundary incorporation.
+        """
         r = thomas_solve(problem_1d_N4_nonhom)
         assert r.euclidean_residual < THOMAS_RESIDUAL_TOL
 
     def test_thomas_system_raw_arrays(self):
-        """thomas_solve_system works on raw (A, b) arrays."""
+        """
+        Confirms the functional correctness of the underlying raw tri-diagonal solver on primitive arrays.
+        Ensures the low-level routine behaves independently of domain wrappers.
+        """
         A = np.array([[-2., 1., 0.], [1., -2., 1.], [0., 1., -2.]])
         b = np.array([1., 0., -1.])
         u = thomas_solve_system(A, b)
         assert np.allclose(A @ u, b, atol=1e-12)
 
     def test_agrees_with_numpy(self, problem_1d_N4_fL):
-        """Thomas and NumPy must agree to machine precision."""
+        """
+        Validates that the Thomas algorithm produces comparable results to standard linear algebra routines.
+        Establishes a robust equivalence baseline.
+        """
         r_thomas = thomas_solve(problem_1d_N4_fL)
         r_numpy  = numpy_solve(problem_1d_N4_fL)
         assert np.allclose(r_thomas.u, r_numpy.u, atol=1e-10)

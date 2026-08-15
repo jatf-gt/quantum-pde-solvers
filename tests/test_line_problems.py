@@ -37,17 +37,30 @@ from problems.poisson_line_3d import PoissonLine3D
 class TestPoissonLine2DOperator:
 
     def test_rejects_non_2d_source(self):
+        """
+        Ensures that instantiating a 2D line problem with an array of incorrect 
+        dimensionality raises an appropriate ValueError, enforcing strict tensor 
+        shapes.
+        """
         with pytest.raises(ValueError, match="2-D"):
             PoissonLine2D(np.zeros(8))
 
     def test_shape_and_spacings(self):
+        """
+        Validates that the geometric spacings (`dx`, `dy`) and grid shapes are 
+        correctly deduced from the continuous domain limits and node counts.
+        """
         prob = PoissonLine2D(np.zeros((8, 4)), Lx=2.0, Ly=1.0)
         assert prob.shape == (8, 4)
         assert prob.dx == pytest.approx(2.0 / 9.0)
         assert prob.dy == pytest.approx(1.0 / 5.0)
 
     def test_strip_operator_is_tst(self):
-        """The strip operator must be Toeplitz symmetric tridiagonal."""
+        """
+        Confirms that the 1D operator governing individual strips is Toeplitz, 
+        symmetric, and strictly tridiagonal, structurally matching the quantum 
+        encoding constraints.
+        """
         prob = PoissonLine2D(np.zeros((8, 8)), Lx=1.0, Ly=1.0)
         A = prob.row_matrix()
         a = -2.0 * (1.0 / prob.dx**2 + 1.0 / prob.dy**2)
@@ -62,7 +75,10 @@ class TestPoissonLine2DOperator:
                            - np.diag(A.diagonal(-1), -1), 0.0)
 
     def test_dirichlet_data_absorbed_into_rhs(self):
-        """Each boundary value enters the RHS as −bc/h² on its own edge."""
+        """
+        Validates the correct algebraic absorption of Dirichlet boundaries into 
+        the right-hand side source term, matching the −bc/h² penalty logic.
+        """
         f = np.zeros((4, 4))
         prob = PoissonLine2D(f, bc_x0=1.0, bc_x1=2.0, bc_y0=3.0, bc_y1=4.0)
         r = prob.rhs()
@@ -77,24 +93,28 @@ class TestPoissonLine2DOperator:
         assert r[1, -1] == pytest.approx(-4.0 / prob.dy**2)
 
     def test_corner_accumulates_both_edges(self):
+        """
+        Verifies that nodes at the geometric corners correctly accumulate boundary 
+        penalties from both intersecting exterior edges.
+        """
         prob = PoissonLine2D(np.zeros((4, 4)), bc_x0=1.0, bc_y0=3.0)
         expected = -1.0 / prob.dx**2 - 3.0 / prob.dy**2
         assert prob.rhs()[0, 0] == pytest.approx(expected)
 
     def test_vector_boundary_data(self):
-        """A per-node boundary array must be applied node by node."""
+        """
+        Ensures that spatially varying (vector) boundary arrays are correctly 
+        mapped node-by-node along the relevant edge.
+        """
         edge = np.arange(1.0, 5.0)
         prob = PoissonLine2D(np.zeros((4, 4)), bc_x0=edge)
         assert np.allclose(prob.rhs()[0, :], -edge / prob.dx**2)
 
     def test_apply_matches_dense_five_point_operator(self):
         """
-        `apply` must reproduce an independently assembled dense Laplacian.
-
-        This is the check that the strip operator and the transverse coupling
-        are mutually consistent: the outer schemes obtain the residual from
-        `apply` but drive the strip solves with `row_matrix`, so a mismatch
-        between them would make every scheme converge to the wrong field.
+        Confirms that the action of the decomposed `apply` precisely matches 
+        an independently assembled dense 5-point Laplacian. Ensures that outer 
+        scheme residuals remain consistent with inner scheme operators.
         """
         N = 5
         prob = PoissonLine2D(np.zeros((N, N)), Lx=1.0, Ly=2.0)
@@ -105,6 +125,10 @@ class TestPoissonLine2DOperator:
         assert np.allclose(prob.apply(u), (A @ u.ravel()).reshape(N, N))
 
     def test_residual_vanishes_at_the_discrete_solution(self):
+        """
+        Verifies that evaluating the operator residual on the exact discrete 
+        solution matrix yields machine zero.
+        """
         N = 6
         prob, _ = build_square_2d(N)
         A = _dense_laplacian_2d(N, N, prob.dx, prob.dy)
@@ -112,7 +136,11 @@ class TestPoissonLine2DOperator:
         assert prob.residual(u) < 1e-12
 
     def test_manufactured_solution_recovered_to_truncation_error(self):
-        """The discrete solution must approach the continuum one as O(h²)."""
+        """
+        Validates the O(h²) order of accuracy. Confirms that successive grid 
+        refinements reduce the discretisation error against a continuum analytic 
+        solution by a factor of roughly four.
+        """
         errors = []
         for N in (8, 16, 32):
             prob, u_exact = build_square_2d(N)
@@ -131,25 +159,37 @@ class TestPoissonLine2DHierarchy:
 
     @pytest.mark.parametrize("N", [4, 8, 16, 32, 64])
     def test_kappa_bounded_by_three(self, N):
-        """κ(A_row) → 3⁻ as N → ∞ and never reaches it."""
+        """
+        Ensures that the condition number of the 2D strip operator is strictly 
+        bounded above by 3, preventing exponential blow-up during HHL phase 
+        estimation.
+        """
         assert 1.0 < PoissonLine2D(np.zeros((N, N))).kappa_row() < 3.0
 
     def test_kappa_increases_monotonically(self):
+        """
+        Verifies that the strip operator condition number monotonically increases 
+        with problem size.
+        """
         kappas = [PoissonLine2D(np.zeros((N, N))).kappa_row()
                   for N in (4, 8, 16, 32, 64)]
         assert all(a < b for a, b in zip(kappas, kappas[1:]))
 
     def test_coarsen_halves_both_directions(self):
+        """
+        Confirms that standard grid coarsening uniformly halves the dimension 
+        of both spatial axes, returning a problem instance one hierarchical 
+        level deeper.
+        """
         coarse = PoissonLine2D(np.zeros((16, 16))).coarsen()
         assert coarse.shape == (8, 8)
         assert coarse.level == 1
 
     def test_coarsening_preserves_aspect_ratio_and_kappa(self):
         """
-        Halving both axes together keeps dx/dy fixed, so κ is preserved to
-        within the change from the reduced node count. Semi-coarsening a single
-        axis would raise κ fourfold per level, driving up the QSVT polynomial
-        degree and the HHL clock register.
+        Validates that grid coarsening preserves the geometric aspect ratio (dx/dy) 
+        and consequently ensures the condition number limit is maintained, keeping 
+        quantum operator costs bounded across the multigrid hierarchy.
         """
         fine = PoissonLine2D(np.zeros((32, 32)))
         coarse = fine.coarsen()
@@ -157,21 +197,33 @@ class TestPoissonLine2DHierarchy:
         assert coarse.kappa_row() < 3.0
 
     def test_coarsen_stops_at_min_strip(self):
+        """
+        Ensures that recursive grid coarsening safely halts, returning None, 
+        when the strip dimension reaches the minimally resolvable problem size.
+        """
         assert PoissonLine2D(np.zeros((4, 4))).coarsen() is None
 
     def test_coarsen_stops_on_odd_dimension(self):
+        """
+        Validates that grids with odd dimensions correctly refuse to coarsen, 
+        preventing malformed fractional nodal domains.
+        """
         assert PoissonLine2D(np.zeros((7, 7))).coarsen() is None
 
     def test_coarse_levels_carry_homogeneous_data(self):
-        """Coarse grids solve the error equation, so source and BCs are zero."""
+        """
+        Confirms that generated coarse grids carry homogeneous boundary and source 
+        data, as required for solving the residual error equation in multigrid 
+        cycles.
+        """
         coarse = PoissonLine2D(np.ones((16, 16)), bc_x0=5.0).coarsen()
         assert np.allclose(coarse.rhs(), 0.0)
 
     def test_anisotropic_grid_semi_coarsens(self):
         """
-        An axis whose spacing already exceeds COARSEN_RATIO times the finest is
-        left alone: coarsening a weakly coupled direction degrades the V-cycle
-        below plain SOR.
+        Verifies that highly anisotropic grids selectively coarsen only along 
+        the tightly coupled spatial axes, preserving convergence rates in 
+        highly skewed physical domains.
         """
         # dx = 1/17 ≈ 0.059, dy = 16/17 ≈ 0.94 — a ratio far beyond 2.
         prob = PoissonLine2D(np.zeros((16, 16)), Lx=1.0, Ly=16.0)
@@ -179,7 +231,11 @@ class TestPoissonLine2DHierarchy:
         assert coarse.shape == (8, 16)
 
     def test_strip_lengths_stay_powers_of_two(self):
-        """Every level must remain encodable on an integral number of qubits."""
+        """
+        Validates that iterative coarsening perfectly preserves power-of-two 
+        strip dimensions, ensuring quantum circuit encodings never encounter 
+        unaligned classical sizes.
+        """
         prob = PoissonLine2D(np.zeros((64, 64)))
         while prob is not None:
             n = prob.shape[0]
@@ -192,20 +248,28 @@ class TestPoissonLine2DHierarchy:
 class TestPoissonLine3D:
 
     def test_rejects_non_3d_source(self):
+        """
+        Ensures that 3D problem instantiation rejects input arrays not 
+        strictly of rank 3.
+        """
         with pytest.raises(ValueError, match="3-D"):
             PoissonLine3D(np.zeros((4, 4)))
 
     def test_rejects_periodic_strip_axis(self):
         """
-        Axis 0 is the strip direction. A periodic strip operator is
-        cyclic-tridiagonal rather than TST, which the quantum block encoding
-        does not support, so this must fail loudly rather than silently produce
-        an unencodable operator.
+        Validates that configuring the primary strip axis (axis 0) as periodic 
+        is explicitly rejected, as cyclic-tridiagonal matrices cannot be 
+        natively mapped onto the symmetric block encoding framework.
         """
         with pytest.raises(ValueError, match="axis 0"):
             PoissonLine3D(np.zeros((4, 4, 4)), periodic=(True, False, False))
 
     def test_periodic_axis_spacing_excludes_boundary_node(self):
+        """
+        Confirms that grid spacing calculations correctly apply L/n logic for 
+        periodic dimensions (where the boundary wraps) versus L/(n+1) for 
+        Dirichlet clamped boundaries.
+        """
         prob = PoissonLine3D(np.zeros((8, 8, 8)), lengths=(1.0, 1.0, 1.0),
                              periodic=(False, False, True))
         assert prob.dx == pytest.approx(1.0 / 9.0)     # Dirichlet: L/(n+1)
@@ -214,12 +278,17 @@ class TestPoissonLine3D:
     @pytest.mark.parametrize("N", [4, 8, 16, 32])
     def test_kappa_bounded_by_two(self, N):
         """
-        κ → 2⁻ in 3D, better conditioned than the 2D case: both transverse
-        directions contribute to the diagonal of the strip operator.
+        Verifies that the condition number for the 3D strip operator is strictly 
+        bounded above by 2, owing to the stabilising presence of two orthogonal 
+        transverse coupling dimensions.
         """
         assert 1.0 < PoissonLine3D(np.zeros((N, N, N))).kappa_row() < 2.0
 
     def test_apply_matches_dense_seven_point_operator(self):
+        """
+        Validates the action of the 3D decomposed `apply` routine against a 
+        reference dense 7-point 3D finite difference matrix.
+        """
         N = 4
         prob = PoissonLine3D(np.zeros((N, N, N)), lengths=(1.0, 2.0, 3.0))
         A = _dense_laplacian_3d(prob)
@@ -229,7 +298,11 @@ class TestPoissonLine3D:
         assert np.allclose(prob.apply(u), (A @ u.ravel()).reshape(N, N, N))
 
     def test_apply_matches_dense_operator_with_periodic_axis(self):
-        """The wraparound coupling must appear in the dense comparison too."""
+        """
+        Ensures that operator application retains accuracy when the wraparound 
+        coupling from periodic boundaries is introduced, verifying consistency 
+        with the dense reference.
+        """
         N = 4
         prob = PoissonLine3D(np.zeros((N, N, N)), lengths=(1.0, 1.0, 1.0),
                              periodic=(False, False, True))
@@ -240,6 +313,10 @@ class TestPoissonLine3D:
         assert np.allclose(prob.apply(u), (A @ u.ravel()).reshape(N, N, N))
 
     def test_residual_vanishes_at_the_discrete_solution(self):
+        """
+        Confirms that the 3D residual precisely vanishes at the exact discrete 
+        solution for a representative cube problem.
+        """
         prob, _ = build_cube_3d(4)
         A = _dense_laplacian_3d(prob)
         u = np.linalg.solve(A, prob.rhs().ravel()).reshape(prob.shape)
@@ -247,9 +324,9 @@ class TestPoissonLine3D:
 
     def test_periodic_manufactured_solution_is_consistent(self):
         """
-        The discrete solve of the periodic slab must recover the manufactured
-        solution to truncation error, confirming that the periodic spacing, the
-        wraparound coupling and the source term are mutually consistent.
+        Validates the geometric and arithmetic consistency of periodic boundaries. 
+        Confirms that the discrete inversion recovers the continuous analytic 
+        source solution accurately across periodic slab interfaces.
         """
         prob, phi = build_periodic_3d(8)
         A = _dense_laplacian_3d(prob)
@@ -258,13 +335,25 @@ class TestPoissonLine3D:
         assert rel < 0.10
 
     def test_coarsen_halves_all_isotropic_axes(self):
+        """
+        Ensures that uniform 3D grid coarsening symmetrically scales down all 
+        spatial dimensions for an isotropic problem geometry.
+        """
         prob = PoissonLine3D(np.zeros((16, 16, 16)))
         assert prob.coarsen().shape == (8, 8, 8)
 
     def test_coarsen_stops_at_min_strip(self):
+        """
+        Validates that 3D grid coarsening prevents degradation past the minimally 
+        defined block size, avoiding degenerate quantum registers.
+        """
         assert PoissonLine3D(np.zeros((4, 4, 4))).coarsen() is None
 
     def test_coarsen_preserves_periodicity(self):
+        """
+        Confirms that instantiated coarse hierarchies inherit and correctly 
+        maintain the spatial periodicity flags defined on the finest grid.
+        """
         prob = PoissonLine3D(np.zeros((16, 16, 16)),
                              periodic=(False, False, True))
         assert prob.coarsen().periodic == (False, False, True)

@@ -65,16 +65,21 @@ def _real_qsvt_circuit(degree: int = 11, seed: int = 0):
 class TestDepolarizingNoiseModel:
 
     def test_excludes_rz_from_error(self):
-        # Virtual-Z rotations carry no gate error on real hardware; a model
-        # that puts a channel on rz would overstate the noise budget.
+        """
+        Validates that virtual-Z rotations are excluded from the depolarizing noise model.
+        Ensures that hardware error budgets are not artificially inflated by error-free virtual operations.
+        """
         model = depolarizing_noise_model(single_qubit_error=0.5, two_qubit_error=0.5)
         assert "rz" not in model.noise_instructions
 
     def test_default_uses_resources_two_qubit_error(self):
+        """
+        Validates that the default noise model correctly adopts the established two-qubit hardware error rates.
+        Confirms that implicit and explicit initializations yield equivalent noise instruction sets.
+        """
         from core.resources import HERON_R2_TWO_QUBIT_ERROR
         model_default = depolarizing_noise_model()
         model_explicit = depolarizing_noise_model(two_qubit_error=HERON_R2_TWO_QUBIT_ERROR)
-        # Both should be constructible without error and target the same gates.
         assert set(model_default.noise_instructions) == set(model_explicit.noise_instructions)
 
 
@@ -90,22 +95,30 @@ class TestFakeBackendNoiseModel:
     """
 
     def test_torino_loads_or_skips_cleanly(self):
+        """
+        Validates the loading mechanism for the FakeTorino hardware backend.
+        Ensures that execution appropriately skips or proceeds depending on the availability of the runtime library.
+        """
         pytest.importorskip("qiskit_ibm_runtime")
         from core.noise import fake_backend_noise_model
         model = fake_backend_noise_model("FakeTorino")
         assert "cz" in model.noise_instructions
 
     def test_default_is_torino_not_kingston(self):
-        # The default was deliberately changed from FakeKingston (unreachable
-        # under this project's qiskit pin) to FakeTorino (confirmed reachable)
-        # -- pinned here so it isn't quietly changed back without re-checking
-        # the version constraint this test's class docstring documents.
+        """
+        Validates that the default fake backend remains set to a confirmed-reachable target under current dependency constraints.
+        Prevents silent regressions to unsupported backend iterations.
+        """
         import inspect
         from core.noise import fake_backend_noise_model
         default = inspect.signature(fake_backend_noise_model).parameters["name"].default
         assert default == "FakeTorino"
 
     def test_unknown_backend_name_lists_available(self):
+        """
+        Validates error handling for unrecognized backend identifiers.
+        Confirms that the system returns a descriptive exception enumerating the available hardware models.
+        """
         pytest.importorskip("qiskit_ibm_runtime")
         from core.noise import fake_backend_noise_model
         with pytest.raises(ValueError, match="Available:"):
@@ -125,6 +138,9 @@ class TestSamplePostselection:
     """
 
     def test_accepts_matching_condition(self):
+        """
+        Validates that the post-selection sampling mechanism correctly identifies and accepts outcomes matching the specified quantum state conditions.
+        """
         qc = QuantumCircuit(3)
         qc.x(2)
         spec = PostSelectSpec(n_data=2, conditions=((2, 1),))
@@ -132,6 +148,9 @@ class TestSamplePostselection:
         assert sample.n_accepted == 200
 
     def test_rejects_non_matching_condition(self):
+        """
+        Validates that the post-selection sampling mechanism appropriately rejects outcomes that deviate from the specified quantum state conditions.
+        """
         qc = QuantumCircuit(3)
         qc.x(2)
         spec = PostSelectSpec(n_data=2, conditions=((2, 0),))
@@ -139,7 +158,10 @@ class TestSamplePostselection:
         assert sample.n_accepted == 0
 
     def test_multi_qubit_condition(self):
-        # bits 3 and 4 both required =1; only bit 3 is set here.
+        """
+        Validates the enforcement of compound post-selection criteria across multiple qubits.
+        Ensures that partial condition matches are correctly rejected.
+        """
         qc = QuantumCircuit(5)
         qc.x(3)
         spec = PostSelectSpec(n_data=3, conditions=((3, 1), (4, 1)))
@@ -147,6 +169,10 @@ class TestSamplePostselection:
         assert sample.n_accepted == 0
 
     def test_shot_estimate_brackets_exact_probability(self):
+        """
+        Validates that the empirical shot-based probability estimate correctly brackets the exact theoretical post-selection probability.
+        Confirms the statistical integrity of the sampling mechanism.
+        """
         qc = _hhl_shaped_circuit()
         spec = hhl_spec(qc, 2)
         _x, record = StatevectorExecutor(diagnostics=False).extract(qc, spec)
@@ -154,6 +180,10 @@ class TestSamplePostselection:
         assert sample.ci_low <= record.postselect_probability <= sample.ci_high
 
     def test_shot_overhead_is_reciprocal_of_probability(self):
+        """
+        Validates that the computed shot overhead strictly equals the reciprocal of the post-selection probability.
+        Ensures the correct scaling factor is applied for resource estimation.
+        """
         qc = QuantumCircuit(2)
         spec = PostSelectSpec(n_data=1, conditions=((1, 0),))
         sample = sample_postselection(qc, spec, shots=1000)
@@ -173,6 +203,10 @@ class TestNoiseExecutorZeroNoise:
     """
 
     def test_hhl_shaped_circuit_matches_statevector_executor(self):
+        """
+        Validates that the density matrix executor perfectly reproduces the ideal statevector output in the zero-noise limit for Harrow-Hassidim-Lloyd circuits.
+        Ensures no spurious error is introduced by vector normalization mismatches.
+        """
         qc = _hhl_shaped_circuit()
         spec = hhl_spec(qc, 2)
         x_exact, _ = StatevectorExecutor(diagnostics=False).extract(qc, spec)
@@ -181,6 +215,10 @@ class TestNoiseExecutorZeroNoise:
         np.testing.assert_allclose(x_noisy, x_exact, atol=1e-6)
 
     def test_real_qsvt_circuit_matches_statevector_executor(self):
+        """
+        Validates that the density matrix executor exactly matches the ideal statevector result for Quantum Singular Value Transformation circuits under zero-noise conditions.
+        Prevents baseline degradation in realistic algorithmic execution.
+        """
         qc, spec = _real_qsvt_circuit()
         x_exact, _ = StatevectorExecutor(diagnostics=False).extract(qc, spec)
         x_noisy, record = NoiseExecutor(noise_model=None).extract(qc, spec)
@@ -188,6 +226,10 @@ class TestNoiseExecutorZeroNoise:
         np.testing.assert_allclose(x_noisy, x_exact, atol=1e-6)
 
     def test_explicit_zero_rate_model_also_recovers_exactly(self):
+        """
+        Validates that explicitly parameterized zero-rate depolarizing models yield pure states identical to the ideal executor.
+        Confirms the numerical stability of the noise application pathways.
+        """
         qc, spec = _real_qsvt_circuit()
         x_exact, _ = StatevectorExecutor(diagnostics=False).extract(qc, spec)
         zero_model = depolarizing_noise_model(single_qubit_error=0.0, two_qubit_error=0.0)
@@ -202,6 +244,10 @@ class TestNoiseExecutorZeroNoise:
 class TestNoiseExecutorUnderNoise:
 
     def test_purity_decreases_with_two_qubit_error(self):
+        """
+        Validates that simulated quantum state purity decreases monotonically as the two-qubit error rate increases.
+        Confirms the expected physical behavior of the applied depolarizing channels.
+        """
         qc, spec = _real_qsvt_circuit()
         rows = depolarizing_sweep(
             qc, spec, error_rates=[0.0, 0.01, 0.05], single_qubit_error=0.0
@@ -212,9 +258,10 @@ class TestNoiseExecutorUnderNoise:
         assert purities[-1] < purities[0]
 
     def test_single_qubit_floor_alone_measurably_degrades_deep_circuit(self):
-        # The finding that motivated exposing single_qubit_error explicitly:
-        # even the tiny realistic floor, compounded over a real QSVT
-        # circuit's gate count, is not negligible.
+        """
+        Validates that baseline single-qubit hardware errors impose a measurable degradation on deep algorithmic circuits.
+        Ensures that error floor impacts are not suppressed or ignored in resource evaluation.
+        """
         qc, spec = _real_qsvt_circuit(degree=11)
         rows = depolarizing_sweep(
             qc, spec, error_rates=[0.0],
@@ -227,6 +274,10 @@ class TestNoiseExecutorUnderNoise:
         )
 
     def test_fidelity_vs_ideal_responds_to_noise(self):
+        """
+        Validates that the calculated state fidelity relative to the ideal execution decreases appropriately in the presence of noise.
+        Confirms the accuracy of the comparative fidelity metric.
+        """
         qc, spec = _real_qsvt_circuit()
         rows = depolarizing_sweep(
             qc, spec, error_rates=[0.0, 0.1], single_qubit_error=0.0
@@ -234,8 +285,10 @@ class TestNoiseExecutorUnderNoise:
         assert rows[0]["fidelity_vs_ideal"] > rows[1]["fidelity_vs_ideal"]
 
     def test_vanishing_postselect_probability_raises(self):
-        # A spec whose condition the circuit can never satisfy: qubit 1 is
-        # forced to |1> deterministically, but the spec requires |0>.
+        """
+        Validates that the executor raises an appropriate runtime exception when post-selection probabilities fall below the vanishing threshold.
+        Prevents division by zero or numerically unstable state reconstructions.
+        """
         qc = QuantumCircuit(2)
         qc.x(1)
         spec = PostSelectSpec(n_data=1, conditions=((1, 0),))

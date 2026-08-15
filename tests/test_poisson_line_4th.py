@@ -144,11 +144,9 @@ class TestOrderOfConvergence2D:
                                            (SIN_2D, "sin.sin")])
     def test_order_is_four(self, case, name):
         """
-        Order ≈ 4 on solutions that are not odd about the boundaries and that
-        carry non-zero Dirichlet data, as well as on the sinusoid.
-
-        Against the defective closure this fails for the first two and passes
-        for the third, which is precisely why all three are here.
+        Validates that the convergence rate remains fourth-order across solutions exhibiting 
+        non-zero Dirichlet data and lacking boundary oddness. Ensures robust accuracy where 
+        previous boundary closures demonstrated catastrophic degradation.
         """
         sizes = [8, 16, 32]
         errors = []
@@ -162,16 +160,19 @@ class TestOrderOfConvergence2D:
 
     def test_cubic_is_machine_exact(self):
         """
-        The stencil is exact on cubics and so is the reflection, so any residual
-        error is algebraic rather than truncation — the sharpest available test
-        of the closure, and the one that first exposed f versus ∂²u/∂n².
+        Confirms machine-precision accuracy on cubic solutions to isolate boundary errors.
+        Validates that the scheme precisely evaluates the normal second derivative rather 
+        than relying on the simpler, less accurate general source formulation.
         """
         problem, exact = build_2d(8, *CUBIC_2D)
         u, _ = dense_solve(problem)
         assert np.max(np.abs(u - exact)) < 1e-12
 
     def test_beats_second_order(self):
-        """Fourth order must actually be more accurate, not merely convergent."""
+        """
+        Verifies that the fourth-order scheme consistently delivers strictly smaller absolute 
+        errors than its second-order counterpart for a given grid spacing.
+        """
         from problems.poisson_line_2d import PoissonLine2D
 
         N = 16
@@ -191,8 +192,8 @@ class TestOrderOfConvergence2D:
 
     def test_extrapolated_face_source_preserves_order(self):
         """
-        The cubic-extrapolation fallback for the face source is O(h⁴) and must
-        not degrade the scheme when the caller supplies no face data.
+        Confirms that cubic extrapolation of unspecified face sources maintains the 
+        global O(h^4) accuracy. Ensures numerical stability under incomplete boundary data.
         """
         sizes = [8, 16, 32]
         errors = []
@@ -208,6 +209,11 @@ class TestOrderOfConvergence3D:
     @pytest.mark.parametrize("case,name", [(EXP_3D, "exp(x+y+z)"),
                                            (SIN_3D, "triple sin")])
     def test_order_is_four(self, case, name):
+        """
+        Validates that the fourth-order convergence rate holds for fully three-dimensional 
+        configurations. Employs a dense solve to strictly isolate truncation errors from 
+        outer-iteration inconsistencies.
+        """
         # Kept modest deliberately: the reference here is a *dense* solve of the
         # N³×N³ system, so the cost is O(N⁹). N=24 would be a 13824² factorisation
         # and minutes of suite time for no additional discrimination.
@@ -222,14 +228,20 @@ class TestOrderOfConvergence3D:
             f"errors {errors}")
 
     def test_cubic_is_machine_exact(self):
+        """
+        Confirms machine-precision exactness on three-dimensional cubic polynomials.
+        Verifies that transverse stencils and boundary reflections remain algebraically 
+        exact across all spatial axes.
+        """
         problem, exact = build_3d(8, *CUBIC_3D)
         u, _ = dense_solve(problem)
         assert np.max(np.abs(u - exact)) < 1e-12
 
     def test_order_is_four_with_a_periodic_axis(self):
         """
-        A periodic axis has no boundary and hence no ghost node: all four
-        transverse neighbours are genuine and the closure must not fire.
+        Verifies the conservation of the fourth-order convergence rate along a dimension 
+        subject to periodic boundary conditions. Confirms that ghost nodes and boundary 
+        closures remain appropriately inactive.
         """
         u_fn = lambda x, y, z: np.exp(x + y) * np.cos(2.0 * np.pi * z)
         f_fn = lambda x, y, z: ((2.0 - 4.0 * np.pi ** 2)
@@ -259,6 +271,10 @@ class TestStripDecompositionConsistency:
 
     @pytest.mark.parametrize("scheme", ["sor", "gauss-seidel", "fmg", "multigrid"])
     def test_2d_schemes_reproduce_the_dense_solve(self, scheme):
+        """
+        Validates that two-dimensional iterative strip decompositions converge precisely 
+        to the exact discrete solution of the assembled global system.
+        """
         problem, _ = build_2d(8, *EXP_2D)
         u_dense, _ = dense_solve(problem)
         kwargs = ({"tol": 1e-12, "max_cycles": 200}
@@ -272,6 +288,10 @@ class TestStripDecompositionConsistency:
     @pytest.mark.parametrize("periodic", [(False, False, False),
                                           (False, False, True)])
     def test_3d_schemes_reproduce_the_dense_solve(self, scheme, periodic):
+        """
+        Confirms that three-dimensional iterative solvers accurately recover the dense 
+        reference solution, ensuring that transverse terms and row matrices align perfectly.
+        """
         problem, _ = build_3d(8, *EXP_3D, periodic=periodic)
         u_dense, _ = dense_solve(problem)
         kwargs = ({"tol": 1e-12, "max_cycles": 200} if scheme == "fmg"
@@ -287,20 +307,27 @@ class TestOperatorStructure:
 
     def test_2d_assembled_operator_is_symmetric(self):
         """
-        Symmetry is required by ``build_dense_block_encoding`` and by
-        ``PentadiagonalToeplitz``. Both boundary corrections are right-hand-side
-        only for exactly this reason.
+        Verifies the algebraic symmetry of the assembled two-dimensional numerical operator.
+        Ensures compatibility with downstream block-encoding and spectral techniques.
         """
         problem, _ = build_2d(8, *EXP_2D)
         _, A = dense_solve(problem)
         assert np.max(np.abs(A - A.T)) == 0.0
 
     def test_3d_assembled_operator_is_symmetric(self):
+        """
+        Verifies the algebraic symmetry of the assembled three-dimensional numerical operator.
+        Ensures strict mathematical consistency across multiple spatial dimensions.
+        """
         problem, _ = build_3d(8, *EXP_3D)
         _, A = dense_solve(problem)
         assert np.max(np.abs(A - A.T)) == 0.0
 
     def test_2d_strip_operators_are_symmetric_and_pentadiagonal(self):
+        """
+        Validates that individual one-dimensional strip matrices isolated from the 
+        two-dimensional operator preserve both symmetry and pentadiagonality.
+        """
         problem, _ = build_2d(8, *EXP_2D)
         for j in range(problem.shape[1]):
             A = problem.row_matrix_for((j,))
@@ -311,8 +338,8 @@ class TestOperatorStructure:
 
     def test_2d_has_exactly_two_distinct_strip_operators(self):
         """
-        The count must not grow with N: one block encoding and one set of QSP
-        phase angles is needed per distinct matrix.
+        Confirms that the number of distinct one-dimensional row matrices is exactly two 
+        in a two-dimensional grid, ensuring scalability of the associated quantum encodings.
         """
         for N in (8, 16, 32):
             problem, _ = build_2d(N, *EXP_2D)
@@ -321,6 +348,10 @@ class TestOperatorStructure:
             assert len(ids) == 2
 
     def test_3d_has_at_most_four_distinct_strip_operators(self):
+        """
+        Ensures that three-dimensional configurations produce no more than four unique 
+        strip operators, restricting quantum resource scaling overheads.
+        """
         problem, _ = build_3d(8, *EXP_3D)
         ids = {id(problem.row_matrix_for((j, k)))
                for j in range(problem.shape[1])
@@ -328,7 +359,10 @@ class TestOperatorStructure:
         assert len(ids) == 4
 
     def test_3d_periodic_axis_contributes_no_boundary_operator(self):
-        """A periodic axis has no boundary, so it halves the operator count."""
+        """
+        Confirms that the inclusion of a periodic dimension halves the total number of 
+        distinct strip operators by eliminating the associated boundary boundaries.
+        """
         problem, _ = build_3d(8, *EXP_3D, periodic=(False, False, True))
         ids = {id(problem.row_matrix_for((j, k)))
                for j in range(problem.shape[1])
@@ -337,9 +371,8 @@ class TestOperatorStructure:
 
     def test_boundary_strip_differs_from_interior_by_a_diagonal_shift(self):
         """
-        The transverse ghost fold is +c_y on the diagonal — an *odd* reflection.
-        An even one would appear in the off-diagonal instead, which is the
-        defect this pins.
+        Verifies that boundary strip operators differ from interior ones strictly by 
+        an additive diagonal shift. Confirms proper implementation of the odd reflection.
         """
         problem, _ = build_2d(8, *EXP_2D)
         interior = problem.row_matrix_for((3,))
@@ -350,21 +383,27 @@ class TestOperatorStructure:
 
     def test_kappa_is_bounded_and_small(self):
         """
-        κ(A_row) stays O(1) rather than O(N²) — the property that makes the
-        line decomposition tractable for the quantum inner solvers, and it must
-        survive the move to fourth order.
+        Validates that the condition number of the row matrix remains tightly bounded.
+        Confirms the O(1) scaling property critical for the feasibility of quantum inner solvers.
         """
         kappas = [build_2d(N, *EXP_2D)[0].kappa_row() for N in (8, 16, 32)]
         assert all(k < 4.0 for k in kappas)
         assert kappas[-1] > kappas[0]          # increasing towards its bound
 
     def test_3d_kappa_is_better_than_2d(self):
-        """Both transverse directions contribute to the diagonal in 3-D."""
+        """
+        Confirms that the three-dimensional condition number exhibits superior 
+        bounds compared to the two-dimensional equivalent, due to additional diagonal contributions.
+        """
         k2 = build_2d(8, *EXP_2D)[0].kappa_row()
         k3 = build_3d(8, *EXP_3D)[0].kappa_row()
         assert k3 < k2
 
     def test_transverse_terms_are_the_fourth_order_stencil(self):
+        """
+        Verifies that the extracted transverse stencil components exactly match the theoretical 
+        fourth-order finite difference coefficients.
+        """
         problem, _ = build_2d(8, *EXP_2D)
         c = 1.0 / (12.0 * problem.dy ** 2)
         assert problem.transverse_terms(1, 3, 8) == (
@@ -376,6 +415,10 @@ class TestOperatorStructure:
 class TestCoarsening:
 
     def test_2d_hierarchy_descends_to_the_floor(self):
+        """
+        Validates that successive geometric coarsening of a two-dimensional domain reliably 
+        reaches the minimum permitted structural grid floor.
+        """
         problem, _ = build_2d(32, *EXP_2D)
         shapes = []
         level = problem
@@ -385,13 +428,20 @@ class TestCoarsening:
         assert shapes == [(32, 32), (16, 16), (8, 8), (4, 4)]
 
     def test_coarse_levels_are_homogeneous(self):
-        """Coarse levels carry the error equation: no source, no boundary data."""
+        """
+        Confirms that mathematically generated coarse domains are fully homogeneous, 
+        reflecting the zero-source condition required by the error formulation.
+        """
         problem, _ = build_2d(16, *EXP_2D)
         coarse = problem.coarsen()
         assert np.all(coarse.rhs() == 0.0)
         assert np.all(coarse.f == 0.0)
 
     def test_3d_hierarchy_preserves_periodicity(self):
+        """
+        Verifies that three-dimensional domains retain their assigned periodic axes 
+        throughout the entire multi-level coarsening progression.
+        """
         problem, _ = build_3d(16, *EXP_3D, periodic=(False, False, True))
         coarse = problem.coarsen()
         assert coarse.periodic == (False, False, True)

@@ -27,17 +27,33 @@ class TestRegistryContract:
     """The registry's structural invariants."""
 
     def test_registry_is_not_empty(self):
+        """
+        Validates that the registry contains a minimum expected number of base test cases.
+        Ensures fundamental availability of the test harness.
+        """
         assert len(cases.available()) >= 20
 
     def test_every_dimension_is_populated(self):
+        """
+        Confirms that each spatial dimension (1D, 2D, and 3D) has at least one registered case.
+        Prevents regression in multi-dimensional support.
+        """
         for dim in (1, 2, 3):
             assert cases.available(dim=dim), f"no cases registered for {dim}D"
 
     def test_every_family_is_populated(self):
+        """
+        Validates the presence of test cases for both standard Poisson and heterostructure families.
+        Guarantees broad domain coverage.
+        """
         for family in ("poisson", "het"):
             assert cases.available(family=family)
 
     def test_get_rejects_unknown_names(self):
+        """
+        Ensures that attempting to fetch an unregistered case name results in a KeyError.
+        Prevents silent fallback and ambiguity in case specification.
+        """
         # A stale legacy label must fail loudly, not resolve to something
         # plausible: silently accepting "fS" is exactly the ambiguity the
         # registry exists to remove.
@@ -45,6 +61,10 @@ class TestRegistryContract:
             cases.get("fS")
 
     def test_register_rejects_a_duplicate_name(self):
+        """
+        Confirms that registering a case with an existing name raises a ValueError.
+        Protects the uniqueness constraint of the test case registry.
+        """
         existing = cases.available()[0]
         clash = cases.Case(
             name=existing, dim=1, family="poisson",
@@ -54,6 +74,10 @@ class TestRegistryContract:
             cases.register(clash)
 
     def test_register_rejects_a_non_power_of_two_resolution(self):
+        """
+        Validates that only power-of-two resolutions are accepted by the registry.
+        Maintains structural assumptions relied upon by downstream solvers.
+        """
         bad = cases.Case(
             name="_test_bad_N", dim=1, family="poisson",
             summary="bad", build=lambda N: None, default_N=(6,),
@@ -62,6 +86,10 @@ class TestRegistryContract:
             cases.register(bad)
 
     def test_register_rejects_an_unknown_reference_strategy(self):
+        """
+        Ensures that unsupported analytical or numerical reference strategies are rejected.
+        Maintains the integrity of validation comparisons.
+        """
         bad = cases.Case(
             name="_test_bad_ref", dim=1, family="poisson",
             summary="bad", build=lambda N: None, reference="guesswork",
@@ -70,6 +98,10 @@ class TestRegistryContract:
             cases.register(bad)
 
     def test_describe_renders_every_case(self):
+        """
+        Confirms that the registry description generator produces output for all registered cases.
+        Assures comprehensive status reporting.
+        """
         table = cases.describe()
         for name in cases.available():
             assert name in table
@@ -88,9 +120,17 @@ class TestCaseStructure:
     """Every registered case builds and reports what it declares."""
 
     def test_builds_at_N4(self, name):
+        """
+        Validates that a given case successfully builds a problem representation at a baseline resolution.
+        Confirms basic instantiation mechanics.
+        """
         assert isinstance(cases.get(name).build(4), cases.BuiltCase)
 
     def test_shapes_match_declared_dimension(self, name):
+        """
+        Ensures that the instantiated geometry, coordinates, and solution fields strictly match the declared spatial dimension.
+        Prevents dimensionality mismatches in generated matrices.
+        """
         case = cases.get(name)
         built = case.build(4)
 
@@ -105,12 +145,20 @@ class TestCaseStructure:
             assert c.shape == expected
 
     def test_condition_number_is_finite_and_at_least_one(self, name):
+        """
+        Validates that the condition number of the resulting system is computationally valid and bounded appropriately.
+        Ensures numerical stability.
+        """
         built = cases.get(name).build(4)
         assert built.kappa is not None
         assert np.isfinite(built.kappa)
         assert built.kappa >= 1.0 - 1e-12
 
     def test_exact_solution_shape_when_present(self, name):
+        """
+        Confirms that any provided exact solution matches the dimensionality and shape of the discrete domain.
+        Guarantees shape alignment for subsequent error analysis.
+        """
         case = cases.get(name)
         built = case.build(4)
         if built.exact is None:
@@ -120,6 +168,10 @@ class TestCaseStructure:
             assert built.exact.shape == built.f_values.shape
 
     def test_declared_default_resolutions_are_powers_of_two(self, name):
+        """
+        Ensures that all default resolutions declared by a case adhere to the power-of-two requirement.
+        Maintains consistency across refinement strategies.
+        """
         for N in cases.get(name).default_N:
             assert N > 0 and (N & (N - 1)) == 0
 
@@ -261,6 +313,10 @@ class TestOneDimensionalResiduals:
         if cases.get(n).dim == 1 and cases.get(n).grid == "interior"
     ])
     def test_interior_grid_excludes_the_boundaries(self, name):
+        """
+        Confirms that interior grids properly omit boundary coordinates.
+        Ensures alignment with homogeneous Dirichlet conditions.
+        """
         built = cases.get(name).build(8)
         x = built.coords[0]
         assert x[0] == pytest.approx(1.0 / 9)
@@ -277,11 +333,19 @@ class TestStripConditioning:
 
     @pytest.mark.parametrize("name", [n for n in ALL_CASES if cases.get(n).dim == 2])
     def test_two_dimensional_strip_kappa_approaches_three(self, name):
+        """
+        Validates that the condition number of 2D strip operators remains bounded below three.
+        Highlights the conditioning advantage of the line decomposition method.
+        """
         kappa = cases.get(name).build(16).kappa
         assert 1.0 <= kappa < 3.0
 
     @pytest.mark.parametrize("name", [n for n in ALL_CASES if cases.get(n).dim == 3])
     def test_three_dimensional_strip_kappa_approaches_two(self, name):
+        """
+        Confirms that the condition number of 3D strip operators remains bounded below two.
+        Validates the scalability of the decomposition in higher dimensions.
+        """
         kappa = cases.get(name).build(16).kappa
         assert 1.0 <= kappa < 2.0
 
@@ -301,15 +365,27 @@ class TestPreservedNameCollisions:
     """
 
     def test_the_two_two_dimensional_sinusoids_differ(self):
+        """
+        Ensures that similarly named 2D sinusoidal cases generate distinct mathematical states.
+        Prevents inadvertent deduplication of genuinely different problem configurations.
+        """
         a = cases.get("poisson_2d_sin_pi").build(8).f_values
         b = cases.get("poisson_2d_fS_10sin2pi").build(8).f_values
         assert np.max(np.abs(a - b)) > 1.0
 
     def test_only_one_two_dimensional_sinusoid_has_a_closed_form(self):
+        """
+        Validates that the availability of a closed-form solution correctly distinguishes related sinusoidal cases.
+        Confirms registry fidelity.
+        """
         assert cases.get("poisson_2d_sin_pi").build(8).exact is not None
         assert cases.get("poisson_2d_fS_10sin2pi").build(8).exact is None
 
     def test_the_two_het_linear_profiles_differ(self):
+        """
+        Confirms that linear heterostructure profile cases with related names produce distinct source terms and exact solutions.
+        Ensures mathematical separation.
+        """
         a = cases.get("het_1d_3a_linear").build(8)
         b = cases.get("het_1d_linear_scaled").build(8)
         assert np.max(np.abs(a.f_values - b.f_values)) > 1.0
@@ -342,12 +418,20 @@ class TestPeriodicity:
         if cases.get(n).dim == 3 and cases.get(n).family == "het"
     ])
     def test_het_3d_cases_are_azimuthally_periodic(self, name):
+        """
+        Validates that 3D heterostructure cases enforce azimuthal periodicity.
+        Confirms the appropriate boundary treatment for the channel geometry.
+        """
         assert cases.get(name).periodic == (False, False, True)
 
     @pytest.mark.parametrize("name", [
         n for n in ALL_CASES if cases.get(n).family == "poisson"
     ])
     def test_generic_poisson_cases_are_not_periodic(self, name):
+        """
+        Ensures that generic Poisson cases do not inadvertently apply periodic boundary conditions.
+        Maintains strict adherence to finite domain definitions.
+        """
         assert not any(cases.get(name).periodic)
 
     def test_periodic_axis_grid_has_no_boundary_node(self):

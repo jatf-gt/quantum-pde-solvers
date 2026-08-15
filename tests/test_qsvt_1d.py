@@ -81,8 +81,8 @@ class TestBlockEncoding:
 
     def test_circuit_is_unitary(self):
         """
-        The block encoding circuit must be unitary to within numerical
-        precision. Verified by checking U^dagger U = I.
+        Verifies that the compiled block-encoding quantum circuit maintains strict 
+        unitarity within standard numerical precision bounds.
         """
         from qiskit.quantum_info import Operator
         qc, alpha = build_tst_block_encoding(4, -2.0, 1.0)
@@ -142,6 +142,10 @@ class TestBlockEncoding:
             f"(should = 1.0 if unitary)")
 
     def test_block_encodes_correct_matrix(self):
+        """
+        Validates that the generated block encoding structurally recovers the scaled 
+        tridiagonal system matrix embedded in the quantum register's superior principal minor.
+        """
         N         = 4
         main_diag = -2.0
         off_diag  =  1.0
@@ -162,8 +166,8 @@ class TestBlockEncoding:
 
     def test_subnormalisation_satisfies_bound(self):
         """
-        alpha must satisfy ||A/alpha||_2 <= 1 for the block encoding
-        to be a valid sub-unitary embedding.
+        Confirms that the derived subnormalisation scalar correctly bounds the spectral 
+        norm of the encoded operator strictly beneath unity.
         """
         for main_diag, off_diag in [(-2.0, 1.0), (-4.0, 1.0)]:
             N     = 4
@@ -181,8 +185,8 @@ class TestBlockEncoding:
 
     def test_alpha_satisfies_subnormalisation_bound(self):
         """
-        alpha must satisfy ||A||_2 <= alpha (subnormalisation condition).
-        For the Sz.-Nagy encoding, alpha = ||A||_2 exactly.
+        Verifies that the implemented Sz.-Nagy operator embedding precisely defines 
+        the subnormalisation factor as equivalent to the classical spectral matrix norm.
         """
         for N, main_diag, off_diag in [(4, -2.0, 1.0), (4, -4.0, 1.0)]:
             qc, alpha = build_tst_block_encoding(N, main_diag, off_diag)
@@ -197,6 +201,10 @@ class TestBlockEncoding:
             )
 
     def test_invalid_N_raises(self):
+        """
+        Ensures that quantum encoding routines rigorously reject system dimensions 
+        that cannot be accommodated within an integer qubit configuration space.
+        """
         with pytest.raises(ValueError, match="power of 2"):
             build_tst_block_encoding(6, -2.0, 1.0)
 
@@ -207,7 +215,8 @@ class TestQSPAngles:
 
     def test_degree_estimate_increases_with_kappa(self):
         """
-        Polynomial degree must increase with condition number.
+        Confirms that the heuristically determined polynomial degree scaling exhibits 
+        the anticipated monotonic progression with respect to the operator condition number.
         """
         d1 = polynomial_degree_estimate(5.0,  0.01)
         d2 = polynomial_degree_estimate(10.0, 0.01)
@@ -216,7 +225,8 @@ class TestQSPAngles:
 
     def test_degree_estimate_increases_with_precision(self):
         """
-        Polynomial degree must increase as epsilon decreases.
+        Validates that increasingly stringent error tolerances reliably mandate 
+        proportionally higher degrees within the QSP approximation polynomial.
         """
         d1 = polynomial_degree_estimate(10.0, 0.1)
         d2 = polynomial_degree_estimate(10.0, 0.01)
@@ -225,16 +235,17 @@ class TestQSPAngles:
 
     def test_angles_shape(self):
         """
-        Phase angle array must have length degree + 1.
+        Verifies that the generated array of quantum signal processing phase parameters 
+        strictly accommodates the structural requirements of the designated polynomial rank.
         """
         angles, degree = compute_inversion_angles(5.0, 0.1, method="auto")
         assert len(angles) == degree + 1
 
     def test_polynomial_approximates_inverse(self):
         """
-        The QSP polynomial must be bounded by 1 on [-1, 1] and must
-        have positive real part on [1/kappa, 1], indicating it approximates
-        a positive function (1/x > 0 on this interval).
+        Validates that the computed QSP transformation conforms to fundamental 
+        sub-unitary bounds on the closed domain [-1, 1], whilst effectively capturing 
+        the positive real inversion spectrum restricted to the effective condition band.
         """
         kappa   = 5.0
         epsilon = 0.1
@@ -258,10 +269,18 @@ class TestQSPAngles:
         )
 
     def test_invalid_kappa_raises(self):
+        """
+        Ensures that physically invalid or degenerate condition numbers are 
+        correctly intercepted during angle computation.
+        """
         with pytest.raises(ValueError, match="kappa"):
             compute_inversion_angles(0.5, 0.01)
 
     def test_invalid_epsilon_raises(self):
+        """
+        Validates that negative algorithmic error bounds correctly trigger 
+        configuration rejection, preserving mathematical robustness.
+        """
         with pytest.raises(ValueError, match="epsilon"):
             compute_inversion_angles(5.0, -0.01)
 
@@ -270,26 +289,45 @@ class TestQSPAngles:
 
 class TestQSVT1D:
 
-    def test_returns_qsvt_solver_result(self, problem_1d_N4_fS, qsvt_cfg_fast):
+    def test_returns_qsvt_solver_result(self):
+        """
+        Verifies that the QSVT execution pipeline successfully returns the standard 
+        result container type, ensuring type coherence across solver frameworks.
+        """
         r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert isinstance(r, QSVTSolverResult)
 
     def test_solution_shape(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        """
+        Confirms that the reconstructed numerical solution strictly mirrors the 
+        geometric dimensions dictated by the input boundary value problem.
+        """
         r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert r.u.shape == (4,)
 
     def test_solver_label(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        """
+        Validates the correct internal tagging of solver provenance on the generated 
+        solution output container.
+        """
         r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert r.solver == "QSVT"
 
     def test_solution_finite(self, problem_1d_N4_fS, qsvt_cfg_fast):
-        """All solution values must be finite."""
+        """
+        Ensures that the final assembled state vector entirely avoids non-physical 
+        computational divergences such as infinities or NaNs.
+        """
         r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert np.all(np.isfinite(r.u)), (
             "QSVT solution contains non-finite values."
         )
 
     def test_circuit_diagnostics_populated(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        """
+        Verifies that structural circuit performance metrics are consistently logged 
+        during the quantum simulation, supporting complexity auditing.
+        """
         r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert r.polynomial_degree > 0
         assert r.circuit_depth     > 0
@@ -298,18 +336,25 @@ class TestQSVT1D:
         assert r.n_angles == r.polynomial_degree + 1
 
     def test_kappa_effective_positive(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        """
+        Confirms that the empirically utilised target condition number reflects 
+        a strictly positive valid mathematical state throughout execution.
+        """
         r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert r.kappa_effective > 0.0
 
     def test_residual_finite(self, problem_1d_N4_fS, qsvt_cfg_fast):
+        """
+        Validates the boundedness of the computationally derived residual norm 
+        following numerical state inversion.
+        """
         r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert np.isfinite(r.euclidean_residual)
 
     def test_sign_consistent_with_thomas(self, problem_1d_N4_fS, qsvt_cfg_fast):
         """
-        The dominant solution component must have the same sign as the
-        Thomas reference. A sign flip indicates a proportionality
-        recovery failure.
+        Demonstrates that the primary wave mode retains a congruent orientation 
+        relative to exact classical integration, safeguarding against parity inversions.
         """
         u_thomas = thomas_solve(problem_1d_N4_fS).u
         u_qsvt   = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast).u
@@ -323,7 +368,10 @@ class TestQSVT1D:
         )
 
     def test_qsvt_solve_system_raw_arrays(self, qsvt_cfg_fast):
-        """qsvt_solve_system accepts raw (A, b) arrays."""
+        """
+        Confirms the robust independent ingestion of unencapsulated matrix and 
+        vector objects into the primary quantum simulation algorithm.
+        """
         A = np.array([[-2., 1., 0., 0.],
                       [ 1.,-2., 1., 0.],
                       [ 0., 1.,-2., 1.],
@@ -334,25 +382,40 @@ class TestQSVT1D:
         assert np.all(np.isfinite(r.u))
 
     def test_non_power_of_2_raises(self, qsvt_cfg_fast):
+        """
+        Validates that generic numerical structures correctly enforce necessary 
+        quantum hardware scaling constraints before initialising execution frames.
+        """
         A = np.eye(3) * (-2.0)
         b = np.ones(3)
         with pytest.raises(ValueError, match="power of 2"):
             qsvt_solve_system(A, b, qsvt_cfg_fast)
 
     def test_non_hermitian_raises(self, qsvt_cfg_fast):
+        """
+        Ensures that mathematically asymmetrical operators are strictly intercepted, 
+        preserving the fundamental theoretical assumptions of the singular value framework.
+        """
         A = np.array([[-2., 2.], [1., -2.]])
         b = np.array([1., 1.])
         with pytest.raises(ValueError, match="Hermitian"):
             qsvt_solve_system(A, b, qsvt_cfg_fast)
 
     def test_zero_rhs_raises(self, qsvt_cfg_fast):
+        """
+        Confirms that trivial homogeneous systems gracefully error out, avoiding 
+        ill-defined classical scalar renormalisation during final superposition collapse.
+        """
         A = np.array([[-2., 1.], [1., -2.]])
         b = np.zeros(2)
         with pytest.raises(ValueError, match="zero"):
             qsvt_solve_system(A, b, qsvt_cfg_fast)
 
     def test_angles_stored_in_result(self, problem_1d_N4_fS, qsvt_cfg_fast):
-        """Phase angles must be stored in the result for reproducibility."""
+        """
+        Verifies that explicitly computed trigonometric signal manipulations are fully 
+        persisted to the output registry, facilitating auditability and reuse.
+        """
         r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)
         assert r.angles is not None
         assert len(r.angles) == r.n_angles

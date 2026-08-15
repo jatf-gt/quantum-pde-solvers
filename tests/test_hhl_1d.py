@@ -23,36 +23,41 @@ pytestmark = pytest.mark.quantum
 class TestHHL1D:
 
     def test_returns_solver_result(self, problem_1d_N4_fS):
+        """Confirms that execution yields a well-formed internal result structure."""
         from solvers.quantum.result import SolverResult
         r = hhl_solve(problem_1d_N4_fS)
         assert isinstance(r, SolverResult)
 
     def test_solution_shape(self, problem_1d_N4_fS):
+        """Validates dimensional congruity between solver outputs and the target domain size."""
         r = hhl_solve(problem_1d_N4_fS)
         assert r.u.shape == (4,)
 
     def test_solver_label(self, problem_1d_N4_fS):
+        """Ensures provenance markings definitively identify the originating solver algorithm."""
         r = hhl_solve(problem_1d_N4_fS)
         assert r.solver == "HHL"
 
     def test_prop_const_nonzero(self, problem_1d_N4_fS):
-        """Proportionality constant must be non-zero and finite."""
+        """
+        Validates the numerical stability and non-triviality of the scaling extraction process.
+        """
         r = hhl_solve(problem_1d_N4_fS)
         assert r.prop_const is not None
         assert np.isfinite(r.prop_const)
         assert abs(r.prop_const) > 1e-10
 
     def test_residual_finite(self, problem_1d_N4_fS):
+        """Confirms that internal residual measurements do not yield arithmetic singularities."""
         r = hhl_solve(problem_1d_N4_fS)
         assert np.isfinite(r.euclidean_residual)
 
     @pytest.mark.parametrize("fn_key", ["fS", "fL", "fH"])
     def test_agrees_with_thomas_loose(self, fn_key):
         """
-        HHL solution must agree with Thomas to within HHL_REL_ERROR_TOL.
-
-        This is a loose check (20%) — the Trotter approximation at
-        epsilon=0.01 introduces errors of order 1-5% for N=4.
+        Ensures quantum-derived solutions broadly converge with classical targets under known theoretical limitations.
+        
+        The baseline structural accuracy acknowledges Trotterization boundaries without requiring precise convergence.
         """
         from core.config import SimConfig1D
         from problems.poisson_1d import PoissonProblem1D
@@ -68,8 +73,9 @@ class TestHHL1D:
 
     def test_solution_has_correct_sign(self, problem_1d_N4_fS):
         """
-        For fS with homogeneous BCs, the solution is negative (u = -sin(πx)/π²).
-        The proportionality recovery must get the sign right.
+        Validates the polarity orientation accuracy of recovered scaled states across the domain interior.
+        
+        Proper coefficient extraction is crucial for ensuring output vectors match the physical properties of the source function.
         """
         from core.exact_solutions import EXACT_SOLUTIONS
         r       = hhl_solve(problem_1d_N4_fS)
@@ -82,7 +88,7 @@ class TestHHL1D:
         )
 
     def test_hhl_solve_system_raw_arrays(self, problem_1d_N4_fS):
-        """hhl_solve_system works on raw (A, b, epsilon) inputs."""
+        """Confirms that raw array inputs gracefully navigate the fundamental HHL structural workflow."""
         prob = problem_1d_N4_fS
         u, x_raw, c = hhl_solve_system(prob.A, prob.b, 0.01)
         assert u.shape == (4,)
@@ -90,7 +96,7 @@ class TestHHL1D:
         assert np.isfinite(c)
 
     def test_zero_rhs_raises(self):
-        """A zero RHS should raise ValueError before calling HHL."""
+        """Ensures that inherently unsolvable trivial null spaces immediately trigger exception barriers."""
         A = np.array([[-2., 1.], [1., -2.]])
         b = np.zeros(2)
         with pytest.raises(ValueError, match="zero"):

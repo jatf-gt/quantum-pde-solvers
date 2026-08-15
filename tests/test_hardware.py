@@ -43,12 +43,17 @@ def ctx():
 class TestHardwareContext:
 
     def test_local_testing_flag(self, ctx):
+        """Confirms that the context properly indicates a local testing environment."""
         assert ctx.is_local_testing is True
 
     def test_local_testing_backend_is_fake_torino(self, ctx):
+        """Validates that local testing utilizes the FakeTorino backend to emulate hardware behaviour."""
         assert ctx.backend.name == "fake_torino"
 
     def test_real_requires_no_credentials_at_construction_time(self):
+        """
+        Ensures that local testing bypasses credential validation mechanisms.
+        """
         # HardwareContext.real() is not called here (it needs a saved
         # account and network access, neither available in this sandbox).
         # This test only confirms local_testing() -- the path this whole
@@ -63,6 +68,9 @@ class TestHardwareContext:
 class TestHardwarePostselectionSample:
 
     def test_deterministic_acceptance(self, ctx):
+        """
+        Validates post-selection acceptance probabilities under realistic device noise profiles.
+        """
         # Same regression this exact check caught a real bug for in
         # core.noise.sample_postselection: qubit 2 forced to |1>, spec
         # requires qubit2=1 -- should accept essentially every shot.
@@ -73,6 +81,9 @@ class TestHardwarePostselectionSample:
         assert sample.probability > 0.85  # allow for realistic device noise
 
     def test_deterministic_rejection(self, ctx):
+        """
+        Ensures that post-selection correctly rejects unsuitable states despite hardware imperfections.
+        """
         qc = QuantumCircuit(3)
         qc.x(2)
         spec = PostSelectSpec(n_data=2, conditions=((2, 0),))
@@ -80,6 +91,9 @@ class TestHardwarePostselectionSample:
         assert sample.probability < 0.15
 
     def test_provenance_populated(self, ctx):
+        """
+        Confirms that hardware sample results comprehensively populate provenance metadata.
+        """
         qc = QuantumCircuit(2)
         spec = PostSelectSpec(n_data=1, conditions=((1, 0),))
         sample = hardware_postselection_sample(qc, spec, ctx, shots=200)
@@ -96,6 +110,9 @@ class TestHardwarePostselectionSample:
 class TestHardwareEstimateBatch:
 
     def test_bell_state_correlations(self, ctx):
+        """
+        Validates the estimation of multi-qubit correlations on simulated hardware.
+        """
         qc = QuantumCircuit(2)
         qc.h(0)
         qc.cx(0, 1)
@@ -107,6 +124,9 @@ class TestHardwareEstimateBatch:
         assert results[1].value > 0.5
 
     def test_batch_shares_one_job(self, ctx):
+        """
+        Ensures that batched estimation requests are coalesced into a single hardware job submission.
+        """
         qc = QuantumCircuit(1)
         qc.h(0)
         pairs = [(qc, SparsePauliOp("Z")), (qc, SparsePauliOp("X"))]
@@ -114,6 +134,9 @@ class TestHardwareEstimateBatch:
         assert results[0].provenance.job_id == results[1].provenance.job_id
 
     def test_resilience_level_is_none_in_local_testing(self, ctx):
+        """
+        Validates that resilience protocols are intentionally deactivated and reported as absent during local testing.
+        """
         # Local testing mode genuinely ignores resilience_level -- the
         # provenance should say so honestly (None), not echo back the
         # configured value as if it took effect. See HardwareContext.estimator
@@ -138,6 +161,9 @@ class TestFidelityFormulaClassical:
     """
 
     def test_matches_direct_fidelity_on_random_states(self):
+        """
+        Confirms that Pauli-basis fidelity decomposition matches direct linear algebra formulations.
+        """
         from solvers.quantum.vqls_utils import (
             pauli_decompose_matrix,
             _pauli_string_to_matrix,
@@ -161,6 +187,9 @@ class TestFidelityFormulaClassical:
         assert via_paulis.real == pytest.approx(direct, abs=1e-9)
 
     def test_sparse_pauli_op_label_matches_pauli_string_to_matrix(self):
+        """
+        Validates the structural alignment between string-based Pauli matrices and qiskit SparsePauliOp semantics.
+        """
         # Foundational assumption for hardware_fidelity_estimate: the Pauli
         # strings pauli_decompose_matrix returns can be fed directly into
         # SparsePauliOp without any reordering.
@@ -176,6 +205,9 @@ class TestFidelityFormulaClassical:
 class TestHardwareFidelityEstimate:
 
     def test_self_fidelity_exceeds_orthogonal_fidelity(self, ctx):
+        """
+        Ensures that fidelity estimates appropriately distinguish identical quantum states from orthogonal configurations.
+        """
         qc = QuantumCircuit(2)
         qc.h(0)
         qc.cx(0, 1)
@@ -191,6 +223,9 @@ class TestHardwareFidelityEstimate:
         assert fid_orth.value < 0.3
 
     def test_reports_term_count(self, ctx):
+        """
+        Validates that fidelity estimation outputs provide consistent tracking of expanded Pauli terms.
+        """
         qc = QuantumCircuit(2)
         qc.h(0)
         qc.cx(0, 1)

@@ -211,8 +211,8 @@ def vqls_cfg_fast():
 
     n_layers=3, max_iter=150 per restart, 3 restarts = 450 total.
     For N=4 (2 qubits) this converges in under 10 seconds.
-    Tolerance is loose (1e-3) — we are checking the solver runs and
-    produces a reasonable answer, not publication-level accuracy.
+    Tolerance is loose (1e-3) — this validates that the solver executes and
+    produces a reasonable outcome, rather than publication-level accuracy.
     """
     return VQLSConfig1D(
         n_layers    = 3,

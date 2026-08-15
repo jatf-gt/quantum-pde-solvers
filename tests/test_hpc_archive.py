@@ -77,7 +77,11 @@ def sweep_3d(tmp_path):
 
 def test_importing_hpc_archive_does_not_pull_matplotlib():
     """
-    The deferred-Matplotlib protection in hpc_plotting is void if the module it
+    Validates that importing the `hpc_archive` module does not inadvertently
+    load Matplotlib. Ensures the plotting stack is not prematurely pulled into 
+    processes requiring lighter dependencies. Checked in a subprocess to avoid
+    state contamination from prior imports.
+    """
     imports for loading pulls Matplotlib at import time. Checked in a
     subprocess, since by the time this test runs the plotting stack may already
     be in `sys.modules` for unrelated reasons.
@@ -92,7 +96,10 @@ def test_importing_hpc_archive_does_not_pull_matplotlib():
 
 
 def test_importing_hpc_plotting_does_not_pull_matplotlib():
-    """The same guarantee for the orchestration module."""
+    """
+    Confirms that the `hpc_plotting` orchestration module defers its Matplotlib 
+    imports, protecting environments where an interactive backend is undesirable.
+    """
     code = (
         "import sys; import benchmark.hpc_plotting; "
         "print('matplotlib' in sys.modules)"
@@ -108,22 +115,36 @@ class TestFilenames:
 
     def test_1d_and_2d_share_a_stem(self):
         """
-        Nothing but the containing directory distinguishes a 1D archive from a
-        2D one. Recorded as a fact about the schema so that a future change is
+        Ensures that 1D and 2D archives use the identical naming stem, verifying 
+        that differentiation is strictly contextual (by directory). Records this 
+        as an explicit schema fact.
+        """
         a deliberate one.
         """
         assert (rio.solution_filename("c", "HHL", 8, dim=1)
                 == rio.solution_filename("c", "HHL", 8, dim=2))
 
     def test_3d_has_its_own_stem(self):
+        """
+        Validates that 3D archives are allocated a distinct naming stem, separating 
+        them from the 1D/2D naming convention.
+        """
         assert rio.solution_filename("c", "HHL", 8, dim=3).startswith("solution3d_")
 
     def test_filename_round_trips_through_save(self, tmp_path):
+        """
+        Confirms that paths constructed for saving solutions correctly match the 
+        expected schema filenames. Verifies physical creation on disk.
+        """
         path = rio.save_solution(tmp_path, "c", "HHL", 8, dim=2, u=np.zeros(3))
         assert path.name == rio.solution_filename("c", "HHL", 8, dim=2)
         assert path.exists()
 
     def test_unknown_dimension_is_rejected(self):
+        """
+        Ensures that providing an unsupported physical dimension raises a KeyError, 
+        preventing malformed file paths from being generated.
+        """
         with pytest.raises(KeyError):
             rio.solution_filename("c", "HHL", 8, dim=4)
 
@@ -133,34 +154,53 @@ class TestFilenames:
 class TestFieldAliases:
 
     def test_resolves_the_1d_spelling(self):
+        """
+        Validates that field alias resolution accurately extracts the 1D-specific 
+        keys (`u_solver`, `u_exact`) mapped to the common semantic names.
+        """
         data = {"u_solver": np.arange(3), "u_exact": np.ones(3)}
         assert rio.field(data, "solution").tolist() == [0, 1, 2]
         assert rio.field(data, "exact").tolist() == [1, 1, 1]
 
     def test_resolves_the_2d_spelling(self):
+        """
+        Validates that field alias resolution accurately extracts the 2D-specific 
+        keys (`phi_solver`, `phi_exact`) mapped to the common semantic names.
+        """
         data = {"phi_solver": np.arange(3), "phi_exact": np.ones(3)}
         assert rio.field(data, "solution").tolist() == [0, 1, 2]
         assert rio.field(data, "exact").tolist() == [1, 1, 1]
 
     def test_resolves_the_3d_spelling(self):
+        """
+        Validates that field alias resolution accurately extracts the 3D-specific 
+        key (`phi`) mapped to the common semantic name.
+        """
         assert rio.field({"phi": np.arange(3)}, "solution").tolist() == [0, 1, 2]
 
     def test_preference_order_prefers_the_native_name(self):
         """
-        The 2D driver writes a `u_solver` alias beside `phi_solver`. Where both
-        are present the 1D spelling wins, which is what keeps a 2D archive
+        Confirms that when multiple alias keys are present, the original 1D 
+        spelling takes precedence. Ensures backward compatibility for 2D archives 
+        parsed by 1D-era loaders.
+        """
         readable by the 1D-era loader.
         """
         data = {"u_solver": np.zeros(3), "phi_solver": np.ones(3)}
         assert rio.field(data, "solution").tolist() == [0, 0, 0]
 
     def test_absent_field_returns_none(self):
+        """
+        Ensures that querying an unrepresented semantic field returns None, rather 
+        than raising an error, when the data dictionary is structurally sound.
+        """
         assert rio.field({"x": np.zeros(3)}, "exact") is None
 
     def test_unknown_field_name_raises(self):
         """
-        A typo must not present as "this archive has no solution": returning
-        None for an unrecognised name would be indistinguishable from a genuine
+        Validates that querying a completely unknown semantic name raises a KeyError. 
+        Protects against typographical errors masking as absent data.
+        """
         absence.
         """
         with pytest.raises(KeyError, match="Unknown field"):
@@ -170,11 +210,18 @@ class TestFieldAliases:
 class TestRowFields:
 
     def test_missing_common_field_raises(self):
+        """
+        Confirms that attempting to extract a mandatory common row field raises a 
+        KeyError if it is absent from the underlying dictionary.
+        """
         with pytest.raises(KeyError, match="common field"):
             rio.row_field({"solver": "HHL"}, "case")
 
     def test_missing_dimension_specific_field_returns_default(self):
-        """1D rows carry no `scheme`; asking for it must not be fatal."""
+        """
+        Ensures that querying a dimension-specific field (e.g. `scheme` in 1D rows) 
+        returns the supplied default value instead of failing.
+        """
         assert rio.row_field({"case": "c"}, "scheme", "n/a") == "n/a"
 
 
@@ -183,6 +230,10 @@ class TestRowFields:
 class TestSweepArchive:
 
     def test_reads_rows_and_solutions(self, sweep_1d):
+        """
+        Validates that `SweepArchive` successfully reconstructs row data and 
+        loads solution arrays from a valid on-disk hierarchy.
+        """
         sw = rio.SweepArchive(sweep_1d, dim=1, plots_subdir=None)
         rows = sw.rows()
         assert len(rows) == 4
@@ -190,19 +241,28 @@ class TestSweepArchive:
         assert rio.field(sol, "solution").shape == (8,)
 
     def test_absent_solution_returns_none(self, sweep_1d):
+        """
+        Ensures that requesting a solution which has not been archived returns None, 
+        maintaining robustness in incomplete sweeps.
+        """
         sw = rio.SweepArchive(sweep_1d, dim=1, plots_subdir=None)
         assert sw.solution("case_a", "QSVT", 8) is None
 
     def test_absent_summary_exits_rather_than_tracebacks(self, tmp_path):
         """
-        A walltime-killed job writes its archives but never its summary, so
-        this is a routine outcome and deserves a message, not a stack trace.
+        Confirms that reading from an archive lacking a summary file yields a clean 
+        SystemExit. Provides expected behaviour for wall-time-killed jobs.
+        """
         """
         sw = rio.SweepArchive(tmp_path, dim=1)
         with pytest.raises(SystemExit, match="No results found"):
             sw.rows()
 
     def test_missing_reports_gaps(self, sweep_1d):
+        """
+        Validates the gap-detection logic by confirming it accurately identifies 
+        unconverged rows lacking complete physical data.
+        """
         sw = rio.SweepArchive(sweep_1d, dim=1, plots_subdir=None)
         rows = sw.rows()
         assert sw.missing(rows) == []
@@ -217,28 +277,42 @@ class TestSweepArchive:
 
     def test_wrong_dimension_makes_every_archive_missing(self, sweep_1d):
         """
-        Reading a 1D sweep as 3D looks for the `solution3d_` stem and finds
-        nothing. Every row reports as a gap, which is exactly the signal that
-        distinguishes a misconfigured reader from a partial sweep.
+        Ensures that an archive parsed with incorrect dimensionality correctly 
+        registers every data file as missing, signalling misconfiguration 
+        rather than raising obscure errors.
+        """
         """
         sw = rio.SweepArchive(sweep_1d, dim=3)
         rows = sw.rows()
         assert len(sw.missing(rows)) == len(rows)
 
     def test_metadata_absence_is_not_an_error(self, sweep_1d):
-        """Provenance is not data; a sweep is interpretable without it."""
+        """
+        Verifies that metadata absence is tolerated cleanly, as provenance files 
+        are supplementary and not strictly required for data interpretation.
+        """
         assert rio.SweepArchive(sweep_1d, dim=1).metadata() == {}
 
     def test_metadata_round_trips(self, sweep_1d):
+        """
+        Validates that written metadata JSON files are correctly parsed back 
+        into python dictionaries by the reader.
+        """
         (sweep_1d / "run_metadata.json").write_text(json.dumps({"dimension": 1}))
         assert rio.SweepArchive(sweep_1d, dim=1).metadata()["dimension"] == 1
 
     def test_plots_dir_defaults_to_a_subdirectory(self, sweep_1d):
+        """
+        Ensures the plots directory correctly resolves to the expected nested 
+        'plots' path for modern (>=2D) layouts.
+        """
         assert rio.SweepArchive(sweep_1d, dim=2).plots_dir.name == "plots"
 
     def test_plots_dir_can_be_the_results_dir(self, sweep_1d):
-        """The 1D driver writes figures beside its results, under names that
-        appear in written work."""
+        """
+        Confirms that 1D layouts correctly collocate figures alongside the 
+        numerical results when explicitly configured.
+        """
         sw = rio.SweepArchive(sweep_1d, dim=1, plots_subdir=None)
         assert sw.plots_dir == sw.results_dir
 
@@ -246,20 +320,28 @@ class TestSweepArchive:
 class TestGrouping:
 
     def test_group_by_case_solver_sorts_by_resolution(self, sweep_1d):
+        """
+        Validates that grouping results by problem case and solver correctly 
+        orders the sub-elements monotonically by resolution (N).
+        """
         sw = rio.SweepArchive(sweep_1d, dim=1, plots_subdir=None)
         grouped = sw.group_by_case_solver(sw.rows())
         assert [r["N"] for r in grouped[("case_a", "HHL")]] == [4, 8]
 
     def test_group_by_case_N_sorts_solvers_canonically(self, sweep_1d):
+        """
+        Validates that grouping results by problem case and resolution uses the 
+        canonical solver ordering.
+        """
         sw = rio.SweepArchive(sweep_1d, dim=1, plots_subdir=None)
         grouped = sw.group_by_case_N(sw.rows())
         assert [r["solver"] for r in grouped[("case_a", 4)]] == ["Thomas", "HHL"]
 
     def test_series_yields_lexical_order_not_canonical(self, sweep_1d):
         """
-        Deliberate, and load-bearing. `series` replaced call sites that iterated
-        `sorted(by_solver.items())`, which orders alphabetically. Yielding the
-        canonical order instead would silently reorder every legend and line in
+        Ensures that `series` yields items in lexical (alphabetical) order, 
+        preserving backwards compatibility for legend construction in older plots.
+        """
         the existing 2D and 3D figures.
         """
         sw = rio.SweepArchive(sweep_1d, dim=1, plots_subdir=None)
@@ -267,6 +349,10 @@ class TestGrouping:
         assert [s for s, _ in sw.series(grouped, "case_a")] == ["HHL", "Thomas"]
 
     def test_series_can_exclude_a_solver(self, sweep_1d):
+        """
+        Confirms that the `series` iterator can successfully filter out explicitly 
+        excluded solvers.
+        """
         sw = rio.SweepArchive(sweep_1d, dim=1, plots_subdir=None)
         grouped = sw.group_by_case_solver(sw.rows())
         got = [s for s, _ in sw.series(grouped, "case_a", exclude=("Thomas",))]
@@ -274,8 +360,9 @@ class TestGrouping:
 
     def test_scheme_comparison_rows_are_droppable(self, tmp_path):
         """
-        Those rows belong to the --compare-schemes study and would otherwise
-        appear as spurious duplicate solvers in the vs-N plots.
+        Verifies that rows relating to alternative schemes are dropped from standard 
+        analyses to prevent spurious duplicates in core solver comparisons.
+        """
         """
         rows = [
             {"case": "c", "solver": "HHL", "N": 4, "max_rel_err": 0.1,
@@ -298,6 +385,10 @@ class TestRoundTrip:
     """The writing helpers must produce what the reading helpers expect."""
 
     def test_summary_round_trips(self, tmp_path):
+        """
+        Verifies that writing a sweep summary to disk and subsequently parsing 
+        it faithfully reproduces the exact dictionary sequence.
+        """
         rows = [{"case": "c", "solver": "HHL", "N": 4, "max_rel_err": 0.5,
                  "max_abs_err": 0.5, "residual": 1e-9, "wall_time_s": 2.0,
                  "converged": True, "notes": "", "rel_l2_err": 0.5,
@@ -307,6 +398,10 @@ class TestRoundTrip:
         assert (tmp_path / "results_summary.csv").exists()
 
     def test_solution_round_trips_across_dimensions(self, tmp_path, sweep_3d):
+        """
+        Validates that writing and reading multi-dimensional numeric fields 
+        preserves exact shapes and correctly integrates with gap reporting.
+        """
         sw = rio.SweepArchive(sweep_3d, dim=3)
         sol = sw.solution("cube", "Thomas", 4)
         assert rio.field(sol, "solution").shape == (4, 4, 4)

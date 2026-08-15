@@ -65,12 +65,20 @@ class TestInnerSolverDispatch:
 
     @pytest.mark.parametrize("module_name", ["run_2d", "run_3d"])
     def test_order_four_selects_the_pentadiagonal_entry_points(self, module_name):
+        """
+        Validates that the fourth-order discretization correctly dispatches to pentadiagonal quantum solver entry points.
+        Confirms that specific aliases for HHL and QSVT are selected.
+        """
         module = __import__(f"hpc.runners.{module_name}", fromlist=["_"])
         assert module._inner_for_order("hhl", 4) == "hhl_4th"
         assert module._inner_for_order("qsvt", 4) == "qsvt_4th"
 
     @pytest.mark.parametrize("module_name", ["run_2d", "run_3d"])
     def test_order_two_is_untouched(self, module_name):
+        """
+        Validates that second-order execution paths remain unaltered during inner solver dispatch.
+        Ensures backward compatibility and correctness for standard finite-difference solvers.
+        """
         module = __import__(f"hpc.runners.{module_name}", fromlist=["_"])
         for solver in ("thomas", "hhl", "vqls", "qsvt"):
             assert module._inner_for_order(solver, 2) == solver
@@ -78,15 +86,18 @@ class TestInnerSolverDispatch:
     @pytest.mark.parametrize("module_name", ["run_2d", "run_3d"])
     def test_thomas_and_vqls_do_not_change(self, module_name):
         """
-        Thomas already falls back to a dense solve on a pentadiagonal matrix, and
-        VQLS decomposes the complete matrix into Paulis, so neither was ever
-        affected by the ±2 truncation and neither needs a fourth-order variant.
+        Validates that the Thomas algorithm and Variational Quantum Linear Solver (VQLS) bypass specific fourth-order re-routing.
+        Confirms that these solvers correctly handle full pentadiagonal matrices without structural truncation.
         """
         module = __import__(f"hpc.runners.{module_name}", fromlist=["_"])
         assert module._inner_for_order("thomas", 4) == "thomas"
         assert module._inner_for_order("vqls", 4) == "vqls"
 
     def test_the_registry_actually_provides_them(self):
+        """
+        Validates that the solver registry accurately lists the fourth-order quantum entry points.
+        Confirms the structural availability of these specialized solver configurations.
+        """
         from solvers.outer import available_inner
 
         assert "hhl_4th" in available_inner()
@@ -101,6 +112,10 @@ class TestInnerOptionsReachTheFourthOrderSolvers:
 
     @pytest.mark.parametrize("module_name", ["run_2d", "run_3d"])
     def test_sweep_defaults_are_mirrored_onto_the_aliases(self, module_name):
+        """
+        Validates that default sweep configurations are successfully propagated to the fourth-order solver aliases.
+        Ensures that necessary computational parameters, such as degree caps, are preserved across the routing layer.
+        """
         module = __import__(f"hpc.runners.{module_name}", fromlist=["_"])
         cfg = module.SweepConfig().inner_config(32)
         assert cfg.for_solver("hhl_4th") == cfg.for_solver("hhl")
@@ -110,7 +125,10 @@ class TestInnerOptionsReachTheFourthOrderSolvers:
 
     @pytest.mark.parametrize("module_name", ["run_2d", "run_3d"])
     def test_command_line_options_reach_the_alias(self, module_name):
-        """``-I hhl.epsilon=0.1`` must apply whichever HHL the sweep runs."""
+        """
+        Validates that explicit command-line overrides successfully propagate to the assigned solver alias.
+        Prevents silent dropping of user-defined tolerance or algorithmic configurations.
+        """
         module = __import__(f"hpc.runners.{module_name}", fromlist=["_"])
         cfg = module.SweepConfig(
             inner_options={"hhl": {"epsilon": 0.123}}).inner_config(8)
@@ -122,6 +140,10 @@ class TestInnerOptionsReachTheFourthOrderSolvers:
 class TestProblemConversion:
 
     def test_2d_conversion_preserves_the_continuous_problem(self):
+        """
+        Validates that two-dimensional problem re-discretization accurately preserves the core continuous problem structure.
+        Confirms the equivalence of boundary conditions, array shapes, and forcing functions.
+        """
         from problems.poisson_line_2d_4th import PoissonLine2D4th
         from hpc.runners.run_2d import _to_4th_order_2d
 
@@ -137,6 +159,10 @@ class TestProblemConversion:
                                   getattr(built.problem, face))
 
     def test_3d_conversion_preserves_periodicity_and_lengths(self):
+        """
+        Validates that three-dimensional fourth-order conversion maintains structural invariants such as periodicity and domain lengths.
+        Ensures that the physical domain definition is conserved.
+        """
         from problems.poisson_line_3d_4th import PoissonLine3D4th
         from hpc.runners.run_3d import _to_4th_order_3d
 
@@ -150,8 +176,8 @@ class TestProblemConversion:
 
     def test_conversion_without_face_data_still_builds(self):
         """
-        The extrapolation fallback must keep the conversion total: a case that
-        supplies no face source is degraded, not broken.
+        Validates that problem conversion gracefully falls back to extrapolation when explicit face source data is absent.
+        Confirms that case constructions remain robust under degraded source definitions.
         """
         from hpc.runners.run_2d import _to_4th_order_2d
 
@@ -160,8 +186,8 @@ class TestProblemConversion:
 
     def test_the_converted_problem_is_more_accurate(self):
         """
-        End to end through the outer layer: the same case, the same scheme, the
-        same inner solver, one discretisation order apart.
+        Validates that the complete fourth-order numerical pipeline significantly reduces discretization error compared to the baseline second-order solver.
+        Provides end-to-end confirmation of convergence improvements.
         """
         from solvers.outer import solve
         from hpc.runners.run_2d import _to_4th_order_2d
@@ -189,6 +215,10 @@ class TestFaceSources:
     """
 
     def test_every_2d_and_3d_case_supplies_face_sources(self):
+        """
+        Validates that all registered two-dimensional and three-dimensional cases provide explicit face source boundary data.
+        Prevents unnecessary fallback to less accurate extrapolation techniques.
+        """
         missing = [name for name in cases.available()
                    if cases.get(name).dim > 1
                    and cases.get(name).build(8).f_faces is None]
@@ -196,8 +226,8 @@ class TestFaceSources:
 
     def test_face_values_match_the_analytic_source(self):
         """
-        Spot-check against a case whose source is known in closed form.
-        f = sin(πx)sin(πy) vanishes on all four faces.
+        Validates that explicitly provided face source arrays match the known analytic functions at the domain boundaries.
+        Confirms the exactitude of continuous-to-discrete mappings.
         """
         built = cases.get("poisson_2d_sin_pi").build(8)
         lo, hi = built.f_faces
@@ -206,21 +236,26 @@ class TestFaceSources:
 
     def test_a_non_vanishing_face_is_captured(self):
         """
-        The two-Gaussian source is non-zero on the faces, so this distinguishes
-        a genuine evaluation from an array of zeros.
+        Validates that boundary conditions with non-zero face sources are correctly evaluated and retained.
+        Ensures the correct capturing of complex boundary interactions.
         """
         built = cases.get("poisson_2d_two_gaussian_plasmanet").build(16)
         lo, hi = built.f_faces
         assert any(np.any(np.abs(face) > 0.0) for face in (*lo, *hi))
 
     def test_periodic_axes_carry_no_face_data(self):
-        """A periodic axis has no boundary, hence no face and no ghost node."""
+        """
+        Validates that periodic boundaries correctly register as lacking face source data, aligning with the absence of ghost nodes on periodic axes.
+        """
         built = cases.get("het_3d_mms_spt100").build(8)
         lo, hi = built.f_faces
         assert lo[2] is None and hi[2] is None
         assert lo[0] is not None and hi[0] is not None
 
     def test_face_shape_matches_the_domain_face(self):
+        """
+        Validates that the dimensionality and shape of the generated face arrays strictly match the expected topological boundaries of the domain.
+        """
         built = cases.get("poisson_3d_two_gaussian_cube").build(8)
         lo, _ = built.f_faces
         assert lo[0].shape == (8, 8)
@@ -236,11 +271,19 @@ class TestRetiredPathIsGone:
     """
 
     def test_multigrid_4th_is_not_importable(self):
+        """
+        Validates the complete removal of the defective, historically retired fourth-order multigrid closure.
+        Confirms that accidental re-imports will raise structural failures.
+        """
         with pytest.raises(ImportError):
             __import__("solvers.outer.multigrid_4th")
 
     @pytest.mark.parametrize("module_name", ["run_2d", "run_3d"])
     def test_runners_do_not_reference_it(self, module_name):
+        """
+        Validates that current execution runners maintain strict isolation from deprecated solver paths.
+        Prevents the accidental reintroduction of architectural dependency inversions.
+        """
         from pathlib import Path
 
         source = (Path(__file__).resolve().parent.parent

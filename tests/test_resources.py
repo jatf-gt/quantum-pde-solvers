@@ -42,6 +42,10 @@ class TestHardwareTargetConstants:
     """
 
     def test_basis_gates_use_cz_not_ecr(self):
+        """
+        Validates that the hardware target correctly specifies CZ as the native two-qubit gate.
+        Ensures resource estimates are predicated on the Heron architecture rather than the legacy Eagle generation.
+        """
         # Heron r1/r2 native two-qubit gate is CZ. ECR belongs to the
         # earlier Eagle generation; conflating the two silently mis-prices
         # every resource estimate in this module.
@@ -49,9 +53,16 @@ class TestHardwareTargetConstants:
         assert "ecr" not in HERON_R2_BASIS_GATES
 
     def test_basis_gates_are_single_and_two_qubit_only(self):
+        """
+        Confirms that the specified basis gates consist strictly of single- and two-qubit operations.
+        """
         assert set(HERON_R2_BASIS_GATES) == {"rz", "sx", "x", "cz"}
 
     def test_budget_is_positive_and_documented_order_of_magnitude(self):
+        """
+        Ensures that the defined two-qubit gate budget aligns with established hardware constraints.
+        Prevents silent degradation of feasibility thresholds by enforcing expected magnitudes.
+        """
         # IBM's reported Heron r2 circuit capacity is on the order of
         # thousands of two-qubit gates, not hundreds or millions.
         assert 1_000 <= HERON_R2_TWO_QUBIT_GATE_BUDGET <= 20_000
@@ -63,6 +74,9 @@ class TestHardwareTargetConstants:
 class TestTranspileReport:
 
     def test_reports_only_target_basis_gates(self):
+        """
+        Validates that the transpilation process correctly decomposes circuits strictly into the designated basis gates.
+        """
         from qiskit import QuantumCircuit
         qc = QuantumCircuit(2)
         qc.h(0)
@@ -71,6 +85,9 @@ class TestTranspileReport:
         assert set(report.gate_counts) <= set(HERON_R2_BASIS_GATES)
 
     def test_post_depth_is_positive_for_nontrivial_circuit(self):
+        """
+        Confirms that non-trivial circuits yield a positive post-transpilation depth and two-qubit gate count.
+        """
         from qiskit import QuantumCircuit
         qc = QuantumCircuit(2)
         qc.h(0)
@@ -80,6 +97,10 @@ class TestTranspileReport:
         assert report.two_qubit_count >= 1
 
     def test_identity_circuit_needs_no_two_qubit_gates(self):
+        """
+        Validates that an identity circuit requires zero two-qubit gates post-transpilation.
+        Ensures the transpiler correctly optimises trivial operations.
+        """
         from qiskit import QuantumCircuit
         qc = QuantumCircuit(3)  # no gates at all
         report = transpile_report(qc)
@@ -93,6 +114,9 @@ class TestBlockEncodingUnitCost:
 
     @pytest.mark.parametrize("N", [4, 8, 16])
     def test_unit_cost_grows_with_N(self, N):
+        """
+        Confirms that the resource cost for block encoding increases as the problem size scales.
+        """
         import numpy as np
         report = block_encoding_unit_cost(N)
         assert report.two_qubit_count > 0
@@ -100,6 +124,9 @@ class TestBlockEncodingUnitCost:
         assert report.n_qubits == int(np.log2(N)) + 1
 
     def test_unit_cost_increases_monotonically(self):
+        """
+        Validates that the block encoding unit cost exhibits monotonic growth with respect to problem size.
+        """
         costs = [block_encoding_unit_cost(N).two_qubit_count for N in (4, 8, 16)]
         assert costs == sorted(costs)
         assert costs[0] < costs[-1]
@@ -125,6 +152,10 @@ class TestComposabilityBound:
         (16, 5), (16, 11),
     ])
     def test_composed_is_a_safe_upper_bound(self, N, degree):
+        """
+        Confirms that the composed resource estimate provides a rigorous upper bound compared to direct full-circuit transpilation.
+        Ensures the validity of subsequent feasibility reports by preventing underestimation of gate counts.
+        """
         result = validate_composability(N, degree)
         assert result["is_safe_upper_bound"], (
             f"composed estimate ({result['composed_two_qubit_count']}) fell "
@@ -136,6 +167,10 @@ class TestComposabilityBound:
         )
 
     def test_overshoot_shrinks_as_N_grows(self):
+        """
+        Validates that the conservatism of the upper bound diminishes as problem size increases.
+        Confirms the scaling assumption that estimates for larger systems are comparatively tight.
+        """
         # The module docstring claims the margin tightens with N; confirm it
         # rather than merely asserting it, since this is the basis for
         # treating N>=8 estimates as tight and N=4 estimates as loose.
@@ -150,6 +185,9 @@ class TestComposabilityBound:
 class TestQSVTResourceEstimate:
 
     def test_small_problem_is_feasible(self):
+        """
+        Validates that constrained problem instances are appropriately classified as feasible within the designated hardware budget.
+        """
         # N=4, production degree 63 (per QSVTConfig1D's own recommended
         # max_degree table): should fit comfortably inside the Heron r2
         # two-qubit budget.
@@ -158,6 +196,9 @@ class TestQSVTResourceEstimate:
         assert report.total_two_qubit_count < HERON_R2_TWO_QUBIT_GATE_BUDGET
 
     def test_large_problem_is_not_feasible(self):
+        """
+        Confirms that problem instances exceeding hardware constraints are correctly identified as infeasible.
+        """
         # N=32, production degree 511: expected to badly exceed the budget --
         # this is the "explicitly not feasible" result from the earlier
         # hardware-scoping discussion, now backed by a transpiled number.
@@ -166,6 +207,9 @@ class TestQSVTResourceEstimate:
         assert report.total_two_qubit_count > 10 * HERON_R2_TWO_QUBIT_GATE_BUDGET
 
     def test_feasible_implies_bound_holds(self):
+        """
+        Ensures that a classification of feasibility implies the composed estimate strictly bounds the direct transpilation count.
+        """
         # A "feasible" verdict should be trustworthy precisely because the
         # estimate is a safe upper bound: if composed <= budget, then the
         # (smaller or equal) directly-transpiled circuit is also <= budget.

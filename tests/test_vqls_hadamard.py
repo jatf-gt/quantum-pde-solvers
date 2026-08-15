@@ -53,6 +53,9 @@ class TestExactModeMatchesClassicalReference:
         (3, 2, 42),
     ])
     def test_matches_across_random_parameter_draws(self, n_qubits, n_layers, seed):
+        """
+        Validates that the Hadamard-test circuit evaluation exactly reproduces the analytical classical cost formulation under varied stochastic parameter initialization.
+        """
         N = 2 ** n_qubits
         pauli_terms = pauli_decompose_matrix(_tst_matrix(N, -2.0, 1.0))
 
@@ -75,6 +78,9 @@ class TestExactModeMatchesClassicalReference:
             )
 
     def test_denominator_imaginary_part_vanishes(self):
+        """
+        Confirms that the imaginary component of the cost denominator evaluates to zero, consistent with real Pauli decomposition coefficients.
+        """
         # Guaranteed by real Pauli coefficients (see module docstring) -- a
         # second, independent check beyond matching the reference cost.
         n_qubits, n_layers = 2, 1
@@ -107,6 +113,10 @@ class TestDenominatorAnsatzMustBeUnconditional:
     """
 
     def test_controlled_ansatz_denominator_variant_disagrees_with_reference(self):
+        """
+        Validates that the erroneously controlled ansatz variant strictly diverges from the correct analytical formulation.
+        Prevents silent regressions on the pairwise terms by structurally proving the error.
+        """
         import pennylane as qml
         from solvers.quantum.vqls_hadamard import _apply_controlled_pauli
 
@@ -182,9 +192,15 @@ class TestCircuitCount:
         (8, 16 + 128),
     ])
     def test_matches_formula(self, n_terms, expected):
+        """
+        Confirms that the empirical evaluation count precisely matches the prescribed polynomial circuit count formula.
+        """
         assert circuit_count(n_terms) == expected
 
     def test_matches_actual_number_of_circuit_evaluations(self, monkeypatch):
+        """
+        Ensures that the actual quantum device execution trace matches the analytical circuit complexity expectations.
+        """
         n_qubits, n_layers = 2, 1
         N = 2 ** n_qubits
         pauli_terms = pauli_decompose_matrix(_tst_matrix(N, -2.0, 1.0))
@@ -222,6 +238,10 @@ class TestCircuitCount:
 class TestShotBasedEvaluation:
 
     def test_shots_introduce_variance(self):
+        """
+        Validates that finite-shot evaluations properly exhibit statistical variance.
+        Confirms they are not erroneously delegating to exact statevector simulation.
+        """
         n_qubits, n_layers = 2, 1
         N = 2 ** n_qubits
         pauli_terms = pauli_decompose_matrix(_tst_matrix(N, -2.0, 1.0))
@@ -240,6 +260,9 @@ class TestShotBasedEvaluation:
         )
 
     def test_shot_mean_converges_towards_exact_value(self):
+        """
+        Confirms that the empirical mean of shot-based evaluations asymptotically approaches the exact analytical cost under the law of large numbers.
+        """
         # Law-of-large-numbers check: averaging many shot-based evaluations
         # should approach the exact cost. Loose tolerance -- this is a
         # statistical sanity check, not a precision test.
@@ -263,6 +286,9 @@ class TestShotBasedEvaluation:
         assert np.mean(samples) == pytest.approx(c_exact, abs=0.15)
 
     def test_diagnostics_returned_when_requested(self):
+        """
+        Ensures that the cost function correctly yields auxiliary diagnostic metadata alongside the scalar cost when explicitly requested.
+        """
         n_qubits, n_layers = 2, 1
         N = 2 ** n_qubits
         pauli_terms = pauli_decompose_matrix(_tst_matrix(N, -2.0, 1.0))
@@ -280,6 +306,9 @@ class TestShotBasedEvaluation:
         assert diag.n_circuits == circuit_count(len(pauli_terms))
 
     def test_default_return_is_bare_float(self):
+        """
+        Validates that the primary evaluation interface defaults to returning an unadorned scalar float for optimizer compatibility.
+        """
         # A plain float is required for direct use with an optimiser
         # expecting params -> float (e.g. scipy.optimize.minimize).
         n_qubits, n_layers = 2, 1

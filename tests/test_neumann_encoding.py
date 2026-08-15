@@ -74,22 +74,27 @@ def _rel_l2(u: np.ndarray, ref: np.ndarray) -> float:
 
 @pytest.mark.parametrize("case_key", _TOEPLITZ_CASES)
 def test_generic_cases_are_toeplitz(case_key):
-    """Every case validated against the two-scalar path must continue to satisfy the Toeplitz predicate."""
+    """
+    Validates that symmetric tridiagonal matrices with uniform diagonals satisfy the Toeplitz structural predicate.
+    Confirms that historically validated cases remain compatible with the two-scalar encoding path.
+    """
     A, _, _, _ = _built(case_key, 8)
     assert is_toeplitz_tridiagonal(A)
 
 
 def test_neumann_case_is_not_toeplitz():
-    """3c must be recognised as outside the two-scalar path's domain."""
+    """
+    Validates that the structural predicate correctly identifies Neumann boundary conditions as non-Toeplitz.
+    Ensures that such matrices are excluded from the two-scalar encoding path.
+    """
     A, _, _, _ = _built("het_1d_3c_neumann", 8)
     assert not is_toeplitz_tridiagonal(A)
 
 
 def test_band_check_alone_does_not_catch_the_neumann_row():
     """
-    The failure's defining property: 3c is tridiagonal, so a bandwidth test
-    cannot distinguish it. Pinning this keeps the Toeplitz check from being
-    mistaken for a duplicate of the band check and removed.
+    Confirms that bandwidth verification alone is insufficient to identify the Neumann row defect.
+    Ensures that the Toeplitz property check is maintained as a distinct structural requirement.
     """
     A, _, _, _ = _built("het_1d_3c_neumann", 8)
     idx = np.arange(A.shape[0])
@@ -98,7 +103,10 @@ def test_band_check_alone_does_not_catch_the_neumann_row():
 
 
 def test_assert_tridiagonal_rejects_the_neumann_operator():
-    """The guard must name the Toeplitz violation, not merely refuse."""
+    """
+    Validates that the encoding guard explicitly identifies Toeplitz violations.
+    Confirms that an appropriate exception is raised when encountering non-uniform tridiagonal matrices.
+    """
     A, _, _, _ = _built("het_1d_3c_neumann", 8)
     with pytest.raises(ValueError, match="not Toeplitz"):
         assert_tridiagonal(A, "QSVT")
@@ -109,10 +117,8 @@ def test_assert_tridiagonal_rejects_the_neumann_operator():
 @pytest.mark.quantum
 def test_qsvt_solves_the_neumann_case():
     """
-    QSVT must now agree with the classical solution of 3c's OWN operator.
-
-    Before the encoding selection was added this stood at ~100 % error, and the
-    returned vector reproduced the solution of the Toeplitz surrogate instead.
+    Validates that the Quantum Singular Value Transformation (QSVT) solver produces the correct solution for the Neumann boundary condition operator.
+    Confirms that the solver no longer defaults to a Toeplitz surrogate matrix, resolving a historical deviation.
     """
     from solvers.quantum.qsvt_1d import QSVTConfig1D, qsvt_solve_system
 
@@ -131,15 +137,8 @@ def test_qsvt_solves_the_neumann_case():
 @pytest.mark.quantum
 def test_hhl_solves_the_neumann_case():
     """
-    HHL must now agree with the classical solution of 3c's own operator.
-
-    The tolerance is looser than QSVT's because HHL carries Trotter error at
-    ε = 0.01 on top of the encoding; the point is the two orders of magnitude
-    between this and the ~1.0 that the Toeplitz surrogate produced.
-
-    N=4 only. The general `NumPyMatrix` evolution is dense, so N=8 costs 29 s
-    against 1.1 s here and demonstrates nothing further — the surrogate was
-    wrong at every N, and one resolution is sufficient to establish that the defect is resolved.
+    Validates that the Harrow-Hassidim-Lloyd (HHL) solver correctly processes the exact Neumann boundary operator.
+    Ensures that the previously observed high error rates, induced by the Toeplitz surrogate mapping, are eliminated, factoring in expected Trotterization error margins.
     """
     from solvers.quantum.hhl_1d import hhl_solve_system
 
@@ -153,8 +152,8 @@ def test_hhl_solves_the_neumann_case():
 @pytest.mark.quantum
 def test_toeplitz_path_is_unchanged_by_the_selection():
     """
-    `encoding="auto"` must be bit-for-bit identical to `encoding="tst"` wherever
-    the latter was valid, so the published 2nd-order figures still reproduce.
+    Validates that the automatic encoding selection mechanism preserves exact computational equivalence with the dedicated Toeplitz path.
+    Ensures the reproducibility of established second-order empirical results.
     """
     from solvers.quantum.qsvt_1d import QSVTConfig1D, qsvt_solve_system
 

@@ -50,10 +50,17 @@ class TestSoundRows:
     """A row with nothing wrong with it must never be scheduled."""
 
     def test_clean_row_has_no_reasons(self):
+        """Confirms that a flawless execution record yields no recomputation reasons."""
         reasons, flags = classify_row(_row())
         assert reasons == []
 
     def test_thomas_is_never_judged_on_error_magnitude(self):
+        """
+        Validates that Thomas solver executions are exempt from error magnitude checks.
+        
+        As the reference solution, large errors indicate discretisation limits shared
+        by all solvers, not failures of the Thomas scheme itself.
+        """
         # Thomas is the reference; a large error against the exact solution is
         # discretisation error shared by every solver on that mesh.
         reasons, _ = classify_row(
@@ -65,6 +72,12 @@ class TestSoftOutcomes:
     """Outcomes recorded for visibility that must not trigger recomputation."""
 
     def test_stagnation_is_a_flag_not_a_reason(self):
+        """
+        Ensures solver stagnation is recorded as an informational flag rather than a failure reason.
+        
+        Quantum solvers routinely halt at their noise floor to conserve resources, which constitutes
+        a valid measurement rather than a defect requiring recomputation.
+        """
         # The outer schemes detect stagnation precisely so a quantum solver at its
         # inner-solver noise floor stops rather than burning futile strip solves.
         reasons, flags = classify_row(
@@ -73,6 +86,12 @@ class TestSoftOutcomes:
         assert "stagnated" in flags
 
     def test_large_error_is_a_flag_not_a_reason(self):
+        """
+        Validates that substantial discrepancies against the reference are flagged but do not mandate recomputation.
+        
+        Degradation with increasing condition number is an expected phenomenon in HHL evaluation,
+        representing a valid measurement of solver limitations.
+        """
         # In 1-D the operator reaches kappa ~ 1.7e3 by N=64; HHL's degradation with
         # kappa is what the benchmark measures, not a defect to be recomputed.
         reasons, flags = classify_row(_row(err_vs_thomas=250.0))
@@ -80,6 +99,7 @@ class TestSoftOutcomes:
         assert any(f.startswith("large_error") for f in flags)
 
     def test_strict_escalates_flags_into_reasons(self):
+        """Confirms that strict mode elevates informational flags to mandatory recomputation reasons."""
         reasons, flags = classify_row(
             _row(stop_reason="stagnated", converged=False), strict=True)
         assert "stagnated" in reasons
@@ -90,17 +110,20 @@ class TestTruncationIsAReason:
     """Outcomes that genuinely leave the field unfinished."""
 
     def test_wall_time_exceeded_is_a_reason(self):
+        """Ensures that exceeding the maximum wall time is classified as a mandatory recomputation reason."""
         reasons, _ = classify_row(
             _row(stop_reason="wall_time_exceeded", converged=False))
         assert "wall_time_exceeded" in reasons
 
     def test_exception_is_a_reason(self):
+        """Validates that runtime exceptions are correctly identified as solver errors requiring recomputation."""
         reasons, _ = classify_row(
             _row(notes="ModuleNotFoundError: No module named 'x'",
                  converged=False, err_vs_thomas=None, max_rel_err=None))
         assert "solver_error" in reasons
 
     def test_missing_error_metric_is_a_reason(self):
+        """Confirms that the absence of required error metrics triggers a recomputation requirement."""
         reasons, _ = classify_row(
             _row(err_vs_thomas=None, max_rel_err=None, wall_time_s=12.0))
         assert "no_error_metric" in reasons
@@ -118,6 +141,7 @@ class TestPerSolveTimeout:
     """
 
     def test_explicit_timeout_marker_is_a_flag(self):
+        """Ensures that explicitly marked timeouts are recorded as flags rather than failure reasons."""
         reasons, flags = classify_row(
             _row(notes="rel_vs_thomas;hhl_timeout:3600s", converged=False,
                  err_vs_thomas=None, max_rel_err=None,
@@ -127,13 +151,10 @@ class TestPerSolveTimeout:
 
     def test_a_raised_budget_is_recognised_without_the_legacy_inference(self):
         """
-        A row produced at a raised ``--hhl-timeout-s`` must classify on its marker.
-
-        The budget is expected to be raised — at 3600 s HHL does not complete for
-        N>=32, so finding where it does means increasing it. Such a row's wall time
-        bears no relation to `LEGACY_HHL_TIMEOUT_S`, and in 2-D/3-D the inference is
-        switched off entirely, so the explicit marker must carry the classification
-        on its own.
+        Validates that rows produced with an extended timeout budget classify correctly based on their explicit marker.
+        
+        Extended wall times are necessary for larger grid dimensions and do not correlate with legacy 
+        time limits. The explicit marker correctly prevents erroneous recomputation scheduling.
         """
         reasons, flags = classify_row(
             _row(notes="hhl_timeout:21600s", converged=False, err_vs_thomas=None,
@@ -142,6 +163,9 @@ class TestPerSolveTimeout:
         assert "solver_timeout" in flags
 
     def test_legacy_1d_row_is_inferred_from_wall_time(self):
+        """
+        Ensures that historical 1-D results lacking explicit markers are correctly inferred as timeouts based on wall time.
+        """
         # Rows written before the marker existed carry only "solver_error"; the sole
         # surviving evidence is a wall time at the budget.
         reasons, flags = classify_row(
@@ -151,6 +175,7 @@ class TestPerSolveTimeout:
         assert "solver_timeout" in flags
 
     def test_a_genuine_1d_failure_inside_the_budget_is_still_a_reason(self):
+        """Confirms that premature solver termination within the allocated budget is correctly classified as a failure."""
         # HET_1D_3c HHL at N=32 died after 743 s, well inside the budget. That is a
         # real failure and must remain scheduled.
         reasons, _ = classify_row(
@@ -162,12 +187,10 @@ class TestPerSolveTimeout:
     @pytest.mark.parametrize("dim", [2, 3])
     def test_the_wall_time_inference_does_not_apply_in_2d_or_3d(self, dim):
         """
-        The inference is valid only for the 1-D schema.
-
-        In 1-D ``wall_time_s`` is one solve; in 2-D and 3-D it is a whole outer
-        iteration over N (or N²) strip solves, which routinely exceeds an hour in a
-        perfectly sound run. Applying the inference there would mark most large-N
-        HHL rows as timed out and suppress the reasons that schedule them.
+        Validates that legacy wall time inference is restricted to 1-D scenarios.
+        
+        In higher dimensions, wall time accumulates across multiple strip solves, meaning that 
+        lengthy executions are typical and should not be erroneously classified as timeouts.
         """
         reasons, flags = classify_row(
             _row(notes="solver_error", converged=False, err_vs_thomas=None,
@@ -180,10 +203,14 @@ class TestStaleGeometry:
     """The SPT-100 correction invalidates specific cases and only those."""
 
     def test_a_stale_case_is_always_a_reason(self):
+        """Ensures that execution records associated with obsolete geometries mandate recomputation."""
         reasons, _ = classify_row(_row(case="3D_HET_MMS_SPT100"))
         assert "stale_geometry" in reasons
 
     def test_unaffected_het_cases_are_absent_from_the_policy_set(self):
+        """
+        Validates that geometry updates do not force needless recomputations for unaffected profiles.
+        """
         # check_geometry_impact.py --dim 1 proves that only 3b moves: the 1-D
         # operator is the dimensionless TST matrix and the *_scaled family
         # normalises L out. Listing another one would force needless recomputation.
@@ -219,14 +246,14 @@ def test_legacy_budget_describes_the_existing_archive():
 
     # The archive now holds rows from two budgets: the original 3600 s sweep and the
     # wave-1 resubmission at 5400 s. Both are sound, so the invariant is checked
-    # against whichever budget a row was produced under rather than against 3600 s
-    # alone -- a row landing just above ANY budget in use is what makes the
-    # wall-clock inference sound, and pinning the assertion to one of them merely
-    # dates the test to the sweep that happened to run first.
+    # against the budget under which a row was produced, rather than against 3600 s
+    # exclusively; a row terminating marginally above any allocated budget validates
+    # the wall-clock inference, preventing the assertion from being rigidly tied
+    # to the chronologically first sweep.
     known_budgets = (3600.0, 5400.0)
     for row in timed_out:
         wall = row["wall_time_s"]
         budget = max((b for b in known_budgets if wall >= b), default=None)
         assert budget is not None, row
-        # Just above its budget, never far beyond it.
+        # Marginally above its budget, bounded closely above.
         assert budget <= wall < budget + 60.0, row
