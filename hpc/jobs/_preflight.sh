@@ -9,17 +9,17 @@
 #  ---------
 #  Two failure modes have each cost a full cluster allocation:
 #
-#    1. A 21 h 4th-order job in which every HHL row failed with
-#       ModuleNotFoundError, because the venv held the UPSTREAM
-#       quantum_linear_solvers (no pentadiagonal_toeplitz.py) rather than the
-#       project fork. The defect was invisible until the results were read back.
+#    1. A 21 h 4th-order job in which every HHL execution failed with
+#       ModuleNotFoundError, owing to the venv holding the UPSTREAM
+#       quantum_linear_solvers (lacking pentadiagonal_toeplitz.py) rather than the
+#       project fork. The defect remained undetected until the results were retrieved.
 #
 #    2. Runs executed against an uncommitted working tree. Every
 #       run_metadata.json on disk records "git_dirty": true, so the code that
 #       produced those results cannot be reconstructed from git history.
 #
-#  Both are detectable in under a second. This script detects them, repairs the
-#  first where it can, and refuses to proceed otherwise.
+#  Both are detectable instantaneously. This script identifies them, rectifies the
+#  former where feasible, and aborts execution otherwise.
 #
 #  Usage
 #  -----

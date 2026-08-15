@@ -12,7 +12,7 @@
 #  the file. IMPORTANT: pass them via `qsub -v NAME` (bare name,
 #  value taken from your shell's exported variable) rather than
 #  `qsub -v NAME=value` -- PBS's own -v parser splits on commas in
-#  the value list, which would break a comma-separated N list like
+#  the value list, which would corrupt a comma-separated N list such as
 #  "4,8,16" if embedded directly after an "=".
 #
 #  Usage
@@ -44,15 +44,15 @@
 
 # --- Resource requests ---
 # Single-threaded (qsp_angles.py does not parallelise across cores).
-# mem=32gb is generous headroom for N<=32 at modest --max-degree; if you
+# mem=32gb is generous headroom for N<=32 at modest --max-degree; should
 # push N=64 or leave --max-degree uncapped, request more (see the
 # per-N memory notes from the earlier analysis -- the Newton solver's
 # working array is O(degree^2)).
-# walltime=71:00:00 stays just under CX3's 72h queue cap; N=32/64 are
+# walltime=71:00:00 remains strictly under CX3's 72h queue cap; N=32/64 are
 # NOT guaranteed to finish inside it (see the precompute script's own
 # docstring caveat about PolyOneOverX.generate() cost) -- if a stage
 # doesn't finish, whatever it completed before being killed is already
-# safe on disk (see script header), so it's fine to just resubmit the
+# safe on disk (see script header), permitting direct resubmission of the
 # same stage and let it skip what's already cached.
 #PBS -l walltime=71:00:00
 #PBS -l select=1:ncpus=1:mem=32gb

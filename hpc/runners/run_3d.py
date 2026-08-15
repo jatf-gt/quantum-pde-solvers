@@ -312,9 +312,10 @@ class RunResult3D:
     peak_E_field:      Optional[float] = None   # V/m, |grad phi|
     peak_E_rel_err:    Optional[float] = None   # %
     peak_E_axial:      Optional[float] = None   # V/m, the thrust-relevant one
-    # Azimuthal mode content: for the spoke case, whether the solver actually
-    # reproduces the mode it was given.  A solver can look accurate in Linf
-    # and still smear the azimuthal structure, which is the whole point of 3-D.
+    # Azimuthal mode content: evaluates whether the solver reliably reproduces
+    # the prescribed mode in the spoke case. A solver may exhibit low L-infinity
+    # error while erroneously diffusing azimuthal structure, thereby compromising
+    # the 3-D physical representation.
     azimuthal_mode_amp:     Optional[float] = None
     azimuthal_mode_rel_err: Optional[float] = None
 

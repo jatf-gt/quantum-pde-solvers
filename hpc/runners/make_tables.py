@@ -87,8 +87,8 @@ STUDY_DIR: dict[int, str] = {
 # -- Hardware feasibility ------------------------------------------------------
 
 # Two-qubit gate error rate representative of current superconducting hardware.
-# Superseded by a device's own calibration where one is available; used here only
-# to derive the budget below, which is the quantity actually reported.
+# Superseded by a device's own calibration where one is available; utilised here
+# exclusively to derive the budget below, which serves as the reported metric.
 DEFAULT_TWO_QUBIT_ERROR: float = 1.0e-3
 
 # Target probability that a circuit completes without a two-qubit fault.

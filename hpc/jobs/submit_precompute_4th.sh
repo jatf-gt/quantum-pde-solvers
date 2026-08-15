@@ -63,7 +63,7 @@
 #  N = 4 / 8 / 16 -- and the sweep proceeds at reduced polynomial accuracy having
 #  ignored 71 h of precompute. MAX_DEGREE is consequently UNSET by default here,
 #  and the guard below refuses any invocation whose tag does not match the tag the
-#  solver will look up. Verified 2026-08-11: none of the four order-4 keys is
+#  solver will query. Verified 2026-08-11: none of the four order-4 keys is
 #  present in results/qsvt_phase_cache/.
 #
 #  Epsilon ordering
@@ -72,7 +72,7 @@
 #  additional 0.5 and 0.1 entries serve the Phase 8 sensitivity study, and
 #  precompute_phases.py processes epsilons largest-first -- i.e. it would compute
 #  the two optional entries before the one the sweep depends on, and a walltime
-#  kill would take exactly the entry that matters. This job therefore runs the
+#  kill would invariably terminate the critical entry. This job therefore executes the
 #  sweep-critical epsilon in a first pass on its own, and the optional ones after.
 #
 #  Cost and staging
@@ -98,7 +98,7 @@
 #    # Stage 2 -- N=16, CAPPED at 14999. Not uncapped: the pentadiagonal operator
 #    # needs degree 19375 there, against the angle solver's sanity limit of 15000,
 #    # so an uncapped solve is REFUSED outright and writes nothing. The
-#    # tridiagonal operator needs 14177 and passes just under, which is why the
+#    # tridiagonal operator needs 14177 and passes marginally below, which is why the
 #    # 2nd-order cache has an uncapped N=16 entry and this one cannot.
 #    export N_VALUES="16" MAX_DEGREE="14999"
 #    qsub -v N_VALUES,MAX_DEGREE hpc/jobs/submit_precompute_4th.sh
@@ -108,7 +108,7 @@
 #    # Required only if the 1-D order-4 sweep is to be run beyond N=16.
 #    #
 #    # 14999 rather than 5000 because the cap sets the polynomial's accuracy, not
-#    # just its cost: at kappa 586.8 a cap of 5000 gives degree/kappa = 8.5, below
+#    # strictly its computational cost: at kappa 586.8 a cap of 5000 gives degree/kappa = 8.5, below
 #    # the ratio ~11 at which the order-2 sweep still held accuracy, whereas 14999
 #    # gives 25.6. Both stages share the tag d14999 so they cannot be staged
 #    # inconsistently -- see the cap-value note in run_1d.py.
@@ -142,7 +142,7 @@
 # --- Resource requests ---
 # Single-threaded: qsp_angles.py does not parallelise across cores.
 # The Newton solver's working array is O(degree^2), hence the generous memory.
-# walltime stays just under CX3's 72 h queue cap. N=16 is not guaranteed to finish
+# walltime stays marginally under CX3's 72 h queue cap. N=16 is not guaranteed to finish
 # inside it; a killed stage loses nothing already cached.
 #PBS -l walltime=71:00:00
 #PBS -l select=1:ncpus=1:mem=32gb
@@ -187,10 +187,10 @@ cd "${REPO_ROOT}" || { echo "ERROR: cannot cd to ${REPO_ROOT}"; exit 1; }
 # Every early exit in this job -- a dirty tree caught by _preflight.sh, a
 # degree-tag mismatch caught by the cache-key guard -- prints its reason to
 # STDOUT and returns non-zero, so the PBS .err file stays empty and the job
-# looks from the outside exactly like one that ran and wrote nothing. It also
+# appears externally identical to one that executed and wrote nothing. It also
 # takes the same 10-30 s either way, that being the cost of importing qiskit,
 # so the wall time does not distinguish them. This trap makes the difference
-# unmissable, and reports how many cache entries were actually added.
+# unambiguous, and reports the exact count of cache entries added.
 
 _cache_count () { ls -1 results/qsvt_phase_cache 2>/dev/null | wc -l | tr -d " "; }
 CACHE_BEFORE="$(_cache_count)"
@@ -312,7 +312,7 @@ tag_written = int(raw_cap) if raw_cap else -1
 if dim == 1:
     import run_1d
     # Order-aware: the pentadiagonal operator crosses the angle solver's degree
-    # sanity limit at N=16, where the tridiagonal one passes just under it.
+    # sanity limit at N=16, where the tridiagonal instance passes marginally below it.
     def cap_for(N):
         return run_1d.qsvt_max_degree(N, 4)
 elif dim == 2:
@@ -402,8 +402,8 @@ echo "Cache keys that will be written:"
 python3 hpc/runners/precompute_phases.py --dim "${DIM}" --order 4 \
         --n-values "${N_VALUES}" --list-kappas
 
-# Pass 1 -- the epsilon the sweep actually requests, alone, so that a walltime
-# kill cannot take it while the optional sensitivity entries survive.
+# Pass 1 -- the exact epsilon requested by the sweep, isolated, ensuring a walltime
+# kill cannot terminate it while optional sensitivity entries survive.
 echo ""
 echo "------------------------------------------------------------"
 echo "  PASS 1/2 -- epsilon=${SWEEP_EPSILON} (required by the sweep)  $(date)"

@@ -234,10 +234,10 @@ QSVT_MAX_DEGREE_BY_N: dict[int, Optional[int]] = {
 #      16       154.5126        19375    REFUSED  (order 2 is 14177: under it)
 #      32       586.8093        83761    REFUSED
 #
-# Leaving N=16 as None therefore asks for a cache entry that cannot be
-# computed: the precompute records it as a failure in seconds, and the sweep
-# then misses and falls back to a reduced degree. Order 2 is untouched -- it
-# passes just under the limit at N=16, which is why this never surfaced before.
+# Permitting N=16 to remain unbounded (None) thus requests an incomputable
+# cache entry: the precompute records a failure, inducing a cache miss during
+# the sweep and forcing a fallback to a reduced degree. Order 2 remains
+# unbounded, as its parameters satisfy the limit at N=16.
 #
 # Cap VALUE, as distinct from whether to cap at all
 # ------------------------------------------------
@@ -351,8 +351,8 @@ THOMAS_TIMING_REPEATS: int = 10
 
 # -- Parallelisation -----------------------------------------------------------
 # Each worker process executes one (case_family, N) work unit. Aer simulations
-# are already OpenMP-threaded internally, so the worker count should not exceed
-# the cores actually requested from PBS -- see the note in main().
+# are internally threaded via OpenMP; therefore, the worker count should strictly
+# align with the core allocation requested from PBS (refer to the note in main).
 MAX_WORKERS_DEFAULT: int = 4
 
 # GPU preference: read from environment so the PBS script can override.
@@ -407,7 +407,7 @@ class RunResult:
     success_probability: Optional[float] = None   # post-selection probability
 
     # -- Solver-specific internals ---------------------------------------------
-    qsvt_degree:        Optional[int]   = None    # degree actually solved
+    qsvt_degree:        Optional[int]   = None    # polynomial degree solved
     qsvt_max_degree:    Optional[int]   = None    # cap requested (cache key!)
     qsvt_kappa_eff:     Optional[float] = None
     qsvt_phases_cached: Optional[bool]  = None
@@ -460,7 +460,7 @@ class RunResult:
     phase_lookup_time_s: Optional[float] = None
 
     # QSVT block-encoding subnormalisation alpha = ||A||_2, and the angle-generation
-    # method actually used. Both are carried by QSVTSolverResult and were discarded.
+    # method utilised. Both are carried by QSVTSolverResult and were discarded.
     qsvt_alpha:         Optional[float] = None
     qsvt_angle_method:  Optional[str]   = None
 

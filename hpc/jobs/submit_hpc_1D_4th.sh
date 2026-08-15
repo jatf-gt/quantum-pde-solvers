@@ -41,7 +41,7 @@
 #  which is exploratory and not guaranteed to complete. Raise N_VALUES only once
 #  that cache entry exists -- the guard below will refuse otherwise.
 #
-#  Note that N=16 needs a CAPPED precompute at order 4, unlike order 2: the
+#  Observe that N=16 requires a CAPPED precompute at order 4, unlike order 2: the
 #  pentadiagonal operator needs degree 19375 there against the angle solver's
 #  sanity limit of 15000, so an uncapped entry cannot be produced at all.
 #  run_1d.qsvt_max_degree(N, order) is the single source of truth for the cap,

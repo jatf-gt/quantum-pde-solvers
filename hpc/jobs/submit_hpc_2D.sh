@@ -102,8 +102,8 @@
 #
 # WALLTIME.  The outer scheme is now full multigrid (O(1) cycles) rather
 # than the original line-Jacobi (O(N) sweeps), so the old per-N hour
-# estimates in this file no longer apply and are not repeated here - they
-# would just be wrong in a new, non-obvious way. Get a real number instead:
+# estimates in this file no longer apply and have been removed to prevent
+# methodological errors. Obtain current empirical estimates via:
 #
 #     python3 hpc/runners/run_2d.py --n-values <N> --solvers <solver> \
 #             --estimate
@@ -118,7 +118,7 @@
 # NOTE ON ncpus vs --max-workers: MAX_WORKERS is set to match ncpus below.
 # Aer simulations are already OpenMP-threaded internally. Running more
 # worker processes than allocated cores oversubscribes the node.
-# If you change ncpus, update MAX_WORKERS accordingly.
+# Modifications to ncpus necessitate a corresponding update to MAX_WORKERS.
 #
 # NOTE ON mem: Section 2 (Two-Gaussian) computes a 200x200 Fourier reference
 # grid, independent of N. Phase 2 (N=128, 256) holds several NxN arrays per
@@ -320,7 +320,7 @@ if [ "${RUN_PHASE2}" = "1" ]; then
     echo "Phase 2 finished at $(date) with exit code ${PHASE2_EXIT}"
 fi
 
-# Overall exit code: non-zero if either phase that actually ran failed.
+# Overall exit code: non-zero if any executed phase failed.
 EXIT_CODE=0
 [ "${PHASE1_EXIT}" -ne 0 ] && EXIT_CODE=${PHASE1_EXIT}
 [ "${RUN_PHASE2}" = "1" ] && [ "${PHASE2_EXIT}" -ne 0 ] && EXIT_CODE=${PHASE2_EXIT}

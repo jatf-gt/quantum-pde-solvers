@@ -34,7 +34,7 @@
 #  OUTER SCHEME
 #  ------------
 #  Both phases use OUTER_SCHEME (default: fmg, full multigrid) for every
-#  solver and every N, so the comparison is like for like.
+#  solver and every N, ensuring rigorous comparability.
 #
 #  A note on the N<=16 crossover: measured 3-D HET data shows SOR and FMG are
 #  a wash at N=16 (11008 vs 12544 strip solves; 411 s vs 422 s of QSVT wall
@@ -47,7 +47,7 @@
 #  unavoidable is N=4, where a 4x4x4 grid cannot be coarsened at all; the
 #  runner falls back to SOR there automatically and tags the affected rows
 #  scheme_fallback in the notes column, so it is never silent.
-#  If you do want the crossover, set SCHEME_CROSSOVER=16 below - affected
+#  To evaluate the crossover, configure SCHEME_CROSSOVER=16 below - affected
 #  rows are then tagged scheme_crossover and remain identifiable in analysis.
 #
 #  PREREQUISITE: activate the virtualenv, and run the QSVT phase precompute.

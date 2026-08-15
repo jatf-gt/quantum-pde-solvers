@@ -111,9 +111,9 @@ from problems.poisson_line_2d import PoissonLine2D
 # -- Domain Definitions --------------------------------------------------------
 
 # Physical extents of the HET discharge channel [m], from core/het_geometry.py.
-# The strip operator depends on the grid through the aspect ratio Lz/Lr alone,
-# so this fixes the 2-D HET kappa sequence: it MUST match what the 2-D/3-D
-# runners actually use, or the cache key computed here misses at runtime.
+# The strip operator depends on the grid exclusively through the aspect ratio Lz/Lr;
+# thus, this determines the 2-D HET kappa sequence. It must rigorously match the
+# parameters utilised by the 2-D/3-D runners to ensure cache key convergence at runtime.
 HET_LZ, HET_LR = geom.L_Z, geom.L_R
 
 # Default resolutions per dimension. The 1-D default stops at 16 because kappa

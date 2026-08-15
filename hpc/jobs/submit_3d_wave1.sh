@@ -11,7 +11,7 @@
 #
 #  Verified affected by the SPT-100 correction (commit 861ff46) using
 #  scripts/check_geometry_impact.py --dim 3: the strip operator moves by 0.93 in
-#  all three. Note that het_3d_discharge_spt100's SOURCE is round-off identical -
+#  all three. Observe that het_3d_discharge_spt100's SOURCE is round-off identical -
 #  its Gaussian is sited in normalised coordinates - so a source-only check would
 #  have wrongly cleared it. Sections 1, 5, 6 and 7 are unaffected and are NOT
 #  re-run here.

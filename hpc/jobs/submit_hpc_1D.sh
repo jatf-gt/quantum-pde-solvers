@@ -29,7 +29,7 @@
 # MUST NOT exceed the ncpus requested here. Aer simulations are already
 # OpenMP-threaded internally, so running more worker processes than allocated
 # cores oversubscribes the node and makes the sweep slower, not faster.
-# If you raise one, raise the other.
+# These configurations must be scaled concurrently.
 #
 # Walltime: the full N=4..64 sweep with QSVT is substantially longer than the
 # previous N<=32 runs. 24h is a starting point; check the actual elapsed time
