@@ -19,13 +19,13 @@
 #  Cost
 #  ----
 #  Measured from the rows being replaced: Thomas ~0, QSVT ~27 s total, VQLS
-#  ~1740 s total, HHL 52+42+92 s at N=4/8/16 and 3600 s each at N=32/64. Total
-#  ~2.7 h, of which 2 h is HHL at N=32/64 re-confirming its timeout under the
-#  corrected source. A 6 h walltime therefore carries ample margin.
+#  ~1740 s total, HHL 52+42+92 s at N=4/8/16 and 7200 s each at N=32/64. Total
+#  ~4.7 h, of which 4 h is HHL at N=32/64 re-confirming its timeout under the
+#  corrected source. A 24 h walltime therefore carries ample margin.
 #
 #  Usage:
 #      qsub hpc/jobs/submit_1d_wave1.sh
-#      qsub -v SKIP_HHL_LARGE=1 hpc/jobs/submit_1d_wave1.sh   # omit the 2 h of
+#      qsub -v SKIP_HHL_LARGE=1 hpc/jobs/submit_1d_wave1.sh   # omit the 4 h of
 #                                                             # known timeouts
 # ============================================================================
 

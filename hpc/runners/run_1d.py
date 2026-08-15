@@ -325,7 +325,7 @@ VQLS_SEED: int = 42
 # LEGACY_HHL_TIMEOUT_S = 3600, the budget the *existing archive* was produced under,
 # because that is a fact about recorded data and must not move when this default is
 # raised - see the docstring there.
-HHL_TIMEOUT_S: float = 5400.0
+HHL_TIMEOUT_S: float = 7200.0
 
 # -- Solver and case families --------------------------------------------------
 # The quantum solvers that `--solvers` selects among. Thomas is deliberately
@@ -1448,6 +1448,51 @@ def _to_4th_order(built, N: int):
         built, A=prob_4th.A, b=prob_4th.b, kappa=prob_4th.kappa)
 
 
+def _to_4th_order_neumann(built, N: int):
+    """
+    Re-express the sub-case 3c Neumann problem on the fourth-order operator.
+    """
+    import dataclasses
+    import numpy as np
+
+    from core.cases import _kappa, _f_het_neumann_3c
+
+    h = built.spacings[0]
+    A = np.zeros((N, N))
+
+    # Main diagonal: -30
+    np.fill_diagonal(A, -30.0)
+
+    # ±1 off-diagonals: +16
+    if N > 1:
+        np.fill_diagonal(A[1:, :], 16.0)
+        np.fill_diagonal(A[:, 1:], 16.0)
+
+    # ±2 off-diagonals: -1
+    if N > 2:
+        np.fill_diagonal(A[2:, :], -1.0)
+        np.fill_diagonal(A[:, 2:], -1.0)
+
+    # Neumann boundary at x=0 (i=0) halved to preserve symmetry:
+    # u_{-1} = u_1 and u_{-2} = u_2
+    A[0, 0] = -15.0
+    A[1, 1] = -31.0
+
+    # Dirichlet boundary at x=1 (i=N-1):
+    # u_{N+1} = -u_{N-1} + h^2 f_N
+    A[-1, -1] = -29.0
+
+    f_N = float(_f_het_neumann_3c(1.0, sigma_norm=0.2))
+    
+    b = 12 * h**2 * np.asarray(built.f_values)
+    # The first row is halved
+    b[0] = 6 * h**2 * float(built.f_values[0])
+    # The last row picks up the boundary term
+    b[-1] += h**2 * f_N
+
+    return dataclasses.replace(built, A=A, b=b, kappa=_kappa(A))
+
+
 # -- Case runners --------------------------------------------------------------
 
 def run_1d_generic_poisson_single_N(
@@ -1563,14 +1608,14 @@ def run_1d_het_single_N(
 
     built = cases.get("het_1d_3c_neumann").build(N)
     if order == 4:
-        log.warning("Sub-case 3c (Neumann) not supported by PoissonProblem1D4th. Skipping.")
-    else:
-        x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
-        case_id = "HET_1D_3c_gaussian_NeumannDirichlet"
+        built = _to_4th_order_neumann(built, N)
+    
+    x, A, b, u_exact, kappa = built.coords[0], built.A, built.b, built.exact, built.kappa
+    case_id = "HET_1D_3c_gaussian_NeumannDirichlet"
 
-        log.info("  N=%3d  kappa=%.2f  sub-case=3c  h=%.5f", N, kappa, built.spacings[0])
-        _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
-                         sel, results, all_solutions, order=order)
+    log.info("  N=%3d  kappa=%.2f  sub-case=3c  h=%.5f", N, kappa, built.spacings[0])
+    _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
+                     sel, results, all_solutions, order=order)
 
 
 # -- Result serialisation ------------------------------------------------------

@@ -2,22 +2,22 @@
 # ============================================================================
 #  submit_1d_4th_wave1.sh   -   4th-order 1D gap fill
 #
-#  Scope taken from results/manifests/rerun_1d_4th.json (16 outstanding of 96):
+#  Scope taken from results/manifests/rerun_1d_4th.json (32 outstanding of 96):
 #
-#      HET_1D_3b_gaussian_Vd300   N=4..32, all solvers   16 rows, geometry redo
+#      HET_1D_3b_gaussian_Vd300              N=4..32, all solvers   16 rows, geometry redo
+#      HET_1D_3c_gaussian_NeumannDirichlet   N=4..32, all solvers   16 rows, previously unimplemented
 #
-#  Why this is 16 rows and not a full sweep
+#  Why this is 32 rows and not a full sweep
 #  ----------------------------------------
 #  scripts/check_geometry_impact.py --dim 1 proves that the SPT-100 correction
 #  (861ff46) moves exactly one 1D case. The 4th-order operator is the
 #  dimensionless pentadiagonal TST matrix, so kappa is geometry-independent;
 #  L_z enters only the source amplitude. Of the HET 1D cases, only 3b sites
-#  its Gaussian against the physical L_Z, and only 3b's source moves. Every
-#  other case is round-off identical and must NOT be re-run.
+#  its Gaussian against the physical L_Z, and only 3b's source moves. Sub-case
+#  3c is included because it was unimplemented for 4th order in previous runs.
+#  Every other case is round-off identical and must NOT be re-run.
 #
 #  N=64 is absent from the 4th-order sweep (phase precompute not available).
-#  3c (Neumann-Dirichlet) is excluded_unimplemented under --order 4.
-#
 #  Cost
 #  ----
 #  Measured from the rows being replaced: Thomas ~0, QSVT ~23 s total, VQLS
@@ -96,7 +96,8 @@ run_step () {
 # Cheapest first. Sub-case 3b lives in section 2.
 run_step het3b_small   4,8,16   2  hhl,vqls,qsvt  3b
 run_step het3b_n32     32       2  hhl,vqls,qsvt  3b
-
+run_step het3c_small   4,8,16   2  hhl,vqls,qsvt  3c
+run_step het3c_n32     32       2  hhl,vqls,qsvt  3c
 echo ""
 echo "============================================================"
 echo "  Gap analysis after the run"
