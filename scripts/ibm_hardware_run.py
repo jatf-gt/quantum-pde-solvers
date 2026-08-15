@@ -153,12 +153,12 @@ def preflight(args) -> int:
 
     major, minor = (int(x) for x in rt_version.split(".")[:2])
     if (major, minor) < (0, 40):
-        print(f"    FAIL: qiskit-ibm-runtime {rt_version} cannot reach the "
+        print(f"    FAIL: qiskit-ibm-runtime {rt_version} cannot access the "
               f"current IBM Quantum Platform.")
         print(f"    The 'ibm_quantum' channel was sunset on 1 July 2025 and "
-              f"the replacement channel 'ibm_quantum_platform' does not exist "
-              f"in releases before 0.40.")
-        print(f"    Fix: use a separate virtual environment with "
+              f"the replacement channel 'ibm_quantum_platform' is absent "
+              f"in releases prior to 0.40.")
+        print(f"    Resolution: deploy a separate virtual environment via "
               f"'pip install -U qiskit qiskit-ibm-runtime'.")
         return 1
     print("    OK: new enough for the ibm_quantum_platform channel.")
@@ -170,7 +170,7 @@ def preflight(args) -> int:
         service = QiskitRuntimeService()
     except Exception as exc:
         print(f"    FAIL: could not load a saved account ({type(exc).__name__}: {exc})")
-        print("    Fix: run the one-time save_account snippet from the notes.")
+        print("    Resolution: execute the save_account configuration snippet.")
         return 1
     print("    OK: saved account loaded.")
 

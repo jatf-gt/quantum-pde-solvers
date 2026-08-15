@@ -107,8 +107,8 @@ def _kw_for(scheme: str, tol: float, criterion: str | None) -> dict:
     kw = {"tol": tol}
     if scheme in ("sor", "gauss-seidel", "jacobi"):
         kw["max_iter"] = 20000
-        # Force the residual criterion in comparison tables so that `tol`
-        # means the same thing for every scheme.  The "jacobi" scheme
+        # Force the residual criterion in comparison tables to maintain
+        # consistency across schemes. The "jacobi" scheme
         # otherwise defaults to the original delta test, under which the same
         # numeric tol is far looser and the row is not comparable.
         kw["criterion"] = criterion or "residual"

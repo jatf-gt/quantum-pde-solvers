@@ -78,7 +78,7 @@ def main() -> None:
     # not a hand-derived vector. Deriving it independently (as an earlier
     # draft of this script did, comparing against a manually-embedded
     # M @ b_norm / alpha) silently assumed a different circuit than the one
-    # actually being measured, and produced a spuriously low fidelity
+    # being measured, resulting in a spuriously low fidelity
     # (~0.15, implausible for a 3-qubit circuit under realistic noise) that
     # was a bug in the comparison, not a real hardware effect.
     target_full = np.asarray(Statevector(full_circuit).data)

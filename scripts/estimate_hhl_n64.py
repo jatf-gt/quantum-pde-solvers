@@ -18,7 +18,7 @@ since it is exactly one solve.
 Usage:
     python3 estimate_hhl_n64.py
     python3 estimate_hhl_n64.py --n 32     # cross-check against the N=32
-                                           # data you already have
+                                           # data already available
 """
 import argparse
 import time

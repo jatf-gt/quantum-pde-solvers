@@ -142,9 +142,9 @@ def run_hhl(
     from problems.poisson_1d_4th import PoissonProblem1D4th
 
     # hhl_solve_4th takes a PoissonProblem1D4th, so reconstruct one.
-    # We pass A and b directly by temporarily wrapping them.
+    # A and b are passed directly via a temporary wrapper.
     # Since hhl_solve_4th reads problem.A, problem.b, problem.N,
-    # we build a minimal duck-typed wrapper.
+    # a minimal duck-typed wrapper is constructed.
     class _ProbWrapper:
         pass
 

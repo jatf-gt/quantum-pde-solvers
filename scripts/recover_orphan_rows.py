@@ -270,8 +270,8 @@ def main() -> int:
         if triple[0] in STALE_GEOMETRY_CASES:
             # Superseded residue, not a lost row. These archives predate the
             # SPT-100 correction, so their fields are wrong however complete they
-            # look; the wave-1 rerun replaces them. Recovering a row from one would
-            # manufacture a plausible record of a solve to the wrong problem.
+            # appear; the wave-1 rerun supersedes them. Recovering a row from one would
+            # manufacture a plausible record of a solve to the incorrect problem.
             superseded.append(triple)
             continue
         if triple not in recorded or args.force:
@@ -400,7 +400,7 @@ def _recover_one(runner, path: Path, case_id: str, solver: str, N: int,
     f_vals = built_f if built_f is not None else archive.get("f")
 
     # The Thomas field for the same (case, N) supplies err_vs_thomas. It is a
-    # separate archive, and its absence is not fatal - the column simply stays
+    # separate archive, and its absence is non-fatal. The column remains
     # None, which is what _record does when no reference is passed.
     thomas_path = path.with_name(
         path.name.replace(f"_{solver}_N{N}", f"_Thomas_N{N}"))

@@ -12,8 +12,8 @@ run_meeting5.py used, which predates both.
 How to use this file
 ---------------------
 Copy it to a new name (e.g. scripts/report_meeting9.py) and edit the lines
-marked "# CHANGE ME" below. Everything else is plumbing you can leave alone:
-argument-free case building via core.cases, dispatch via
+marked "# CHANGE ME" below. All other components constitute infrastructure
+that requires no modification: argument-free case building via core.cases, dispatch via
 solvers.outer.get_inner (1-D) / solvers.outer.solve (2-D/3-D), a comparison
 table, one figure, and one CSV. Runtime at the defaults below is well under a
 minute on a laptop with no quantum backend beyond statevector simulation.

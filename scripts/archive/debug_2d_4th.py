@@ -124,7 +124,7 @@ def build_strip_matrix_4th(N: int, dx: float) -> np.ndarray:
     shift to obtain the full strip operator — see ``jacobi_2d_4th``.
     """
     from problems.poisson_1d_4th import PoissonProblem1D4th
-    # Use fS as a dummy source — we only need the matrix, not the RHS.
+    # Evaluate with fS as a dummy source — only the matrix is required, not the RHS.
     prob = PoissonProblem1D4th(N=N, source_fn="fS")
     return prob.A.copy()
 

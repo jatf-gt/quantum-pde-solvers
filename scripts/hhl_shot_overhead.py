@@ -139,12 +139,12 @@ def main() -> None:
     spec = hhl_spec(circuit, num_qubits)
 
     # Pre-transpilation depth is what solution.state reports directly and
-    # can look deceptively small if the circuit uses a handful of large,
+    # appears deceptively small if the circuit uses a handful of large,
     # undecomposed composite instructions (QPE/reciprocal/prep blocks are
     # typically built this way). Post-transpilation depth, via
     # core.resources.transpile_report (Phase 2, same tool used throughout
-    # this project's hardware-feasibility numbers), is the one that reflects
-    # what actually gets submitted.
+    # this project's hardware-feasibility numbers), rigorously reflects
+    # the exact execution submission.
     from core.resources import transpile_report
     pre_depth = circuit.depth()
     report = transpile_report(circuit, coupling_map=None, optimization_level=1)

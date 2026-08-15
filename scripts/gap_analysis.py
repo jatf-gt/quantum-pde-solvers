@@ -51,8 +51,8 @@ from typing import Iterable, Optional
 # puts ``scripts/`` on ``sys.path[0]`` rather than the repository root, so the local
 # import below fails however sound the working directory. The PBS submission scripts
 # invoke this module exactly that way for their post-run analysis, and the step is
-# guarded with ``|| true``, so the failure was silent: the manifest simply never
-# appeared. Resolving the root from ``__file__`` makes the invocation location
+# guarded with ``|| true``, so the failure was silent: the manifest failed to
+# appear. Resolving the root from ``__file__`` makes the invocation location
 # irrelevant, matching what every module under ``hpc/runners/`` already does.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))

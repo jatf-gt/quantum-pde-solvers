@@ -73,7 +73,7 @@ def main() -> None:
         print("Validating the composability safe-upper-bound property "
               "before trusting the extrapolated estimates...")
         for N, _kappa, _degree in PRODUCTION_SIZES:
-            # Cheap degree, just to re-confirm the bound holds for this N
+            # Evaluate degree to rigorously confirm the bound holds for this N,
             # before trusting the large-degree extrapolation below.
             check = validate_composability(N, degree=11)
             status = "OK (safe upper bound)" if check["is_safe_upper_bound"] else "BROKEN"

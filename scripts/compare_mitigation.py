@@ -152,30 +152,27 @@ def main() -> None:
     over_off = fit_off["max_fidelity"] > 1.0 or fit_off["F_prep"] > 1.0
 
     if over_on and not over_off:
-        print("CONFIRMED as a mitigation artifact: the mitigated run exceeds "
-              "the physical bound F <= 1, the unmitigated run does not.\n"
-              "Readout mitigation inverts a measured response matrix, and "
-              "that inversion does not respect the observable's [-1, 1] "
-              "range, so an unbiased mitigated estimator is allowed to "
+        print("Confirmed as a mitigation artifact: the mitigated run exceeds "
+              "the physical bound F <= 1, whereas the unmitigated run does not.\n"
+              "Readout mitigation inverts a measured response matrix; "
+              "that inversion does not enforce the observable's [-1, 1] "
+              "range, permitting an unbiased mitigated estimator to "
               "overshoot. It biases the fitted intercept F_prep, NOT the "
-              "slope: report F_UA as the result and note the intercept is "
-              "not physically meaningful under mitigation.")
+              "slope: F_UA should be reported as the result, noting that the intercept is "
+              "non-physical under mitigation.")
     elif over_on and over_off:
-        print("NOT a mitigation artifact: F > 1 appears in the UNMITIGATED "
-              "run too. Something upstream is wrong -- most likely the "
+        print("Not a mitigation artifact: F > 1 appears in the unmitigated "
+              "run. This indicates an upstream defect, likely the "
               "Direct Fidelity Estimation coefficient sum or the target "
-              "state. Every fidelity number in this project should be "
-              "re-checked before use. Start by confirming that the Pauli "
-              "coefficients of |target><target| sum correctly and that the "
-              "target matches the transpiled circuit's own statevector.")
+              "state. All fidelity metrics must be re-verified prior to use. "
+              "Validation of the Pauli coefficients' summation for |target><target| "
+              "and the transpiled circuit's statevector match is required.")
     elif not over_on and not over_off:
-        print("No overshoot in either run; both respect F <= 1. Nothing to "
-              "explain.")
+        print("No overshoot observed; both runs respect F <= 1.")
     else:
-        print("Unexpected: the UNMITIGATED run overshoots but the mitigated "
-              "one does not. This is not the behaviour either mechanism "
-              "predicts; treat both runs as suspect and investigate before "
-              "quoting either.")
+        print("Anomalous result: the unmitigated run overshoots while the mitigated "
+              "run does not. This contradicts the theoretical models for both mechanisms; "
+              "both executions should be considered suspect pending further investigation.")
 
     # ── Slope robustness, the reason the headline survives ──
     print("\n" + "-" * 72)
@@ -193,9 +190,9 @@ def main() -> None:
               f"rescaled={np.exp(s_resc):.4f}  "
               f"excl. d=0={np.exp(s_nod0):.4f}  "
               f"spread={max(vals)-min(vals):.4f}")
-    print("\nA spread of a few times 1e-3 means the per-application fidelity "
-          "is insensitive to how the intercept anomaly is treated, which is "
-          "what makes it safe to quote as the result.")
+    print("\nA variance on the order of 1e-3 indicates the per-application fidelity "
+          "is insensitive to the treatment of the intercept anomaly, ensuring "
+          "its validity as a quotable result.")
 
     total = (on.get("total_quantum_seconds") or 0) + (off.get("total_quantum_seconds") or 0)
     if total:

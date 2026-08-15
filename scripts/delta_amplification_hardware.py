@@ -274,7 +274,7 @@ def main() -> None:
         sor_err, sor_res, sor_diverged = measure_amplification(N, delta, "sor")
 
         # Amplification is only a meaningful quantity for a run that
-        # actually stabilised. A diverged run's "error" is a snapshot of
+        # attained stability. The "error" of a diverged run is a snapshot of
         # blow-up, not a fixed-point offset -- reporting err/delta for it
         # would present an artifact of *when the loop stopped* as if it
         # were a physical amplification factor. See measure_amplification's
@@ -318,11 +318,11 @@ def main() -> None:
               f"diverged runs -- they are not meaningful quantities to "
               f"report, see measure_amplification's docstring. ***")
 
-    print("\n'binding_constraint' shows which error dominates: if the "
+    print("\n'binding_constraint' indicates the dominant error source: if the "
           "amplified quantum error exceeds discretisation error, the outer "
-          "scheme's amplification -- not qubit count -- is what limits "
-          "the usable problem size at this delta. DIVERGED is a distinct, "
-          "more severe outcome (see above).")
+          "scheme's amplification -- not the qubit count -- constitutes the limit "
+          "on usable problem size for a given delta. DIVERGED represents a distinct, "
+          "more severe operational failure (see above).")
 
     fmg_amps = [r["fmg_amplification"] for r in rows if not r["fmg_diverged"]]
     sor_amps = [r["sor_amplification"] for r in rows if not r["sor_diverged"]]
