@@ -1,0 +1,18 @@
+{
+  "timestamp_utc": "2026-08-15T19:36:35.696887+00:00",
+  "hardware": true,
+  "backend": "ibm_kingston",
+  "job_id": "da0bui0b1g9c73a9ln4g",
+  "N": 4,
+  "n_qubits": 3,
+  "alpha": 3.6180339887498953,
+  "transpiled_depth": 137,
+  "two_qubit_gates": 37,
+  "n_pauli_terms": 20,
+  "shots_per_pub": 4096,
+  "resilience_level": 1,
+  "fidelity": 0.9332615864626442,
+  "fidelity_std_err": 0.003369576510227651,
+  "delta": 0.06673841353735577,
+  "quantum_seconds": null
+}
