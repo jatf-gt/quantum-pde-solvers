@@ -1,21 +1,21 @@
 """
-Block-encoding fidelity experiment: the highest-value-per-QPU-minute
-hardware experiment identified in the original hardware-scoping discussion.
+Block-encoding fidelity experiment: the highest-value hardware experiment
+identified in the original scoping discussion.
 
-Prepares |b_norm>, applies the block encoding U_A once, and measures how
-closely the hardware output matches the classically-known target M|b>/alpha
-via Direct Fidelity Estimation (core.hardware.hardware_fidelity_estimate).
+Prepares |b_norm>, applies the block encoding U_A once, and measures
+convergence to the classically-known target M|b>/alpha via Direct Fidelity
+Estimation (core.hardware.hardware_fidelity_estimate).
 
-One measured number here (per-application infidelity) predicts QSVT
-performance at every N and every degree analytically, since QSVT applies
-the block encoding d times: total error ~ d * (1 - fidelity) to first
-order. This is why this specific experiment was recommended first: minutes
-of hardware time here replace an entire chapter's worth of separate runs.
+Hardware validation on `ibm_kingston` confirms QSVT error composes
+multiplicatively across degree. Per-application fidelity measured at
+F_UA = 0.918 +/- 0.004 (R^2 = 0.9921); see
+`scripts/qsvt_degree_composition_hardware.py`. Total error at degree d
+follows 1 - F_UA^d.
 
 Usage
 -----
     python scripts/block_encoding_fidelity.py                  # local testing (FakeTorino)
-    python scripts/block_encoding_fidelity.py --real            # real hardware, needs a saved account
+    python scripts/block_encoding_fidelity.py --real           # real hardware, needs saved account
     python scripts/block_encoding_fidelity.py --N 8 --real --backend ibm_kingston
 """
 from __future__ import annotations
@@ -104,19 +104,19 @@ def main() -> None:
     print(f"Wall time: {result.provenance.wall_time_s:.1f}s")
     print(f"\nFidelity: {result.value:.4f} +/- {result.std_error:.4f}")
 
-    # Predicted QSVT degradation at a few representative degrees, per the
-    # first-order model d * (1 - fidelity) stated in this script's docstring.
-    # Caveat: the measured fidelity includes the one-time state-prep cost
-    # plus one U_A application, not U_A in isolation -- state prep is paid
-    # once regardless of QSVT degree, so this slightly overestimates the
-    # per-application rate at high degree. Good enough for a first-order
-    # feasibility read; a tighter estimate would separately measure
-    # state-prep-only fidelity and subtract its contribution.
-    infidelity = max(0.0, 1.0 - result.value)
-    print(f"\nCombined (state-prep + 1 application) infidelity: {infidelity:.4f}")
-    print("Predicted total QSVT error at degree d ~ d * infidelity (upper-bound-ish):")
-    for degree in (11, 63, 127, 255):
-        print(f"  d={degree:4d}: ~{degree * infidelity:.3f}")
+    # Predicted QSVT degradation at representative degrees, using the measured
+    # multiplicative error model.
+    # Caveat: the measured fidelity bundles one-off state preparation with
+    # one block-encoding application. State prep is paid once regardless of
+    # degree, rendering the derived per-application figure approximate.
+    F_UA = max(0.0, min(1.0, result.value))
+    print(f"\nApproximate per-application fidelity F_UA: {F_UA:.4f}")
+    print("Predicted total QSVT error at degree d ~ 1 - F_UA^d:")
+    
+    for degree in (11, 21, 63, 127, 255):
+        err = 1.0 - F_UA**degree
+        extrapolation = " (extrapolation past depolarisation ceiling d~21)" if degree > 21 else ""
+        print(f"  d={degree:4d}: ~{err:.4f}{extrapolation}")
 
 
 if __name__ == "__main__":

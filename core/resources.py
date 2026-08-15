@@ -1,98 +1,39 @@
 """
-Post-transpilation resource estimation against real IBM hardware targets.
+Post-transpilation resource estimation against IBM hardware targets.
 
 Motivation
 ----------
-Every circuit-depth and qubit-count figure currently reported anywhere in
-this project — the README's HPC section, ``QSVTSolverResult.circuit_depth``,
-the numbers quoted in progress reports — is measured *before*
-transpilation. That is the right quantity for comparing algorithms to each
-other and for the statevector-simulation cost model in
-``solvers/backend_factory.py``, where an abstract gate is exactly as
-expensive as any other. It is the wrong quantity for asking whether a
-circuit can run on a real device, because a device only executes a fixed
-native gate set over a fixed qubit connectivity, and an arbitrary
-``UnitaryGate`` — which is what ``block_encoding.build_tst_block_encoding``
-produces — is synthesised into dozens of native two-qubit gates before a
-single shot can be taken.
+Circuit-depth and qubit-count figures are measured prior to transpilation. This provides the correct metric for algorithmic comparisons and statevector-simulation cost models. It fails, however, to determine hardware feasibility: physical devices execute a fixed native gate set over a fixed topology. A ``UnitaryGate`` must be synthesised into native two-qubit gates prior to execution. This module supplies that transpiled metric, determining whether a circuit fits within contemporary hardware fidelity budgets.
 
-This module supplies that second, harder number. It answers: after
-transpilation to a real IBM Heron r2 target, how many two-qubit gates does
-this circuit actually need, and does that fit inside what today's hardware
-can execute with useful fidelity?
+Target Hardware
+---------------
+IBM Heron r2 (e.g. ``ibm_kingston``, 156 qubits, heavy-hex topology). Native basis: {RZ, SX, X, CZ}. 
 
-Target hardware
-----------------
-IBM Heron r2 (e.g. ``ibm_kingston``, 156 qubits, heavy-hex topology).
-Native basis: {RZ, SX, X} single-qubit, CZ two-qubit — confirmed against
-current IBM documentation and independent hardware papers as of August 2026
-(Heron r1/r2 use CZ; the earlier Eagle generation used ECR instead, so a
-basis-gate choice copied from an Eagle-era paper would silently misprice
-every count in this module).
+Two published figures anchor feasibility:
+*   **Circuit capacity**: Heron r2 executes up to ~5,000 two-qubit gate operations.
+*   **Median 2Q error**: CZ error rates on Heron hardware lie in the 2–3 × 10⁻³ range.
 
-    HERON_R2_BASIS_GATES = ("rz", "sx", "x", "cz")
+Both are exposed as module constants. Device calibration drifts; values must be re-verified prior to execution.
 
-Two published figures anchor the feasibility judgement:
-
-*   **Circuit capacity**: IBM reports Heron r2 executing computations with
-    up to ~5,000 two-qubit gate operations, roughly double the ~2,880
-    reported for the prior generation.
-*   **Median 2Q error**: independently reported in the 2–3 × 10⁻³ range for
-    CZ on Heron r1/r2 hardware (values differ slightly by system and
-    measurement date; treat as an order-of-magnitude anchor, not a
-    per-device guarantee — always re-check current calibration before an
-    actual run).
-
-Both are exposed as module constants below, each carrying the caveat that
-device calibration drifts and should be re-verified close to the run.
-
-Composability, and what it actually gives you
------------------------------------------------
-Directly transpiling a full QSVT circuit at production degree is not
-generally feasible: at N=32 the degree is in the hundreds, and Qiskit's
-unitary synthesis pass is not free. The estimate here instead transpiles the
-*single* block-encoding application once, and combines its two-qubit count
-with the degree:
+Composability
+-------------
+Directly transpiling a production-degree QSVT circuit is generally unfeasible. The estimate instead transpiles a single block-encoding application and scales it:
 
     two_qubit_total ≈ degree × two_qubit_count(U_A) + two_qubit_count(state_prep)
 
-The first draft of this module claimed this composition was exact, on the
-reasoning that ``_build_qsvt_circuit`` applies the identical block-encoding
-gate ``degree`` times interleaved only with single-qubit Rz rotations (the
-"non-alternating" convention documented there), so every application should
-transpile identically in isolation. ``validate_composability`` was written
-to confirm that claim before it was relied on, and instead disproved it: a
-direct sweep over N ∈ {4, 8, 16} and degree ∈ {5, 11, 21, 41} showed the
-composed estimate consistently *exceeds* the directly-transpiled count —
-never once falls short — by a margin that shrinks sharply with N:
+Cross-application optimisation between adjacent block-encoding instances causes the composed estimate to safely bound, rather than equal, the directly-transpiled count. Sweeps confirm the composed estimate exceeds the direct count by margins that shrink sharply with N: 27-36% at N=4, ~1% at N=8, and ~0.4% at N=16. The "feasible" verdict (``total <= budget``) remains trustworthy. Provisional "not feasible" verdicts at N=4 require direct transpile verification. Calls to :func:`validate_composability` assert this upper-bound property per problem shape.
 
-    N=4  : composed exceeds direct by 27-36%
-    N=8  : composed exceeds direct by 0.5-1.2%
-    N=16 : composed exceeds direct by 0.4%
+Hardware Validation (August 2026)
+---------------------------------
+The independent-error assumption underlying these extrapolations holds on ``ibm_kingston``. Measured ln F is linear in QSVT polynomial degree to R² = 0.9921 over d in [0,7], yielding a per-application fidelity F_UA = 0.918 ± 0.004 (see ``scripts/qsvt_degree_composition_hardware.py``).
 
-The excess comes from cross-application optimisation the transpiler finds
-between adjacent block-encoding applications, which the isolated single-gate
-transpile cannot see; the effect is proportionally largest when the circuit
-itself is smallest. The composed estimate is therefore not exact, but it is
-a *safe upper bound* on the two-qubit count in every case tested, which is
-the property a feasibility screen actually needs: a "feasible" verdict
-(``total <= budget``) is trustworthy, since the real circuit needs no more
-than the estimate; a "not feasible" verdict close to the budget should be
-treated as provisional for N=4-sized problems (where the margin is wide
-enough to matter) and re-checked with a direct transpile.
-
-Every use of the extrapolated estimate in this project should be preceded,
-at least once per problem shape, by a call to :func:`validate_composability`
-— ``tests/test_resources.py`` does this for every N used elsewhere in the
-codebase, and asserts the safe-upper-bound property rather than exactness.
+The measurement establishes a usable depth separate from the gate budget. Fidelity saturates at the depolarisation floor (1/2ⁿ) for d >~ 31. Circuits beyond d ≈ 21 (~780 two-qubit gates) produce output indistinguishable from the maximally mixed state. The ``HERON_R2_TWO_QUBIT_GATE_BUDGET`` of 5000 is therefore an upper bound on submittability, not measurability: the circuit family becomes uninformative roughly 6x sooner than the gate budget suggests.
 
 References
 ----------
-IBM Quantum, "Processor types" (Heron r1/r2/r3), docs.quantum.ibm.com.
-IBM Quantum Developer Conference, Nov 2024 (Heron r2 unveiling; ~5,000 2Q
-    gate circuit capacity, up from ~2,880).
-Qiskit transpiler documentation, "Represent quantum computers for the
-    transpiler" (native basis gates by processor generation).
+IBM Quantum, "Processor types" (Heron r1/r2/r3).
+IBM Quantum Developer Conference, Nov 2024.
+Qiskit transpiler documentation.
 """
 from __future__ import annotations
 

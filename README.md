@@ -37,7 +37,8 @@ Solves a 2D Poisson problem, compares outer schemes, and prints results in secon
 7. [Algorithm summary](#7-algorithm-summary)
 8. [Test suite](#8-test-suite)
 9. [Methodological notes](#9-methodological-notes)
-10. [References](#10-references)
+10. [Hardware results](#10-hardware-results)
+11. [References](#11-references)
 
 ---
 
@@ -194,6 +195,12 @@ pip install -e quantum_linear_solvers/
 | `pytest` | Test suite |
 
 > **Compatibility note.** `quantum_linear_solvers/` has been patched to replace the deprecated `QuantumCircuit.isometry()` with the `Isometry` gate from `qiskit.circuit.library`. This patch is applied to the vendored source and requires no user action. Do not revert it.
+
+### 2.1 Two-environment setup
+
+The pinned environment (`qiskit==1.4.5`) produces every simulator and HPC result, and it is the environment the regression baseline is locked against. 
+
+A **second environment** with `qiskit >= 2.x` and `qiskit-ibm-runtime >= 0.40` is required *only* for real-hardware submission (`scripts/ibm_hardware_run.py`, `scripts/qsvt_degree_composition_hardware.py`). Hardware scripts deliberately avoid importing PennyLane-dependent modules so they run cleanly in this minimal second environment.
 
 Local pinned versions (`qiskit==1.4.5`, `qiskit-aer==0.17.2`, `pennylane==0.45.0`, `pyqsp==0.2.0`) differ from the HPC venv (`qiskit==0.45.3`). The two environments are not required to match.
 
@@ -610,7 +617,28 @@ Extracting the full solution vector at each line-Jacobi step requires $\mathcal{
 
 ---
 
-## 10. References
+## 10. Hardware results
+
+A hardware measurement campaign on IBM `ibm_kingston` (Heron r2, 156 qubits) was conducted in August 2026. The test circuit was the 2-D line row operator at $N_x=4$ ($\kappa_\text{row} = 2.3586$), requiring 3 qubits (2 data + 1 block-encoding ancilla). Direct Fidelity Estimation (DFE) was performed over 20 Pauli terms, 2048 shots per term.
+
+### Summary of measured values
+
+| Metric | Result | Interpretation |
+| --- | --- | --- |
+| Single-application fidelity | 0.9333 | State preparation + one block-encoding application |
+| Per-application fidelity ($F_{UA}$) | 0.918 $\pm$ 0.004 | Derived from shallow sweep ($d \in [0, 7]$); $R^2 = 0.9921$ |
+| Error composition | Multiplicative | Hardware error scales as $1 - F_{UA}^d$, verifying the independent-error assumption |
+| Depth ceiling | $d \lesssim 21$ | Fidelity saturates at the depolarisation floor ($1/2^n = 0.125$) past $\approx 780$ gates. Deep points yield noise, an instrumental limit |
+| Readout mitigation | Inconclusive | Intercept shifts physical bounds ($0.963 \to 1.033$); slope difference ($1.7\sigma$) is unresolved |
+
+These validations underpin the resource estimates in `core/resources.py` and predictions in `scripts/block_encoding_fidelity.py`. The raw hardware result archives are stored under `results/`.
+
+### Known limitation: VQLS hardware viability
+VQLS is not wired for real-hardware submission. Its Hadamard-test cost function evaluates $2L + 2L^2$ individual circuits per step. Routing PennyLane QNodes one-at-a-time via `qiskit.remote` is impractically slow. Viable hardware execution requires rebuilding those circuits natively in Qiskit for batched evaluation via `core.hardware.hardware_estimate_batch` (documented in `core/hardware.py`).
+
+---
+
+## 11. References
 
 1. Ghafourpour, L. and Laizet, S. (2025). Applicability of solving the one- and two-dimensional Poisson equations with the quantum Harrow-Hassidim-Lloyd algorithm. *Physical Review Applied*, 24, 024032.
 2. Harrow, A. W., Hassidim, A. and Lloyd, S. (2009). Quantum algorithm for linear systems of equations. *Physical Review Letters*, 103, 150502.

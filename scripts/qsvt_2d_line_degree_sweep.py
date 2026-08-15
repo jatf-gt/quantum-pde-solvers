@@ -1,34 +1,23 @@
 """
-2-D line QSVT degree sweep: where algorithmic accuracy meets hardware
-fidelity, for the specific sub-problem this project's whole 2-D/3-D
-architecture is built around.
+2-D line QSVT degree sweep: quantifies the intersection of algorithmic accuracy and hardware fidelity for the core sub-problem.
 
-The row/strip operator A_row (problems/poisson_line_2d.py) is not the full
-1-D Poisson operator -- it carries an extra -2/dy^2 diagonal shift from the
-transverse coupling, which pins kappa(A_row) -> 3 independent of N (measured
-directly here: kappa=2.36 for a 4x4 unit-square strip). This is the
-project's central hardware-feasibility argument, restated with numbers: the
-same line decomposition that makes the 2-D problem classically tractable is
-also what makes its quantum inner solve hardware-feasible, because a
-well-conditioned operator needs only a low-degree QSVT polynomial -- this
-sweep confirms directly that degree 5 already gives machine-precision
-algorithmic accuracy on this specific row operator (rel_error ~ 1e-15).
+Operator Properties
+-------------------
+The row operator A_row (from problems/poisson_line_2d.py) carries a -2/dy² diagonal shift from transverse coupling, pinning kappa(A_row) near 3 regardless of N (measured: kappa=2.36 at Nx=4). This well-conditioned operator requires only a low-degree QSVT polynomial. A degree of 5 yields machine-precision algorithmic accuracy (rel_error ~ 1e-15).
 
-This script measures, at each degree in the sweep, three independent
-things -- not assumed to move together:
+Evaluation Metrics
+------------------
+The script measures three independent quantities per degree:
 
-1. Algorithmic accuracy: solving the row problem exactly via QSVT (real QSP
-   angles, via solvers.quantum.qsvt_1d.qsvt_solve_system) and comparing
-   against a direct solve. This is the noiseless upper bound.
-2. Circuit cost: post-transpilation two-qubit gate count, via
-   core.resources (Phase 2) -- what actually has to run.
-3. Hardware fidelity: via core.hardware.hardware_fidelity_estimate
-   (Phase 5), against FakeTorino by default or real hardware with --real.
+1. **Algorithmic accuracy**: Real QSP angles (solvers.quantum.qsvt_1d.qsvt_solve_system) against a direct solve. Provides the noiseless upper bound.
+2. **Circuit cost**: Post-transpilation two-qubit gate count (core.resources).
+3. **Hardware fidelity**: Measured via core.hardware.hardware_fidelity_estimate against FakeTorino (default) or real hardware (--real).
 
-The crossover degree -- where hardware fidelity starts costing more
-accuracy than a higher degree would gain -- is the actual, quantitative
-answer to "how deep can this specific circuit usefully go on today's
-hardware", replacing the vague "NISQ limits this" with a number.
+Hardware Validation
+-------------------
+Hardware error composes multiplicatively. Validated on `ibm_kingston`, measured per-application fidelity is F_UA = 0.918 (R² = 0.9921). Modelled hardware error is thus 1 - F_UA^d.
+
+The crossover degree identifies where hardware fidelity restricts accuracy more than polynomial degree improves it. Note that fidelity saturates at the depolarisation floor for d <~ 21. Crossovers computed beyond this depth represent extrapolations past measurable physical limits on this backend.
 
 Usage
 -----

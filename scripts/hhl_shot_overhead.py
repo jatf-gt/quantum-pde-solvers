@@ -1,41 +1,11 @@
 """
 HHL post-selection shot-overhead experiment.
 
-Measures the real cost the original hardware-scoping discussion flagged for
-HHL: post-selection succeeds with probability ~1/kappa^2, so obtaining one
-usable sample requires ~kappa^2 total shots. This script measures that
-overhead directly via core.hardware.hardware_postselection_sample, and
-reports it alongside the exact (statevector) value for comparison.
+Quantifies the overhead required for HHL post-selection. HHL succeeds with probability ~1/kappa², necessitating ~kappa² total shots per usable sample. This script measures the overhead directly via core.hardware.hardware_postselection_sample and compares it against the exact statevector value.
 
-A bug was found and fixed in this script's first version
-------------------------------------------------------------
-The first version passed main_diag/off_diag directly to
-TridiagonalToeplitz, without spectrally normalising them first --
-hhl_solve_system (solvers/quantum/hhl_1d.py) does normalise, and its
-docstring says so explicitly. Running the buggy version produced an exact
-post-selection probability of 0.95 for a kappa~9 problem, where ~1/kappa^2
-~ 0.012 was expected: two orders of magnitude off, and a direct consequence
-of feeding a Hamiltonian-simulation-based QPE routine an eigenvalue range
-it was never designed for. build_hhl_circuit below now normalises exactly
-as hhl_solve_system does, and a kappa-based sanity check (comparing the
-measured exact probability against the 1/kappa^2 order of magnitude) has
-been added so a similar mismatch would be flagged automatically rather than
-silently trusted.
-
-IMPORTANT -- one part of this script is untested here
-----------------------------------------------------------
-Everything else in this Phase 5 delivery (core/hardware.py,
-block_encoding_fidelity.py) was validated directly against FakeTorino in
-this development environment, and the normalisation fix above was checked
-character-for-character against the repository's current hhl_1d.py. The
-HHL circuit construction itself could not be run here: quantum_linear_solvers
-is present in the repo tree but not populated as an importable package in
-any sandbox clone available during development (no .gitmodules entry
-either -- it appears to be a local, uncommitted dependency on the
-development machine). Please run this once and check the sanity-check
-warning does not fire, and that the exact probability printed is in a
-plausible range for the kappa reported, before trusting the hardware
-numbers that follow it.
+Implementation Correction
+-------------------------
+The initial version passed main_diag and off_diag directly to TridiagonalToeplitz without spectral normalisation. This produced a post-selection probability of 0.95 for a kappa~9 problem (expected ~0.012) by feeding a Hamiltonian-simulation-based QPE routine an invalid eigenvalue range. The current build_hhl_circuit mirrors hhl_solve_system exactly, performing the required normalisation. A sanity check now warns if the measured probability deviates by two orders of magnitude from the 1/kappa² expectation.
 
 Usage
 -----

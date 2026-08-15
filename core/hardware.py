@@ -1,13 +1,9 @@
 """
-Execution against real IBM Quantum hardware, via Qiskit Runtime.
+Execution against IBM Quantum hardware via Qiskit Runtime.
 
-Scope, decided deliberately
-----------------------------
-This module does not attempt to reconstruct a solution vector from real
-hardware. ``core.noise.NoiseExecutor`` (Phase 3) already established why:
-amplitude reconstruction needs a phase reference, which a real device does
-not have. What a real device *can* do without qualification is answer two
-kinds of question, and this module is built around exactly those two:
+Scope
+-----
+This module avoids reconstructing solution vectors from real hardware. As established in ``core.noise.NoiseExecutor`` (Phase 3), amplitude reconstruction requires a phase reference absent in physical devices. Real devices reliably provide two outputs, defining this module's scope:
 
 1. **Post-selection statistics** — genuine measurement counts, no
    reconstruction needed. ``hardware_postselection_sample`` is the
@@ -60,8 +56,19 @@ own Python session:
 
     from qiskit_ibm_runtime import QiskitRuntimeService
     QiskitRuntimeService.save_account(
-        channel="ibm_quantum", token="<your Premium-plan API token>"
-    )
+        channel="ibm_quantum_platform",
+        token="<44-character API key from the IBM Quantum Platform dashboard>",
+        instance="<your instance CRN>",
+        set_as_default=True, overwrite=True)
+
+> [!NOTE]
+> Requires `qiskit-ibm-runtime >= 0.40`, which in turn requires
+> `qiskit >= 2.x`. This project pins `qiskit==1.4.5`, so hardware
+> submission must be run from a **separate virtual environment**. The
+> pinned environment continues to produce every simulator result and is
+> unaffected. Verified: the block-encoding construction, `Isometry` state
+> preparation, transpilation and Direct Fidelity Estimation all run
+> unchanged under `qiskit 2.3.0` / `qiskit-ibm-runtime 0.45.1`.
 
 After that, ``QiskitRuntimeService()`` with no arguments loads the saved
 account automatically, which is what ``HardwareContext.real`` does below.

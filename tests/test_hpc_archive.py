@@ -117,9 +117,7 @@ class TestFilenames:
         """
         Ensures that 1D and 2D archives use the identical naming stem, verifying 
         that differentiation is strictly contextual (by directory). Records this 
-        as an explicit schema fact.
-        """
-        a deliberate one.
+        as an explicit schema fact, a deliberate one.
         """
         assert (rio.solution_filename("c", "HHL", 8, dim=1)
                 == rio.solution_filename("c", "HHL", 8, dim=2))

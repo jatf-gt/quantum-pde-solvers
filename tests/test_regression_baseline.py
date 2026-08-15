@@ -1,58 +1,33 @@
 """
-Baseline regression lock — the replication guarantee.
+Baseline regression lock: enforces the replication guarantee.
 
 Purpose
 -------
-Everything the thesis reports was produced under exact statevector evolution
-on the code as it stood at tag ``v1.0-thesis-baseline``. The hardware work
-that follows adds execution modes, transpilation accounting, noise models and
-device backends. None of it may perturb a baseline number.
+Thesis results derive from exact statevector evolution at tag ``v1.0-thesis-baseline``. Subsequent hardware modifications (execution modes, transpilation accounting, noise models, and device backends) must not perturb baseline metrics.
 
-This file enforces that. It records the output of a fixed set of canonical
-solves in a committed golden file and fails if any of them moves. It is the
-contract between the thesis and the repository: as long as it passes, the
-figures in the thesis can be regenerated from ``main``, and there is no need
-to maintain a separate frozen fork.
+This module guarantees that property. It records canonical solver outputs in a committed baseline file and asserts their invariance. As long as this suite passes, thesis figures remain reproducible from ``main``, obviating the need for a separate frozen fork.
 
 Design
 ------
-The golden values are *generated*, not hand-written. Hand-transcribed
-expected values are a well-known way to bake in a typo and then defend it
-forever. The workflow is:
+Baseline values are generated, not hand-written, to prevent transcription errors. Workflow:
 
-    # once, on the baseline commit, in the msc_qiskit environment
+    # once, on the baseline commit
     pytest tests/test_regression_baseline.py --update-baseline
 
     # thereafter, on every change
     pytest tests/test_regression_baseline.py
 
-The generated file ``tests/baselines/baseline_v1.json`` is committed. It
-carries the git SHA, the platform, and the pinned library versions that
-produced it, because a baseline without provenance is an assertion rather
-than a record.
+The generated file ``tests/baselines/baseline_v1.json`` carries the git SHA, platform, and pinned library versions. A baseline without provenance is an assertion rather than a record.
 
 Tolerances
 ----------
-Deterministic paths — Thomas, QSVT, the outer-scheme iteration counts — are
-compared at ``rtol=0`` where the arithmetic permits, and otherwise at
-``1e-12``, which is floating-point reassociation noise rather than
-algorithmic slack.
+Deterministic paths (Thomas, QSVT, outer-scheme iteration counts) are compared at ``rtol=0`` where arithmetic permits, and otherwise at ``1e-12`` to accommodate floating-point reassociation.
 
-VQLS is the exception and is compared loosely. Its optimiser is stochastic
-in its restarts and its convergence depends on BLAS reduction order, so an
-exact lock would produce false failures on a different machine. Its final
-cost is bounded rather than pinned. This is stated here rather than buried
-in a tolerance constant, because a loose test that looks strict is worse
-than an honest loose one.
+VQLS is stochastic; its optimiser exhibits varying convergence depending on BLAS reduction order. Its final cost is bounded rather than pinned, preventing false failures across different hardware. 
 
 Anchors
 -------
-Two values in ``EXPECTED_OUTER`` are transcribed from logged runs on the
-author's machine rather than generated, and are marked as such. They are the
-2-D legacy Jacobi iteration counts at N=4 and N=8 (26 and 73 iterations,
-final deltas 9.617e-07 and 9.450e-07, final error 1.007% at N=8). They are
-kept because they predate this file and independently confirm that the
-outer-solver rewrite of 2026-08-07 preserved the original loop exactly.
+Two values in ``EXPECTED_OUTER`` are transcribed from historical logs rather than generated. These 2-D legacy Jacobi iteration counts (N=4 and N=8) predate this file, verifying that the outer-solver rewrite of 2026-08-07 preserved the loop's structure exactly.
 """
 from __future__ import annotations
 

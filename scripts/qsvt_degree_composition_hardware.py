@@ -1,63 +1,29 @@
 """
-Does hardware error compose as F^d across QSVT degree? A real-device test
-of the extrapolation model this entire project's feasibility analysis rests on.
+Assesses whether hardware error composes as F^d across QSVT degree. Provides a real-device test of the extrapolation model underlying the project's feasibility analysis.
 
-The question
-------------
-Every hardware-feasibility claim in this project extrapolates from a single
-block-encoding application to a degree-d QSVT circuit:
+Rationale
+---------
+These models assume errors from repeated U_A applications accumulate independently. Previous validation relied on simulators, whose noise models assume independent per-gate channels by construction and cannot falsify the premise. This script provides the required real-device measurement.
 
-    core/resources.py          composes two-qubit gate counts as d * count(U_A)
-    qsvt_2d_line_degree_sweep  models total error as 1 - F_1^d
-    block_encoding_fidelity    predicts QSVT error at degree d as d * (1 - F_1)
+Measures F_d directly at d = 1, 3, 5... for the 2-D line row operator, comparing against the F_1^d prediction. Potential outcomes:
 
-All three assume errors from repeated applications of the same unitary
-accumulate independently. That assumption has been flagged as unvalidated in
-each of those modules' docstrings and has never been checked against a real
-device -- only against simulators whose noise models are, by construction,
-built from independent per-gate channels and therefore cannot possibly
-falsify it.
+    F_d ~= F_1^d   Extrapolations hold.
+    F_d >  F_1^d   Coherent errors partially cancel. QSVT is more robust than predicted; feasibility limits remain conservative.
+    F_d <  F_1^d   Errors compound super-linearly. Feasibility limits require revision.
 
-This script measures F_d directly, for d = 1, 3, 5, ..., on the actual 2-D
-line row operator, and compares against the F_1^d prediction. Three outcomes,
-all worth reporting:
+Operator Selection
+------------------
+The transverse coupling in A_row provides a diagonal shift pinning kappa(A_row) near 3, independent of N. This yields the only QSVT circuit shallow enough for degree sweeps within a standard QPU budget, while remaining the core operator for the 2-D and 3-D architectures.
 
-    F_d ~= F_1^d   The extrapolations are sound; say so with evidence.
-    F_d >  F_1^d   Coherent errors partially cancel across repetitions. A
-                   positive result: QSVT is more hardware-robust than an
-                   independent-error model predicts, and every feasibility
-                   limit in this project is conservative.
-    F_d <  F_1^d   Errors compound worse than modelled; the feasibility
-                   limits are optimistic and should be restated.
+Execution Cost
+--------------
+QPU time is metered per execution second. Every mode reports usage from job.metrics(). For reference: 20 PUBs with 4096 shots on a 3-qubit circuit consume ~34 s on ibm_kingston. Resilience level 2 (ZNE) increases execution time roughly threefold.
 
-Why the row operator, not the 1-D Poisson operator
------------------------------------------------------
-A_row carries the -2/dy^2 diagonal shift from transverse coupling, pinning
-kappa(A_row) -> 3 independent of N (measured: 2.36 at Nx=4). This is the
-only operator in the project whose QSVT circuit is shallow enough to run at
-several degrees within a small QPU budget, and it is the one the whole 2-D/
-3-D architecture actually uses. Measuring the composition law here is
-therefore both affordable and directly relevant.
-
-Cost control
-------------
-QPU time is metered per second of execution, not per job, and every mode
-below reports actual usage from job.metrics(). A reference point from this
-project: 20 PUBs x 4096 shots on a 3-qubit circuit consumed 34 s on
-ibm_kingston. Budget accordingly, and note that resilience_level=2 (ZNE)
-multiplies execution time roughly 3x because it runs each circuit at
-several noise amplification factors.
-
-Modes
------
-    --calibration   Dump the backend's current calibration snapshot.
-                    Uses NO QPU time. Run this on the same day as any
-                    hardware job: device error rates drift daily, and a
-                    fidelity number is not interpretable without the
-                    device state that produced it.
+Operation Modes
+---------------
+    --calibration   Dumps the backend calibration snapshot. Consumes zero QPU time. Required alongside hardware runs, as daily error rate drift renders fidelity figures uninterpretable without device state.
     (default)       Dry run against FakeTorino. No QPU time, no credentials.
-    --submit        Real hardware. Prints a budget estimate and requires
-                    typed confirmation before spending anything.
+    --submit        Executes on hardware. Prints a budget estimate and requires confirmation.
 """
 from __future__ import annotations
 
@@ -73,7 +39,7 @@ sys.path.insert(0, str(REPO_ROOT))
 import numpy as np
 
 
-# -- Row operator (local, to keep this script importable in a minimal env) -----
+# ── Row operator (local, to keep this script importable in a minimal env) ─────
 
 def row_operator(Nx: int, Ly_over_Lx: float = 1.0):
     """
@@ -98,18 +64,9 @@ def row_operator(Nx: int, Ly_over_Lx: float = 1.0):
 
 def build_degree_circuit(Nx: int, degree: int, seed: int = 0):
     """
-    A QSVT-shaped circuit at the given degree: state preparation, then the
-    block encoding applied `degree` times with single-qubit Rz rotations
-    between applications.
+    Builds a QSVT circuit at the specified degree: state preparation followed by degree applications of the block encoding interleaved with single-qubit Rz rotations.
 
-    Uses synthetic, non-degenerate phase angles rather than real QSP angles.
-    This is deliberate and matters for the validity of the measurement: the
-    question here is how *hardware error* composes across repeated
-    applications of U_A, which depends on the gate sequence, not on the
-    particular rotation angles between them. Real QSP angles would need
-    pyqsp in this minimal environment and would change nothing about the
-    error-composition physics. The same reasoning, and the same choice, is
-    documented in core/resources.py::validate_composability.
+    Employs synthetic, non-degenerate phase angles instead of true QSP angles. Hardware error composition depends on the gate sequence, not the specific rotation angles. True QSP angles require pyqsp, adding dependency overhead without altering the underlying error physics (see core/resources.py::validate_composability).
     """
     from qiskit import QuantumCircuit
     from qiskit.circuit.library import Isometry
@@ -160,17 +117,13 @@ def pauli_terms_for_projector(target: np.ndarray):
     return terms
 
 
-# -- Calibration provenance (zero QPU cost) ------------------------------------
+# ── Calibration provenance (zero QPU cost) ────────────────────────────────────
 
 def capture_calibration(args) -> int:
     """
-    Record the backend's current calibration.
+    Records the backend's current calibration.
 
-    Device error rates drift day to day, so a fidelity measurement is only
-    interpretable alongside the device state that produced it. Run this on
-    the same day as any hardware job and keep the output with the results;
-    it is what makes the measurement reproducible-in-principle and
-    citable in a thesis appendix.
+    Device error rates drift daily. Fidelity measurements require contemporaneous device state for valid interpretation and reproducibility. Execute alongside any hardware job.
     """
     from qiskit_ibm_runtime import QiskitRuntimeService
 
@@ -226,12 +179,12 @@ def capture_calibration(args) -> int:
     path = args.out / f"calibration_{backend.name}_{stamp}.json"
     path.write_text(json.dumps(record, indent=2))
     print(f"\nSaved: {path}")
-    print("Archive these metrics with fidelity data; it represents the hardware "
-          "state at measurement time.")
+    print("Keep this alongside your fidelity results -- it is the device "
+          "state they were measured against.")
     return 0
 
 
-# -- The sweep -----------------------------------------------------------------
+# ── The sweep ─────────────────────────────────────────────────────────────────
 
 def run_sweep(args, use_hardware: bool) -> dict:
     from qiskit import transpile
@@ -297,39 +250,60 @@ def run_sweep(args, use_hardware: bool) -> dict:
 
 def analyse(record: dict) -> None:
     """
-    Test whether hardware error composes multiplicatively across degree.
+    Tests whether hardware error composes multiplicatively across degree.
 
-    If errors from repeated U_A applications accumulate independently, then
+    Independent accumulation of errors yields F_d = F_prep * (F_UA)^d, or ln F_d = ln F_prep + d * ln F_UA. The testable content is the linearity of ln F in d. A least-squares fit leverages all sweep points; the resulting R² quantifies model validity.
 
-        F_d = F_prep * (F_UA)^d      i.e.    ln F_d = ln F_prep + d * ln F_UA
+    Previous versions exhibited two failure modes:
+      1. Modelling F_d as F_1^d raised the one-off state-preparation error to the d-th power, producing a spurious "errors cancel" verdict.
+      2. A two-point estimate (F_UA = F_1/F_0) proved unstable. At Nx=4, the d=1 circuit adds few gates to a state preparation that already dominates the error. F_1 and F_0 were nearly equal, producing an unphysical per-application fidelity above 1.
 
-    so ln F is LINEAR in d. That linearity is the testable content of the
-    model, and a least-squares fit of ln F against d is the right way to
-    test it -- both because it uses every sweep point rather than two, and
-    because the fit quality (R^2) is itself the answer.
-
-    Two earlier versions of this function got the baseline wrong, in ways
-    worth recording since both produced confident, opposite, and false
-    findings on a simulator whose noise is independent by construction:
-
-      1. Modelling F_d as F_1^d raised the ONE-OFF state-preparation error
-         to the d-th power, manufacturing a spurious "errors cancel"
-         verdict (ratio rising to 2.0 at d=7).
-      2. Correcting that with a two-point estimate F_UA = F_1/F_0 was
-         unstable: at Nx=4 the d=1 circuit adds only ~19 two-qubit gates on
-         top of a state preparation that already dominates the error, so
-         F_1 and F_0 are nearly equal and their ratio came out as 1.0043 --
-         a per-application fidelity above 1, which is unphysical, and which
-         then made every higher degree look anomalously "WORSE".
-
-    The fit below avoids both failure modes. Degree 0 (state preparation
-    alone, zero two-qubit gates) is included so the intercept is measured
-    rather than assumed.
+    The present fit avoids both modes. Degree 0 (state preparation alone) is included to measure, rather than assume, the intercept.
     """
     rows = sorted(record["rows"], key=lambda r: r["degree"])
-    pts = [(r["degree"], r["fidelity"]) for r in rows if r["fidelity"] > 1e-6]
+
+    # ── Depolarisation floor ─────────────────────────────────────────────────
+    # A fully depolarised state rho = I/2^n has DFE fidelity <t|I/2^n|t> =
+    # 1/2^n against ANY target. Once a circuit is deep enough to decohere
+    # completely, the measured "fidelity" stops decaying and sits at that
+    # floor -- it is no longer measuring anything about the circuit.
+    #
+    # An earlier version of this function fitted every point regardless, and
+    # on a real ibm_kingston sweep to d=63 that produced a confident and
+    # FALSE verdict ("errors do not accumulate independently, the F^d
+    # extrapolation does not hold"). The tail it fitted was 0.1118, 0.1250,
+    # 0.1222 for a 3-qubit circuit -- all within one error bar of
+    # 1/2^3 = 0.125. Nothing had broken; the measurement had saturated.
+    # Points at or near the floor are therefore excluded from the fit and
+    # reported separately.
+    n_qubits = int(np.log2(max(2, record.get("Nx", 4)))) + 1
+    floor = 1.0 / (2 ** n_qubits)
+    typical_err = float(np.median([r.get("fidelity_std_err", 0.007) or 0.007
+                                   for r in rows]))
+    live = [r for r in rows if r["fidelity"] - floor > 3 * typical_err]
+    saturated = [r for r in rows if r not in live]
+
+    print(f"\nDepolarisation floor for {n_qubits} qubits: 1/2^{n_qubits} = "
+          f"{floor:.4f}")
+    if saturated:
+        print(f"  SATURATED (excluded from fit): "
+              f"degrees {[r['degree'] for r in saturated]} with fidelities "
+              f"{[round(r['fidelity'], 4) for r in saturated]}")
+        print(f"  These circuits are indistinguishable from the maximally "
+              f"mixed state. This is an instrumental limit, not a failure "
+              f"of the composition model.")
+        deepest_live = max((r["degree"] for r in live), default=None)
+        if deepest_live is not None:
+            print(f"  Usable QSVT depth on this backend for this circuit "
+                  f"family: d <~ {deepest_live}")
+
+    # Fit the floor-subtracted signal over the live points only.
+    pts = [(r["degree"], r["fidelity"] - floor) for r in live
+           if r["fidelity"] - floor > 1e-6]
     if len(pts) < 3:
-        print("\nNeed at least 3 sweep points with positive fidelity to fit.")
+        print("\nFewer than 3 unsaturated points; cannot fit a composition "
+              "law. Re-run with shallower degrees -- the deep points carry "
+              "no information.")
         return
 
     d = np.array([p[0] for p in pts], dtype=float)
@@ -346,7 +320,7 @@ def analyse(record: dict) -> None:
     F_UA = float(np.exp(slope))
 
     print(f"\nLeast-squares fit of ln F against degree:")
-    print(f"  intercept -> state-prep fidelity F_prep = {F_prep:.4f}")
+    print(f"  intercept -> (F_prep - floor)            = {F_prep:.4f}")
     print(f"  slope     -> per-application  F_UA      = {F_UA:.4f}")
     print(f"  R^2 (linearity of ln F in d)            = {r2:.4f}")
 
@@ -390,6 +364,12 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--calibration", action="store_true",
                    help="Dump backend calibration. No QPU time.")
+    p.add_argument("--reanalyse", type=Path, default=None,
+                   help="Re-run the analysis on a previously saved results "
+                        "JSON. No QPU time, no credentials -- the fidelities "
+                        "are already measured and are not re-acquired. Use "
+                        "this after any change to analyse(), rather than "
+                        "repeating the sweep on hardware.")
     p.add_argument("--submit", action="store_true", help="USES QPU TIME.")
     p.add_argument("--backend", type=str, default=None)
     p.add_argument("--Nx", type=int, default=4)
@@ -403,6 +383,18 @@ def main() -> None:
     p.add_argument("--out", type=Path, default=Path("results/degree_composition"))
     args = p.parse_args()
 
+    if args.reanalyse:
+        record = json.loads(args.reanalyse.read_text())
+        print(f"Re-analysing {args.reanalyse.name}  "
+              f"(backend={record.get('backend')}, "
+              f"resilience_level={record.get('resilience_level')})")
+        print("No QPU time is used: these fidelities were already measured.")
+        for r in sorted(record["rows"], key=lambda x: x["degree"]):
+            print(f"  d={r['degree']:3d}  2Q={r.get('two_qubit_gates', 0):5d}  "
+                  f"F={r['fidelity']:.4f} +/- {r.get('fidelity_std_err', float('nan')):.4f}")
+        analyse(record)
+        return
+
     if args.calibration:
         sys.exit(capture_calibration(args))
 
@@ -415,8 +407,8 @@ def main() -> None:
               f"{args.resilience_level}")
         print(f"ROUGH budget estimate: ~{est:.0f} s (~{est/60:.1f} min) of QPU "
               f"allowance.")
-        print("Increased circuit depth extends per-shot execution time; consider this a lower "
-              "bound. Actual usage is reported upon job completion.")
+        print("Deeper circuits run longer per shot, so treat this as a lower "
+              "bound. Actual usage is reported per job as it completes.")
         print("!" * 70)
         if input("Type 'yes' to continue: ").strip().lower() != "yes":
             print("Aborted. No QPU time used.")
