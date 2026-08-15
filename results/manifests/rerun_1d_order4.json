@@ -167,6 +167,166 @@
       "reasons": [
         "stale_geometry"
       ]
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 4,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 8,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 16,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "Thomas",
+      "N": 32,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "HHL",
+      "N": 32,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "VQLS",
+      "N": 32,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "HET_1D_3c_gaussian_NeumannDirichlet",
+      "solver": "QSVT",
+      "N": 32,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     }
   ],
   "keep": [
@@ -771,9 +931,9 @@
     "stale": [],
     "unexplained": []
   },
-  "generated": "2026-08-15T20:22:53+00:00",
+  "generated": "2026-08-15T02:34:32+00:00",
   "dim": 1,
-  "order": 4,
+  "order": 2,
   "results_dir": "results/1Dhpc_run_4th",
   "strict": false,
   "expected": {
@@ -783,7 +943,8 @@
       "1D_Poisson_fS_hom",
       "1D_Poisson_fS_nonhom",
       "HET_1D_3a_linear_hom",
-      "HET_1D_3b_gaussian_Vd300"
+      "HET_1D_3b_gaussian_Vd300",
+      "HET_1D_3c_gaussian_NeumannDirichlet"
     ],
     "n_values": [
       4,
@@ -797,8 +958,6 @@
       "VQLS",
       "QSVT"
     ],
-    "excluded_unimplemented": [
-      "HET_1D_3c_gaussian_NeumannDirichlet"
-    ]
+    "excluded_unimplemented": []
   }
 }
