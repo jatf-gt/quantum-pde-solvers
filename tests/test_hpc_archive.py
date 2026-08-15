@@ -82,10 +82,6 @@ def test_importing_hpc_archive_does_not_pull_matplotlib():
     processes requiring lighter dependencies. Checked in a subprocess to avoid
     state contamination from prior imports.
     """
-    imports for loading pulls Matplotlib at import time. Checked in a
-    subprocess, since by the time this test runs the plotting stack may already
-    be in `sys.modules` for unrelated reasons.
-    """
     code = (
         "import sys; import benchmark.hpc_archive; "
         "print('matplotlib' in sys.modules)"
@@ -182,8 +178,6 @@ class TestFieldAliases:
         spelling takes precedence. Ensures backward compatibility for 2D archives 
         parsed by 1D-era loaders.
         """
-        readable by the 1D-era loader.
-        """
         data = {"u_solver": np.zeros(3), "phi_solver": np.ones(3)}
         assert rio.field(data, "solution").tolist() == [0, 0, 0]
 
@@ -198,8 +192,6 @@ class TestFieldAliases:
         """
         Validates that querying a completely unknown semantic name raises a KeyError. 
         Protects against typographical errors masking as absent data.
-        """
-        absence.
         """
         with pytest.raises(KeyError, match="Unknown field"):
             rio.field({"u_solver": np.zeros(3)}, "solutoin")
@@ -251,7 +243,6 @@ class TestSweepArchive:
         Confirms that reading from an archive lacking a summary file yields a clean 
         SystemExit. Provides expected behaviour for wall-time-killed jobs.
         """
-        """
         sw = rio.SweepArchive(tmp_path, dim=1)
         with pytest.raises(SystemExit, match="No results found"):
             sw.rows()
@@ -278,7 +269,6 @@ class TestSweepArchive:
         Ensures that an archive parsed with incorrect dimensionality correctly 
         registers every data file as missing, signalling misconfiguration 
         rather than raising obscure errors.
-        """
         """
         sw = rio.SweepArchive(sweep_1d, dim=3)
         rows = sw.rows()
@@ -340,8 +330,6 @@ class TestGrouping:
         Ensures that `series` yields items in lexical (alphabetical) order, 
         preserving backwards compatibility for legend construction in older plots.
         """
-        the existing 2D and 3D figures.
-        """
         sw = rio.SweepArchive(sweep_1d, dim=1, plots_subdir=None)
         grouped = sw.group_by_case_solver(sw.rows())
         assert [s for s, _ in sw.series(grouped, "case_a")] == ["HHL", "Thomas"]
@@ -360,7 +348,6 @@ class TestGrouping:
         """
         Verifies that rows relating to alternative schemes are dropped from standard 
         analyses to prevent spurious duplicates in core solver comparisons.
-        """
         """
         rows = [
             {"case": "c", "solver": "HHL", "N": 4, "max_rel_err": 0.1,
