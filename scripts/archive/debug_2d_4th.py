@@ -56,7 +56,7 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-# ── Colour codes ──────────────────────────────────────────────────────────────
+# -- Colour codes --------------------------------------------------------------
 G = "\033[92m"
 Y = "\033[93m"
 R = "\033[91m"
@@ -65,7 +65,7 @@ B = "\033[1m"
 X = "\033[0m"
 
 
-# ── Error metrics ─────────────────────────────────────────────────────────────
+# -- Error metrics -------------------------------------------------------------
 
 def _max_rel_err(u: np.ndarray, ref: np.ndarray) -> float:
     mask = np.abs(ref) > 1e-10
@@ -90,7 +90,7 @@ def _colour(err: float) -> str:
     return G if err < 5.0 else (Y if err < 20.0 else R)
 
 
-# ── Problem setup ─────────────────────────────────────────────────────────────
+# -- Problem setup -------------------------------------------------------------
 
 def build_grid_2d(N: int):
     """Interior grid for the unit square."""
@@ -189,14 +189,14 @@ def _build_rhs_strip(
     return b
 
 
-# ── Classical Thomas solver for strips ───────────────────────────────────────
+# -- Classical Thomas solver for strips ---------------------------------------
 
 def thomas_strip(A: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Solve the strip system via NumPy direct solver."""
     return np.linalg.solve(A, b)
 
 
-# ── Outer iteration ───────────────────────────────────────────────────────────
+# -- Outer iteration -----------------------------------------------------------
 
 def jacobi_2d_4th(
     N: int,
@@ -317,7 +317,7 @@ def _make_strip_solver(inner: str, A_strip: np.ndarray, kwargs: dict):
         raise ValueError(f"Unknown inner solver: '{inner}'")
 
 
-# ── Comparison with second-order 2D ──────────────────────────────────────────
+# -- Comparison with second-order 2D ------------------------------------------
 
 def run_thomas_2d_2nd(
     N: int,
@@ -347,7 +347,7 @@ def run_thomas_2d_2nd(
     return phi
 
 
-# ── Plotting ──────────────────────────────────────────────────────────────────
+# -- Plotting ------------------------------------------------------------------
 
 def plot_solutions(
     x: np.ndarray,
@@ -411,7 +411,7 @@ def plot_solutions(
     print(f"\n  {G}Plot saved to: {out_path}{X}")
 
 
-# ── Header and table helpers ──────────────────────────────────────────────────
+# -- Header and table helpers --------------------------------------------------
 
 def _header(title: str) -> None:
     print(f"\n{B}{C}{'═'*64}{X}")
@@ -445,7 +445,7 @@ def _table_row(
           f"time={wall:.2f}s")
 
 
-# ── Compare orders ────────────────────────────────────────────────────────────
+# -- Compare orders ------------------------------------------------------------
 
 def compare_orders(N_values: list[int]) -> None:
     """Compare second- and fourth-order 2D accuracy at multiple N."""
@@ -487,7 +487,7 @@ def compare_orders(N_values: list[int]) -> None:
     print()
 
 
-# ── Main run ──────────────────────────────────────────────────────────────────
+# -- Main run ------------------------------------------------------------------
 
 def run_single(
     N: int,
@@ -512,7 +512,7 @@ def run_single(
 
     solutions: dict[str, np.ndarray] = {}
 
-    # ── Thomas 4th-order reference ────────────────────────────────────────────
+    # -- Thomas 4th-order reference --------------------------------------------
     _header_inner = f"Thomas-4th (reference)"
     print(f"\n  Running {_header_inner}...")
     t0 = time.perf_counter()
@@ -524,7 +524,7 @@ def run_single(
     t_thomas4 = time.perf_counter() - t0
     solutions["Thomas-4th"] = phi_thomas4
 
-    # ── Thomas 2nd-order for comparison ──────────────────────────────────────
+    # -- Thomas 2nd-order for comparison --------------------------------------
     t0 = time.perf_counter()
     phi_thomas2 = run_thomas_2d_2nd(N, f_vals, dx)
     t_thomas2 = time.perf_counter() - t0
@@ -536,7 +536,7 @@ def run_single(
     _table_row("Thomas-2nd", phi_thomas2, u_ex, phi_thomas4,
                0, True, t_thomas2)
 
-    # ── Quantum solvers ───────────────────────────────────────────────────────
+    # -- Quantum solvers -------------------------------------------------------
     solvers_to_run = (
         ["vqls", "qsvt", "hhl"] if inner == "all"
         else ([inner] if inner not in ("thomas",) else [])
@@ -567,13 +567,13 @@ def run_single(
         except Exception as exc:
             print(f"  {label:<14}  {R}FAILED: {exc}{X}")
 
-    # ── Plot ──────────────────────────────────────────────────────────────────
+    # -- Plot ------------------------------------------------------------------
     if do_plot:
         out_dir = REPO_ROOT / "results" / "debugging"
         plot_solutions(x, y, u_ex, solutions, N, out_dir)
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# -- Entry point ---------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(

@@ -15,7 +15,7 @@ from problems.poisson_1d import PoissonProblem1D
 from solvers.quantum.result import SolverResult
 
 
-# ── NumPy Direct Solver ───────────────────────────────────────────────────────
+# -- NumPy Direct Solver -------------------------------------------------------
 
 def numpy_solve(problem: PoissonProblem1D) -> SolverResult:
     """
@@ -40,7 +40,7 @@ def numpy_solve(problem: PoissonProblem1D) -> SolverResult:
     )
 
 
-# ── Private Utility Methods ───────────────────────────────────────────────────
+# -- Private Utility Methods ---------------------------------------------------
 
 def _relative_residual(A: np.ndarray, u: np.ndarray, b: np.ndarray) -> float:
     """Computes the relative Euclidean residual ‖Au - b‖₂ / ‖b‖₂."""

@@ -44,7 +44,7 @@ from pathlib import Path
 
 import numpy as np
 
-# ── System Path Resolution ────────────────────────────────────────────────────
+# -- System Path Resolution ----------------------------------------------------
 
 # Dynamically resolve the project root directory (one level up from this script)
 # and append it to the system path to enable absolute imports.
@@ -60,7 +60,7 @@ from solvers.quantum.vqls_1d import vqls_solve_system, VQLSConfig1D
 
 RESULTS_DIR = Path("results/het_plasma")
 
-# ── Pass/Fail Thresholds ──────────────────────────────────────────────────────
+# -- Pass/Fail Thresholds ------------------------------------------------------
 # Derived from the anticipated algorithmic precision bounds at epsilon=0.01:
 #   Thomas : Machine precision (exact analytical tridiagonal resolution).
 #   HHL    : Trotterisation error scales as ~ ε ~ 1%; a 5% threshold is
@@ -117,12 +117,12 @@ def run_benchmark(
     A = problem.A
     b = problem.b
 
-    # ── Thomas Execution ──────────────────────────────────────────────────────
+    # -- Thomas Execution ------------------------------------------------------
     t0       = time.perf_counter()
     u_thomas = thomas_solve_system(A, b)
     t_thomas = time.perf_counter() - t0
 
-    # ── HHL Execution ─────────────────────────────────────────────────────────
+    # -- HHL Execution ---------------------------------------------------------
     t0 = time.perf_counter()
     try:
         u_hhl, _, c_hhl = hhl_solve_system(A, b, cfg.epsilon)
@@ -135,7 +135,7 @@ def run_benchmark(
             print(f"  HHL failed: {exc}")
     t_hhl = time.perf_counter() - t0
 
-    # ── VQLS Execution ────────────────────────────────────────────────────────
+    # -- VQLS Execution --------------------------------------------------------
     t0 = time.perf_counter()
     try:
         vqls_r = vqls_solve_system(A, b, vc)
@@ -149,18 +149,18 @@ def run_benchmark(
             print(f"  VQLS failed: {exc}")
     t_vqls = time.perf_counter() - t0
 
-    # ── Electric Field Recovery ───────────────────────────────────────────────
+    # -- Electric Field Recovery -----------------------------------------------
     x_full, E_thomas = problem.electric_field(u_thomas)
     _,      E_hhl    = problem.electric_field(u_hhl)
     _,      E_vqls   = problem.electric_field(u_vqls)
 
-    # ── Error Metric Compilation ──────────────────────────────────────────────
+    # -- Error Metric Compilation ----------------------------------------------
     hhl_rel_phi  = rel_err_pct(u_hhl,   u_thomas)
     vqls_rel_phi = rel_err_pct(u_vqls,  u_thomas)
     hhl_rel_E    = rel_err_pct(E_hhl,   E_thomas)
     vqls_rel_E   = rel_err_pct(E_vqls,  E_thomas)
 
-    # ── Console Reporting ─────────────────────────────────────────────────────
+    # -- Console Reporting -----------------------------------------------------
     if verbose:
         _print_report(
             cfg, problem, u_thomas, u_hhl, u_vqls,
@@ -307,7 +307,7 @@ def plot_results(r: dict, save_fig: bool = True) -> None:
     x_int  = r["x_int"]
     x_full = r["x_full"]
 
-    # ── Panel 1: Plasma Profiles ──────────────────────────────────────────────
+    # -- Panel 1: Plasma Profiles ----------------------------------------------
     ax1_twin = ax1.twinx()
     l1, = ax1.plot(
         x_int, r["n_density"], "b-o", ms=4, lw=1.5,
@@ -329,7 +329,7 @@ def plot_results(r: dict, save_fig: bool = True) -> None:
     ax1.axvline(cfg.x_peak, color="grey", linestyle=":", alpha=0.7,
                 label=f"Peak x̃={cfg.x_peak}")
 
-    # ── Panel 2: Potential Profile ────────────────────────────────────────────
+    # -- Panel 2: Potential Profile --------------------------------------------
     # Include boundary values for a complete picture.
     phi_thomas_full = np.concatenate([[cfg.alpha_bc], r["u_thomas"], [0.0]])
     phi_hhl_full    = np.concatenate([[cfg.alpha_bc], r["u_hhl"],    [0.0]])
@@ -351,7 +351,7 @@ def plot_results(r: dict, save_fig: bool = True) -> None:
     ax2.legend(fontsize=9)
     ax2.grid(True, alpha=0.3)
 
-    # ── Panel 3: Electric Field ───────────────────────────────────────────────
+    # -- Panel 3: Electric Field -----------------------------------------------
     ax3.plot(x_full, r["E_thomas"] / 1e4, "g-",  lw=2.5,
              label="Thomas (classical)")
     ax3.plot(x_full, r["E_hhl"]    / 1e4, "b--", lw=1.8,
@@ -374,7 +374,7 @@ def plot_results(r: dict, save_fig: bool = True) -> None:
     ax3.legend(fontsize=8)
     ax3.grid(True, alpha=0.3)
 
-    # ── Panel 4: Error Analysis and VQLS Convergence ──────────────────────────
+    # -- Panel 4: Error Analysis and VQLS Convergence --------------------------
     ax4a = ax4
     ax4b = ax4.twinx()
 
@@ -461,7 +461,7 @@ def save_results_csv(r: dict) -> None:
     print(f"  CSV saved to {filepath}")
 
 
-# ── Primary Execution Orchestrator ────────────────────────────────────────────
+# -- Primary Execution Orchestrator --------------------------------------------
 
 def main() -> None:
     """Primary execution driver for the HET physical plasma benchmarks."""

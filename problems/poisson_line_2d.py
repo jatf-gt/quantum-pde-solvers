@@ -123,7 +123,7 @@ class PoissonLine2D:
         self._A = self._build_row_matrix()
         self._rhs = self._build_rhs()
 
-    # ── Operator ──────────────────────────────────────────────────────────────
+    # -- Operator --------------------------------------------------------------
 
     def _build_row_matrix(self) -> np.ndarray:
         """Assembles the (Nx, Nx) Toeplitz symmetric tridiagonal strip operator."""
@@ -176,7 +176,7 @@ class PoissonLine2D:
         r += -2.0 * (1.0 / self.dx**2 + 1.0 / self.dy**2) * u
         return r
 
-    # ── Coarsening ────────────────────────────────────────────────────────────
+    # -- Coarsening ------------------------------------------------------------
 
     MIN_STRIP = 4          # quantum solvers need >= 2 qubits, i.e. n >= 4
 
@@ -225,7 +225,7 @@ class PoissonLine2D:
             _level=self.level + 1,
         )
 
-    # ── Utilities ─────────────────────────────────────────────────────────────
+    # -- Utilities -------------------------------------------------------------
 
     def grid(self) -> tuple[np.ndarray, np.ndarray]:
         """

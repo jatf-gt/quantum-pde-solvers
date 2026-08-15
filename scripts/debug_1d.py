@@ -133,7 +133,7 @@ def _dump_solution(case_name: str, N: int, solver: str, x: np.ndarray,
         print(f"    pointwise error vs exact (%) = {np.round(err, 3).tolist()}")
 
 
-# ── Case comparison ────────────────────────────────────────────────────────────
+# -- Case comparison ------------------------------------------------------------
 
 def run_case(name: str, N: int, inners: list[str], inner_opts: dict,
             dump: bool = False, verbose: bool = False) -> list[tuple]:
@@ -191,7 +191,7 @@ def run_case(name: str, N: int, inners: list[str], inner_opts: dict,
     return rows
 
 
-# ── Kappa scaling table ────────────────────────────────────────────────────────
+# -- Kappa scaling table --------------------------------------------------------
 
 def kappa_table(case_names: list[str] | None = None) -> None:
     """
@@ -221,7 +221,7 @@ def kappa_table(case_names: list[str] | None = None) -> None:
           f"HET cases do not, because they are not that matrix.")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,

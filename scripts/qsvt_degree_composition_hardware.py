@@ -73,7 +73,7 @@ sys.path.insert(0, str(REPO_ROOT))
 import numpy as np
 
 
-# ── Row operator (local, to keep this script importable in a minimal env) ─────
+# -- Row operator (local, to keep this script importable in a minimal env) -----
 
 def row_operator(Nx: int, Ly_over_Lx: float = 1.0):
     """
@@ -160,7 +160,7 @@ def pauli_terms_for_projector(target: np.ndarray):
     return terms
 
 
-# ── Calibration provenance (zero QPU cost) ────────────────────────────────────
+# -- Calibration provenance (zero QPU cost) ------------------------------------
 
 def capture_calibration(args) -> int:
     """
@@ -226,12 +226,12 @@ def capture_calibration(args) -> int:
     path = args.out / f"calibration_{backend.name}_{stamp}.json"
     path.write_text(json.dumps(record, indent=2))
     print(f"\nSaved: {path}")
-    print("Keep this alongside your fidelity results -- it is the device "
-          "state they were measured against.")
+    print("Archive these metrics with fidelity data; it represents the hardware "
+          "state at measurement time.")
     return 0
 
 
-# ── The sweep ─────────────────────────────────────────────────────────────────
+# -- The sweep -----------------------------------------------------------------
 
 def run_sweep(args, use_hardware: bool) -> dict:
     from qiskit import transpile
@@ -415,8 +415,8 @@ def main() -> None:
               f"{args.resilience_level}")
         print(f"ROUGH budget estimate: ~{est:.0f} s (~{est/60:.1f} min) of QPU "
               f"allowance.")
-        print("Deeper circuits run longer per shot, so treat this as a lower "
-              "bound. Actual usage is reported per job as it completes.")
+        print("Increased circuit depth extends per-shot execution time; consider this a lower "
+              "bound. Actual usage is reported upon job completion.")
         print("!" * 70)
         if input("Type 'yes' to continue: ").strip().lower() != "yes":
             print("Aborted. No QPU time used.")

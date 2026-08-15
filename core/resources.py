@@ -119,7 +119,7 @@ __all__ = [
 ]
 
 
-# ── Hardware target constants ─────────────────────────────────────────────────
+# -- Hardware target constants -------------------------------------------------
 
 # Confirmed current (Heron r1/r2) native gate set. Do not reuse for Eagle-
 # generation backends (native two-qubit gate ECR, not CZ) or for a future
@@ -139,7 +139,7 @@ HERON_R2_TWO_QUBIT_GATE_BUDGET: int = 5_000
 HERON_R2_TWO_QUBIT_ERROR: float = 2.5e-3
 
 
-# ── Result containers ─────────────────────────────────────────────────────────
+# -- Result containers ---------------------------------------------------------
 
 @dataclass
 class ResourceReport:
@@ -264,7 +264,7 @@ class FeasibilityReport:
         }
 
 
-# ── Core transpilation ────────────────────────────────────────────────────────
+# -- Core transpilation --------------------------------------------------------
 
 def transpile_report(
     circuit,
@@ -323,7 +323,7 @@ def transpile_report(
     )
 
 
-# ── QSVT-specific building blocks ─────────────────────────────────────────────
+# -- QSVT-specific building blocks ---------------------------------------------
 
 def block_encoding_unit_cost(
     N:          int,
@@ -447,7 +447,7 @@ def qsvt_resource_estimate(
     )
 
 
-# ── Composability validation ──────────────────────────────────────────────────
+# -- Composability validation --------------------------------------------------
 
 def validate_composability(
     N:          int,
@@ -522,7 +522,7 @@ def validate_composability(
     }
 
 
-# ── Convenience: a full sweep ──────────────────────────────────────────────────
+# -- Convenience: a full sweep --------------------------------------------------
 
 def feasibility_table(
     sizes:  Sequence[Tuple[int, float, int]],

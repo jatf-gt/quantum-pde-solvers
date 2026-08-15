@@ -14,7 +14,7 @@ configuration to verify correctness before committing to the full suite.
 import sys
 from pathlib import Path
 
-# ── System Path Resolution ────────────────────────────────────────────────────
+# -- System Path Resolution ----------------------------------------------------
 
 # Dynamically resolve the project root directory (one level up from this script)
 # and append it to the system path to enable absolute imports.
@@ -30,7 +30,7 @@ from benchmark.runner import (
 from benchmark.reporting import print_result_table_2d
 
 
-# ── Primary Execution Sequence ────────────────────────────────────────────────
+# -- Primary Execution Sequence ------------------------------------------------
 
 if __name__ == "__main__":
 

@@ -143,7 +143,7 @@ echo "  SOLVERS   : ${SOLVERS}"
 echo "  SCHEME    : ${SCHEME}"
 echo "  WORKERS   : ${WORKERS}"
 
-# ── QSVT phase-cache coverage ────────────────────────────────────────────────
+# -- QSVT phase-cache coverage ------------------------------------------------
 # Every distinct strip operator, not one per resolution. A miss does not fail:
 # the phases are computed inline instead, on the critical path of a sweep that
 # already costs N^2 strip solves per outer iteration.
@@ -204,7 +204,7 @@ OPT_ARGS=""
 [ -n "${TOL}" ]       && OPT_ARGS="${OPT_ARGS} --tol ${TOL}"
 [ -n "${MAX_OUTER}" ] && OPT_ARGS="${OPT_ARGS} --max-outer ${MAX_OUTER}"
 
-# ── Sweep ────────────────────────────────────────────────────────────────────
+# -- Sweep --------------------------------------------------------------------
 # One step per resolution, ascending, so a walltime kill loses only the most
 # expensive tail. --append is what makes that safe: without it each step would
 # rewrite results_full.json from its own rows alone.

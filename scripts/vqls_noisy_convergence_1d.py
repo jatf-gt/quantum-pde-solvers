@@ -73,7 +73,7 @@ def main() -> None:
     print(f"Shots per circuit: {args.shots}  ->  "
           f"{args.shots * circuit_count(n_terms):,} total shots per cost call\n")
 
-    # ── Exact-cost baseline (the classical shortcut) ───────────────────────
+    # -- Exact-cost baseline (the classical shortcut) -----------------------
     exact_cost = build_cost_function(pauli_terms, b_norm, n_qubits, args.n_layers)
 
     t0 = time.time()
@@ -85,7 +85,7 @@ def main() -> None:
     print(f"Exact-cost COBYLA:  final cost={result_exact.fun:.6f}  "
           f"nfev={result_exact.nfev}  wall={t_exact:.1f}s")
 
-    # ── Noisy (shot-based) cost, same starting point and iteration budget ──
+    # -- Noisy (shot-based) cost, same starting point and iteration budget --
     noisy_cost = build_hadamard_cost_function(
         pauli_terms, b_norm, n_qubits, args.n_layers, shots=args.shots
     )

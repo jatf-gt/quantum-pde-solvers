@@ -69,7 +69,7 @@ plt = None
 ticker = None
 
 
-# ── Solver Presentation ───────────────────────────────────────────────────────
+# -- Solver Presentation -------------------------------------------------------
 
 # SOLVER_ORDER is imported from benchmark.results_io: the canonical ordering is
 # a property of the schema, not of the presentation, and both the grouping and
@@ -138,7 +138,7 @@ _PLANES = [
 ]
 
 
-# ── Sweep Reader ──────────────────────────────────────────────────────────────
+# -- Sweep Reader --------------------------------------------------------------
 #
 # `SweepArchive` lives in benchmark/results_io.py. It is imported above and
 # used unchanged: loading, grouping and the figure destination are properties
@@ -277,7 +277,7 @@ def load_solution_1d(sweep: SweepArchive, case: str, solver: str, N: int) -> dic
     return out
 
 
-# ── Metric Plots (2-D and 3-D) ────────────────────────────────────────────────
+# -- Metric Plots (2-D and 3-D) ------------------------------------------------
 #
 # These read `scheme`, `linf_err`, `weighted_cost` and `err_vs_thomas`, which
 # 1-D result rows do not carry. `run_1d` therefore calls none of them; see the
@@ -426,7 +426,7 @@ def plot_error_decomposition(sweep, case: str, by_solver: dict, plt) -> Path | N
     return out
 
 
-# ── One-Dimensional Plots ─────────────────────────────────────────────────────
+# -- One-Dimensional Plots -----------------------------------------------------
 
 def plot_solution_profiles(
     sweep: SweepArchive,
@@ -775,7 +775,7 @@ def plot_summary_table(
     plt.close(fig)
 
 
-# ── Two-Dimensional Plots ─────────────────────────────────────────────────────
+# -- Two-Dimensional Plots -----------------------------------------------------
 
 def plot_fields(sweep, case: str, N: int, rows: list[dict], plt, TwoSlopeNorm) -> Path | None:
     """
@@ -838,7 +838,7 @@ def plot_fields(sweep, case: str, N: int, rows: list[dict], plt, TwoSlopeNorm) -
     return out
 
 
-# ── Three-Dimensional Plots ───────────────────────────────────────────────────
+# -- Three-Dimensional Plots ---------------------------------------------------
 
 def axis_labels_for(case: str, sol: dict) -> tuple[str, str, str]:
     if "HET" in case or bool(sol.get("periodic", (False,) * 3)[2]):
@@ -1052,7 +1052,7 @@ def plot_azimuthal_fidelity(sweep, case: str, by_solver: dict, plt) -> Path | No
     return out
 
 
-# ── Entry Points ──────────────────────────────────────────────────────────────
+# -- Entry Points --------------------------------------------------------------
 
 def _matplotlib():
     """

@@ -58,7 +58,7 @@ echo "  PREFLIGHT  -  repo=${REPO_ROOT}"
 echo "  order=${ORDER}  python=$(python3 --version 2>&1)"
 echo "=============================================================================="
 
-# ── Provenance ───────────────────────────────────────────────────────────────
+# -- Provenance ---------------------------------------------------------------
 if git -C "${REPO_ROOT}" rev-parse --git-dir >/dev/null 2>&1; then
     commit="$(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
     if [ -z "$(git -C "${REPO_ROOT}" status --porcelain)" ]; then
@@ -75,7 +75,7 @@ else
     warn "not a git repository; provenance cannot be recorded"
 fi
 
-# ── Interpreter and third-party stack ────────────────────────────────────────
+# -- Interpreter and third-party stack ----------------------------------------
 [ -n "${VIRTUAL_ENV}" ] && pass "venv active: ${VIRTUAL_ENV}" \
                         || warn "no virtualenv active; using $(command -v python3)"
 
@@ -95,7 +95,7 @@ can_import pennylane      && pass "pennylane  (VQLS)" \
 can_import pyqsp && pass "pyqsp  (QSVT phase angles)" \
                  || warn "pyqsp absent; QSVT will use the Chebyshev fallback"
 
-# ── quantum_linear_solvers: the fork, not upstream ───────────────────────────
+# -- quantum_linear_solvers: the fork, not upstream ---------------------------
 TRI="quantum_linear_solvers.linear_solvers.matrices.tridiagonal_toeplitz"
 PENTA="quantum_linear_solvers.linear_solvers.matrices.pentadiagonal_toeplitz"
 
@@ -124,7 +124,7 @@ if [ "${ORDER}" = "4" ]; then
     fi
 fi
 
-# ── Project packages ─────────────────────────────────────────────────────────
+# -- Project packages ---------------------------------------------------------
 # pytest.ini sets pythonpath=., but a PBS job invoking python3 directly does not
 # read it, so the runners rely on being launched from the repository root.
 cd "${REPO_ROOT}" || exit 1
@@ -132,7 +132,7 @@ for module in core.cases solvers.outer solvers.backend_factory benchmark.results
     can_import "${module}" && pass "${module}" || fail "${module} not importable"
 done
 
-# ── Backend report ───────────────────────────────────────────────────────────
+# -- Backend report -----------------------------------------------------------
 device="$(python3 -c "
 from solvers.backend_factory import get_aer_backend
 b = get_aer_backend()
@@ -141,7 +141,7 @@ print(getattr(b.options, 'device', 'unknown'))
 [ -n "${device}" ] && pass "Aer backend device: ${device}" \
                    || warn "could not resolve an Aer backend"
 
-# ── Verdict ──────────────────────────────────────────────────────────────────
+# -- Verdict ------------------------------------------------------------------
 echo "------------------------------------------------------------------------------"
 if [ "${failures}" -gt 0 ]; then
     echo "  PREFLIGHT FAILED  -  ${failures} error(s), ${warnings} warning(s)"

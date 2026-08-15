@@ -60,7 +60,7 @@ def _real_qsvt_circuit(degree: int = 11, seed: int = 0):
     return qc, qsvt_spec(n, 1)
 
 
-# ── Noise model builders ──────────────────────────────────────────────────────
+# -- Noise model builders ------------------------------------------------------
 
 class TestDepolarizingNoiseModel:
 
@@ -112,7 +112,7 @@ class TestFakeBackendNoiseModel:
             fake_backend_noise_model("FakeNotARealBackend")
 
 
-# ── sample_postselection: the bit-order regression ────────────────────────────
+# -- sample_postselection: the bit-order regression ----------------------------
 
 @pytest.mark.quantum
 class TestSamplePostselection:
@@ -161,7 +161,7 @@ class TestSamplePostselection:
             assert sample.shot_overhead == pytest.approx(1.0 / sample.probability)
 
 
-# ── NoiseExecutor: zero-noise recovery (the normalisation regression) ─────────
+# -- NoiseExecutor: zero-noise recovery (the normalisation regression) ---------
 
 @pytest.mark.quantum
 class TestNoiseExecutorZeroNoise:
@@ -196,7 +196,7 @@ class TestNoiseExecutorZeroNoise:
         np.testing.assert_allclose(x_noisy, x_exact, atol=1e-6)
 
 
-# ── NoiseExecutor under real noise ────────────────────────────────────────────
+# -- NoiseExecutor under real noise --------------------------------------------
 
 @pytest.mark.quantum
 class TestNoiseExecutorUnderNoise:

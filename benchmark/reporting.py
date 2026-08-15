@@ -20,7 +20,7 @@ from benchmark.sensitivity import SensitivitySweepResult
 from benchmark import tables
 
 
-# ── Diagnostic thresholds ─────────────────────────────────────────────────────
+# -- Diagnostic thresholds -----------------------------------------------------
 
 _WARN_RESIDUAL:    float = 1.0e-1   # residual above this triggers a warning
 _WARN_REL_ERR:     float = 20.0     # max relative error [%] above this triggers a warning

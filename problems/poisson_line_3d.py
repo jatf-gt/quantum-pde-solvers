@@ -146,7 +146,7 @@ class PoissonLine3D:
         self._A = self._build_row_matrix()
         self._rhs = self._build_rhs()
 
-    # ── Convenience Aliases Matching the 2D Class ─────────────────────────────
+    # -- Convenience Aliases Matching the 2D Class -----------------------------
 
     @property
     def dx(self) -> float:
@@ -163,7 +163,7 @@ class PoissonLine3D:
         """Spacing along axis 2."""
         return self.spacings[2]
 
-    # ── Operator ──────────────────────────────────────────────────────────────
+    # -- Operator --------------------------------------------------------------
 
     def _diag(self) -> float:
         """Diagonal entry of the 7-point stencil, -2·Σ_d 1/h_d²."""
@@ -226,7 +226,7 @@ class PoissonLine3D:
                 out[tuple(hi)] += u[tuple(lo)] * inv_h2
         return out
 
-    # ── Coarsening ────────────────────────────────────────────────────────────
+    # -- Coarsening ------------------------------------------------------------
 
     def coarsen(self) -> Optional["PoissonLine3D"]:
         """
@@ -272,7 +272,7 @@ class PoissonLine3D:
             lengths=self.lengths, periodic=self.periodic,
             _level=self.level + 1)
 
-    # ── Utilities ─────────────────────────────────────────────────────────────
+    # -- Utilities -------------------------------------------------------------
 
     def grid(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """

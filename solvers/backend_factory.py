@@ -36,7 +36,7 @@ import os
 
 log = logging.getLogger(__name__)
 
-# ── Public Interface ──────────────────────────────────────────────────────────
+# -- Public Interface ----------------------------------------------------------
 
 
 def get_aer_backend(
@@ -105,7 +105,7 @@ def get_aer_backend(
     from qiskit_aer import AerSimulator
     from qiskit_aer.backends.aerbackend import AerError
 
-    # ── GPU path ──────────────────────────────────────────────────────────────
+    # -- GPU path --------------------------------------------------------------
     if prefer_gpu:
         cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
         if not cuda_visible:
@@ -145,7 +145,7 @@ def get_aer_backend(
                     exc,
                 )
 
-    # ── CPU fallback ──────────────────────────────────────────────────────────
+    # -- CPU fallback ----------------------------------------------------------
     backend = AerSimulator(
         method="statevector",
         device="CPU",

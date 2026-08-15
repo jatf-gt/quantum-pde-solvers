@@ -69,7 +69,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 
-# ── System Path Resolution ────────────────────────────────────────────────────
+# -- System Path Resolution ----------------------------------------------------
 
 # Dynamically resolve the project root directory (one level up from this script)
 # and append it to the system path to enable absolute imports.
@@ -91,7 +91,7 @@ RESULTS_DIR = Path("results/het_2d")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# ── Execution Parameters ──────────────────────────────────────────────────────
+# -- Execution Parameters ------------------------------------------------------
 
 # Interior nodes per direction. Must be a power of two: a strip of length N is
 # amplitude-encoded on log₂(N) qubits.
@@ -140,7 +140,7 @@ SOLVERS = [
 ]
 
 
-# ── Utility ───────────────────────────────────────────────────────────────────
+# -- Utility -------------------------------------------------------------------
 
 def _rel_err_2d(u: np.ndarray, ref: np.ndarray) -> np.ndarray:
     """
@@ -252,7 +252,7 @@ def _run_solvers(problem, reference: np.ndarray) -> dict:
     return results
 
 
-# ── Case A: sinusoidal source, analytical solution ────────────────────────────
+# -- Case A: sinusoidal source, analytical solution ----------------------------
 
 def run_case_a(cfg: HETConfig2D) -> dict:
     """
@@ -291,7 +291,7 @@ def run_case_a(cfg: HETConfig2D) -> dict:
     return data
 
 
-# ── Case B: Boeuf-Garrigues profile, physical BCs ─────────────────────────────
+# -- Case B: Boeuf-Garrigues profile, physical BCs -----------------------------
 
 def run_case_b(cfg: HETConfig2D) -> dict:
     """
@@ -340,7 +340,7 @@ def run_case_b(cfg: HETConfig2D) -> dict:
     return data
 
 
-# ── Figure A: Case A solution contours and errors ─────────────────────────────
+# -- Figure A: Case A solution contours and errors -----------------------------
 
 def plot_case_a(data: dict, save: bool = True) -> None:
     """
@@ -385,7 +385,7 @@ def plot_case_a(data: dict, save: bool = True) -> None:
     for col, (u_sol, label, colour) in enumerate(
         zip(u_sols, solver_labels, solver_cols)
     ):
-        # ── Row 0: solution contour ───────────────────────────────────────────
+        # -- Row 0: solution contour -------------------------------------------
         ax = fig.add_subplot(gs[0, col])
         cf = ax.contourf(X, Y, u_sol, levels=levels_u, cmap="viridis")
         ax.contour(X, Y, u_sol, levels=levels_u,
@@ -402,7 +402,7 @@ def plot_case_a(data: dict, save: bool = True) -> None:
                      f"Max rel. err. = {_max_rel_err(u_sol, u_exact):.2f}%")
         ax.set_aspect("equal")
 
-        # ── Row 1: absolute error ─────────────────────────────────────────────
+        # -- Row 1: absolute error ---------------------------------------------
         ax = fig.add_subplot(gs[1, col])
         cf = ax.contourf(X, Y, np.abs(u_sol - u_exact), levels=20, cmap="hot_r")
         fig.colorbar(cf, ax=ax, shrink=0.85,
@@ -420,7 +420,7 @@ def plot_case_a(data: dict, save: bool = True) -> None:
     plt.show()
 
 
-# ── Figure B: Case B solution contours ────────────────────────────────────────
+# -- Figure B: Case B solution contours ----------------------------------------
 
 def plot_case_b(data: dict, save: bool = True) -> None:
     """
@@ -485,7 +485,7 @@ def plot_case_b(data: dict, save: bool = True) -> None:
     plt.show()
 
 
-# ── Figure C: electric field vector plots ─────────────────────────────────────
+# -- Figure C: electric field vector plots -------------------------------------
 
 def plot_electric_field(data_a: dict, save: bool = True) -> None:
     """
@@ -576,7 +576,7 @@ def plot_electric_field(data_a: dict, save: bool = True) -> None:
     plt.show()
 
 
-# ── CSV export ────────────────────────────────────────────────────────────────
+# -- CSV export ----------------------------------------------------------------
 
 def export_csv(data_a: dict, data_b: dict) -> None:
     """
@@ -623,7 +623,7 @@ def export_csv(data_a: dict, data_b: dict) -> None:
     print(f"  Metrics exported to {filepath}")
 
 
-# ── Main entry point ──────────────────────────────────────────────────────────
+# -- Main entry point ----------------------------------------------------------
 
 def main() -> None:
     """

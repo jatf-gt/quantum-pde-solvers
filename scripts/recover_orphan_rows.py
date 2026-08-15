@@ -81,7 +81,7 @@ from solvers.outer.core import OuterResult, WorkLog     # noqa: E402
 from scripts.gap_analysis import STALE_GEOMETRY_CASES   # noqa: E402
 
 
-# ── Archive naming ────────────────────────────────────────────────────────────
+# -- Archive naming ------------------------------------------------------------
 
 ARCHIVE_PREFIX: dict[int, str] = {2: "solutions_", 3: "solution3d_"}
 """
@@ -129,7 +129,7 @@ def parse_archive_name(path: Path, dim: int) -> Optional[tuple[str, str, int]]:
         return None
 
 
-# ── Case lookup ───────────────────────────────────────────────────────────────
+# -- Case lookup ---------------------------------------------------------------
 
 def build_case_index(runner, N: int) -> dict:
     """
@@ -170,7 +170,7 @@ def build_case_index(runner, N: int) -> dict:
     return index
 
 
-# ── Row reconstruction ────────────────────────────────────────────────────────
+# -- Row reconstruction --------------------------------------------------------
 
 def synthesise_outer_result(archive: dict, scheme: str = "") -> OuterResult:
     """

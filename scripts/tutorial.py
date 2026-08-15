@@ -120,7 +120,7 @@ def _load_driver(dim: int):
     return module
 
 
-# ── One Dimension ─────────────────────────────────────────────────────────────
+# -- One Dimension -------------------------------------------------------------
 
 def run_1d(
     N:          int,
@@ -256,7 +256,7 @@ def _plot_1d(problem, fields: dict, exact, N: int, source_fn: str) -> None:
     print(f"\n  {_G}saved {out}{_X}")
 
 
-# ── Two and Three Dimensions ──────────────────────────────────────────────────
+# -- Two and Three Dimensions --------------------------------------------------
 
 def run_nd(dim: int, args: argparse.Namespace) -> None:
     """
@@ -327,7 +327,7 @@ def run_nd(dim: int, args: argparse.Namespace) -> None:
             driver.plot_fields(rows, prob, u_exact, tag, args.N)
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     ap = argparse.ArgumentParser(

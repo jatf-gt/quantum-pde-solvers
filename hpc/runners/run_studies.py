@@ -3,7 +3,7 @@
 Equal-accuracy and one-at-a-time sensitivity studies for the 1-D solvers.
 
 Purpose
-───────
+-------
 The primary sweep (`hpc/runners/run_1d.py`) evaluates each solver at exactly one
 parameter setting — HHL at ε = 0.01, VQLS at n_layers = max(6, 2n+2) with
 n_restarts = max(3, 2n), QSVT at the degree cap `run_1d.qsvt_max_degree` returns.
@@ -29,7 +29,7 @@ This module is that driver.
       are separately interpretable in a thesis figure.
 
 Scope and cost
-──────────────
+--------------
 Both studies re-solve at every grid point, so their cost is a multiple of a
 primary-sweep row: roughly 10 solves per case for HHL (5 equal-accuracy ε values
 plus 5 sensitivity), 34 for VQLS (a 5×4 layer/restart grid plus 14 OAT points)
@@ -41,7 +41,7 @@ The default scope is therefore N = 8 over three cases spanning the accuracy
 range: a smooth sinusoid, a discontinuous source, and the HET application case.
 
 Outputs
-───────
+-------
 Written through `benchmark/results_io.SweepArchive`, which is the schema for this
 new material — NOT `benchmark/hpc_archive.py`, which is the read-only contract
 fixed by the existing `results/{1,2,3}Dhpc_run/` sweeps and must not acquire
@@ -52,7 +52,7 @@ new-format files. Products, under ``results/1Dstudies/``:
   run_metadata.json        Environment, git state and the resolved grids.
 
 References
-──────────
+----------
 Bravo-Prieto, C., LaRose, R., Cerezo, M., Subasi, Y., Cincio, L. & Coles, P. J.
     (2023). Variational Quantum Linear Solver. Quantum, 7, 1188.
 Saltelli, A., Ratto, M., Andres, T., Campolongo, F., Cariboni, J., Gatelli, D.,
@@ -86,7 +86,7 @@ from benchmark import sensitivity as sens                       # noqa: E402
 from benchmark.results_io import SweepArchive                   # noqa: E402
 from core import cases                                          # noqa: E402
 
-# ── Output directory and logging ──────────────────────────────────────────────
+# -- Output directory and logging ----------------------------------------------
 
 RESULTS_DIR = Path("results") / "1Dstudies"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -100,7 +100,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("studies")
 
-# ── Default scope ─────────────────────────────────────────────────────────────
+# -- Default scope -------------------------------------------------------------
 # Three cases spanning the accuracy range the primary sweep exhibits: a smooth
 # sinusoid where every solver does well, a discontinuous source that is the
 # designed stress case, and the HET application case whose right-hand side is
@@ -179,7 +179,7 @@ SOLVERS: tuple[str, ...] = ("hhl", "vqls", "qsvt")
 EXCLUDED_CASES: frozenset[str] = frozenset({"het_1d_3c_neumann"})
 
 
-# ── Case assembly ─────────────────────────────────────────────────────────────
+# -- Case assembly -------------------------------------------------------------
 
 def _build(case_key: str, N: int, order: int) -> dict:
     """
@@ -329,7 +329,7 @@ def _build_outer(case_key: str, N: int, order: int, scheme: str,
     }
 
 
-# ── QSVT degree grids ─────────────────────────────────────────────────────────
+# -- QSVT degree grids ---------------------------------------------------------
 
 def _qsvt_degree_grid(kappa: float, epsilon: float, declared: list) -> list:
     """
@@ -382,7 +382,7 @@ def _qsvt_degree_grid(kappa: float, epsilon: float, declared: list) -> list:
     return kept
 
 
-# ── Studies ───────────────────────────────────────────────────────────────────
+# -- Studies -------------------------------------------------------------------
 
 def run_equal_accuracy(bundle: dict, solvers: tuple[str, ...],
                        r_target: float) -> list:
@@ -561,7 +561,7 @@ def run_sensitivity_outer(bundle: dict,
     return out
 
 
-# ── Metadata ──────────────────────────────────────────────────────────────────
+# -- Metadata ------------------------------------------------------------------
 
 def _git(*args: str) -> str:
     """Return git output, or "unknown" where git is unavailable."""
@@ -623,7 +623,7 @@ def _metadata(args, case_keys, n_values, solvers) -> dict:
     }
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# -- Entry point ---------------------------------------------------------------
 
 def main() -> int:
     global RESULTS_DIR

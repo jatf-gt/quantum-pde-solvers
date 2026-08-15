@@ -41,7 +41,7 @@ import numpy as np
 from problems.poisson_1d_4th import PoissonProblem1D4th
 from solvers.quantum.result import SolverResult
 
-# ── Submodule path ────────────────────────────────────────────────────────────
+# -- Submodule path ------------------------------------------------------------
 # The quantum_linear_solvers submodule lives at the repo root.
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _QLS_PATH = _REPO_ROOT / "quantum_linear_solvers"
@@ -155,14 +155,14 @@ def hhl_solve_system_4th(
     b = np.asarray(b)
     N = len(b)
 
-    # ── Normalise ─────────────────────────────────────────────────────────────
+    # -- Normalise -------------------------------------------------------------
     alpha = float(np.linalg.norm(A, ord=2))   # spectral norm = ||A||_2
     b_norm_factor = float(np.linalg.norm(b))
 
     A_norm = A / alpha
     b_norm = b / b_norm_factor
 
-    # ── Build the PentadiagonalToeplitz matrix object ─────────────────────────
+    # -- Build the PentadiagonalToeplitz matrix object -------------------------
     # The integer stencil coefficients are a=-30, b1=16, b2=-1.
     # After normalisation by alpha, the values passed to the class are:
     #   main_diag  = -30 / alpha
@@ -197,14 +197,14 @@ def hhl_solve_system_4th(
     if trotter_steps is not None:
         matrix.trotter_steps = trotter_steps
 
-    # ── Run HHL ───────────────────────────────────────────────────────────────
+    # -- Run HHL ---------------------------------------------------------------
     hhl = HHL(epsilon=epsilon)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         solution = hhl.solve(matrix, b_norm)
 
-    # ── Extract raw solution vector from statevector ──────────────────────────
+    # -- Extract raw solution vector from statevector --------------------------
     x_raw = _extract_solution_vector(solution, num_qubits)
 
     # Normalise to unit vector — post-selection amplitude is suppressed

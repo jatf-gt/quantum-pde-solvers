@@ -40,14 +40,14 @@ import numpy as np
 from core import het_geometry as geom
 
 
-# ── Physical Constants ────────────────────────────────────────────────────────
+# -- Physical Constants --------------------------------------------------------
 
 E_CHARGE    = 1.602176634e-19   # Elementary charge [C]
 EPS_0       = 8.854187817e-12   # Vacuum permittivity [F/m]
 EV_TO_J     = E_CHARGE          # Conversion factor: 1 eV in Joules
 
 
-# ── Configuration Structure ───────────────────────────────────────────────────
+# -- Configuration Structure ---------------------------------------------------
 
 @dataclass
 class HETConfig:
@@ -162,7 +162,7 @@ class HETConfig:
         )
 
 
-# ── Physical Configuration (Boeuf-Garrigues) ──────────────────────────────────
+# -- Physical Configuration (Boeuf-Garrigues) ----------------------------------
 
 @dataclass
 class HETPhysicalConfig:
@@ -301,7 +301,7 @@ class HETPhysicalConfig:
         )
 
 
-# ── Two-Dimensional Physical Configuration (Boeuf-Garrigues) ──────────────────
+# -- Two-Dimensional Physical Configuration (Boeuf-Garrigues) ------------------
 
 @dataclass
 class HETConfig2D:
@@ -445,7 +445,7 @@ class HETConfig2D:
         self.alpha_bc = float(self.V_discharge / self.phi_0)
         self.delta_0  = self.delta_0_factor / self.alpha
 
-    # ── Mesh-Dependent Physical Fields ────────────────────────────────────────
+    # -- Mesh-Dependent Physical Fields ----------------------------------------
 
     def grid(self, N: int, Nr: int | None = None) -> tuple[np.ndarray, np.ndarray]:
         """

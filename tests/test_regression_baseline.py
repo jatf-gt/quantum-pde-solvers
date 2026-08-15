@@ -78,7 +78,7 @@ ATOL_EXACT = 1e-14
 VQLS_COST_CEILING = 1e-3
 
 
-# ── pytest wiring ─────────────────────────────────────────────────────────────
+# -- pytest wiring -------------------------------------------------------------
 #
 # The ``--update-baseline`` flag and the session-finish writer are declared in
 # tests/conftest.py, because pytest only honours ``pytest_addoption`` and
@@ -104,7 +104,7 @@ def baseline(updating) -> Dict[str, Any]:
     return json.loads(BASELINE_FILE.read_text())
 
 
-# ── Provenance ────────────────────────────────────────────────────────────────
+# -- Provenance ----------------------------------------------------------------
 
 def _git_sha() -> str:
     try:
@@ -132,7 +132,7 @@ def _provenance() -> Dict[str, Any]:
     }
 
 
-# ── Canonical cases ───────────────────────────────────────────────────────────
+# -- Canonical cases -----------------------------------------------------------
 #
 # Deliberately small. This suite must run in the time a person will actually
 # wait for, or it stops being run and stops protecting anything. Broader
@@ -189,7 +189,7 @@ def _maybe_float(v):
     return float(v)
 
 
-# ── 1-D solver lock ───────────────────────────────────────────────────────────
+# -- 1-D solver lock -----------------------------------------------------------
 
 @pytest.mark.quantum
 @pytest.mark.parametrize("case_id,N,source_fn,solver", CASES_1D,
@@ -242,7 +242,7 @@ def test_1d_solver_output_unchanged(case_id, N, source_fn, solver,
             )
 
 
-# ── Outer-scheme lock ─────────────────────────────────────────────────────────
+# -- Outer-scheme lock ---------------------------------------------------------
 #
 # Transcribed from logged runs predating this file. They pin the legacy Jacobi
 # path, which the 2026-08-07 outer-solver rewrite was required to reproduce
@@ -296,7 +296,7 @@ def test_legacy_jacobi_iteration_count_unchanged(N):
     assert final_delta == pytest.approx(expected_delta, rel=delta_rtol)
 
 
-# ── Baseline generation ───────────────────────────────────────────────────────
+# -- Baseline generation -------------------------------------------------------
 
 _STASH: Dict[str, Any] = {}
 

@@ -95,7 +95,7 @@ __all__ = [
 HERON_R2_SINGLE_QUBIT_ERROR: float = 3.0e-4
 
 
-# ── Noise model builders ──────────────────────────────────────────────────────
+# -- Noise model builders ------------------------------------------------------
 
 def depolarizing_noise_model(
     single_qubit_error: float = HERON_R2_SINGLE_QUBIT_ERROR,
@@ -250,7 +250,7 @@ def fake_backend_noise_model(name: str = "FakeTorino"):
     return NoiseModel.from_backend(backend)
 
 
-# ── Noisy solution-vector executor ─────────────────────────────────────────────
+# -- Noisy solution-vector executor ---------------------------------------------
 
 class NoiseExecutor:
     """
@@ -373,7 +373,7 @@ class NoiseExecutor:
         record = ExecutionRecord(**record_common, extra={"purity": purity})
         return x_raw, record
 
-    # ── Internals ─────────────────────────────────────────────────────────────
+    # -- Internals -------------------------------------------------------------
 
     def _reference_accepted_amplitudes(self, circuit, spec: PostSelectSpec) -> np.ndarray:
         """
@@ -416,7 +416,7 @@ def _is_null(x: np.ndarray, atol: float) -> bool:
     return bool(np.allclose(x, 0.0, atol=atol))
 
 
-# ── Shot-sampled post-selection statistics ────────────────────────────────────
+# -- Shot-sampled post-selection statistics ------------------------------------
 
 @dataclass
 class PostSelectionSample:
@@ -526,7 +526,7 @@ def _wilson_interval(k: int, n: int, z: float = 1.96) -> Tuple[float, float]:
     return (max(0.0, (centre - margin) / denom), min(1.0, (centre + margin) / denom))
 
 
-# ── Convenience: a parametric sweep ────────────────────────────────────────────
+# -- Convenience: a parametric sweep --------------------------------------------
 
 def depolarizing_sweep(
     circuit,

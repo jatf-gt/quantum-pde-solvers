@@ -48,7 +48,7 @@ class WallTimeExceeded(Exception):
     """
 
 
-# ── Work accounting ───────────────────────────────────────────────────────────
+# -- Work accounting -----------------------------------------------------------
 
 @dataclass
 class WorkLog:
@@ -91,7 +91,7 @@ class WorkLog:
         return f"{self.total} solves ({', '.join(parts)})"
 
 
-# ── Result container ──────────────────────────────────────────────────────────
+# -- Result container ----------------------------------------------------------
 
 @dataclass
 class OuterResult:
@@ -127,7 +127,7 @@ class OuterResult:
                 f"{self.work.summary()}, {self.wall_time_s:.2f}s")
 
 
-# ── Inner solver protocol ─────────────────────────────────────────────────────
+# -- Inner solver protocol -----------------------------------------------------
 
 @runtime_checkable
 class InnerSolver(Protocol):
@@ -143,7 +143,7 @@ class InnerSolver(Protocol):
     def __call__(self, A: np.ndarray, b: np.ndarray) -> np.ndarray: ...
 
 
-# ── Problem protocol ──────────────────────────────────────────────────────────
+# -- Problem protocol ----------------------------------------------------------
 
 @runtime_checkable
 class LineProblem2D(Protocol):
@@ -282,7 +282,7 @@ class HigherOrderTransverse(Protocol):
         ...
 
 
-# ── Stagnation detection ──────────────────────────────────────────────────────
+# -- Stagnation detection ------------------------------------------------------
 
 class StagnationMonitor:
     """
@@ -341,7 +341,7 @@ class StagnationMonitor:
         return (prior - recent) / prior < self.min_improvement
 
 
-# ── Strip sweep - the primitive every scheme is built from ────────────────────
+# -- Strip sweep - the primitive every scheme is built from --------------------
 
 def strip_sweep(
     problem,

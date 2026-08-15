@@ -67,7 +67,7 @@ __all__ = [
 ]
 
 
-# ── Scheme registry ───────────────────────────────────────────────────────────
+# -- Scheme registry -----------------------------------------------------------
 
 def _jacobi(problem, inner, **kw):
     """The original scheme: simultaneous strip update, delta stopping test."""
@@ -157,7 +157,7 @@ def describe_scheme(name: str | None = None) -> str:
     return "\n".join(out)
 
 
-# ── CLI option parsing ────────────────────────────────────────────────────────
+# -- CLI option parsing --------------------------------------------------------
 #
 # Shared by every runner script that exposes -I/-S flags for inner-solver and
 # outer-scheme options. Kept beside the registries they are validated against
@@ -241,7 +241,7 @@ def coerce_scheme_opts(d: dict) -> dict:
     return out
 
 
-# ── Public entry points ───────────────────────────────────────────────────────
+# -- Public entry points -------------------------------------------------------
 
 def solve(
     problem: LineProblem2D,

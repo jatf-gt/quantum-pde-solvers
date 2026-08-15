@@ -38,7 +38,7 @@ from solvers.quantum.block_encoding import is_toeplitz_tridiagonal
 from solvers.quantum.result import SolverResult
 
 
-# ── Public High-Level Interface ───────────────────────────────────────────────
+# -- Public High-Level Interface -----------------------------------------------
 
 def hhl_solve(problem: PoissonProblem1D) -> SolverResult:
     """
@@ -73,7 +73,7 @@ def hhl_solve(problem: PoissonProblem1D) -> SolverResult:
     )
 
 
-# ── Core Algorithmic Sub-Routine ──────────────────────────────────────────────
+# -- Core Algorithmic Sub-Routine ----------------------------------------------
 
 def hhl_solve_system(
     A:       np.ndarray,
@@ -120,7 +120,7 @@ def hhl_solve_system(
     """
     N = len(b)
 
-    # ── Phase 0: Structural Precondition ──────────────────────────────────────
+    # -- Phase 0: Structural Precondition --------------------------------------
     # `TridiagonalToeplitz` is constructed from A[0,0] and A[0,1] only, so any wider
     # band -- or any diagonal that is not constant -- would be discarded without
     # trace and a different system solved. Where that reconstruction is exact the
@@ -134,7 +134,7 @@ def hhl_solve_system(
     # appearing entirely healthy. See `is_toeplitz_tridiagonal`.
     use_toeplitz = is_toeplitz_tridiagonal(A)
 
-    # ── Phase 1: Spectral Normalisation ───────────────────────────────────────
+    # -- Phase 1: Spectral Normalisation ---------------------------------------
     A_norm_factor = float(np.linalg.norm(A, ord=2))
     b_norm_factor = float(np.linalg.norm(b))
 
@@ -147,7 +147,7 @@ def hhl_solve_system(
 
     b_norm = b / b_norm_factor
 
-    # ── Phase 2: Operator Construction ────────────────────────────────────────
+    # -- Phase 2: Operator Construction ----------------------------------------
     num_qubits    = int(np.log2(N))
     trotter_steps = max(1, int(np.ceil(1.0 / epsilon)))
 
@@ -175,17 +175,17 @@ def hhl_solve_system(
         # cannot drift apart on a value neither of them varies.
         matrix = NumPyMatrix(A / A_norm_factor, tolerance=epsilon)
 
-    # ── Phase 3: Algorithm Execution ──────────────────────────────────────────
+    # -- Phase 3: Algorithm Execution ------------------------------------------
     hhl = HHL()
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         solution = hhl.solve(matrix, b_norm)
 
-    # ── Phase 4: Statevector Extraction ───────────────────────────────────────
+    # -- Phase 4: Statevector Extraction ---------------------------------------
     x_raw = _extract_solution_statevector(solution.state, num_qubits)
 
-    # ── Phase 5: Dimensionality Recovery ──────────────────────────────────────
+    # -- Phase 5: Dimensionality Recovery --------------------------------------
     # The scaling constant is recovered against the *normalised* system, so that
     # quantum error is not amplified by the geometric factor ||b||_2 / ||A||_2.
     # This matters for physically scaled domains — notably the HET case, where
@@ -217,7 +217,7 @@ def hhl_solve_system(
     return u, x_raw, c
 
 
-# ── Private Utility Methods ───────────────────────────────────────────────────
+# -- Private Utility Methods ---------------------------------------------------
 
 def _relative_residual(
     A: np.ndarray,

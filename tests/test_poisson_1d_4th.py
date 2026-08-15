@@ -47,7 +47,7 @@ from problems.poisson_1d_4th import PoissonProblem1D4th
 RESOLUTIONS = (4, 8, 16, 32, 64)
 
 
-# ── Manufactured solutions ────────────────────────────────────────────────────
+# -- Manufactured solutions ----------------------------------------------------
 #
 # The sign convention is that of the discretisation: A/(12h²) approximates the
 # second derivative, so the governing equation is u″ = f, not −u″ = f.
@@ -90,7 +90,7 @@ def _observed_order(f, u, alpha, beta, supply_boundary=True):
     return float(p[0])
 
 
-# ── Order of convergence ──────────────────────────────────────────────────────
+# -- Order of convergence ------------------------------------------------------
 
 class TestOrderOfConvergence:
 
@@ -137,7 +137,7 @@ class TestOrderOfConvergence:
         assert order == pytest.approx(4.0, abs=0.3)
 
 
-# ── Consistency of the assembled system ───────────────────────────────────────
+# -- Consistency of the assembled system ---------------------------------------
 
 class TestBoundaryRowConsistency:
 
@@ -182,7 +182,7 @@ class TestBoundaryRowConsistency:
         assert not np.allclose(base.b, moved.b)
 
 
-# ── Boundary source resolution ────────────────────────────────────────────────
+# -- Boundary source resolution ------------------------------------------------
 
 class TestBoundarySourceResolution:
 
@@ -210,7 +210,7 @@ class TestBoundarySourceResolution:
         assert prob.f_boundary[1] == pytest.approx(f(1.0), rel=1e-10)
 
 
-# ── Integration with the case registry ────────────────────────────────────────
+# -- Integration with the case registry ----------------------------------------
 
 class TestCaseRegistryBoundarySource:
     """

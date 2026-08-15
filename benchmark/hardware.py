@@ -9,7 +9,7 @@ fields (backend_name, backend_shots, error_mitigation, hardware_run)
 populated appropriately.
 
 Scope and limitations
-─────────────────────
+---------------------
 Real hardware execution is subject to:
   1. Queue times that may be hours to days.
   2. Device noise that introduces errors not present in simulation.
@@ -23,7 +23,7 @@ framework records all hardware-specific metadata to enable post-hoc
 comparison and noise analysis.
 
 Error mitigation
-────────────────
+----------------
 Zero-noise extrapolation (ZNE) via Qiskit's RuntimeEstimatorV2 is
 supported as an optional mitigation strategy. ZNE scales the noise by
 factors [1, 2, 3] and extrapolates to zero noise using a linear fit.
@@ -32,7 +32,7 @@ and is appropriate for the circuit depths encountered in this benchmark
 (N ≤ 8 for hardware runs).
 
 Usage
-─────
+-----
 Hardware execution is gated behind the ENABLE_HARDWARE_RUN flag to prevent
 accidental submission of jobs to real devices. Set this flag explicitly:
 
@@ -46,7 +46,7 @@ accidental submission of jobs to real devices. Set this flag explicitly:
     result = run_hhl_on_hardware(A, b, u_thomas, u_exact, ..., hw_cfg=cfg)
 
 References
-──────────
+----------
   IBM Quantum Runtime documentation: https://docs.quantum.ibm.com/
   Temme et al. (2017) Phys. Rev. Lett. 119, 180509. (ZNE)
   Montanez-Barrera et al. (2025) arXiv:2502.06471. (QPU benchmarking)
@@ -67,7 +67,7 @@ from benchmark.equal_accuracy import _build_base_result
 log = logging.getLogger(__name__)
 
 
-# ── Hardware configuration ────────────────────────────────────────────────────
+# -- Hardware configuration ----------------------------------------------------
 
 @dataclass
 class HardwareConfig:

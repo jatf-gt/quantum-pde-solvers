@@ -68,7 +68,7 @@ from solvers.quantum.vqls_utils import (
 )
 
 
-# ── VQLS Configuration ────────────────────────────────────────────────────────
+# -- VQLS Configuration --------------------------------------------------------
 
 @dataclass
 class VQLSConfig1D:
@@ -127,7 +127,7 @@ DEFAULT_VQLS_CONFIG = VQLSConfig1D(
 )
 
 
-# ── Public High-Level Interface ───────────────────────────────────────────────
+# -- Public High-Level Interface -----------------------------------------------
 
 def vqls_solve(
     problem: PoissonProblem1D,
@@ -160,7 +160,7 @@ def vqls_solve(
     )
 
 
-# ── Core Algorithmic Sub-Routine ──────────────────────────────────────────────
+# -- Core Algorithmic Sub-Routine ----------------------------------------------
 
 def _vqls_single_run(
     A           : np.ndarray,
@@ -228,14 +228,14 @@ def _vqls_single_run(
     """
     n_p = n_params(n_qubits, config.n_layers)
 
-    # ── Fresh Random Initialisation ───────────────────────────────────────────
+    # -- Fresh Random Initialisation -------------------------------------------
     # Each independent run draws a new theta_init from a different seed.
     # This is the critical difference from sequential refinement: we are
     # exploring a new basin of the landscape, not refining within the same one.
     rng        = np.random.default_rng(seed)
     theta_init = rng.uniform(0, 2 * np.pi, size=n_p)
 
-    # ── Objective Function ────────────────────────────────────────────────────
+    # -- Objective Function ----------------------------------------------------
     cost_fn = build_cost_function(
         pauli_terms  = pauli_terms,
         b_norm       = b_norm,
@@ -244,7 +244,7 @@ def _vqls_single_run(
         device_name  = config.device_name,
     )
 
-    # ── Exploration / Optimisation Pass ───────────────────────────────────────
+    # -- Exploration / Optimisation Pass ---------------------------------------
     if config.optimiser == "COBYLA":
         # COBYLA Cascade
         opt_result = minimize(
@@ -374,7 +374,7 @@ def vqls_solve_system(
         raise ValueError("RHS vector b is numerically zero.")
     b_norm = b / b_norm_factor
 
-    # ── Pauli Decomposition ───────────────────────────────────────────────────
+    # -- Pauli Decomposition ---------------------------------------------------
     # Computed once and shared across all restarts to avoid redundant work.
     # The decomposition depends only on A, not on the parameter vector.
     pauli_terms, A_norm_factor = pauli_decompose_normalised(A)
@@ -391,7 +391,7 @@ def vqls_solve_system(
             f"n_restarts={config.n_restarts}"
         )
 
-    # ── Phase 1: Independent Exploration Restarts ─────────────────────────────
+    # -- Phase 1: Independent Exploration Restarts -----------------------------
     # Generate n_restarts independent seeds from the master seed. Using a
     # seeded RNG to generate the child seeds ensures full reproducibility:
     # the same master seed always produces the same set of child seeds and
@@ -452,7 +452,7 @@ def vqls_solve_system(
                 all_cost_histories.append([best_cost_global])
             break
 
-    # ── Phase 2: Global Refinement of Best Result ─────────────────────────────
+    # -- Phase 2: Global Refinement of Best Result -----------------------------
     # Apply one final tight refinement pass to the best parameter vector
     # found across all restarts. This polishes the solution within the
     # identified global minimum basin without risking escape to a worse basin
@@ -503,7 +503,7 @@ def vqls_solve_system(
             f"best_seed_idx={np.argmin([h[-1] for h in all_cost_histories[:-1]])}"
         )
 
-    # ── Solution Recovery ─────────────────────────────────────────────────────
+    # -- Solution Recovery -----------------------------------------------------
     u, c = recover_solution(
         params      = optimal_params,
         A           = A,
@@ -544,7 +544,7 @@ def vqls_solve_system(
     )
 
 
-# ── Private Utility Methods ───────────────────────────────────────────────────
+# -- Private Utility Methods ---------------------------------------------------
 
 def _validate_system(A: np.ndarray, b: np.ndarray) -> None:
     """

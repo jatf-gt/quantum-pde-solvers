@@ -125,7 +125,7 @@ echo "  SOLVERS         : ${SOLVERS}"
 echo "  WORKERS         : ${WORKERS}"
 echo "  HHL_TIMEOUT_S   : ${HHL_TIMEOUT_S}"
 
-# ── QSVT phase-cache coverage ────────────────────────────────────────────────
+# -- QSVT phase-cache coverage ------------------------------------------------
 # The phase angles are the expensive, non-parallelisable stage of QSVT, and the
 # cache key includes the degree tag: uncapped entries are recorded as d-1 and
 # run_1d.py requests exactly the cap that qsvt_max_degree gives. A miss does not
@@ -185,7 +185,7 @@ PY
     ;;
 esac
 
-# ── Sweep ────────────────────────────────────────────────────────────────────
+# -- Sweep --------------------------------------------------------------------
 # One step per resolution, ascending, so that a walltime kill loses only the
 # most expensive tail rather than the whole sweep. --append is what makes that
 # safe: without it each step would rewrite results_full.json from its own rows

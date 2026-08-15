@@ -34,7 +34,7 @@ from problems.poisson_line_3d_4th import PoissonLine3D4th
 from solvers.outer import solve
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers -------------------------------------------------------------------
 
 def dense_solve(problem):
     """
@@ -134,7 +134,7 @@ CUBIC_3D = (lambda x, y, z: x ** 3 + y ** 3 + z ** 3,
             lambda x, y, z: 6.0 * (x + y + z))
 
 
-# ── Order of convergence ──────────────────────────────────────────────────────
+# -- Order of convergence ------------------------------------------------------
 
 class TestOrderOfConvergence2D:
     """The property the whole exercise exists to obtain."""
@@ -247,7 +247,7 @@ class TestOrderOfConvergence3D:
         assert observed_order(errors, sizes) > 3.7
 
 
-# ── The strip decomposition must be the same system ───────────────────────────
+# -- The strip decomposition must be the same system ---------------------------
 
 class TestStripDecompositionConsistency:
     """
@@ -281,7 +281,7 @@ class TestStripDecompositionConsistency:
         assert np.max(np.abs(result.u - u_dense)) < 1e-9
 
 
-# ── Operator structure ────────────────────────────────────────────────────────
+# -- Operator structure --------------------------------------------------------
 
 class TestOperatorStructure:
 
@@ -371,7 +371,7 @@ class TestOperatorStructure:
             (-2, -c), (-1, 16.0 * c), (1, 16.0 * c), (2, -c))
 
 
-# ── Coarsening ────────────────────────────────────────────────────────────────
+# -- Coarsening ----------------------------------------------------------------
 
 class TestCoarsening:
 
@@ -398,7 +398,7 @@ class TestCoarsening:
         assert coarse.shape == (8, 8, 8)
 
 
-# ── Validation ────────────────────────────────────────────────────────────────
+# -- Validation ----------------------------------------------------------------
 
 class TestValidation:
 
@@ -419,7 +419,7 @@ class TestValidation:
             PoissonLine3D4th(np.zeros((8, 2, 8)))
 
 
-# ── Shared primitives ─────────────────────────────────────────────────────────
+# -- Shared primitives ---------------------------------------------------------
 
 class TestPrimitives:
 

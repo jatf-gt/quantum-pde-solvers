@@ -48,7 +48,7 @@ def main():
     b = prob.rhs()[:, N // 2]   # one representative strip's right-hand side
 
     print(f"Timing ONE real HHL solve at n={N} (epsilon={args.epsilon})...")
-    print("This calls the actual backend - it will take as long as it takes.")
+    print("Execution demands computational overhead; awaiting backend response.")
 
     hhl = get_inner("hhl", epsilon=args.epsilon)
     t0 = time.perf_counter()

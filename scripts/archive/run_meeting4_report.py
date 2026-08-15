@@ -128,7 +128,7 @@ MARKERS = {
 }
 
 
-# ── Utility functions ─────────────────────────────────────────────────────────
+# -- Utility functions ---------------------------------------------------------
 
 def _rel_err_pct(u: np.ndarray, ref: np.ndarray) -> np.ndarray:
     """

@@ -2,7 +2,7 @@
 Equal-accuracy benchmarking protocol for quantum linear system solvers.
 
 Motivation
-──────────
+----------
 A naive comparison of HHL, VQLS, and QSVT at nominally equal precision
 parameters (e.g. ε = 0.01 for all) is methodologically unsound because:
 
@@ -24,7 +24,7 @@ parameters (e.g. ε = 0.01 for all) is methodologically unsound because:
      the equal-accuracy comparison.
 
 Protocol
-────────
+--------
 For each quantum solver and each problem (N, case_id):
 
   1. Define a target residual r_target (e.g. 1e-3).
@@ -40,7 +40,7 @@ approximately equal residual, enabling a fair comparison of circuit depth,
 qubit count, and wall time.
 
 Parameter grids
-───────────────
+---------------
 HHL:
   Primary parameter: epsilon ∈ {0.1, 0.05, 0.01, 0.005, 0.001}
   Note: trotter_steps = max(1, ceil(1/epsilon)) is coupled to epsilon.
@@ -61,7 +61,7 @@ QSVT:
   is the most resource-efficient one that achieves the target.
 
 References
-──────────
+----------
   Bravo-Prieto et al. (2023) Quantum 7, 1188.  doi:10.22331/q-2023-11-22-1188
   Ghafourpour & Laizet (2025) Phys. Rev. Applied 24, 024032.
 """
@@ -86,7 +86,7 @@ from benchmark.metrics import (
 
 log = logging.getLogger(__name__)
 
-# ── Default parameter grids ───────────────────────────────────────────────────
+# -- Default parameter grids ---------------------------------------------------
 
 HHL_EPSILON_GRID: list[float] = [0.1, 0.05, 0.01, 0.005, 0.001]
 
@@ -102,7 +102,7 @@ DEFAULT_R_TARGET: float = 1.0e-3
 DEFAULT_BAND_FACTOR: float = 3.0   # accept r ∈ [r_target/3, r_target*3]
 
 
-# ── Result dataclass ──────────────────────────────────────────────────────────
+# -- Result dataclass ----------------------------------------------------------
 
 @dataclass
 class EqualAccuracyResult:
@@ -143,7 +143,7 @@ class EqualAccuracyResult:
     notes:             str = ""
 
 
-# ── Internal helpers ──────────────────────────────────────────────────────────
+# -- Internal helpers ----------------------------------------------------------
 
 def _build_base_result(
     case_id: str,
@@ -291,7 +291,7 @@ def _select_best(
     return best, in_band
 
 
-# ── HHL equal-accuracy sweep ──────────────────────────────────────────────────
+# -- HHL equal-accuracy sweep --------------------------------------------------
 
 def sweep_hhl_equal_accuracy(
     A: np.ndarray,
@@ -435,7 +435,7 @@ def sweep_hhl_equal_accuracy(
     )
 
 
-# ── VQLS equal-accuracy sweep ─────────────────────────────────────────────────
+# -- VQLS equal-accuracy sweep -------------------------------------------------
 
 def sweep_vqls_equal_accuracy(
     A: np.ndarray,
@@ -466,7 +466,7 @@ def sweep_vqls_equal_accuracy(
     sweep, n_restarts is also varied.
 
     Critical note on VQLS convergence
-    ───────────────────────────────────
+    -----------------------------------
     The COBYLA optimiser tolerance is fixed at 1e-8 throughout. The cost
     function value C is recorded but is NOT used as the acceptance criterion.
     Only the measured residual r = ‖Aû - b‖₂/‖b‖₂ determines acceptance.
@@ -617,7 +617,7 @@ def sweep_vqls_equal_accuracy(
     )
 
 
-# ── QSVT equal-accuracy sweep ─────────────────────────────────────────────────
+# -- QSVT equal-accuracy sweep -------------------------------------------------
 
 def sweep_qsvt_equal_accuracy(
     A: np.ndarray,
@@ -646,7 +646,7 @@ def sweep_qsvt_equal_accuracy(
     so that the first in-band result is the most resource-efficient one.
 
     Critical note on QSVT residual monotonicity
-    ─────────────────────────────────────────────
+    ---------------------------------------------
     The QSVT residual is NOT guaranteed to decrease monotonically with
     increasing polynomial degree due to oscillatory Chebyshev approximation
     error. The sweep therefore evaluates all grid points and selects the
@@ -765,7 +765,7 @@ def sweep_qsvt_equal_accuracy(
         notes=notes,
     )
 
-# ── Equal accuracy in 2-D and 3-D ─────────────────────────────────────────────
+# -- Equal accuracy in 2-D and 3-D ---------------------------------------------
 
 # The inner-solver option each solver's precision knob is spelled as, in the
 # registry `solvers/outer/inner.py` validates against. The registry rejects an

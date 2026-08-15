@@ -9,7 +9,7 @@ all metrics are *measured* from the actual solver output, never inferred or
 estimated from input parameters.
 
 Mathematical context
-────────────────────
+--------------------
 For a linear system  A u = b  with solution  u*:
 
   Relative residual:   r  = ‖A û - b‖₂ / ‖b‖₂
@@ -22,7 +22,7 @@ residual r without knowledge of κ. The residual must always be computed
 explicitly from the returned solution vector.
 
 References
-──────────
+----------
   Bravo-Prieto et al. (2023) Quantum 7, 1188.  doi:10.22331/q-2023-11-22-1188
   Ghafourpour & Laizet (2025) Phys. Rev. Applied 24, 024032.
   Morales et al. (2026) Rev. Mod. Phys. 98, 025005.
@@ -37,11 +37,11 @@ from typing import Optional
 import numpy as np
 
 
-# ── Tolerance for near-zero masking in relative error computation ─────────────
+# -- Tolerance for near-zero masking in relative error computation -------------
 _REL_ERR_MASK_TOL: float = 1.0e-10
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
+# -- Public API ----------------------------------------------------------------
 
 @dataclass
 class CircuitMetrics:
@@ -97,12 +97,12 @@ class BenchmarkResult:
     under which it is absent. Fields are grouped by category for clarity.
 
     Serialisation
-    ─────────────
+    -------------
     All fields are JSON-serialisable (None, int, float, str, list of float).
     numpy arrays are converted to Python lists before storage.
 
     Attributes — Problem identification
-    ────────────────────────────────────
+    ------------------------------------
     case_id : str
         Unique identifier for the problem case (e.g. '1D_Poisson_fS_hom').
     solver : str
@@ -121,7 +121,7 @@ class BenchmarkResult:
         Right Dirichlet boundary value φ(1).
 
     Attributes — Accuracy metrics
-    ──────────────────────────────
+    ------------------------------
     residual : float
         Relative residual r = ‖Aû - b‖₂ / ‖b‖₂. Always computed from the
         returned solution vector; never inferred from solver parameters.
@@ -150,7 +150,7 @@ class BenchmarkResult:
         the circuit error. None for Thomas and VQLS.
 
     Attributes — Timing
-    ────────────────────
+    --------------------
     wall_time_s : float
         Total solver wall time [s] measured with time.perf_counter().
         For VQLS, includes the full optimisation loop.
@@ -161,13 +161,13 @@ class BenchmarkResult:
         Subset of wall_time_s. None for HHL, VQLS, Thomas.
 
     Attributes — Circuit resources
-    ───────────────────────────────
+    -------------------------------
     circuit_metrics : Optional[CircuitMetrics]
         Full circuit resource record. None for Thomas (no circuit).
         See CircuitMetrics docstring for field definitions.
 
     Attributes — Algorithm-specific parameters
-    ────────────────────────────────────────────
+    --------------------------------------------
     hhl_epsilon : Optional[float]
         HHL QPE precision parameter ε. None for other solvers.
     hhl_trotter_steps : Optional[int]
@@ -211,7 +211,7 @@ class BenchmarkResult:
         False if computed at runtime. None for other solvers.
 
     Attributes — Sensitivity study metadata
-    ─────────────────────────────────────────
+    -----------------------------------------
     sensitivity_param : Optional[str]
         Name of the parameter being varied in a sensitivity sweep.
         None for primary benchmark runs.
@@ -223,7 +223,7 @@ class BenchmarkResult:
         None for primary benchmark (fixed-parameter) runs.
 
     Attributes — Hardware execution metadata
-    ─────────────────────────────────────────
+    -----------------------------------------
     backend_name : str
         Execution backend: 'aer_statevector' | 'aer_gpu' | 'ibm_<device>'.
     backend_shots : Optional[int]
@@ -236,7 +236,7 @@ class BenchmarkResult:
         When True, backend_shots and error_mitigation must be non-None.
     """
 
-    # ── Problem identification ────────────────────────────────────────────────
+    # -- Problem identification ------------------------------------------------
     case_id:               str
     solver:                str
     N:                     int
@@ -246,7 +246,7 @@ class BenchmarkResult:
     alpha_bc:              float
     beta_bc:               float
 
-    # ── Accuracy metrics ──────────────────────────────────────────────────────
+    # -- Accuracy metrics ------------------------------------------------------
     residual:                    float
     max_rel_err_vs_exact:        Optional[float]
     max_abs_err_vs_exact:        Optional[float]
@@ -256,25 +256,25 @@ class BenchmarkResult:
     err_alg:                     Optional[float]
     proportionality_residual:    Optional[float]
 
-    # ── Timing ────────────────────────────────────────────────────────────────
+    # -- Timing ----------------------------------------------------------------
     wall_time_s:          float
     phase_lookup_time_s:  Optional[float]
 
-    # ── Circuit resources ─────────────────────────────────────────────────────
+    # -- Circuit resources -----------------------------------------------------
     circuit_metrics:  Optional[CircuitMetrics]
 
-    # ── HHL parameters ────────────────────────────────────────────────────────
+    # -- HHL parameters --------------------------------------------------------
     hhl_epsilon:        Optional[float]
     hhl_trotter_steps:  Optional[int]
 
-    # ── VQLS parameters ───────────────────────────────────────────────────────
+    # -- VQLS parameters -------------------------------------------------------
     vqls_n_layers:       Optional[int]
     vqls_n_restarts:     Optional[int]
     vqls_cost_final:     Optional[float]
     vqls_n_evaluations:  Optional[int]
     vqls_converged:      Optional[bool]
 
-    # ── QSVT parameters ───────────────────────────────────────────────────────
+    # -- QSVT parameters -------------------------------------------------------
     qsvt_polynomial_degree:  Optional[int]
     qsvt_max_degree_cap:     Optional[int]
     qsvt_subnormalisation:   Optional[float]
@@ -282,12 +282,12 @@ class BenchmarkResult:
     qsvt_angle_method:       Optional[str]
     qsvt_phase_from_cache:   Optional[bool]
 
-    # ── Sensitivity study metadata ────────────────────────────────────────────
+    # -- Sensitivity study metadata --------------------------------------------
     sensitivity_param:  Optional[str]
     sensitivity_value:  Optional[float]
     r_target:           Optional[float]
 
-    # ── Hardware execution metadata ───────────────────────────────────────────
+    # -- Hardware execution metadata -------------------------------------------
     backend_name:       str   = "aer_statevector"
     backend_shots:      Optional[int]  = None
     error_mitigation:   Optional[str]  = None
@@ -314,7 +314,7 @@ class BenchmarkResult:
         return d
 
 
-# ── Computation utilities ─────────────────────────────────────────────────────
+# -- Computation utilities -----------------------------------------------------
 
 def compute_residual(
     A: np.ndarray,

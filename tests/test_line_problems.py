@@ -32,7 +32,7 @@ from problems.poisson_line_2d import PoissonLine2D
 from problems.poisson_line_3d import PoissonLine3D
 
 
-# ── PoissonLine2D: operator and right-hand side ───────────────────────────────
+# -- PoissonLine2D: operator and right-hand side -------------------------------
 
 class TestPoissonLine2DOperator:
 
@@ -125,7 +125,7 @@ class TestPoissonLine2DOperator:
             assert 3.0 < coarse / fine < 5.0
 
 
-# ── PoissonLine2D: conditioning and coarsening ────────────────────────────────
+# -- PoissonLine2D: conditioning and coarsening --------------------------------
 
 class TestPoissonLine2DHierarchy:
 
@@ -187,7 +187,7 @@ class TestPoissonLine2DHierarchy:
             prob = prob.coarsen()
 
 
-# ── PoissonLine3D ─────────────────────────────────────────────────────────────
+# -- PoissonLine3D -------------------------------------------------------------
 
 class TestPoissonLine3D:
 
@@ -270,7 +270,7 @@ class TestPoissonLine3D:
         assert prob.coarsen().periodic == (False, False, True)
 
 
-# ── Private helpers ───────────────────────────────────────────────────────────
+# -- Private helpers -----------------------------------------------------------
 
 def _dense_laplacian_2d(Nx: int, Ny: int, dx: float, dy: float) -> np.ndarray:
     """

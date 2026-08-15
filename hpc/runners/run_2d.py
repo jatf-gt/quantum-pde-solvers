@@ -83,7 +83,7 @@ from solvers.outer import (InnerConfig, available_inner,available_schemes,
                            build_hierarchy, describe_inner, describe_scheme,
                            get_inner, resolve_options, solve)
 
-# ── Output directory and logging ──────────────────────────────────────────────
+# -- Output directory and logging ----------------------------------------------
 
 RESULTS_DIR = Path("results") / "2Dhpc_run"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -166,7 +166,7 @@ for _noisy in ("qiskit.transpiler", "qiskit_aer", "qiskit_ibm_runtime",
     logging.getLogger(_noisy).setLevel(logging.CRITICAL)
 
 
-# ── Sweep configuration ───────────────────────────────────────────────────────
+# -- Sweep configuration -------------------------------------------------------
 
 # NOTE: 128 and 256 are included so --max-n 128 / --max-n 256 behave as
 # expected. They are still expensive; a two-phase submission script that
@@ -234,7 +234,7 @@ HET_phi0: float = geom.PHI_0
 MAX_WORKERS_DEFAULT: int = 4
 
 
-# ── Result dataclass ──────────────────────────────────────────────────────────
+# -- Result dataclass ----------------------------------------------------------
 
 @dataclass
 class RunResult2D:
@@ -245,13 +245,13 @@ class RunResult2D:
     ``plot_hpc_results.py`` and any existing analysis notebooks continue to
     work; everything new is appended after them.
     """
-    # ── identity ──────────────────────────────────────────────────────────────
+    # -- identity --------------------------------------------------------------
     case:            str
     solver:          str
     N:               int
     kappa_row:       float
 
-    # ── accuracy (legacy field names) ─────────────────────────────────────────
+    # -- accuracy (legacy field names) -----------------------------------------
     max_rel_err:     Optional[float]
     max_abs_err:     Optional[float]
     residual:        Optional[float]
@@ -267,7 +267,7 @@ class RunResult2D:
     hhl_scale_c:     Optional[float] = None
     stop_reason:     str = ""
 
-    # ── outer scheme ──────────────────────────────────────────────────────────
+    # -- outer scheme ----------------------------------------------------------
     scheme:             str = ""
     n_outer:            int = 0
     convergence_factor: Optional[float] = None   # geometric mean residual ratio
@@ -275,13 +275,13 @@ class RunResult2D:
     level_shapes:       str = ""                 # JSON
     level_kappas:       str = ""                 # JSON
 
-    # ── work accounting ───────────────────────────────────────────────────────
+    # -- work accounting -------------------------------------------------------
     strip_solves:         int = 0
     strip_solves_by_size: str = ""               # JSON, {strip length: count}
     weighted_cost:        Optional[float] = None # finest-strip-solve units
     mean_strip_size:      Optional[float] = None
 
-    # ── inner solver diagnostics ──────────────────────────────────────────────
+    # -- inner solver diagnostics ----------------------------------------------
     inner_calls:     int = 0
     inner_total_s:   Optional[float] = None
     inner_mean_s:    Optional[float] = None
@@ -290,21 +290,21 @@ class RunResult2D:
     inner_options:   str = ""                    # JSON, as resolved
     n_circuit_evals: Optional[float] = None
 
-    # ── error decomposition ───────────────────────────────────────────────────
+    # -- error decomposition ---------------------------------------------------
     err_vs_thomas:       Optional[float] = None  # quantum algorithmic error, %
     err_thomas_vs_exact: Optional[float] = None  # discretisation error, %
     linf_err:            Optional[float] = None  # amplitude-normalised Linf, %
 
-    # ── derived physics ───────────────────────────────────────────────────────
+    # -- derived physics -------------------------------------------------------
     peak_E_field:   Optional[float] = None       # V/m
     peak_E_rel_err: Optional[float] = None       # % against the reference
 
-    # ── efficiency ────────────────────────────────────────────────────────────
+    # -- efficiency ------------------------------------------------------------
     s_per_strip_solve: Optional[float] = None
     solves_per_digit:  Optional[float] = None    # strip solves per decade of
                                                  # residual reduction
 
-    # ── benchmarking-framework provenance (Phase 8) ───────────────────────────
+    # -- benchmarking-framework provenance (Phase 8) ---------------------------
     # Which discretisation produced the row. Previously recoverable only from the
     # results DIRECTORY name, so a 2nd- and a 4th-order row were indistinguishable
     # once merged -- and `--append` supersedes on (case, solver, N), in which the
@@ -323,7 +323,7 @@ class RunResult2D:
     backend_name:         Optional[str] = None
 
 
-# ── Logging helpers ───────────────────────────────────────────────────────────
+# -- Logging helpers -----------------------------------------------------------
 
 def _banner(msg: str) -> None:
     sep = "=" * 78
@@ -334,7 +334,7 @@ def _section(msg: str) -> None:
     log.info("-" * 78); log.info("  %s", msg); log.info("-" * 78)
 
 
-# ── Error metrics ─────────────────────────────────────────────────────────────
+# -- Error metrics -------------------------------------------------------------
 
 def _max_rel(u: np.ndarray, ref: np.ndarray, tol: float = 1e-10) -> float:
     """
@@ -386,14 +386,14 @@ def _electric_field(phi: np.ndarray, dx: float, dy: float):
     return Ex, Ey, float(np.max(np.sqrt(Ex**2 + Ey**2)))
 
 
-# ── Problem definitions ───────────────────────────────────────────────────────
+# -- Problem definitions -------------------------------------------------------
 #
 # All five sections' cases (source, exact/reference solution, boundary data,
 # domain extents) now live in core/cases.py, read via cases.get(name).build(N)
 # in each run_sectionN below - not built inline here as they used to be.
 
 
-# ── Sweep settings container ──────────────────────────────────────────────────
+# -- Sweep settings container --------------------------------------------------
 
 @dataclass
 class SweepConfig:
@@ -460,7 +460,7 @@ class SweepConfig:
         return kw
 
 
-# ── Result recording ──────────────────────────────────────────────────────────
+# -- Result recording ----------------------------------------------------------
 
 def _save_solution_2d(case, solver, N, x, y, phi, phi_ref, f_vals,
                       residual_history=None) -> None:
@@ -530,20 +530,20 @@ def _record(results, case_id, solver_name, N, kappa, x, y, dx, dy,
     d = res.diagnostics
     acc = _accuracy(phi, phi_ref)
 
-    # ── work accounting ───────────────────────────────────────────────────────
+    # -- work accounting -------------------------------------------------------
     by_size = res.work.solves_by_size
     total = res.work.total
     alpha = COST_ALPHA.get(solver_name, 1.0)
     mean_size = (sum(n * k for n, k in by_size.items()) / total) if total else None
 
-    # ── efficiency ────────────────────────────────────────────────────────────
+    # -- efficiency ------------------------------------------------------------
     hist = res.residual_history
     decades = None
     if len(hist) > 1 and hist[0] > 0.0 and hist[-1] > 0.0:
         decades = float(np.log10(hist[0] / hist[-1]))
     per_digit = (total / decades) if (decades and decades > 0.0) else None
 
-    # ── physics ───────────────────────────────────────────────────────────────
+    # -- physics ---------------------------------------------------------------
     _, _, peak_E = _electric_field(phi, dx, dy)
     peak_E_err = None
     if phi_ref is not None:
@@ -551,7 +551,7 @@ def _record(results, case_id, solver_name, N, kappa, x, y, dx, dy,
         if peak_E_ref > 0.0:
             peak_E_err = float(abs(peak_E - peak_E_ref) / peak_E_ref * 100.0)
 
-    # ── error decomposition ───────────────────────────────────────────────────
+    # -- error decomposition ---------------------------------------------------
     if solver_name == "thomas":
         err_vs_thomas = 0.0
     elif phi_thomas is not None:
@@ -613,7 +613,7 @@ def _record(results, case_id, solver_name, N, kappa, x, y, dx, dy,
                           res.residual_history if cfg.save_history else None)
 
 
-# ── Per-case driver ───────────────────────────────────────────────────────────
+# -- Per-case driver -----------------------------------------------------------
 
 def _estimate_case(case_id, N, problem, cfg: SweepConfig) -> None:
     """
@@ -643,7 +643,7 @@ def _estimate_case(case_id, N, problem, cfg: SweepConfig) -> None:
                  s.upper(), secs, secs / 3600.0)
 
 
-# ── Fourth order ──────────────────────────────────────────────────────────────
+# -- Fourth order --------------------------------------------------------------
 # Under --order 4 the runner selects a different problem object and then takes
 # the ordinary solve() path. It does NOT carry its own iteration loop: the
 # retired 4th-order branch did, and in consequence the fourth-order sweeps
@@ -760,7 +760,7 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
                    "falling back to scheme=%r for this case only.",
                    N, N, effective_scheme)
 
-    # ── classical reference ───────────────────────────────────────────────────
+    # -- classical reference ---------------------------------------------------
     res_T = solve(problem, inner="thomas", scheme=effective_scheme,
                   inner_options=inner_cfg, **scheme_kw)
     phi_T = res_T.u
@@ -777,7 +777,7 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
     reference = phi_ref if phi_ref is not None else phi_T
     ref_note = "" if phi_ref is not None else "rel_vs_thomas"
 
-    # ── optional outer-scheme comparison, classical inner solver only ─────────
+    # -- optional outer-scheme comparison, classical inner solver only ---------
     if cfg.compare_schemes:
         for alt in available_schemes():
             if alt == cfg.scheme:
@@ -795,7 +795,7 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
                     dataclasses.replace(cfg, save_solutions=False),
                     notes=f"scheme_comparison:{alt}")
 
-    # ── quantum solvers ───────────────────────────────────────────────────────
+    # -- quantum solvers -------------------------------------------------------
     for solver_name in cfg.solvers:
         try:
             res_q = solve(problem, inner=_inner_for_order(solver_name, cfg.order),
@@ -821,7 +821,7 @@ def _run_case(case_id, N, X, Y, dx, dy, f_vals, phi_ref, cfg: SweepConfig,
                 notes=(fallback_note or ref_note))
 
 
-# ── Sections ──────────────────────────────────────────────────────────────────
+# -- Sections ------------------------------------------------------------------
 
 def run_section1(N, cfg, results):
     _banner(f"SECTION 1 - Poisson, sinusoidal source, unit square, N={N}")
@@ -879,7 +879,7 @@ SECTIONS = {"section1": run_section1, "section2": run_section2,
             "section5": run_section5}
 
 
-# ── Serialisation ─────────────────────────────────────────────────────────────
+# -- Serialisation -------------------------------------------------------------
 
 def _load_existing_results(path: Path) -> list[RunResult2D]:
     """
@@ -1025,7 +1025,7 @@ def _save_metadata(N_values, cfg: SweepConfig, sections, max_workers,
     log.info("Metadata written -> %s", fname)
 
 
-# ── Final summary ─────────────────────────────────────────────────────────────
+# -- Final summary -------------------------------------------------------------
 
 def _print_summary(results) -> None:
     # Deduplicated for the same reason the saved summary is: under --append the
@@ -1089,7 +1089,7 @@ def _print_summary(results) -> None:
                      r.inner_calls, pct)
 
 
-# ── CLI plumbing ──────────────────────────────────────────────────────────────
+# -- CLI plumbing --------------------------------------------------------------
 
 def parse_kv(items, flag: str) -> dict:
     """Parse ``key=value`` and ``solver.key=value`` pairs from the CLI."""
@@ -1132,7 +1132,7 @@ def coerce_scheme_opts(d: dict) -> dict:
     return out
 
 
-# ── Work unit dispatch ────────────────────────────────────────────────────────
+# -- Work unit dispatch --------------------------------------------------------
 
 def _init_worker(results_dir: Path, qsvt_caps: dict) -> None:
     """
@@ -1176,7 +1176,7 @@ def _execute_work_unit(work_type: str, N: int, cfg: SweepConfig) -> list:
     return results
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     ap = argparse.ArgumentParser(
@@ -1245,7 +1245,7 @@ def main() -> None:
         print(describe_scheme())
         return
 
-    # ── resolve and validate the sweep ────────────────────────────────────────
+    # -- resolve and validate the sweep ----------------------------------------
     if args.n_values:
         N_values = [int(v) for v in args.n_values.split(",") if v.strip()]
     else:
@@ -1351,7 +1351,7 @@ def main() -> None:
         _save_metadata(N_values, cfg, sections, args.max_workers,
                        tag=args.phase_tag)
 
-    # ── execute ───────────────────────────────────────────────────────────────
+    # -- execute ---------------------------------------------------------------
     t0 = time.perf_counter()
     results: list = []
     if args.append:

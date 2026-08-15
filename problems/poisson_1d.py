@@ -14,7 +14,7 @@ import numpy as np
 from core.config import SimConfig1D
 from core.source_functions import SOURCE_FUNCTIONS
 
-# ── Grid construction ─────────────────────────────────────────────────────────
+# -- Grid construction ---------------------------------------------------------
 
 def build_grid(N: int) -> tuple[np.ndarray, float]:
     """
@@ -41,7 +41,7 @@ def build_grid(N: int) -> tuple[np.ndarray, float]:
     return x, dx
 
 
-# ── TST matrix ────────────────────────────────────────────────────────────────
+# -- TST matrix ----------------------------------------------------------------
 
 def build_tst_matrix(N: int) -> np.ndarray:
     """
@@ -78,7 +78,7 @@ def build_tst_matrix(N: int) -> np.ndarray:
     return A
 
 
-# ── Right-hand side ───────────────────────────────────────────────────────────
+# -- Right-hand side -----------------------------------------------------------
 
 def build_rhs(
     x: np.ndarray,
@@ -129,7 +129,7 @@ def build_rhs(
     return b
 
 
-# ── Condition number utility ──────────────────────────────────────────────────
+# -- Condition number utility --------------------------------------------------
 
 def condition_number(A: np.ndarray) -> float:
     """
@@ -158,7 +158,7 @@ def condition_number(A: np.ndarray) -> float:
     return float(abs_eigs.max() / abs_eigs.min())
 
 
-# ── Packaged problem ──────────────────────────────────────────────────────────
+# -- Packaged problem ----------------------------------------------------------
 
 class PoissonProblem1D:
     """

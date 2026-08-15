@@ -38,7 +38,7 @@ def ctx():
     return HardwareContext.local_testing()
 
 
-# ── HardwareContext ────────────────────────────────────────────────────────────
+# -- HardwareContext ------------------------------------------------------------
 
 class TestHardwareContext:
 
@@ -57,7 +57,7 @@ class TestHardwareContext:
         assert ctx2._service is None
 
 
-# ── Post-selection sampling ───────────────────────────────────────────────────
+# -- Post-selection sampling ---------------------------------------------------
 
 @pytest.mark.quantum
 class TestHardwarePostselectionSample:
@@ -90,7 +90,7 @@ class TestHardwarePostselectionSample:
         assert sample.provenance.wall_time_s > 0
 
 
-# ── Observable estimation ─────────────────────────────────────────────────────
+# -- Observable estimation -----------------------------------------------------
 
 @pytest.mark.quantum
 class TestHardwareEstimateBatch:
@@ -127,7 +127,7 @@ class TestHardwareEstimateBatch:
         assert results[0].provenance.resilience_level is None
 
 
-# ── Fidelity estimation ───────────────────────────────────────────────────────
+# -- Fidelity estimation -------------------------------------------------------
 
 class TestFidelityFormulaClassical:
     """

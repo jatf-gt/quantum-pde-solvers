@@ -49,11 +49,11 @@ from typing import Optional
 
 import numpy as np
 
-# ── Ensure repo root is on sys.path ──────────────────────────────────────────
+# -- Ensure repo root is on sys.path ------------------------------------------
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-# ── Terminal colour codes ─────────────────────────────────────────────────────
+# -- Terminal colour codes -----------------------------------------------------
 G = "\033[92m"   # green
 Y = "\033[93m"   # yellow
 R = "\033[91m"   # red
@@ -62,7 +62,7 @@ B = "\033[1m"    # bold
 X = "\033[0m"    # reset
 
 
-# ── Error metric helpers ──────────────────────────────────────────────────────
+# -- Error metric helpers ------------------------------------------------------
 
 def _max_rel_err(u: np.ndarray, ref: np.ndarray) -> float:
     """Max relative error (%), masking near-zero reference values."""
@@ -88,7 +88,7 @@ def _colour(err_pct: float) -> str:
     return R
 
 
-# ── Solver wrappers ───────────────────────────────────────────────────────────
+# -- Solver wrappers -----------------------------------------------------------
 
 def run_thomas(A: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, float]:
     """Solve via NumPy direct solver (exact reference for this matrix)."""
@@ -160,7 +160,7 @@ def run_hhl(
     return np.array(result.u), wall, result
 
 
-# ── Display helpers ───────────────────────────────────────────────────────────
+# -- Display helpers -----------------------------------------------------------
 
 def _header(title: str) -> None:
     print(f"\n{B}{C}{'═' * 64}{X}")
@@ -206,7 +206,7 @@ def _print_row(
     )
 
 
-# ── Plotting ──────────────────────────────────────────────────────────────────
+# -- Plotting ------------------------------------------------------------------
 
 def plot_solutions(
     x: np.ndarray,
@@ -251,7 +251,7 @@ def plot_solutions(
     except Exception:
         have_2nd = False
 
-    # ── Figure layout ─────────────────────────────────────────────────────────
+    # -- Figure layout ---------------------------------------------------------
     n_panels = 2 if len(solutions) > 1 else 1
     fig, axes = plt.subplots(
         n_panels, 1,
@@ -264,7 +264,7 @@ def plot_solutions(
     ax_sol = axes[0]
     ax_err = axes[1] if n_panels == 2 else None
 
-    # ── Solution profiles ─────────────────────────────────────────────────────
+    # -- Solution profiles -----------------------------------------------------
     # Exact solution (if available)
     if u_exact is not None:
         ax_sol.plot(
@@ -295,7 +295,7 @@ def plot_solutions(
     ax_sol.legend(fontsize=9, loc="best")
     ax_sol.grid(True, alpha=0.3)
 
-    # ── Error panel ───────────────────────────────────────────────────────────
+    # -- Error panel -----------------------------------------------------------
     if ax_err is not None and u_thomas_4th is not None:
         for label, u in solutions.items():
             if label == "Thomas":
@@ -329,7 +329,7 @@ def plot_solutions(
     print(f"\n  {G}Plot saved to: {out_path}{X}")
 
 
-# ── Core study functions ──────────────────────────────────────────────────────
+# -- Core study functions ------------------------------------------------------
 
 def compare_orders(N_values: list[int], source_fn: str = "fS") -> None:
     """
@@ -418,14 +418,14 @@ def run_single(
     # Collect solutions for plotting
     solutions: dict[str, np.ndarray] = {}
 
-    # ── Thomas reference ──────────────────────────────────────────────────────
+    # -- Thomas reference ------------------------------------------------------
     u_thomas, t_thomas = run_thomas(prob.A, prob.b)
     solutions["Thomas"] = u_thomas
 
     _print_table_header()
     _print_row("Thomas", u_thomas, u_exact, u_thomas, prob.A, prob.b, t_thomas)
 
-    # ── VQLS ─────────────────────────────────────────────────────────────────
+    # -- VQLS -----------------------------------------------------------------
     if inner in ("vqls", "all"):
         if n_layers == -1:
             # Adapt to N
@@ -453,7 +453,7 @@ def run_single(
         except Exception as exc:
             print(f"  {'VQLS':<12}  {R}FAILED: {exc}{X}")
 
-    # ── QSVT ─────────────────────────────────────────────────────────────────
+    # -- QSVT -----------------------------------------------------------------
     if inner in ("qsvt", "all"):
         # print(
         #     f"\n  {Y}QSVT: epsilon={epsilon}, max_degree={max_degree}, "
@@ -484,7 +484,7 @@ def run_single(
             print(f"  {'QSVT':<12}  {R}FAILED: {exc}{X}")
 
 
-    # ── HHL ──────────────────────────────────────────────────────────────────
+    # -- HHL ------------------------------------------------------------------
     if inner in ("hhl", "all"):
         # print(
         #     f"\n  {Y}HHL: epsilon={epsilon}, "
@@ -510,11 +510,11 @@ def run_single(
 
     print()
 
-    # ── Inline comparison with 2nd order ──────────────────────────────────────
+    # -- Inline comparison with 2nd order --------------------------------------
     print(f"\n  {C}Comparison with 2nd-order at the same N:{X}")
     compare_orders([N], source_fn)
 
-    # ── Plot ──────────────────────────────────────────────────────────────────
+    # -- Plot ------------------------------------------------------------------
     if do_plot and solutions:
         out_dir = REPO_ROOT / "results" / "debugging"
         plot_solutions(
@@ -527,7 +527,7 @@ def run_single(
         )
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# -- Entry point ---------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(

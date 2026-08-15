@@ -98,7 +98,7 @@ from typing import Any, Iterator, Optional
 import numpy as np
 
 
-# ── Schema Constants ──────────────────────────────────────────────────────────
+# -- Schema Constants ----------------------------------------------------------
 
 SOLVER_ORDER: tuple[str, ...] = ("Thomas", "HHL", "VQLS", "QSVT")
 """Canonical solver ordering. Fixes column order in every field figure, so the
@@ -136,7 +136,7 @@ decides. `field` resolves these; no caller should spell them directly.
 """
 
 
-# ── Filename Convention ───────────────────────────────────────────────────────
+# -- Filename Convention -------------------------------------------------------
 
 def solution_filename(case: str, solver: str, N: int, dim: int = 1) -> str:
     """
@@ -237,7 +237,7 @@ def row_field(row: dict, name: str, default: Any = None) -> Any:
     return row.get(name, default)
 
 
-# ── Sweep Archive ─────────────────────────────────────────────────────────────
+# -- Sweep Archive -------------------------------------------------------------
 
 class SweepArchive:
     """
@@ -299,7 +299,7 @@ class SweepArchive:
                           else self.results_dir)
         self.skip_scheme_comparison = skip_scheme_comparison
 
-    # ── Loading ───────────────────────────────────────────────────────────────
+    # -- Loading ---------------------------------------------------------------
 
     def rows(self) -> list[dict]:
         """
@@ -395,7 +395,7 @@ class SweepArchive:
                 gaps.append((case, solver, int(N)))
         return gaps
 
-    # ── Grouping ──────────────────────────────────────────────────────────────
+    # -- Grouping --------------------------------------------------------------
 
     def _keep(self, row: dict) -> bool:
         """Whether a summary row belongs in the grouped views."""
@@ -535,7 +535,7 @@ def solver_sort_key(s: str) -> tuple:
     return (SOLVER_ORDER.index(s) if s in SOLVER_ORDER else 99, s)
 
 
-# ── Writing ───────────────────────────────────────────────────────────────────
+# -- Writing -------------------------------------------------------------------
 #
 # Provided so the HPC runners can adopt a single declaration of the schema they
 # currently each construct by hand. Not yet wired into those drivers: 2D and 3D
@@ -605,7 +605,7 @@ def save_solution(
     return path
 
 
-# ── Adaptation to the typed benchmarking framework ────────────────────────────
+# -- Adaptation to the typed benchmarking framework ----------------------------
 
 def _num(value: Any) -> Optional[float]:
     """Coerce to float, returning None for absent or non-numeric entries."""

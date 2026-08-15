@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from core.source_functions import SOURCE_FUNCTIONS, SOURCE_FUNCTIONS_2D
 
 
-# ── 1D Quantum Configuration ──────────────────────────────────────────────────
+# -- 1D Quantum Configuration --------------------------------------------------
 
 @dataclass
 class SimConfig1D:
@@ -64,7 +64,7 @@ class SimConfig1D:
             )
 
 
-# ── 2D Quantum Configuration ──────────────────────────────────────────────────
+# -- 2D Quantum Configuration --------------------------------------------------
 
 @dataclass
 class SimConfig2D:

@@ -87,7 +87,7 @@ _ZERO_MATRIX_TOL = 1e-14
 _BAND_TOL = 1e-12
 
 
-# ── Public Interface ──────────────────────────────────────────────────────────
+# -- Public Interface ----------------------------------------------------------
 
 def is_toeplitz_tridiagonal(A: np.ndarray) -> bool:
     """
@@ -428,7 +428,7 @@ def subnormalisation_factor(
     return float(np.max(np.abs(eigs)))
 
 
-# ── Private Helpers ───────────────────────────────────────────────────────────
+# -- Private Helpers -----------------------------------------------------------
 
 def _assemble_dilation_circuit(
     M     : np.ndarray,

@@ -7,7 +7,7 @@ centred finite difference stencil.
 The stencil is:
 
     -u_{i-2} + 16u_{i-1} - 30u_i + 16u_{i+1} - u_{i+2}
-    ──────────────────────────────────────────────────── = f_i + O(h^4)
+    ---------------------------------------------------- = f_i + O(h^4)
                          12 h^2
 
 This produces a pentadiagonal Toeplitz matrix with integer diagonals
@@ -172,7 +172,7 @@ class PoissonProblem1D4th:
         self.b = self._build_rhs()
         self.kappa = self._condition_number()
 
-    # ── Boundary source data ──────────────────────────────────────────────────
+    # -- Boundary source data --------------------------------------------------
 
     def _resolve_f_boundary(
         self, supplied: tuple[float, float] | None
@@ -233,7 +233,7 @@ class PoissonProblem1D4th:
             f0, f1 = float(f_vals[0]), float(f_vals[-1])
         return (f0, f1)
 
-    # ── Matrix assembly ───────────────────────────────────────────────────────
+    # -- Matrix assembly -------------------------------------------------------
 
     def _build_matrix(self) -> np.ndarray:
         """
@@ -287,7 +287,7 @@ class PoissonProblem1D4th:
         after absorbing boundary values and ghost-point reflections.
 
         Corrections applied:
-        ┌─────────────────────────────────────────────────────────────────┐
+        ┌-----------------------------------------------------------------┐
         │ Row 0 (i=1):                                                    │
         │   +16·u₀ term   →  b[0] -= 16·α                                │
         │   −u₋₁ term     →  u₋₁ = 2α − u₁ + h²·f(0),                    │
@@ -304,7 +304,7 @@ class PoissonProblem1D4th:
         │ Row N−1 (i=N):  symmetric to row 0                              │
         │                    →  b[-1] -= 14·β,  b[-1] += h²·f(1)         │
         │ Row N−2 (i=N−1): symmetric to row 1  →  b[-2] += β             │
-        └─────────────────────────────────────────────────────────────────┘
+        └-----------------------------------------------------------------┘
 
         The −14α is the term that must not be written as −18α: the boundary
         node contributes +16α and the ghost −2α, which subtract rather than
@@ -328,13 +328,13 @@ class PoissonProblem1D4th:
         # Base RHS: 12 h² · f(x_i)
         b = 12.0 * dx**2 * np.asarray(f_vals, dtype=float).copy()
 
-        # ── Left boundary corrections ─────────────────────────────────────────
+        # -- Left boundary corrections -----------------------------------------
         b[0] -= 14.0 * alpha      # row 0: -16α (from +16u₀) + 2α (from ghost)
         b[0] += dx**2 * f0        # row 0: second-derivative term of the ghost
         if N > 1:
             b[1] += alpha         # row 1: +α (from -u_{i-2} = -u₀)
 
-        # ── Right boundary corrections ────────────────────────────────────────
+        # -- Right boundary corrections ----------------------------------------
         b[-1] -= 14.0 * beta      # row N-1: symmetric to row 0
         b[-1] += dx**2 * f1
         if N > 1:
@@ -342,7 +342,7 @@ class PoissonProblem1D4th:
 
         return b
 
-    # ── Utilities ─────────────────────────────────────────────────────────────
+    # -- Utilities -------------------------------------------------------------
 
     def _condition_number(self) -> float:
         """2-norm condition number kappa(A) = |lambda_max| / |lambda_min|."""

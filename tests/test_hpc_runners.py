@@ -49,7 +49,7 @@ def _quiet_runner_logs(monkeypatch):
         monkeypatch.setattr(module, "log", null, raising=False)
 
 
-# ── Supersession ──────────────────────────────────────────────────────────────
+# -- Supersession --------------------------------------------------------------
 
 class TestDedupe2D:
     """`run_2d._dedupe_results` keeps the newest row per identity."""
@@ -127,7 +127,7 @@ class TestDedupe3D:
         assert len(run_3d._dedupe_results(rows)) == 1
 
 
-# ── Scope selection ───────────────────────────────────────────────────────────
+# -- Scope selection -----------------------------------------------------------
 
 class TestRunSelection:
     """`run_1d.RunSelection` decides what a gap-fill invocation touches."""

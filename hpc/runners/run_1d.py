@@ -59,7 +59,7 @@ lazy-import discipline itself.
 Date   : August 2026
 """
 
-# ── Standard library ──────────────────────────────────────────────────────────
+# -- Standard library ----------------------------------------------------------
 import argparse
 import concurrent.futures
 import csv
@@ -77,11 +77,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Optional
 
-# ── Third-party ───────────────────────────────────────────────────────────────
+# -- Third-party ---------------------------------------------------------------
 import numpy as np
 import multiprocessing as mp
 
-# ── Local ─────────────────────────────────────────────────────────────────────
+# -- Local ---------------------------------------------------------------------
 # Ensure the repository root is on sys.path regardless of invocation location.
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -91,7 +91,7 @@ from core import cases  # noqa: E402
 from solvers.backend_factory import get_aer_backend, log_backend_info  # noqa: E402
 
 
-# ── Output directory and logging ──────────────────────────────────────────────
+# -- Output directory and logging ----------------------------------------------
 
 RESULTS_DIR = Path("results") / "1Dhpc_run"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -177,7 +177,7 @@ def _redirect_log_file(path: Path) -> None:
         new_handler.setFormatter(fmt)
     logger.addHandler(new_handler)
 
-# ── Suppress external library logging noise ───────────────────────────────────
+# -- Suppress external library logging noise -----------------------------------
 # Qiskit transpiler pass timings, IBM provider plugin errors, and Aer backend
 # initialisation messages are irrelevant to benchmark progress monitoring.
 for _noisy in (
@@ -188,23 +188,23 @@ for _noisy in (
     logging.getLogger(_noisy).setLevel(logging.CRITICAL)
 
 
-# ── Sweep configuration ───────────────────────────────────────────────────────
+# -- Sweep configuration -------------------------------------------------------
 
-# ── N values ──────────────────────────────────────────────────────────────────
+# -- N values ------------------------------------------------------------------
 # The full sweep. --max-n truncates this list; there is no separate "include
 # N=64" flag, because N=64 is now part of the default sweep.
 N_VALUES_ALL: list[int] = [4, 8, 16, 32, 64]
 
-# ── QSVT: which N are attempted at all ────────────────────────────────────────
+# -- QSVT: which N are attempted at all ----------------------------------------
 QSVT_MAX_N: int = 64
 
-# ── QSVT: post-hoc wall-time warning threshold (seconds) ──────────────────────
+# -- QSVT: post-hoc wall-time warning threshold (seconds) ----------------------
 # NOTE: this is a WARNING only. QSVT is not interruptible mid-solve, so this
 # cannot abort a long run -- it only flags one in the log after the fact.
 # Set to None to silence the warning entirely.
 QSVT_TIME_LIMIT_S: Optional[float] = 1800.0   # 30 minutes per QSVT call
 
-# ── QSVT: polynomial degree cap, per N ────────────────────────────────────────
+# -- QSVT: polynomial degree cap, per N ----------------------------------------
 # The QSVT phase cache is keyed on (kappa, epsilon, method, max_degree), so
 # these values MUST match what hpc/runners/precompute_phases.py was run with,
 # or the lookup misses and a from-scratch solve is attempted at runtime (hours
@@ -307,7 +307,7 @@ def qsvt_max_degree(N: int, order: int = 2) -> Optional[int]:
 QSVT_UNCACHED_FALLBACK_DEGREE: int = 5000
 QSVT_MAX_DEGREE_FALLBACK: int = 5000
 
-# ── HHL / VQLS configuration ──────────────────────────────────────────────────
+# -- HHL / VQLS configuration --------------------------------------------------
 HHL_EPSILON: float = 0.01
 VQLS_SEED: int = 42
 
@@ -327,7 +327,7 @@ VQLS_SEED: int = 42
 # raised - see the docstring there.
 HHL_TIMEOUT_S: float = 5400.0
 
-# ── Solver and case families ──────────────────────────────────────────────────
+# -- Solver and case families --------------------------------------------------
 # The quantum solvers that `--solvers` selects among. Thomas is deliberately
 # absent: it is always executed, both because it costs microseconds and because
 # it is the reference solution for sub-case 3b, which has no closed form.
@@ -342,14 +342,14 @@ SECTION_FAMILIES: dict[str, str] = {
     "2":  "het_1d",
 }
 
-# ── Timing repeats ────────────────────────────────────────────────────────────
+# -- Timing repeats ------------------------------------------------------------
 # Repeats give a mean/std rather than a single sample, which is what makes a
 # timing number defensible on a shared node. Only the classical solver is
 # repeated by default: repeating the quantum solvers would multiply the total
 # sweep wall time by the same factor for little statistical gain.
 THOMAS_TIMING_REPEATS: int = 10
 
-# ── Parallelisation ───────────────────────────────────────────────────────────
+# -- Parallelisation -----------------------------------------------------------
 # Each worker process executes one (case_family, N) work unit. Aer simulations
 # are already OpenMP-threaded internally, so the worker count should not exceed
 # the cores actually requested from PBS -- see the note in main().
@@ -360,7 +360,7 @@ MAX_WORKERS_DEFAULT: int = 4
 _USE_GPU: bool = os.environ.get("QUANTUM_PDE_USE_GPU", "1") != "0"
 
 
-# ── Result dataclass ──────────────────────────────────────────────────────────
+# -- Result dataclass ----------------------------------------------------------
 
 @dataclass
 class RunResult:
@@ -371,13 +371,13 @@ class RunResult:
     defaults to None so that a solver which cannot supply a given metric
     simply leaves it blank rather than forcing a placeholder.
     """
-    # ── Identity ──────────────────────────────────────────────────────────────
+    # -- Identity --------------------------------------------------------------
     case:           str
     solver:         str
     N:              int
     kappa:          float
 
-    # ── Core accuracy / cost ──────────────────────────────────────────────────
+    # -- Core accuracy / cost --------------------------------------------------
     max_rel_err:    Optional[float]   # % vs reference, near-zero nodes masked
     max_abs_err:    Optional[float]
     residual:       Optional[float]   # ||Au - b|| / ||b||
@@ -385,18 +385,18 @@ class RunResult:
     converged:      bool
     notes:          str = ""
 
-    # ── Additional accuracy norms ─────────────────────────────────────────────
+    # -- Additional accuracy norms ---------------------------------------------
     # L2 is the conventional norm for PDE convergence studies; max-norm alone
     # is noisier and unusual to report on its own.
     rel_l2_err:     Optional[float] = None   # ||u-u_ref||_2 / ||u_ref||_2
     rms_err:        Optional[float] = None
 
-    # ── Timing statistics ─────────────────────────────────────────────────────
+    # -- Timing statistics -----------------------------------------------------
     wall_time_mean_s: Optional[float] = None
     wall_time_std_s:  Optional[float] = None
     n_timing_repeats: int = 1
 
-    # ── Circuit metrics ───────────────────────────────────────────────────────
+    # -- Circuit metrics -------------------------------------------------------
     # NOT recoverable from a saved solution vector. Populated only where the
     # underlying solver module exposes them; see the note in _run_qsvt.
     n_qubits:            Optional[int]   = None   # data-register qubits
@@ -406,7 +406,7 @@ class RunResult:
     n_gates_2q:          Optional[int]   = None   # CX count: the cost driver
     success_probability: Optional[float] = None   # post-selection probability
 
-    # ── Solver-specific internals ─────────────────────────────────────────────
+    # -- Solver-specific internals ---------------------------------------------
     qsvt_degree:        Optional[int]   = None    # degree actually solved
     qsvt_max_degree:    Optional[int]   = None    # cap requested (cache key!)
     qsvt_kappa_eff:     Optional[float] = None
@@ -417,10 +417,10 @@ class RunResult:
     hhl_epsilon:        Optional[float] = None
     hhl_scale_c:        Optional[float] = None    # proportionality constant
 
-    # ── Reproducibility ───────────────────────────────────────────────────────
+    # -- Reproducibility -------------------------------------------------------
     random_seed:    Optional[int] = None
 
-    # ── Benchmarking-framework metrics (Phase 8) ──────────────────────────────
+    # -- Benchmarking-framework metrics (Phase 8) ------------------------------
     # Fields declared by `benchmark/results_io.BenchmarkResult` that this schema
     # did not previously carry. They are appended rather than replacing anything,
     # so `benchmark/hpc_archive.py`, `scripts/gap_analysis.py` and
@@ -478,7 +478,7 @@ class RunResult:
     backend_name:       Optional[str] = None
 
 
-# ── Logging helpers ───────────────────────────────────────────────────────────
+# -- Logging helpers -----------------------------------------------------------
 
 def _banner(msg: str) -> None:
     """Print a clearly visible section banner to stdout and the log file."""
@@ -496,7 +496,7 @@ def _section(msg: str) -> None:
     log.info(sep)
 
 
-# ── Error metrics ─────────────────────────────────────────────────────────────
+# -- Error metrics -------------------------------------------------------------
 
 def _relative_residual(A: np.ndarray, u: np.ndarray, b: np.ndarray) -> float:
     """||Au - b|| / ||b||. Solver-agnostic and reference-free."""
@@ -648,7 +648,7 @@ def _error_split(u:       Optional[np.ndarray],
     return out
 
 
-# ── Solution archiving ────────────────────────────────────────────────────────
+# -- Solution archiving --------------------------------------------------------
 
 def _save_solution(
     case:    str,
@@ -801,7 +801,7 @@ def _save_all_solutions(all_solutions: dict) -> None:
              "%d arrays total)", path, len(all_solutions), len(flat))
 
 
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 #  Solver wrappers
 #
 #  Every wrapper returns a uniform 3-element core -- (u, residual, wall) --
@@ -809,7 +809,7 @@ def _save_all_solutions(all_solutions: dict) -> None:
 #  returns u=None on failure. That last point matters: a wrapper that lets an
 #  exception escape takes down the whole work unit, losing the OTHER solvers'
 #  results for that (case, N) too.
-# ──────────────────────────────────────────────────────────────────────────────
+# ------------------------------------------------------------------------------
 
 def _run_thomas(A: np.ndarray, b: np.ndarray,
                 repeats: int = THOMAS_TIMING_REPEATS
@@ -1176,7 +1176,7 @@ def _qsvt_phases_are_cached(kappa: float, epsilon: float,
         return None
 
 
-# ── Run selection ─────────────────────────────────────────────────────────────
+# -- Run selection -------------------------------------------------------------
 
 @dataclass(frozen=True)
 class RunSelection:
@@ -1267,7 +1267,7 @@ class RunSelection:
         return False
 
 
-# ── Per-case solver driver ────────────────────────────────────────────────────
+# -- Per-case solver driver ----------------------------------------------------
 
 def _run_all_solvers(
     case_id:       str,
@@ -1306,7 +1306,7 @@ def _run_all_solvers(
 
     n_data_qubits = int(np.log2(N)) if N > 0 and (N & (N - 1)) == 0 else None
 
-    # ── Thomas (classical reference) ──────────────────────────────────────────
+    # -- Thomas (classical reference) ------------------------------------------
     u_T, res_T, t_T, t_T_mean, t_T_std = _run_thomas(A, b)
     if u_T is None:
         log.error("    Thomas FAILED for %s N=%d -- skipping case.", case_id, N)
@@ -1332,7 +1332,7 @@ def _run_all_solvers(
     u_ref = u_T if reference == "thomas" else u_exact
     ref_note = "rel_vs_thomas" if reference == "thomas" else ""
 
-    # ── HHL ───────────────────────────────────────────────────────────────────
+    # -- HHL -------------------------------------------------------------------
     if sel.wants_solver("hhl"):
         u_H, res_H, t_H, conv_H, c_H, note_H = _run_hhl(
             A, b, N, timeout_s=sel.hhl_timeout_s, order=order)
@@ -1356,7 +1356,7 @@ def _run_all_solvers(
                 hhl_trotter_steps=int(np.ceil(1.0 / HHL_EPSILON)),
                 hhl_scale_c=c_H if u_H is not None else None)
 
-    # ── VQLS ──────────────────────────────────────────────────────────────────
+    # -- VQLS ------------------------------------------------------------------
     if sel.wants_solver("vqls"):
         u_V, res_V, t_V, conv_V, cost_V, lay_V, res_ct_V, extra_V = _run_vqls(A, b, N)
         if u_V is not None:
@@ -1374,7 +1374,7 @@ def _run_all_solvers(
                 vqls_n_restarts=res_ct_V if u_V is not None else None,
                 random_seed=VQLS_SEED, **extra_V)
 
-    # ── QSVT ──────────────────────────────────────────────────────────────────
+    # -- QSVT ------------------------------------------------------------------
     if not sel.wants_solver("qsvt"):
         return
     u_Q, res_Q, t_Q, conv_Q, deg_Q, dep_Q, cap_Q, extra_Q = _run_qsvt(
@@ -1394,7 +1394,7 @@ def _run_all_solvers(
             qsvt_max_degree=cap_Q, **extra_Q)
 
 
-# ── Discretisation order ──────────────────────────────────────────────────────
+# -- Discretisation order ------------------------------------------------------
 
 def _to_4th_order(built, N: int):
     """
@@ -1448,7 +1448,7 @@ def _to_4th_order(built, N: int):
         built, A=prob_4th.A, b=prob_4th.b, kappa=prob_4th.kappa)
 
 
-# ── Case runners ──────────────────────────────────────────────────────────────
+# -- Case runners --------------------------------------------------------------
 
 def run_1d_generic_poisson_single_N(
     N: int, sel: RunSelection, results: list[RunResult], all_solutions: dict,
@@ -1523,7 +1523,7 @@ def run_1d_het_single_N(
     def apply_4th_order(built):
         return built if order != 4 else _to_4th_order(built, N)
 
-    # ── Sub-case 3a: linear profile, homogeneous BCs ──────────────────────────
+    # -- Sub-case 3a: linear profile, homogeneous BCs --------------------------
     _section(f"Sub-case 3a: linear profile, homogeneous BCs  (N={N})")
 
     built = cases.get("het_1d_3a_linear").build(N)
@@ -1535,7 +1535,7 @@ def run_1d_het_single_N(
     _run_all_solvers(case_id, N, x, A, b, u_exact, kappa,
                      sel, results, all_solutions, order=order)
 
-    # ── Sub-case 3b: Gaussian profile, V_d = 300 V ────────────────────────────
+    # -- Sub-case 3b: Gaussian profile, V_d = 300 V ----------------------------
     # No closed-form solution, so the Thomas result is the reference.
     _section(f"Sub-case 3b: Gaussian profile, V_d=300V, Dirichlet BCs  (N={N})")
 
@@ -1556,7 +1556,7 @@ def run_1d_het_single_N(
         log.info("    Peak |E| (Thomas) = %.3e V/m",
                  float(np.max(np.abs(-np.gradient(u_T, x)))))
 
-    # ── Sub-case 3c: Gaussian profile, Neumann-Dirichlet BCs ──────────────────
+    # -- Sub-case 3c: Gaussian profile, Neumann-Dirichlet BCs ------------------
     _section(f"Sub-case 3c: Gaussian profile, Neumann-Dirichlet BCs  (N={N})")
     log.info("  BCs: phi'(0)=0 (Neumann), phi(1)=0 (Dirichlet)")
     log.info("  Reference: quadrature of the double integral of the source")
@@ -1573,7 +1573,7 @@ def run_1d_het_single_N(
                          sel, results, all_solutions, order=order)
 
 
-# ── Result serialisation ──────────────────────────────────────────────────────
+# -- Result serialisation ------------------------------------------------------
 
 def _load_existing_results(path: Path) -> list[RunResult]:
     """
@@ -1692,7 +1692,7 @@ def _save_run_metadata(N_values: list[int], sel: RunSelection,
         overwrite each other's provenance.
     """
     meta: dict = {
-        # ── Environment ───────────────────────────────────────────────────────
+        # -- Environment -------------------------------------------------------
         "timestamp":   time.strftime("%Y-%m-%d %H:%M:%S"),
         "hostname":    platform.node(),
         "platform":    platform.platform(),
@@ -1703,7 +1703,7 @@ def _save_run_metadata(N_values: list[int], sel: RunSelection,
         "use_gpu":     _USE_GPU,
         "pbs_jobid":   os.environ.get("PBS_JOBID"),
         "pbs_queue":   os.environ.get("PBS_QUEUE"),
-        # ── Run configuration (not derivable from the results table) ──────────
+        # -- Run configuration (not derivable from the results table) ----------
         "N_values":            N_values,
         "order":               order,
         "sections":            sections if sections is not None else list(SECTION_FAMILIES),
@@ -1748,7 +1748,7 @@ def _save_run_metadata(N_values: list[int], sel: RunSelection,
         log.info("Run metadata saved to %s", RESULTS_DIR / name)
 
 
-# ── Work unit dispatch ────────────────────────────────────────────────────────
+# -- Work unit dispatch --------------------------------------------------------
 
 def _init_worker(results_dir: Path, qsvt_fallback_degree: int) -> None:
     """
@@ -1814,7 +1814,7 @@ def _execute_work_unit(work_type: str, N: int, sel: RunSelection, order: int
     return results, solutions
 
 
-# ── Main entry point ──────────────────────────────────────────────────────────
+# -- Main entry point ----------------------------------------------------------
 
 def main() -> None:
     """
@@ -1911,7 +1911,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # ── Resolve scope ─────────────────────────────────────────────────────────
+    # -- Resolve scope ---------------------------------------------------------
     if args.n_values:
         try:
             N_values = [int(tok) for tok in args.n_values.split(",") if tok.strip()]
@@ -1952,7 +1952,7 @@ def main() -> None:
         hhl_timeout_s=args.hhl_timeout_s,
     )
 
-    # ── Resolve backend and report configuration ──────────────────────────────
+    # -- Resolve backend and report configuration ------------------------------
     backend = get_aer_backend(prefer_gpu=_USE_GPU)
 
     global RESULTS_DIR, LOG_FILE, QSVT_UNCACHED_FALLBACK_DEGREE
@@ -2005,7 +2005,7 @@ def main() -> None:
             log.info("--append: merging with %d prior row(s).", len(prior))
         results.extend(prior)
 
-    # ── Build the work unit list ──────────────────────────────────────────────
+    # -- Build the work unit list ----------------------------------------------
     # Smallest N first: with only a handful of workers and a large spread in
     # per-unit cost (HHL/QSVT scale badly with kappa -- see Problem 2 below),
     # dispatching largest-N units first saturates every worker on the slowest
@@ -2061,7 +2061,7 @@ def main() -> None:
                     log.error("Work unit failed: type=%s N=%d - %s",
                               work_type, N, exc, exc_info=True)
 
-    # ── Persist everything ────────────────────────────────────────────────────
+    # -- Persist everything ----------------------------------------------------
     _save_results(results)
     _save_all_solutions(all_solutions)
 

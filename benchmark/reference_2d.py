@@ -48,7 +48,7 @@ from problems.poisson_line_2d import PoissonLine2D
 from solvers.outer import solve
 
 
-# ── Default Refinement Parameters ─────────────────────────────────────────────
+# -- Default Refinement Parameters ---------------------------------------------
 
 # Integer mesh refinement multiplier, N_fine = N · REFINE_FACTOR. The value 19
 # reproduces the reference literature's h = 1/153 fine mesh at the N = 8
@@ -67,7 +67,7 @@ REFERENCE_TOL = 1e-10
 REFERENCE_MAX_CYCLES = 200
 
 
-# ── Reference Solution Construction ───────────────────────────────────────────
+# -- Reference Solution Construction -------------------------------------------
 
 def fine_mesh_reference(
     f_fn:          Callable[[np.ndarray, np.ndarray], np.ndarray],
@@ -172,12 +172,12 @@ def fine_mesh_reference(
         partially converged field is still returned, but every metric derived
         from it is then limited by the reference's own algebraic error.
     """
-    # ── Mode 1: Analytical Solution ───────────────────────────────────────────
+    # -- Mode 1: Analytical Solution -------------------------------------------
     if analytical_fn is not None:
         X, Y = _interior_grid(N, N, Lx, Ly)
         return np.asarray(analytical_fn(X, Y), dtype=float)
 
-    # ── Mode 2 / 3: Fine Resolution Selection ─────────────────────────────────
+    # -- Mode 2 / 3: Fine Resolution Selection ---------------------------------
     if target_h is not None:
         N_fine = max(N, int(round(Lx / target_h)) - 1)
     else:
@@ -189,7 +189,7 @@ def fine_mesh_reference(
             f"resolution N={N}. Augment refine_factor or diminish target_h."
         )
 
-    # ── Fine-Mesh Solve ───────────────────────────────────────────────────────
+    # -- Fine-Mesh Solve -------------------------------------------------------
     X_fine, Y_fine = _interior_grid(N_fine, N_fine, Lx, Ly)
     x_fine, y_fine = X_fine[:, 0], Y_fine[0, :]
 
@@ -220,7 +220,7 @@ def fine_mesh_reference(
             RuntimeWarning,
         )
 
-    # ── Coarse Node Extraction ────────────────────────────────────────────────
+    # -- Coarse Node Extraction ------------------------------------------------
     stride = (N_fine + 1) / (N + 1)
 
     if abs(stride - round(stride)) < 1e-9:
@@ -231,7 +231,7 @@ def fine_mesh_reference(
     return _bilinear_sample(result.u, N, N_fine)
 
 
-# ── Private Utility Methods ───────────────────────────────────────────────────
+# -- Private Utility Methods ---------------------------------------------------
 
 def _edge_data(bc, coords: np.ndarray):
     """

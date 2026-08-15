@@ -80,7 +80,7 @@ echo "  N_VALUES  : ${N_VALUES:-<not set, script default: 4,8,16>}"
 echo "  MAX_DEGREE: ${MAX_DEGREE:-<not set, uncapped>}"
 echo "============================================================"
 
-# ── Repository root resolution ───────────────────────────────
+# -- Repository root resolution -------------------------------
 # PBS copies this script to a spool directory before executing it, so $0 and
 # BASH_SOURCE do NOT point at the original file. PBS_O_WORKDIR -- the directory
 # qsub was invoked from -- is the only reliable anchor. Ascending from it means

@@ -7,7 +7,7 @@ Placing all result containers here prevents circular import dependencies:
   - This module has no dependency on vqls_1d.py or hhl_1d.py
 
 Result hierarchy
-────────────────
+----------------
   SolverResult       : 1-D solver output (HHL, Thomas, NumPy, VQLS base)
   VQLSSolverResult   : SolverResult extended with VQLS-specific diagnostics
   QSVTSolverResult   : SolverResult extended with QSP/QSVT diagnostics
@@ -18,7 +18,7 @@ are outer iterations over many such solves and report their outcome through
 strip-solve work log and the residual history rather than a single solution.
 
 References
-──────────
+----------
 Bravo-Prieto et al., "Variational Quantum Linear Solver",
     Quantum 7, 1188 (2023).
 Ghafourpour & Laizet, Phys. Rev. Applied 24, 024032 (2025).
@@ -31,7 +31,7 @@ from typing import List, Optional
 import numpy as np
 
 
-# ── 1-D solver result ─────────────────────────────────────────────────────────
+# -- 1-D solver result ---------------------------------------------------------
 
 @dataclass
 class SolverResult:
@@ -64,7 +64,7 @@ class SolverResult:
     euclidean_residual:   Optional[float]      = None
 
 
-# ── VQLS extended result ──────────────────────────────────────────────────────
+# -- VQLS extended result ------------------------------------------------------
 
 @dataclass
 class VQLSSolverResult(SolverResult):
@@ -110,7 +110,7 @@ class VQLSSolverResult(SolverResult):
     n_parameters:      int                      = 0
 
 
-# ── QSVT result container ─────────────────────────────────────────────────────
+# -- QSVT result container -----------------------------------------------------
 
 @dataclass
 class QSVTSolverResult(SolverResult):

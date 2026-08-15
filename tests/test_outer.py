@@ -48,7 +48,7 @@ from solvers.outer.core import OuterResult, StagnationMonitor, WorkLog
 from solvers.outer.multigrid import restriction_from
 
 
-# ── Work accounting ───────────────────────────────────────────────────────────
+# -- Work accounting -----------------------------------------------------------
 
 class TestWorkLog:
 
@@ -94,7 +94,7 @@ class TestWorkLog:
         assert "3 solves" in s and "n=16:2" in s and "n=8:1" in s
 
 
-# ── Stagnation detection ──────────────────────────────────────────────────────
+# -- Stagnation detection ------------------------------------------------------
 
 class TestStagnationMonitor:
 
@@ -148,7 +148,7 @@ class TestStagnationMonitor:
         assert m.best == pytest.approx(0.1)
 
 
-# ── Inner solver registry ─────────────────────────────────────────────────────
+# -- Inner solver registry -----------------------------------------------------
 
 class TestInnerRegistry:
 
@@ -289,7 +289,7 @@ class TestPerturbedInnerSolver:
         assert large > small
 
 
-# ── Strip sweep ───────────────────────────────────────────────────────────────
+# -- Strip sweep ---------------------------------------------------------------
 
 class TestStripSweep:
 
@@ -360,7 +360,7 @@ class TestStripSweep:
         assert np.all(np.isfinite(u))
 
 
-# ── Stationary schemes ────────────────────────────────────────────────────────
+# -- Stationary schemes --------------------------------------------------------
 
 class TestSolveStationary:
 
@@ -394,7 +394,7 @@ class TestSolveStationary:
         prob, _ = build_square_2d(8)
         tol, max_iter = 1e-8, 500
 
-        # ── Reference: an explicit line-Jacobi loop over the strip systems. ───
+        # -- Reference: an explicit line-Jacobi loop over the strip systems. ---
         A = prob.row_matrix()
         rhs = prob.rhs()
         Nx, Ny = prob.shape
@@ -417,7 +417,7 @@ class TestSolveStationary:
             if delta < tol:
                 break
 
-        # ── The package, driven in its reproducibility mode. ──────────────────
+        # -- The package, driven in its reproducibility mode. ------------------
         res = solve(prob, inner="thomas", scheme="jacobi",
                     tol=tol, max_iter=max_iter, patience=max_iter + 1)
 
@@ -527,7 +527,7 @@ class TestOptimalOmega:
         assert 1.0 <= optimal_omega(16, 16, 16) < 2.0
 
 
-# ── Multigrid ─────────────────────────────────────────────────────────────────
+# -- Multigrid -----------------------------------------------------------------
 
 class TestTransferOperators:
 
@@ -729,7 +729,7 @@ class TestMultigridSolve:
         assert res.u.shape == prob.shape
 
 
-# ── Entry points ──────────────────────────────────────────────────────────────
+# -- Entry points --------------------------------------------------------------
 
 class TestSolveEntryPoint:
 

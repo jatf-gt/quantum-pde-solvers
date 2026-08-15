@@ -103,7 +103,7 @@ __all__ = [
 ]
 
 
-# ── Context: backend, mode, mitigation, all in one place ──────────────────────
+# -- Context: backend, mode, mitigation, all in one place ----------------------
 
 @dataclass
 class HardwareContext:
@@ -206,7 +206,7 @@ class HardwareContext:
         ctx._service = service
         return ctx
 
-    # ── Primitive factories ──────────────────────────────────────────────────
+    # -- Primitive factories --------------------------------------------------
 
     def sampler(self):
         from qiskit_ibm_runtime import SamplerV2
@@ -234,7 +234,7 @@ class HardwareContext:
         return e
 
 
-# ── Provenance ─────────────────────────────────────────────────────────────────
+# -- Provenance -----------------------------------------------------------------
 
 @dataclass
 class JobProvenance:
@@ -282,7 +282,7 @@ def _backend_version(backend) -> Optional[str]:
     return getattr(backend, "backend_version", None)
 
 
-# ── Post-selection sampling ────────────────────────────────────────────────────
+# -- Post-selection sampling ----------------------------------------------------
 
 @dataclass
 class PostSelectionSample:
@@ -380,7 +380,7 @@ def _wilson_interval(k: int, n: int, z: float = 1.96) -> Tuple[float, float]:
     return (max(0.0, (centre - margin) / denom), min(1.0, (centre + margin) / denom))
 
 
-# ── Observable estimation ───────────────────────────────────────────────────────
+# -- Observable estimation -------------------------------------------------------
 
 @dataclass
 class EstimateResult:
@@ -493,7 +493,7 @@ def hardware_estimate_batch(
     ]
 
 
-# ── Fidelity estimation (block-encoding hardware experiment) ─────────────────
+# -- Fidelity estimation (block-encoding hardware experiment) -----------------
 
 def hardware_fidelity_estimate(
     circuit,

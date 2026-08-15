@@ -1,6 +1,6 @@
 """
 benchmark/tables.py
-────────────────────────────────────────────────────────────────────────────────
+--------------------------------------------------------------------------------
 Publication-standard table generation for the quantum PDE solver benchmark.
 
 Produces two output formats from BenchmarkResult collections:
@@ -13,7 +13,7 @@ Produces two output formats from BenchmarkResult collections:
      interactive debugging sessions.
 
 Table catalogue
-───────────────
+---------------
   primary_comparison   Primary benchmark: all solvers × all N, fixed parameters.
   equal_accuracy       Equal-accuracy protocol: resource cost at matched residual.
   sensitivity          OAT sensitivity: one parameter swept, all metrics shown.
@@ -22,7 +22,7 @@ Table catalogue
   order_comparison     2nd-order vs 4th-order discretisation at matched accuracy.
 
 Mathematical notation
-─────────────────────
+---------------------
   κ     condition number of A
   r     relative residual ‖Au - b‖₂ / ‖b‖₂
   e∞    maximum relative error [%]
@@ -31,7 +31,7 @@ Mathematical notation
   t     wall time [s]
 
 References
-──────────
+----------
   Ghafourpour & Laizet (2025) Phys. Rev. Applied 24, 024032.
   Bravo-Prieto et al. (2023) Quantum 7, 1188.
 """
@@ -48,7 +48,7 @@ from benchmark.equal_accuracy import EqualAccuracyResult
 from benchmark.sensitivity import SensitivitySweepResult
 
 
-# ── Formatting helpers ────────────────────────────────────────────────────────
+# -- Formatting helpers --------------------------------------------------------
 
 def _fmt_sci(val: Optional[float], decimals: int = 2) -> str:
     """Format a float in scientific notation, or '---' if None."""
@@ -114,7 +114,7 @@ def _latex_pct(val: Optional[float], decimals: int = 3) -> str:
     return f"{val:.{decimals}f}"
 
 
-# ── LaTeX table builders ──────────────────────────────────────────────────────
+# -- LaTeX table builders ------------------------------------------------------
 
 def _latex_header(caption: str, label: str, col_spec: str) -> str:
     return (
@@ -505,7 +505,7 @@ def latex_order_comparison(
     return buf.getvalue()
 
 
-# ── Console table builders ────────────────────────────────────────────────────
+# -- Console table builders ----------------------------------------------------
 
 def console_primary_comparison(
     results: list[BenchmarkResult],
@@ -711,7 +711,7 @@ def console_sensitivity(
     return buf.getvalue()
 
 
-# ── File output ───────────────────────────────────────────────────────────────
+# -- File output ---------------------------------------------------------------
 
 def save_latex_tables(
     output_dir: Path,

@@ -106,7 +106,7 @@ def _fmt_pct(e: float, good: float = 1.0, ok: float = 5.0) -> str:
     return f"{colour(e, good, ok)}{e:>9.3f}%{RESET}"
 
 
-# ── Hierarchy inspection ──────────────────────────────────────────────────────
+# -- Hierarchy inspection ------------------------------------------------------
 
 def show_hierarchy(case: str, N: int) -> None:
     prob, _, tag = build_case(case, N)
@@ -139,7 +139,7 @@ def show_hierarchy(case: str, N: int) -> None:
         print(f"  coarsening them would degrade the coarse-grid correction.{RESET}")
 
 
-# ── Scheme / solver comparison ────────────────────────────────────────────────
+# -- Scheme / solver comparison ------------------------------------------------
 
 def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
                    tol: float, inner_opts: dict, scheme_opts: dict,
@@ -197,7 +197,7 @@ def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
     return rows
 
 
-# ── Grid-independence / discretisation study ──────────────────────────────────
+# -- Grid-independence / discretisation study ----------------------------------
 
 def run_convergence_study(case: str, tol: float) -> None:
     """
@@ -239,7 +239,7 @@ def run_convergence_study(case: str, tol: float) -> None:
     print(f"  anisotropy forces a shallower hierarchy).")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     ap = argparse.ArgumentParser(

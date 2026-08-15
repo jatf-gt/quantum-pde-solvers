@@ -3,7 +3,7 @@
 Publication tables and hardware-feasibility reporting from recorded sweeps.
 
 Purpose
-───────
+-------
 `benchmark/tables.py` renders LaTeX and console tables from typed
 `BenchmarkResult` objects, and `benchmark/hardware.py` estimates whether a
 circuit could run on real hardware. Neither was reachable from the recorded
@@ -16,7 +16,7 @@ It is pure post-processing — it reads archives and writes text — so it runs 
 login node in seconds and needs no PBS job.
 
 Hardware feasibility
-────────────────────
+--------------------
 `estimate_hardware_feasibility` is an order-of-magnitude heuristic in circuit
 depth and qubit count. Where the sweep recorded a *measured* depth and two-qubit
 gate count, that measurement is used instead and the estimate is reported only as
@@ -32,7 +32,7 @@ p is n₂ ≤ ln(p) / ln(1 − ε₂). At ε₂ = 1e-3 and p = 0.5 this gives �
 which is the default below.
 
 Outputs
-───────
+-------
 Written under ``<results-dir>/tables/``:
 
   tab_primary_comparison.tex   Errors, residual, depth, qubits, wall time.
@@ -44,7 +44,7 @@ Written under ``<results-dir>/tables/``:
   tables_console.txt           The same content as aligned plain text.
 
 References
-──────────
+----------
 Preskill, J. (2018). Quantum Computing in the NISQ era and beyond.
     Quantum, 2, 79.
 """
@@ -84,7 +84,7 @@ STUDY_DIR: dict[int, str] = {
     1: "results/1Dstudies", 2: "results/2Dstudies", 3: "results/3Dstudies",
 }
 
-# ── Hardware feasibility ──────────────────────────────────────────────────────
+# -- Hardware feasibility ------------------------------------------------------
 
 # Two-qubit gate error rate representative of current superconducting hardware.
 # Superseded by a device's own calibration where one is available; used here only
@@ -284,7 +284,7 @@ def console_hardware_feasibility(rows: list[dict], budget: int) -> str:
     return "\n".join(out) + "\n"
 
 
-# ── Driver ────────────────────────────────────────────────────────────────────
+# -- Driver --------------------------------------------------------------------
 
 def load_sweep(results_dir: Path, dim: int, order: int) -> list:
     """
@@ -398,7 +398,7 @@ def main() -> int:
         r_target=r_target,
     )
 
-    # ── Hardware feasibility ──────────────────────────────────────────────────────
+    # -- Hardware feasibility ------------------------------------------------------
     budget = two_qubit_budget(args.two_qubit_error, args.success_target)
     hw_rows = hardware_feasibility_rows(primary, budget)
 
@@ -416,7 +416,7 @@ def main() -> int:
         encoding="utf-8")
     written.append(hw_json)
 
-    # ── Console rendering ─────────────────────────────────────────────────────────
+    # -- Console rendering ---------------------------------------------------------
     console = [T.console_primary_comparison(primary)]
     if ea_results:
         console.append(T.console_equal_accuracy(ea_results, r_target))

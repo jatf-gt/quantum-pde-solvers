@@ -96,7 +96,7 @@ import numpy as np
 from core import het_geometry as geom
 
 
-# ── Built Case ────────────────────────────────────────────────────────────────
+# -- Built Case ----------------------------------------------------------------
 
 @dataclass
 class BuiltCase:
@@ -172,7 +172,7 @@ class BuiltCase:
     f_faces:  Optional[tuple] = None
 
 
-# ── Case Declaration ──────────────────────────────────────────────────────────
+# -- Case Declaration ----------------------------------------------------------
 
 @dataclass(frozen=True)
 class Case:
@@ -390,7 +390,7 @@ def describe(name: str | None = None) -> str:
     return "\n".join(rows)
 
 
-# ── 1D Assembly Helpers ───────────────────────────────────────────────────────
+# -- 1D Assembly Helpers -------------------------------------------------------
 
 def _grid_1d(N: int) -> tuple[np.ndarray, float]:
     """
@@ -660,7 +660,7 @@ def _het_config_case(N: int, profile: str, V_d: float) -> BuiltCase:
     )
 
 
-# ── 1D Source Terms and Closed Forms ──────────────────────────────────────────
+# -- 1D Source Terms and Closed Forms ------------------------------------------
 #
 # The generic trio is re-stated here rather than imported from
 # `core/source_functions.py` so that each case is self-describing and the two
@@ -894,7 +894,7 @@ def _build_3c(N: int, sigma_norm: float = 0.2) -> BuiltCase:
     )
 
 
-# ── 1D Generic Poisson Cases ──────────────────────────────────────────────────
+# -- 1D Generic Poisson Cases --------------------------------------------------
 
 register(Case(
     name="poisson_1d_fS_hom",
@@ -950,7 +950,7 @@ register(Case(
 ))
 
 
-# ── 1D HET Cases: HPC Sub-Case Family ─────────────────────────────────────────
+# -- 1D HET Cases: HPC Sub-Case Family -----------------------------------------
 #
 # These three are the HET axial sub-cases of the 1D HPC sweep. They are a
 # distinct family from the `HETConfig` cases below: different sources, different
@@ -1012,7 +1012,7 @@ register(Case(
 ))
 
 
-# ── 1D HET Cases: Non-Dimensional HETConfig Family ────────────────────────────
+# -- 1D HET Cases: Non-Dimensional HETConfig Family ----------------------------
 #
 # The parameterised-profile model of `core/het_config.py`, non-dimensionalised
 # by the Debye length and the electron thermal voltage. Sweeps H1-H4 drew on
@@ -1082,7 +1082,7 @@ register(Case(
 ))
 
 
-# ── 1D Boeuf & Garrigues (1998) Figure 5 axial profile ────────────────────────
+# -- 1D Boeuf & Garrigues (1998) Figure 5 axial profile ------------------------
 #
 # Boeuf & Garrigues do not solve Poisson's equation for the potential at all:
 # their quasineutral model derives the field from the electron momentum
@@ -1188,7 +1188,7 @@ register(Case(
 ))
 
 
-# ── 2D Assembly Helpers ───────────────────────────────────────────────────────
+# -- 2D Assembly Helpers -------------------------------------------------------
 
 def _grid_2d(
     N:  int,
@@ -1447,7 +1447,7 @@ def _build_het_2d_bg(N: int) -> BuiltCase:
     )
 
 
-# ── 2D Generic Poisson Cases ──────────────────────────────────────────────────
+# -- 2D Generic Poisson Cases --------------------------------------------------
 
 register(Case(
     name="poisson_2d_sin_pi",
@@ -1532,7 +1532,7 @@ register(Case(
 ))
 
 
-# ── 2D HET Cases ──────────────────────────────────────────────────────────────
+# -- 2D HET Cases --------------------------------------------------------------
 
 register(Case(
     name="het_2d_mms_spt100",
@@ -1619,7 +1619,7 @@ register(Case(
 ))
 
 
-# ── 3D Assembly Helpers ───────────────────────────────────────────────────────
+# -- 3D Assembly Helpers -------------------------------------------------------
 #
 # Physical constants. The benchmark drivers use these four-significant-figure
 # values, whilst core/het_config.py carries the full CODATA figures
@@ -2038,7 +2038,7 @@ def _build_highmode_3d(N: int) -> BuiltCase:
                     (1.0, 1.0, 1.0), (False, False, False), source=src)
 
 
-# ── 3D Generic Poisson Cases ──────────────────────────────────────────────────
+# -- 3D Generic Poisson Cases --------------------------------------------------
 
 register(Case(
     name="poisson_3d_triple_sin_cube",
@@ -2109,7 +2109,7 @@ register(Case(
 ))
 
 
-# ── 3D HET Cases ──────────────────────────────────────────────────────────────
+# -- 3D HET Cases --------------------------------------------------------------
 
 register(Case(
     name="het_3d_mms_spt100",

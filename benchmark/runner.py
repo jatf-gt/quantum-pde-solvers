@@ -6,7 +6,7 @@ problem construction, solver invocation, metric collection, and result
 persistence. It is the primary entry point for HPC runner scripts.
 
 Sweep catalogue
-───────────────
+---------------
   run_primary_1d          Primary 1D benchmark: all solvers × all N.
   run_equal_accuracy_1d   Equal-accuracy protocol for 1D cases.
   run_sensitivity_1d      OAT sensitivity sweep for 1D cases (N ∈ {4, 8}).
@@ -18,7 +18,7 @@ result is persisted immediately after the solver returns, so partial
 progress survives a walltime kill on HPC.
 
 Design principles
-─────────────────
+-----------------
   1. Solvers are called via the existing (A, b) → SolverResult interface
      in solvers/quantum/. This module does not import solver internals.
   2. The Thomas algorithm is always run first and its solution stored as
@@ -60,7 +60,7 @@ from benchmark.results_io import SweepArchive
 log = logging.getLogger(__name__)
 
 
-# ── Problem builders ──────────────────────────────────────────────────────────
+# -- Problem builders ----------------------------------------------------------
 
 def _build_problem_2nd(
     N: int,
@@ -107,7 +107,7 @@ def _build_problem_4th(
     return prob.A, prob.b, prob.x, prob.kappa, u_exact
 
 
-# ── Thomas reference solver ───────────────────────────────────────────────────
+# -- Thomas reference solver ---------------------------------------------------
 
 def _run_thomas(
     A: np.ndarray,
@@ -126,7 +126,7 @@ def _run_thomas(
     return u, compute_residual(A, u, b), wall
 
 
-# ── Quantum solver wrappers ───────────────────────────────────────────────────
+# -- Quantum solver wrappers ---------------------------------------------------
 
 def _run_hhl(
     A: np.ndarray,
@@ -278,7 +278,7 @@ def _run_qsvt(
         return None, float("nan"), time.perf_counter() - t0, {}
 
 
-# ── Primary 1D sweep ──────────────────────────────────────────────────────────
+# -- Primary 1D sweep ----------------------------------------------------------
 
 def run_primary_1d(
     cases: list[dict],
@@ -444,7 +444,7 @@ def run_primary_1d(
     return all_results
 
 
-# ── Equal-accuracy sweep ──────────────────────────────────────────────────────
+# -- Equal-accuracy sweep ------------------------------------------------------
 
 def run_equal_accuracy_1d(
     cases: list[dict],
@@ -560,7 +560,7 @@ def run_equal_accuracy_1d(
     return all_ea
 
 
-# ── Sensitivity sweep ─────────────────────────────────────────────────────────
+# -- Sensitivity sweep ---------------------------------------------------------
 
 def run_sensitivity_1d(
     cases: list[dict],

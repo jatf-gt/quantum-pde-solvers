@@ -18,7 +18,7 @@ from typing import Callable
 import numpy as np
 
 
-# ── 1D Source Functions ───────────────────────────────────────────────────────
+# -- 1D Source Functions -------------------------------------------------------
 
 def f_sin(x: np.ndarray) -> np.ndarray:
     """
@@ -85,7 +85,7 @@ SOURCE_FUNCTIONS: dict[str, Callable[[np.ndarray], np.ndarray]] = {
 }
 
 
-# ── 2D Source Functions ───────────────────────────────────────────────────────
+# -- 2D Source Functions -------------------------------------------------------
 
 def f_sin_2d(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """
@@ -155,7 +155,7 @@ SOURCE_FUNCTIONS_2D: dict[str, Callable[[np.ndarray, np.ndarray], np.ndarray]] =
 }
 
 
-# ── HET Plasma Charge Density Profiles ────────────────────────────────────────
+# -- HET Plasma Charge Density Profiles ----------------------------------------
 
 def het_gaussian(
     x:     np.ndarray,

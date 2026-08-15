@@ -70,7 +70,7 @@ def _rel_l2(u: np.ndarray, ref: np.ndarray) -> float:
     return float(np.linalg.norm(u - ref) / np.linalg.norm(ref))
 
 
-# ── Structural predicate ──────────────────────────────────────────────────────
+# -- Structural predicate ------------------------------------------------------
 
 @pytest.mark.parametrize("case_key", _TOEPLITZ_CASES)
 def test_generic_cases_are_toeplitz(case_key):
@@ -104,7 +104,7 @@ def test_assert_tridiagonal_rejects_the_neumann_operator():
         assert_tridiagonal(A, "QSVT")
 
 
-# ── Solver behaviour ──────────────────────────────────────────────────────────
+# -- Solver behaviour ----------------------------------------------------------
 
 @pytest.mark.quantum
 def test_qsvt_solves_the_neumann_case():

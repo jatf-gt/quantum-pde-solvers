@@ -24,7 +24,7 @@ import pytest
 from solvers.outer import solve, PoissonLine2D
 
 
-# ── Analytic discretisation-error reference ───────────────────────────────────
+# -- Analytic discretisation-error reference -----------------------------------
 
 def analytic_problem(N: int):
     x = np.arange(1, N + 1) / (N + 1)
@@ -63,7 +63,7 @@ class TestDiscretizationErrorReference:
         assert errors == sorted(errors, reverse=True)
 
 
-# ── Amplification measurement ─────────────────────────────────────────────────
+# -- Amplification measurement -------------------------------------------------
 
 class TestAmplificationMeasurement:
     """
@@ -232,7 +232,7 @@ class TestDivergenceDetection:
         assert diverging_ratio > 1.5
 
 
-# ── Row-operator conditioning claim ───────────────────────────────────────────
+# -- Row-operator conditioning claim -------------------------------------------
 
 class TestRowOperatorConditioning:
     """

@@ -62,7 +62,7 @@ sys.path.insert(0, str(REPO_ROOT))
 import numpy as np
 
 
-# ── Circuit construction (version-portable: only block_encoding is imported) ──
+# -- Circuit construction (version-portable: only block_encoding is imported) --
 
 def build_experiment_circuit(N: int, main_diag: float, off_diag: float):
     """
@@ -128,7 +128,7 @@ def pauli_terms_for_projector(target: np.ndarray):
     return terms
 
 
-# ── Preflight ─────────────────────────────────────────────────────────────────
+# -- Preflight -----------------------------------------------------------------
 
 def preflight(args) -> int:
     """
@@ -236,7 +236,7 @@ def preflight(args) -> int:
     return 0
 
 
-# ── Submission ────────────────────────────────────────────────────────────────
+# -- Submission ----------------------------------------------------------------
 
 def run_experiment(args, use_hardware: bool) -> dict:
     from qiskit import transpile
@@ -272,8 +272,8 @@ def run_experiment(args, use_hardware: bool) -> dict:
     job = estimator.run(pubs)
     print(f"Job ID: {job.job_id()}")
     if use_hardware:
-        print("Queued. This may take a while -- queue time is NOT charged "
-              "against your quota, only QPU execution time is.")
+        print("Job queued. Note: queue duration incurs no compute allocation charges; "
+              "only QPU execution time is metered.")
     result = job.result()
 
     fidelity = sum(c.real * float(r.data.evs) for (c, _s), r in zip(terms, result))

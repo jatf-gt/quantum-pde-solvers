@@ -6,15 +6,15 @@ Schema contract
 All benchmark output is written to a structured directory tree:
 
   results/<run_tag>/
-    ├── results_full.json          Complete BenchmarkResult list (primary).
-    ├── results_summary.csv        Flat CSV of all primary fields.
-    ├── equal_accuracy.json        EqualAccuracyResult list.
-    ├── sensitivity_<solver>.json  SensitivitySweepResult list per solver.
-    ├── run_metadata.json          Run configuration and environment info.
-    ├── tables/                    LaTeX .tex files (from benchmark/tables.py).
-    ├── figures/                   Saved figures (.pdf, .png).
-    └── solutions/                 Per-solve .npz archives.
-        └── <case_id>_<solver>_N<N>.npz
+    ├-- results_full.json          Complete BenchmarkResult list (primary).
+    ├-- results_summary.csv        Flat CSV of all primary fields.
+    ├-- equal_accuracy.json        EqualAccuracyResult list.
+    ├-- sensitivity_<solver>.json  SensitivitySweepResult list per solver.
+    ├-- run_metadata.json          Run configuration and environment info.
+    ├-- tables/                    LaTeX .tex files (from benchmark/tables.py).
+    ├-- figures/                   Saved figures (.pdf, .png).
+    └-- solutions/                 Per-solve .npz archives.
+        └-- <case_id>_<solver>_N<N>.npz
 
 The schema is intentionally flat: all BenchmarkResult fields are stored
 at the top level of each JSON record (CircuitMetrics is flattened with a
@@ -51,7 +51,7 @@ from benchmark.equal_accuracy import EqualAccuracyResult
 from benchmark.sensitivity import SensitivitySweepResult
 
 
-# ── Legacy field aliases ──────────────────────────────────────────────────────
+# -- Legacy field aliases ------------------------------------------------------
 # The following mapping reconciles field names introduced in earlier runner
 # versions with their current equivalents. Applied during deserialisation to
 # maintain backward compatibility with pre-existing archives.
@@ -72,7 +72,7 @@ _LEGACY_ALIASES: dict[str, str] = {
 }
 
 
-# ── BenchmarkResult serialisation ─────────────────────────────────────────────
+# -- BenchmarkResult serialisation ---------------------------------------------
 
 def _benchmark_result_to_dict(result: BenchmarkResult) -> dict:
     """Serialise a BenchmarkResult to a JSON-compatible flat dictionary."""
@@ -147,7 +147,7 @@ def _dict_to_benchmark_result(d: dict) -> BenchmarkResult:
         ) from exc
 
 
-# ── SweepArchive ──────────────────────────────────────────────────────────────
+# -- SweepArchive --------------------------------------------------------------
 
 class SweepArchive:
     """
@@ -175,7 +175,7 @@ class SweepArchive:
                   self.tables_dir, self.figures_dir):
             d.mkdir(parents=True, exist_ok=True)
 
-    # ── Primary results ───────────────────────────────────────────────────────
+    # -- Primary results -------------------------------------------------------
 
     def write_primary(self, results: list[BenchmarkResult]) -> None:
         """Write primary BenchmarkResult list to JSON and CSV."""
@@ -228,7 +228,7 @@ class SweepArchive:
         ]
         self.write_primary(existing + to_add)
 
-    # ── Solution archives ─────────────────────────────────────────────────────
+    # -- Solution archives -----------------------------------------------------
 
     def write_solution(
         self,
@@ -298,7 +298,7 @@ class SweepArchive:
         data = np.load(fname, allow_pickle=False)
         return dict(data)
 
-    # ── Equal-accuracy results ────────────────────────────────────────────────
+    # -- Equal-accuracy results ------------------------------------------------
 
     def write_equal_accuracy(self, ea_results: list[EqualAccuracyResult]) -> None:
         """Write equal-accuracy results to JSON."""
@@ -345,7 +345,7 @@ class SweepArchive:
             ))
         return results
 
-    # ── Sensitivity results ───────────────────────────────────────────────────
+    # -- Sensitivity results ---------------------------------------------------
 
     def write_sensitivity(
         self,
@@ -391,7 +391,7 @@ class SweepArchive:
             ))
         return sweeps
 
-    # ── Run metadata ──────────────────────────────────────────────────────────
+    # -- Run metadata ----------------------------------------------------------
 
     def write_metadata(self, config: dict) -> None:
         """
@@ -413,7 +413,7 @@ class SweepArchive:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, default=str)
 
-    # ── Archive completeness ──────────────────────────────────────────────────
+    # -- Archive completeness --------------------------------------------------
 
     def missing(
         self,

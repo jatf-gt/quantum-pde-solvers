@@ -25,7 +25,7 @@ import numpy as np
 import pennylane as qml
 
 
-# ── Pauli Decomposition ───────────────────────────────────────────────────────
+# -- Pauli Decomposition -------------------------------------------------------
 
 def pauli_decompose_matrix(
     A: np.ndarray,
@@ -85,7 +85,7 @@ def pauli_decompose_normalised(
     return terms, norm_factor
 
 
-# ── Ansatz Construction ───────────────────────────────────────────────────────
+# -- Ansatz Construction -------------------------------------------------------
 
 def build_ansatz(
     params: np.ndarray,
@@ -135,7 +135,7 @@ def n_params(n_qubits: int, n_layers: int) -> int:
     return n_qubits * (n_layers + 1)
 
 
-# ── Cost Function Evaluation ──────────────────────────────────────────────────
+# -- Cost Function Evaluation --------------------------------------------------
 
 def build_cost_function(
     pauli_terms:  List[Tuple[complex, str]],
@@ -180,7 +180,7 @@ def build_cost_function(
         A function mapping a variational parameter array to a scalar cost
         value bounded within [0, 1].
     """
-    # ── Numerator: <b|A|x(θ)> ─────────────────────────────────────────────────
+    # -- Numerator: <b|A|x(θ)> -------------------------------------------------
     # We compute this directly using statevector inner products rather than
     # Hadamard tests, which is valid on a statevector simulator and avoids
     # the overhead of constructing O(L) separate circuits.
@@ -223,7 +223,7 @@ def build_cost_function(
     return cost_fn
 
 
-# ── Dimensionality Recovery ───────────────────────────────────────────────────
+# -- Dimensionality Recovery ---------------------------------------------------
 
 def recover_solution(
     params:       np.ndarray,
@@ -316,7 +316,7 @@ def recover_solution(
     return u, c_phys
 
 
-# ── Private Utility Methods ───────────────────────────────────────────────────
+# -- Private Utility Methods ---------------------------------------------------
 
 def _pauli_string_to_matrix(pauli_str: str) -> np.ndarray:
     """

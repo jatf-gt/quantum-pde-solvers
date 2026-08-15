@@ -43,7 +43,7 @@ from solvers.outer import get_inner, solve
 RESULTS_DIR = REPO_ROOT / "results" / "example_report"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── CHANGE ME: pick the cases and resolutions this report covers ─────────────
+# -- CHANGE ME: pick the cases and resolutions this report covers -------------
 # Full case lists: core.cases.available(dim=1), .available(dim=2), .available(dim=3)
 CASE_1D = "poisson_1d_fS_hom"
 N_1D = 8
@@ -55,7 +55,7 @@ INNER_2D = "qsvt"                           # cheapest quantum solver per strip
 SCHEME_2D = "fmg"
 
 
-# ── 1-D section ────────────────────────────────────────────────────────────────
+# -- 1-D section ----------------------------------------------------------------
 
 def run_1d() -> list[dict]:
     """
@@ -132,7 +132,7 @@ def _plot_1d(x: np.ndarray, u_exact, rows: list[dict]) -> None:
     print(f"  saved {out}")
 
 
-# ── 2-D section ────────────────────────────────────────────────────────────────
+# -- 2-D section ----------------------------------------------------------------
 
 def run_2d() -> list[dict]:
     """
@@ -209,7 +209,7 @@ def _plot_2d(prob, u_exact, rows: list[dict]) -> None:
     print(f"  saved {out}")
 
 
-# ── CSV export ─────────────────────────────────────────────────────────────────
+# -- CSV export -----------------------------------------------------------------
 
 def write_csv(rows: list[dict]) -> None:
     out = RESULTS_DIR / "report_metrics.csv"
@@ -223,7 +223,7 @@ def write_csv(rows: list[dict]) -> None:
     print(f"\n  saved {out}")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     t0 = time.perf_counter()

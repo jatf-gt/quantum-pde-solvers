@@ -41,7 +41,7 @@ from core.source_functions import HET_SOURCE_FUNCTIONS
 from core.exact_solutions import HET_EXACT_SOLUTIONS
 
 
-# ── Problem Container ─────────────────────────────────────────────────────────
+# -- Problem Container ---------------------------------------------------------
 
 @dataclass
 class HETPoissonProblem1D:
@@ -95,7 +95,7 @@ class HETPoissonProblem1D:
         self.dx     = 1.0 / (N + 1)
         self.x      = np.arange(1, N + 1) * self.dx
 
-        # ── System Matrix Construction ────────────────────────────────────────
+        # -- System Matrix Construction ----------------------------------------
         # The TST operator mirrors the generic 1D Poisson case; the plasma
         # physics enters exclusively through the right-hand side vector.
         self.A = (
@@ -104,11 +104,11 @@ class HETPoissonProblem1D:
             +  1.0 * np.diag(np.ones(N - 1), k=-1)
         )
 
-        # ── Right-Hand Side Assembly ──────────────────────────────────────────
+        # -- Right-Hand Side Assembly ------------------------------------------
         self.b      = self._build_rhs()
         self.b_phys = self.b * cfg.phi_0   # Dimensional projection [V]
 
-        # ── Condition Number Evaluation ───────────────────────────────────────
+        # -- Condition Number Evaluation ---------------------------------------
         eigs       = np.abs(np.linalg.eigvalsh(self.A))
         self.kappa = float(eigs.max() / eigs.min())
 
@@ -189,7 +189,7 @@ class HETPoissonProblem1D:
         )
 
 
-# ── Physical Problem Container ────────────────────────────────────────────────
+# -- Physical Problem Container ------------------------------------------------
 
 class HETPhysicalProblem1D:
     """
@@ -260,7 +260,7 @@ class HETPhysicalProblem1D:
         self.dx     = 1.0 / (N + 1)
         self.x      = np.arange(1, N + 1) * self.dx
 
-        # ── System Matrix Construction ────────────────────────────────────────
+        # -- System Matrix Construction ----------------------------------------
         # Identical TST operator to the generic 1D Poisson case.
         self.A = (
             -2.0 * np.diag(np.ones(N))
@@ -268,14 +268,14 @@ class HETPhysicalProblem1D:
             +  1.0 * np.diag(np.ones(N - 1), k=-1)
         )
 
-        # ── Prescribed Analytical Distributions ───────────────────────────────
+        # -- Prescribed Analytical Distributions -------------------------------
         self.n_profile    = self._density_profile()
         self.delta_n      = self._charge_separation()
 
-        # ── Right-Hand Side Assembly ──────────────────────────────────────────
+        # -- Right-Hand Side Assembly ------------------------------------------
         self.b = self._build_rhs()
 
-        # ── Sanity check: solution scale should be O(alpha_bc) ────────────────
+        # -- Sanity check: solution scale should be O(alpha_bc) ----------------
         # The dominant contribution to the potential is the applied voltage,
         # so the solution norm should be comparable to alpha_bc = V_d/phi_0.
         # The space charge contribution is alpha * delta_0 = delta_0_factor.
@@ -293,7 +293,7 @@ class HETPhysicalProblem1D:
                 UserWarning,
             )
 
-        # ── Condition Number Evaluation ───────────────────────────────────────
+        # -- Condition Number Evaluation ---------------------------------------
         eigs       = np.abs(np.linalg.eigvalsh(self.A))
         self.kappa = float(eigs.max() / eigs.min())
 

@@ -41,7 +41,7 @@ from core.execution import (                                      # noqa: E402
 )
 
 
-# ── Frozen transcriptions of the pre-refactor inline logic ────────────────────
+# -- Frozen transcriptions of the pre-refactor inline logic --------------------
 
 def _original_hhl_extraction(circuit, num_qubits: int) -> np.ndarray:
     """Verbatim copy of ``hhl_1d._extract_solution_statevector`` before the refactor."""
@@ -82,7 +82,7 @@ def _original_qsvt_extraction(sv: np.ndarray, n: int, n_a: int) -> np.ndarray:
     return np.imag(x_raw)
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers -------------------------------------------------------------------
 
 def _random_hhl_circuit(n_b: int, n_l: int, n_anc: int, seed: int):
     qc = QuantumCircuit(
@@ -106,7 +106,7 @@ def _random_qsvt_circuit(n: int, n_a: int, seed: int):
     return qc
 
 
-# ── Bit-level equivalence ─────────────────────────────────────────────────────
+# -- Bit-level equivalence -----------------------------------------------------
 
 @pytest.mark.quantum
 class TestStatevectorExecutorEquivalence:
@@ -181,7 +181,7 @@ class TestStatevectorExecutorEquivalence:
         assert np.array_equal(strict, np.imag(manual))
 
 
-# ── Post-selection bookkeeping ────────────────────────────────────────────────
+# -- Post-selection bookkeeping ------------------------------------------------
 
 @pytest.mark.quantum
 class TestPostSelectionProbability:
@@ -219,7 +219,7 @@ class TestPostSelectionProbability:
         assert record.postselect_probability == pytest.approx(1.0, rel=1e-12)
 
 
-# ── Specification validation ──────────────────────────────────────────────────
+# -- Specification validation --------------------------------------------------
 
 class TestPostSelectSpecValidation:
     """Invalid specifications must fail loudly at construction, not silently."""
@@ -249,7 +249,7 @@ class TestPostSelectSpecValidation:
             hhl_spec(qc, num_qubits=3)
 
 
-# ── Default executor and scoping ──────────────────────────────────────────────
+# -- Default executor and scoping ----------------------------------------------
 
 class TestDefaultExecutor:
     """The default must be exact, and any override must be strictly scoped."""
@@ -272,7 +272,7 @@ class TestDefaultExecutor:
         assert default_executor() is original
 
 
-# ── Failure path ──────────────────────────────────────────────────────────────
+# -- Failure path --------------------------------------------------------------
 
 @pytest.mark.quantum
 class TestNullExtraction:

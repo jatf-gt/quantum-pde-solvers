@@ -81,7 +81,7 @@ from __future__ import annotations
 import math
 
 
-# ── Primary Dimensions ────────────────────────────────────────────────────────
+# -- Primary Dimensions --------------------------------------------------------
 #
 # These four numbers are the entire declared geometry. Everything else is
 # derived from them.
@@ -93,7 +93,7 @@ R_OUT: float = 0.050      # Outer channel radius [m]
 PHI_0: float = 300.0      # Nominal discharge voltage scale [V]
 
 
-# ── Derived Dimensions ────────────────────────────────────────────────────────
+# -- Derived Dimensions --------------------------------------------------------
 
 L_R: float = R_OUT - R_IN                 # Radial channel width [m] = 20 mm
 R_MEAN: float = 0.5 * (R_IN + R_OUT)      # Mean channel radius [m] = 40 mm
@@ -102,7 +102,7 @@ L_S: float = 2.0 * math.pi * R_MEAN       # Mean circumference [m] ≈ 251.3 mm
 ASPECT_RADIAL_AZIMUTHAL: float = L_R / L_S      # ≈ 0.080; justifies unwrapping
 
 
-# ── Electrode Potentials ──────────────────────────────────────────────────────
+# -- Electrode Potentials ------------------------------------------------------
 #
 # Operating point of the SPT-100 at nominal discharge conditions. The wall
 # potential is the floating potential of the dielectric channel wall, which sits
@@ -114,7 +114,7 @@ V_CATHODE: float = 0.0      # Cathode-plane potential [V]
 V_WALL: float = -20.0       # Floating dielectric wall potential [V]
 
 
-# ── Azimuthal Mode Structure ──────────────────────────────────────────────────
+# -- Azimuthal Mode Structure --------------------------------------------------
 #
 # The rotating spoke is a coherent low-order azimuthal density perturbation
 # observed in Hall thrusters, modelled here as a multiplicative modulation
@@ -124,7 +124,7 @@ SPOKE_MODE_M: int = 2         # Azimuthal mode number of the rotating spoke
 SPOKE_EPSILON: float = 0.30   # Relative amplitude of the azimuthal modulation
 
 
-# ── Superseded Values ─────────────────────────────────────────────────────────
+# -- Superseded Values ---------------------------------------------------------
 
 L_R_LEGACY_2D: float = 0.020
 """

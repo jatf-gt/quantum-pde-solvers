@@ -65,7 +65,7 @@ sys.path.insert(0, str(REPO_ROOT))
 import core.cases as cases          # noqa: E402
 import core.het_geometry as geom    # noqa: E402
 
-# ── Superseded geometry ───────────────────────────────────────────────────────
+# -- Superseded geometry -------------------------------------------------------
 # The values in force before commit 861ff46. R_OUT was already correct at 50 mm;
 # L_R, R_MEAN and L_S are derived and so are recomputed rather than listed.
 
@@ -98,7 +98,7 @@ genuine geometry effect is O(0.1) or larger in every case observed.
 """
 
 
-# ── Case selection ────────────────────────────────────────────────────────────
+# -- Case selection ------------------------------------------------------------
 
 def het_case_ids(dim: Optional[int] = None) -> list[str]:
     """
@@ -198,7 +198,7 @@ def _relative_difference(before: Optional[np.ndarray],
     return float(np.abs(before - after).max() / denominator)
 
 
-# ── Geometry patching ─────────────────────────────────────────────────────────
+# -- Geometry patching ---------------------------------------------------------
 
 def apply_pre_correction_geometry() -> None:
     """
@@ -220,7 +220,7 @@ def apply_pre_correction_geometry() -> None:
     importlib.reload(cases)
 
 
-# ── Reporting ─────────────────────────────────────────────────────────────────
+# -- Reporting -----------------------------------------------------------------
 
 def compare(case_ids: list[str], N: int) -> tuple[list[str], list[str]]:
     """

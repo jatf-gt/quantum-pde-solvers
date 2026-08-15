@@ -108,7 +108,7 @@ from problems.poisson_1d import build_tst_matrix
 from problems.poisson_line_2d import PoissonLine2D
 
 
-# ── Domain Definitions ────────────────────────────────────────────────────────
+# -- Domain Definitions --------------------------------------------------------
 
 # Physical extents of the HET discharge channel [m], from core/het_geometry.py.
 # The strip operator depends on the grid through the aspect ratio Lz/Lr alone,

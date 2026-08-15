@@ -78,7 +78,7 @@ def main() -> None:
     print(f"QSVT circuit: N={args.N}, degree={args.degree}, "
           f"{qc.num_qubits} qubits, pre-transpile depth={qc.depth()}\n")
 
-    # ── Step 1: shot noise only ────────────────────────────────────────────
+    # -- Step 1: shot noise only --------------------------------------------
     print("Step 1: shot noise only (no gate error)")
     x_exact, rec_exact = StatevectorExecutor(diagnostics=False).extract(qc, spec)
     sample = sample_postselection(qc, spec, shots=args.shots)
@@ -87,7 +87,7 @@ def main() -> None:
           f"(95% CI [{sample.ci_low:.4f}, {sample.ci_high:.4f}])")
     print(f"  shot overhead (1/p)          : {sample.shot_overhead:.1f}\n")
 
-    # ── Step 2: parametric depolarising sweep ──────────────────────────────
+    # -- Step 2: parametric depolarising sweep ------------------------------
     print("Step 2: parametric depolarising sweep")
     error_rates = [0.0, 1e-3, HERON_R2_TWO_QUBIT_ERROR, 5e-3, 1e-2, 2e-2, 5e-2]
 
@@ -112,7 +112,7 @@ def main() -> None:
               f"fidelity={r['fidelity_vs_ideal']:.4f}")
     print()
 
-    # ── Step 3: fake backend (real calibration data) ───────────────────────
+    # -- Step 3: fake backend (real calibration data) -----------------------
     print("Step 3: fake backend (real IBM calibration data)")
     try:
         from core.noise import fake_backend_noise_model, NoiseExecutor
@@ -127,7 +127,7 @@ def main() -> None:
         print(f"  Skipped: {exc}")
     print()
 
-    # ── Save ─────────────────────────────────────────────────────────────
+    # -- Save -------------------------------------------------------------
     args.out.mkdir(parents=True, exist_ok=True)
     import json
     payload = {

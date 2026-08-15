@@ -210,7 +210,7 @@ class PoissonLine3D4th:
         self._A_cache[(0, 0)] = self._A_int
         self._rhs = self._build_rhs()
 
-    # ── Face geometry ─────────────────────────────────────────────────────────
+    # -- Face geometry ---------------------------------------------------------
 
     def _face_shape(self, axis: int) -> tuple[int, ...]:
         """Shape of the face normal to ``axis``: the other two extents, in order."""
@@ -251,7 +251,7 @@ class PoissonLine3D4th:
         return np.broadcast_to(np.asarray(supplied, dtype=float),
                                self._face_shape(axis)).copy()
 
-    # ── Operator ──────────────────────────────────────────────────────────────
+    # -- Operator --------------------------------------------------------------
 
     def _build_row_matrix(self, adjacency: tuple[int, int]) -> np.ndarray:
         """
@@ -433,7 +433,7 @@ class PoissonLine3D4th:
         """(N0, N1, N2) right-hand side with Dirichlet data already absorbed."""
         return self._rhs
 
-    # ── Convenience aliases matching the 2-D class ────────────────────────────
+    # -- Convenience aliases matching the 2-D class ----------------------------
 
     @property
     def dx(self) -> float:
@@ -450,7 +450,7 @@ class PoissonLine3D4th:
         """Spacing along axis 2."""
         return self.spacings[2]
 
-    # ── Coarsening ────────────────────────────────────────────────────────────
+    # -- Coarsening ------------------------------------------------------------
 
     def coarsen(self) -> Optional["PoissonLine3D4th"]:
         """
@@ -487,7 +487,7 @@ class PoissonLine3D4th:
             lengths=self.lengths, periodic=self.periodic,
             _level=self.level + 1)
 
-    # ── Utilities ─────────────────────────────────────────────────────────────
+    # -- Utilities -------------------------------------------------------------
 
     def grid(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """

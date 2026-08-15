@@ -47,7 +47,7 @@ from typing import Any, Callable, Optional
 import numpy as np
 
 
-# ── Option declaration ────────────────────────────────────────────────────────
+# -- Option declaration --------------------------------------------------------
 
 @dataclass(frozen=True)
 class Option:
@@ -171,7 +171,7 @@ class InnerConfig(dict):
         return dict(self.get(name, {}))
 
 
-# ── Wrapper: timing, diagnostics, failure fallback ────────────────────────────
+# -- Wrapper: timing, diagnostics, failure fallback ----------------------------
 
 class InnerSolverWrapper:
     """
@@ -239,7 +239,7 @@ class InnerSolverWrapper:
         return d
 
 
-# ── Built-in solvers ──────────────────────────────────────────────────────────
+# -- Built-in solvers ----------------------------------------------------------
 
 @register("thomas")
 def _thomas(**_):
@@ -383,7 +383,7 @@ def _qsvt(**opts):
     return solve
 
 
-# ── Fourth-order (pentadiagonal) inner solvers ────────────────────────────────
+# -- Fourth-order (pentadiagonal) inner solvers --------------------------------
 #
 # Registered separately rather than folded into the 2nd-order factories above,
 # because the two differ in the operator they may legally be given, not merely in
@@ -454,7 +454,7 @@ def _qsvt_4th(**opts):
     return solve
 
 
-# ── Factory ───────────────────────────────────────────────────────────────────
+# -- Factory -------------------------------------------------------------------
 
 def get_inner(name: str, fallback_to_thomas: bool = True,
               **options) -> InnerSolverWrapper:

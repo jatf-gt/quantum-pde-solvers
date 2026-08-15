@@ -52,7 +52,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 
-# ── System Path Resolution ────────────────────────────────────────────────────
+# -- System Path Resolution ----------------------------------------------------
 
 # Dynamically resolve the project root directory (one level up from this script)
 # and append it to the system path to enable absolute imports.

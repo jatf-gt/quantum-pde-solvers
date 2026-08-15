@@ -21,7 +21,7 @@ import pytest
 from core import cases
 
 
-# ── Registry Contract ─────────────────────────────────────────────────────────
+# -- Registry Contract ---------------------------------------------------------
 
 class TestRegistryContract:
     """The registry's structural invariants."""
@@ -76,7 +76,7 @@ class TestRegistryContract:
             assert cases.get(name).name in cases.describe(name)
 
 
-# ── Per-Case Structure ────────────────────────────────────────────────────────
+# -- Per-Case Structure --------------------------------------------------------
 
 ALL_CASES = cases.available()
 CASES_1D = cases.available(dim=1)
@@ -144,7 +144,7 @@ def test_higher_dimensional_cases_carry_a_line_problem(name):
     assert built.A is None and built.b is None
 
 
-# ── Mathematical Consistency ──────────────────────────────────────────────────
+# -- Mathematical Consistency --------------------------------------------------
 
 def _truncation_error(case, N):
     """

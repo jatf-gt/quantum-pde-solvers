@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-# ── System Path Resolution ────────────────────────────────────────────────────
+# -- System Path Resolution ----------------------------------------------------
 
 # Dynamically resolve the project root directory (one level up from this script)
 # and append it to the system path to enable absolute imports.
@@ -40,7 +40,7 @@ from solvers.quantum.vqls_1d import vqls_solve_system, VQLSConfig1D
 RESULTS_DIR = Path("results/het")
 
 
-# ── Core Execution Subroutine ─────────────────────────────────────────────────
+# -- Core Execution Subroutine -------------------------------------------------
 
 def run_het_trio(
     cfg:         HETConfig,
@@ -166,7 +166,7 @@ def run_het_trio(
     }
 
 
-# ── Benchmark Sweeps ──────────────────────────────────────────────────────────
+# -- Benchmark Sweeps ----------------------------------------------------------
 
 def sweep_h1(verbose: bool = True) -> list[dict]:
     """
@@ -279,7 +279,7 @@ def sweep_h4() -> None:
         )
 
 
-# ── Data Exportation ──────────────────────────────────────────────────────────
+# -- Data Exportation ----------------------------------------------------------
 
 def save_het_results(results: list[dict], filename: str) -> None:
     """
@@ -303,7 +303,7 @@ def save_het_results(results: list[dict], filename: str) -> None:
     print(f"\n  Saved to {filepath}")
 
 
-# ── Graphical Visualisation ───────────────────────────────────────────────────
+# -- Graphical Visualisation ---------------------------------------------------
 
 def plot_het_solutions(results: list[dict], save_fig: bool = False) -> None:
     """
@@ -353,7 +353,7 @@ def plot_het_solutions(results: list[dict], save_fig: bool = False) -> None:
     plt.show()
 
 
-# ── Primary Execution Orchestrator ────────────────────────────────────────────
+# -- Primary Execution Orchestrator --------------------------------------------
 
 def main() -> None:
     """

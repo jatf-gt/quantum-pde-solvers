@@ -77,7 +77,7 @@ from solvers.outer.core import (LineProblem2D, OuterResult, StagnationMonitor,
                                 WorkLog, strip_sweep)
 
 
-# ── Transfer operators ────────────────────────────────────────────────────────
+# -- Transfer operators --------------------------------------------------------
 
 def interpolation_1d(n_fine: int, n_coarse: int, L: float) -> np.ndarray:
     """
@@ -202,7 +202,7 @@ def build_hierarchy(problem, max_levels: int = 10) -> list[Level]:
     return levels
 
 
-# ── Cycles ────────────────────────────────────────────────────────────────────
+# -- Cycles --------------------------------------------------------------------
 
 _WallTimeExceeded = WallTimeExceeded
 """
@@ -324,7 +324,7 @@ def solve_multigrid(
     monitor = StagnationMonitor(window=patience)
     t0 = time.perf_counter()
 
-    # ── FMG start: nested iteration from the coarsest level upward ────────────
+    # -- FMG start: nested iteration from the coarsest level upward ------------
     # Each level needs a genuine right-hand side, obtained by restricting the
     # fine one.  Passing zeros here (a natural-looking mistake) makes every
     # intermediate V-cycle solve A e = 0, so the FMG start does nothing and
@@ -378,7 +378,7 @@ def solve_multigrid(
     else:
         u = np.zeros(tuple(problem.shape))
 
-    # ── V-cycles on the finest level ──────────────────────────────────────────
+    # -- V-cycles on the finest level ------------------------------------------
     stop = "max_cycles"
     if fmg_timed_out or _over_budget():
         stop = "wall_time_exceeded"

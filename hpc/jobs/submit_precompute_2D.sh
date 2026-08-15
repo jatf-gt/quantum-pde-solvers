@@ -45,7 +45,7 @@ echo "  MAX_DEGREE: ${MAX_DEGREE:-<uncapped>}"
 echo "  LIST_KAPPAS: ${LIST_KAPPAS:-0}"
 echo "============================================================"
 
-# ── Repository root resolution ───────────────────────────────
+# -- Repository root resolution -------------------------------
 # PBS copies this script to a spool directory before executing it, so $0 and
 # BASH_SOURCE do NOT point at the original file. PBS_O_WORKDIR -- the directory
 # qsub was invoked from -- is the only reliable anchor. Ascending from it means

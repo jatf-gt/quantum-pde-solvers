@@ -108,7 +108,7 @@ from solvers.quantum.qsp_angles import (
 from solvers.quantum.result import SolverResult, QSVTSolverResult
 
 
-# ── QSVT configuration ────────────────────────────────────────────────────────
+# -- QSVT configuration --------------------------------------------------------
 
 @dataclass
 class QSVTConfig1D:
@@ -167,7 +167,7 @@ class QSVTConfig1D:
 DEFAULT_QSVT_CONFIG = QSVTConfig1D()
 
 
-# ── Public interface ──────────────────────────────────────────────────────────
+# -- Public interface ----------------------------------------------------------
 
 def qsvt_solve(
     problem : PoissonProblem1D,
@@ -281,7 +281,7 @@ def qsvt_solve_system(
     if b_norm < 1e-14:
         raise ValueError("RHS vector b is numerically zero.")
 
-    # ── Stage 0: sign normalisation for negative definite matrices ────────────
+    # -- Stage 0: sign normalisation for negative definite matrices ------------
     # The QSVT polynomial p(x) approximates 1/x for x in [1/kappa, 1].
     # This requires the matrix to be positive semidefinite after normalisation.
     # The 1-D and 2-D Poisson TST matrices are negative definite (all
@@ -301,7 +301,7 @@ def qsvt_solve_system(
         )
     # A is now positive definite; proceed with standard QSVT.
 
-    # ── Stage 1: block encoding ───────────────────────────────────────────────
+    # -- Stage 1: block encoding -----------------------------------------------
     # Use the spectral norm (largest eigenvalue) as the subnormalisation
     # factor alpha, rather than |a|+2|b| (subnormalisation_factor). This is
     # what build_tst_block_encoding uses internally to construct the block
@@ -344,7 +344,7 @@ def qsvt_solve_system(
             f"kappa(A)={kappa_A:.2f}, kappa_eff={kappa_eff:.2f}"
         )
 
-    # ── Stage 2: QSP phase angles ─────────────────────────────────────────────
+    # -- Stage 2: QSP phase angles ---------------------------------------------
     if (
         hasattr(config, "_precomputed_angles")
         and config._precomputed_angles is not None
@@ -369,7 +369,7 @@ def qsvt_solve_system(
             max_degree = config.max_degree,
         )
 
-    # ── Stage 3: QSVT circuit construction ────────────────────────────────────
+    # -- Stage 3: QSVT circuit construction ------------------------------------
     qsvt_circuit = _build_qsvt_circuit(
         be_circuit = be_circuit,
         angles     = angles,
@@ -386,7 +386,7 @@ def qsvt_solve_system(
             f"circuit depth={circuit_depth}"
         )
 
-    # ── Stage 4/5: execution and post-selected solution extraction ────────────
+    # -- Stage 4/5: execution and post-selected solution extraction ------------
     # Routed through core.execution so that the same solver body runs under
     # exact statevector evolution (the default and the thesis baseline), under
     # a shot-based noisy simulator, or on hardware. The default executor
@@ -505,7 +505,7 @@ def _qsvt_recovery_diagnostics(
         )
 
 
-# ── Private circuit builders ──────────────────────────────────────────────────
+# -- Private circuit builders --------------------------------------------------
 
 def _build_qsvt_circuit(
     be_circuit : QuantumCircuit,

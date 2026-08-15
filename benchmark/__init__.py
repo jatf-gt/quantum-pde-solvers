@@ -2,7 +2,7 @@
 Benchmarking framework for quantum PDE solver evaluation.
 
 Public API
-──────────
+----------
   metrics         BenchmarkResult, CircuitMetrics, compute_* utilities.
   equal_accuracy  Equal-accuracy protocol: sweep_*_equal_accuracy.
   sensitivity     OAT sensitivity: sensitivity_sweep_*, run_all_sensitivity_sweeps.

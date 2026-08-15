@@ -93,8 +93,8 @@ def main():
                 w.writerow(r)
         print(f"  also rewrote {csv_path}")
 
-    print("Done. The removed cases are now ready for a clean re-run with "
-         "--append (nothing stale remains to collide with).")
+    print("Operation complete. The extracted configurations are prepared for execution with "
+         "--append (ensuring collision-free deployment).")
 
 
 if __name__ == "__main__":

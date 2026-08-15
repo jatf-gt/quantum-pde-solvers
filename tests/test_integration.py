@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-# ── Temporarily inert: awaiting the Phase 8 reporting schema ──────────────────
+# -- Temporarily inert: awaiting the Phase 8 reporting schema ------------------
 # The Phase 8 benchmarking rewrite retired `compute_errors`, `Config2D`,
 # `BenchmarkResult2D` and `compute_errors_2d` from `benchmark/metrics.py`, and
 # reshaped `BenchmarkResult` from a field-carrying reporting object into a flat,

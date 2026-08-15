@@ -882,7 +882,7 @@ def main():
 
     _QUANTUM_SOLVERS = ["hhl", "vqls", "qsvt"]
 
-    # ── Generic Poisson (unit square) ─────────────────────────────────────────
+    # -- Generic Poisson (unit square) -----------------------------------------
     if args.solver != "het":
         x, y, dx = build_grid_2d(N)
         f_vals  = f_sin2d(x, y)
@@ -946,7 +946,7 @@ def main():
             plot_solutions(N, x, y, u_exact, results_dict)
             plot_convergence(errors_by_solver, N)
 
-    # ── HET 2D MMS case ───────────────────────────────────────────────────────
+    # -- HET 2D MMS case -------------------------------------------------------
     if args.solver in ("all", "het"):
         run_het_2d_case(
             Nz=N, Nr=N,

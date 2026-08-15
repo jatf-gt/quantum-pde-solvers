@@ -81,7 +81,7 @@ __all__ = [
 ]
 
 
-# ── Post-selection specification ──────────────────────────────────────────────
+# -- Post-selection specification ----------------------------------------------
 
 @dataclass(frozen=True)
 class PostSelectSpec:
@@ -149,7 +149,7 @@ class PostSelectSpec:
                     f"required bit must be 0 or 1, got {bit} on qubit {qubit}"
                 )
 
-    # ── Derived bit-masks ─────────────────────────────────────────────────────
+    # -- Derived bit-masks -----------------------------------------------------
 
     @property
     def mask(self) -> int:
@@ -172,7 +172,7 @@ class PostSelectSpec:
         """True if basis state ``index`` survives post-selection."""
         return (index & self.mask) == self.target
 
-    # ── Convenience constructors ──────────────────────────────────────────────
+    # -- Convenience constructors ----------------------------------------------
 
     @classmethod
     def from_registers(
@@ -210,7 +210,7 @@ class PostSelectSpec:
         )
 
 
-# ── Execution diagnostics ─────────────────────────────────────────────────────
+# -- Execution diagnostics -----------------------------------------------------
 
 @dataclass
 class ExecutionRecord:
@@ -290,7 +290,7 @@ class ExecutionRecord:
         return 1.0 / p
 
 
-# ── Executor interface ────────────────────────────────────────────────────────
+# -- Executor interface --------------------------------------------------------
 
 class Executor(Protocol):
     """
@@ -325,7 +325,7 @@ class Executor(Protocol):
         ...
 
 
-# ── Exact statevector executor ────────────────────────────────────────────────
+# -- Exact statevector executor ------------------------------------------------
 
 class StatevectorExecutor:
     """
@@ -393,7 +393,7 @@ class StatevectorExecutor:
 
         return x_raw, record
 
-    # ── Internals ─────────────────────────────────────────────────────────────
+    # -- Internals -------------------------------------------------------------
 
     @staticmethod
     def _mask(
@@ -420,7 +420,7 @@ class StatevectorExecutor:
         return amplitudes, prob
 
 
-# ── Shared helpers, reused by every executor ──────────────────────────────────
+# -- Shared helpers, reused by every executor ----------------------------------
 
 def _project(amplitudes: np.ndarray, component: str) -> np.ndarray:
     """Take the algorithm-specified component of the accepted amplitudes."""
@@ -471,7 +471,7 @@ def _dump_amplitudes(
         )
 
 
-# ── Default executor, with scoped override ────────────────────────────────────
+# -- Default executor, with scoped override ------------------------------------
 
 _DEFAULT: Executor = StatevectorExecutor()
 
@@ -534,7 +534,7 @@ def execution_context(executor: Executor):
         set_default_executor(previous)
 
 
-# ── Specification builders for the solvers in this project ────────────────────
+# -- Specification builders for the solvers in this project --------------------
 
 def hhl_spec(circuit: Any, num_qubits: int, label: str = "HHL") -> PostSelectSpec:
     """

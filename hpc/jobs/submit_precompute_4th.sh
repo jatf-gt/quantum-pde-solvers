@@ -168,7 +168,7 @@ echo "  N_VALUES  : ${N_VALUES:-<not set, per-dimension default>}"
 echo "  MAX_DEGREE: ${MAX_DEGREE:-<not set: uncapped, tag d-1>}"
 echo "============================================================"
 
-# ── Repository root resolution ───────────────────────────────
+# -- Repository root resolution -------------------------------
 # PBS copies this script to a spool directory before executing it, so $0 and
 # BASH_SOURCE do NOT point at the original file. PBS_O_WORKDIR -- the directory
 # qsub was invoked from -- is the only reliable anchor.
@@ -183,7 +183,7 @@ if [ ! -f "${REPO_ROOT}/pyproject.toml" ]; then
 fi
 cd "${REPO_ROOT}" || { echo "ERROR: cannot cd to ${REPO_ROOT}"; exit 1; }
 
-# ── Exit verdict ─────────────────────────────────────────────────────────────
+# -- Exit verdict -------------------------------------------------------------
 # Every early exit in this job -- a dirty tree caught by _preflight.sh, a
 # degree-tag mismatch caught by the cache-key guard -- prints its reason to
 # STDOUT and returns non-zero, so the PBS .err file stays empty and the job

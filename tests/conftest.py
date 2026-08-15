@@ -40,7 +40,7 @@ from problems.poisson_line_3d import PoissonLine3D
 from solvers.quantum.vqls_1d import VQLSConfig1D
 
 
-# ── 1D Poisson fixtures ───────────────────────────────────────────────────────
+# -- 1D Poisson fixtures -------------------------------------------------------
 
 @pytest.fixture(scope="module")
 def cfg_1d_N4_fS():
@@ -84,7 +84,7 @@ def problem_1d_N4_nonhom(cfg_1d_N4_nonhom):
     return PoissonProblem1D(cfg_1d_N4_nonhom)
 
 
-# ── Line-decomposed 2D/3D manufactured solutions ──────────────────────────────
+# -- Line-decomposed 2D/3D manufactured solutions ------------------------------
 
 def build_square_2d(N: int) -> tuple[PoissonLine2D, np.ndarray]:
     """
@@ -202,7 +202,7 @@ def periodic_3d_N8():
     return build_periodic_3d(8)
 
 
-# ── VQLS config fixture ───────────────────────────────────────────────────────
+# -- VQLS config fixture -------------------------------------------------------
 
 @pytest.fixture(scope="module")
 def vqls_cfg_fast():
@@ -224,7 +224,7 @@ def vqls_cfg_fast():
     )
 
 
-# ── HET fixtures ──────────────────────────────────────────────────────────────
+# -- HET fixtures --------------------------------------------------------------
 
 @pytest.fixture(scope="module")
 def het_cfg_N4_linear_hom():
@@ -267,7 +267,7 @@ def het_physical_problem_N4(het_physical_cfg_N4):
     return HETPhysicalProblem1D(het_physical_cfg_N4)
 
 
-# ── Shared error metric ───────────────────────────────────────────────────────
+# -- Shared error metric -------------------------------------------------------
 
 def rel_err(u: np.ndarray, ref: np.ndarray) -> float:
     """
@@ -298,7 +298,7 @@ def rel_err(u: np.ndarray, ref: np.ndarray) -> float:
     return float(np.max(np.abs((u - ref)[mask]) / np.abs(ref[mask])))
 
 
-# ── Shared tolerance constants ────────────────────────────────────────────────
+# -- Shared tolerance constants ------------------------------------------------
 
 # These are loose — tests check correctness, not publication accuracy.
 THOMAS_RESIDUAL_TOL  = 1e-10   # Thomas should be near machine precision

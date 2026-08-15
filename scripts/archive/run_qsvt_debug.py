@@ -44,7 +44,7 @@ RESULTS_DIR = Path("results/qsvt_debug")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# ── Utility ───────────────────────────────────────────────────────────────────
+# -- Utility -------------------------------------------------------------------
 
 def _rel_err_pct(u: np.ndarray, ref: np.ndarray) -> np.ndarray:
     """Pointwise relative error in percent, NaN where |ref| < 1% of max."""
@@ -76,7 +76,7 @@ def _row(label: str, rel: float, res: float, t: float, extra: str = "") -> None:
     )
 
 
-# ── Section 1: Generic 1-D Poisson ────────────────────────────────────────────
+# -- Section 1: Generic 1-D Poisson --------------------------------------------
 
 def run_generic_poisson() -> None:
     """
@@ -139,7 +139,7 @@ def run_generic_poisson() -> None:
         print(f"    Exact  = {np.round(u_exact,     6).tolist()}")
 
 
-# ── Section 2: HET 1-D linear profile ─────────────────────────────────────────
+# -- Section 2: HET 1-D linear profile -----------------------------------------
 
 def run_het_1d() -> None:
     """
@@ -208,7 +208,7 @@ def run_het_1d() -> None:
         print(f"    Thom % = {np.round(err_t, 3).tolist()}")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main() -> None:
     t_start = time.perf_counter()

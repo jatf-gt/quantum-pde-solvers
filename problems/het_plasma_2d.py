@@ -63,7 +63,7 @@ from core.het_config import HETConfig2D
 from problems.poisson_line_2d import PoissonLine2D
 
 
-# ── Boeuf-Garrigues Physical Case ─────────────────────────────────────────────
+# -- Boeuf-Garrigues Physical Case ---------------------------------------------
 
 def build_het_problem(
     cfg: HETConfig2D,
@@ -113,7 +113,7 @@ def build_het_problem(
     )
 
 
-# ── Manufactured Sinusoidal Case ──────────────────────────────────────────────
+# -- Manufactured Sinusoidal Case ----------------------------------------------
 
 def build_het_sinusoidal(
     cfg: HETConfig2D,

@@ -14,11 +14,11 @@ lives here once rather than twice.
 What stays out of this module, deliberately: the result table itself
 (``run_comparison`` in each debug script) is not consolidated, because its
 column set genuinely differs by dimension (2-D reports ``dx``/``dy``
-separately; 3-D reports an anisotropy ratio and physical spacings in mm), and
-forcing one signature onto both would read worse than the two versions it
-replaces. Only the parts that were byte-for-byte identical - the error metric,
-the colour threshold, the cost-weighting table and the "saving versus SOR"
-summary - move here.
+separately; 3-D reports an anisotropy ratio and physical spacings in mm).
+Consolidating these signatures would introduce architectural complexity
+without computational benefit. Only the components that are byte-for-byte
+identical - the error metric, the colour threshold, the cost-weighting
+table and the "saving versus SOR" summary - are centralised here.
 
 References
 ----------
@@ -31,7 +31,7 @@ import numpy as np
 
 from solvers.outer import solve, solve_staged
 
-# ── ANSI console colours ─────────────────────────────────────────────────────
+# -- ANSI console colours -----------------------------------------------------
 
 GREEN  = "\033[92m"
 YELLOW = "\033[93m"
@@ -40,7 +40,7 @@ CYAN   = "\033[96m"
 BOLD   = "\033[1m"
 RESET  = "\033[0m"
 
-# ── Empirical per-strip-solve cost exponents ─────────────────────────────────
+# -- Empirical per-strip-solve cost exponents ---------------------------------
 #
 # t(n) ~ n^alpha, fitted from the N=4 / N=8 statevector timings (HHL 0.267 s ->
 # 1.36 s, VQLS 0.806 -> 1.965, QSVT 0.0259 -> 0.0393). Used to weight coarse-
@@ -51,7 +51,7 @@ ALPHA: dict[str, float] = {
 }
 
 
-# ── Error metric and colour threshold ────────────────────────────────────────
+# -- Error metric and colour threshold ----------------------------------------
 
 def rel_err(u: np.ndarray, ref: np.ndarray) -> float:
     """Maximum absolute error normalised by the reference amplitude, per cent."""
@@ -63,7 +63,7 @@ def colour(pct: float, good: float = 1.0, ok: float = 5.0) -> str:
     return GREEN if pct < good else (YELLOW if pct < ok else RED)
 
 
-# ── Saving versus line-SOR ────────────────────────────────────────────────────
+# -- Saving versus line-SOR ----------------------------------------------------
 
 def savings_summary(rows: list[tuple],
                     header: str = "Saving versus line-SOR "
@@ -102,7 +102,7 @@ def savings_summary(rows: list[tuple],
                   f"solves, {f_cost:5.1f}x lower weighted cost")
 
 
-# ── Inner-solver error tolerance study ────────────────────────────────────────
+# -- Inner-solver error tolerance study ----------------------------------------
 
 def noise_study(prob, tag: str, N: int, tol: float) -> None:
     """
@@ -152,12 +152,12 @@ def noise_study(prob, tag: str, N: int, tol: float) -> None:
         print(f"  {d * 100:>6.1f}% | {ea_s:>11} {a.n_outer:>6} | {eb:>10.3f} "
               f"{b.n_outer:>5} | {amp:>14}")
 
-    print(f"\n  Read this as the quantum error budget: an inner solver whose")
-    print(f"  per-strip error exceeds the value at which SOR diverges cannot be")
-    print(f"  used in the current architecture at this N, at any iteration count.")
+    print(f"\n  Quantum error budget interpretation: an inner solver exhibiting a")
+    print(f"  per-strip error exceeding the SOR divergence threshold is inviable")
+    print(f"  for the current architecture at this N, regardless of iteration count.")
 
 
-# ── Multigrid-then-polish study ───────────────────────────────────────────────
+# -- Multigrid-then-polish study -----------------------------------------------
 
 def polish_study(prob, tag: str, N: int) -> None:
     """
@@ -218,7 +218,7 @@ def polish_study(prob, tag: str, N: int) -> None:
     print(f"  the lever is the inner solver's per-strip error, not the outer loop.")
 
 
-# ── Convergence and cost plot ─────────────────────────────────────────────────
+# -- Convergence and cost plot -------------------------------------------------
 
 def plot_convergence_and_cost(rows: list[tuple], case: str, N: int,
                               out_dir) -> None:

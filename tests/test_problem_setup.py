@@ -18,7 +18,7 @@ from problems.poisson_1d import PoissonProblem1D, build_grid, build_tst_matrix
 from problems.poisson_line_2d import PoissonLine2D
 
 
-# ── SimConfig validation ──────────────────────────────────────────────────────
+# -- SimConfig validation ------------------------------------------------------
 
 class TestSimConfig:
 
@@ -65,7 +65,7 @@ class TestSimConfig2D:
             SimConfig2D(N=4, epsilon=0.01, source_fn="bad")
 
 
-# ── Grid construction ─────────────────────────────────────────────────────────
+# -- Grid construction ---------------------------------------------------------
 
 class TestGrid1D:
 
@@ -95,7 +95,7 @@ class TestGrid1D:
         assert x[-1] == pytest.approx(N * dx)
 
 
-# ── TST matrix structure ──────────────────────────────────────────────────────
+# -- TST matrix structure ------------------------------------------------------
 
 class TestTSTMatrix1D:
 
@@ -123,7 +123,7 @@ class TestTSTMatrix1D:
         assert np.allclose(A[mask == 0], 0.0)
 
 
-# ── PoissonProblem1D ──────────────────────────────────────────────────────────
+# -- PoissonProblem1D ----------------------------------------------------------
 
 class TestPoissonProblem1D:
 
@@ -172,7 +172,7 @@ class TestPoissonProblem1D:
         assert "fS" in s
 
 
-# ── PoissonLine2D strip operator ──────────────────────────────────────────────
+# -- PoissonLine2D strip operator ----------------------------------------------
 
 class TestPoissonLine2D:
     """
@@ -210,7 +210,7 @@ class TestPoissonLine2D:
         assert prob.kappa_row() == pytest.approx(eigs.max() / eigs.min(), rel=1e-12)
 
 
-# ── Source functions and exact solutions ──────────────────────────────────────
+# -- Source functions and exact solutions --------------------------------------
 
 class TestSourceFunctions:
 

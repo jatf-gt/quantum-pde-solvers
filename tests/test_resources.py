@@ -31,7 +31,7 @@ from core.resources import (                                       # noqa: E402
 )
 
 
-# ── Hardware target sanity ────────────────────────────────────────────────────
+# -- Hardware target sanity ----------------------------------------------------
 
 class TestHardwareTargetConstants:
     """
@@ -57,7 +57,7 @@ class TestHardwareTargetConstants:
         assert 1_000 <= HERON_R2_TWO_QUBIT_GATE_BUDGET <= 20_000
 
 
-# ── Transpilation mechanics ───────────────────────────────────────────────────
+# -- Transpilation mechanics ---------------------------------------------------
 
 @pytest.mark.quantum
 class TestTranspileReport:
@@ -86,7 +86,7 @@ class TestTranspileReport:
         assert report.two_qubit_count == 0
 
 
-# ── Block-encoding unit cost ──────────────────────────────────────────────────
+# -- Block-encoding unit cost --------------------------------------------------
 
 @pytest.mark.quantum
 class TestBlockEncodingUnitCost:
@@ -105,7 +105,7 @@ class TestBlockEncodingUnitCost:
         assert costs[0] < costs[-1]
 
 
-# ── The empirical safe-upper-bound property ───────────────────────────────────
+# -- The empirical safe-upper-bound property -----------------------------------
 
 @pytest.mark.quantum
 class TestComposabilityBound:
@@ -144,7 +144,7 @@ class TestComposabilityBound:
         assert overshoot_16 < overshoot_4
 
 
-# ── End-to-end feasibility estimate ───────────────────────────────────────────
+# -- End-to-end feasibility estimate -------------------------------------------
 
 @pytest.mark.quantum
 class TestQSVTResourceEstimate:

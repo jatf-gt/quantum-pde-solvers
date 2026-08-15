@@ -95,7 +95,7 @@ MARKERS = {
 }
 
 
-# ── Utility functions ─────────────────────────────────────────────────────────
+# -- Utility functions ---------------------------------------------------------
 
 def _rel_err_pct(u: np.ndarray, ref: np.ndarray) -> np.ndarray:
     scale = np.max(np.abs(ref))
@@ -308,7 +308,7 @@ def plot_section_1(data: dict, save: bool = True) -> None:
                for all solvers at N=4 and N=8 side by side.
         Right: normalised residual bar chart for all solvers at N=4 and N=8.
     """
-    # ── Figure 1a: solution profiles and error ────────────────────────────────
+    # -- Figure 1a: solution profiles and error --------------------------------
     fig_a, axes_a = plt.subplots(2, 2, figsize=(14, 9))
     fig_a.suptitle(
         "Section 1 — Algorithm Comparison: 1-D Poisson, "
@@ -365,7 +365,7 @@ def plot_section_1(data: dict, save: bool = True) -> None:
     _save_figure(fig_a, "figure_1a_solution_error.pdf", save)
     plt.show()
 
-    # ── Figure 1b: decomposed error and residuals ─────────────────────────────
+    # -- Figure 1b: decomposed error and residuals -----------------------------
     fig_b, axes_b = plt.subplots(1, 2, figsize=(14, 6))
     fig_b.suptitle(
         "Section 1 — Error Decomposition and Residuals\n"
@@ -626,7 +626,7 @@ def plot_section_3(data: dict, save: bool = True) -> None:
     )
     gs = gridspec.GridSpec(2, 3, figure=fig, hspace=0.44, wspace=0.32)
 
-    # ── Row 1: sub-case 3a ────────────────────────────────────────────────────
+    # -- Row 1: sub-case 3a ----------------------------------------------------
     d3a    = data["3a"]
     cfg    = d3a["cfg"]
     x      = d3a["x"]
@@ -690,7 +690,7 @@ def plot_section_3(data: dict, save: bool = True) -> None:
     ax.legend(fontsize=7)
     ax.grid(True, alpha=0.3, which="both")
 
-    # ── Row 2: sub-case 3b ────────────────────────────────────────────────────
+    # -- Row 2: sub-case 3b ----------------------------------------------------
     d3b      = data["3b"]
     cfg_b    = d3b["cfg"]
     x_int    = d3b["x_int"]
@@ -774,7 +774,7 @@ def run_section_4() -> dict:
 
     results = {}
 
-    # ── (a) HET sinusoidal ────────────────────────────────────────────────────
+    # -- (a) HET sinusoidal ----------------------------------------------------
     print("\n  (a) HET sinusoidal: phi = sin(pi*x)*sin(pi*y), N=4")
     print(f"  Note: system residual O(1) for Jacobi iterates. "
           f"Convergence = Jacobi update error.")
@@ -837,7 +837,7 @@ def run_section_4() -> dict:
     results["het_Ey"]       = Ey_h
     results["het_u_thomas"] = u_thomas_h
 
-    # ── (b) Generic 2-D Poisson verification ─────────────────────────────────
+    # -- (b) Generic 2-D Poisson verification ---------------------------------
     print("\n  (b) Generic 2-D Poisson: fS source, N=4 (QSVT verification)")
     print(
         f"\n  {'Solver':<12} {'Iters':>6}  {'Conv':>5}  "

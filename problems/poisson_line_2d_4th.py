@@ -121,7 +121,7 @@ from typing import Optional
 import numpy as np
 
 
-# ── Shared N-dimensional primitives ───────────────────────────────────────────
+# -- Shared N-dimensional primitives -------------------------------------------
 # Used by this module and by problems/poisson_line_3d_4th.py. They are written
 # once, against an arbitrary number of axes, because the alternative is ~150
 # lines of index arithmetic duplicated between the two classes, where a
@@ -355,7 +355,7 @@ def extrapolate_face(f: np.ndarray, axis: int, upper: bool) -> np.ndarray:
     return np.tensordot(_EXTRAP_WEIGHTS, block, axes=([0], [axis]))
 
 
-# ── The 2-D problem ───────────────────────────────────────────────────────────
+# -- The 2-D problem -----------------------------------------------------------
 
 class PoissonLine2D4th:
     """
@@ -492,7 +492,7 @@ class PoissonLine2D4th:
         self._A_int, self._A_bnd = self._build_row_matrices()
         self._rhs = self._build_rhs()
 
-    # ── Boundary source data ──────────────────────────────────────────────────
+    # -- Boundary source data --------------------------------------------------
 
     def _resolve_face(self, supplied, axis: int, upper: bool,
                       size: int) -> np.ndarray:
@@ -519,7 +519,7 @@ class PoissonLine2D4th:
             return np.asarray(extrapolate_face(self.f, axis, upper), dtype=float)
         return np.broadcast_to(np.asarray(supplied, dtype=float), (size,)).copy()
 
-    # ── Operator ──────────────────────────────────────────────────────────────
+    # -- Operator --------------------------------------------------------------
 
     def _build_row_matrices(self) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -695,7 +695,7 @@ class PoissonLine2D4th:
         return (apply_axis_4th(u, 0, self.dx)
                 + apply_axis_4th(u, 1, self.dy))
 
-    # ── Coarsening ────────────────────────────────────────────────────────────
+    # -- Coarsening ------------------------------------------------------------
 
     def coarsen(self) -> Optional["PoissonLine2D4th"]:
         """
@@ -733,7 +733,7 @@ class PoissonLine2D4th:
             _level=self.level + 1,
         )
 
-    # ── Utilities ─────────────────────────────────────────────────────────────
+    # -- Utilities -------------------------------------------------------------
 
     def grid(self) -> tuple[np.ndarray, np.ndarray]:
         """

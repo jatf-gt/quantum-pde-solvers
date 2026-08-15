@@ -124,7 +124,7 @@ import numpy as np
 from solvers.outer import solve, PoissonLine2D
 
 
-# ── Manufactured (exact) reference problem ─────────────────────────────────────
+# -- Manufactured (exact) reference problem -------------------------------------
 
 def analytic_problem(N: int):
     """
@@ -188,7 +188,7 @@ def measure_delta(args) -> float:
     return max(0.0, 1.0 - result.value)
 
 
-# ── Amplification measurement ─────────────────────────────────────────────────
+# -- Amplification measurement -------------------------------------------------
 
 def measure_amplification(N: int, delta: float, scheme: str, max_iter: int = 800):
     """

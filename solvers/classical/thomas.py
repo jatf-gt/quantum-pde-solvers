@@ -19,7 +19,7 @@ from problems.poisson_1d import PoissonProblem1D
 from solvers.quantum.result import SolverResult
 
 
-# ── 1D Benchmark Wrapper ──────────────────────────────────────────────────────
+# -- 1D Benchmark Wrapper ------------------------------------------------------
 
 def thomas_solve(problem: PoissonProblem1D) -> SolverResult:
     """
@@ -52,7 +52,7 @@ def thomas_solve(problem: PoissonProblem1D) -> SolverResult:
     )
 
 
-# ── Core Algorithm ────────────────────────────────────────────────────────────
+# -- Core Algorithm ------------------------------------------------------------
 
 def thomas_solve_system(A: np.ndarray, b: np.ndarray) -> np.ndarray:
     """

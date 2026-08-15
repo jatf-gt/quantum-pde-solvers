@@ -59,7 +59,7 @@ B = "\033[1m"
 X = "\033[0m"
 
 
-# ── Error metrics ─────────────────────────────────────────────────────────────
+# -- Error metrics -------------------------------------------------------------
 
 def _max_rel_err(u: np.ndarray, ref: np.ndarray) -> float:
     mask = np.abs(ref) > 1e-10
@@ -72,7 +72,7 @@ def _colour(err: float) -> str:
     return G if err < 5.0 else (Y if err < 20.0 else R)
 
 
-# ── Problem setup ─────────────────────────────────────────────────────────────
+# -- Problem setup -------------------------------------------------------------
 
 def build_grid_3d(N: int):
     """Interior grid for the unit cube."""
@@ -217,7 +217,7 @@ def _build_rhs_strip(
     return b
 
 
-# ── Outer iteration ───────────────────────────────────────────────────────────
+# -- Outer iteration -----------------------------------------------------------
 
 def jacobi_3d_4th(
     N: int,
@@ -374,7 +374,7 @@ def run_thomas_3d_2nd(
     return phi
 
 
-# ── Plotting ──────────────────────────────────────────────────────────────────
+# -- Plotting ------------------------------------------------------------------
 
 def plot_slices(
     x: np.ndarray,
@@ -446,7 +446,7 @@ def plot_slices(
         print(f"  {G}Plot saved to: {out_path}{X}")
 
 
-# ── Header and table helpers ──────────────────────────────────────────────────
+# -- Header and table helpers --------------------------------------------------
 
 def _header(title: str) -> None:
     print(f"\n{B}{C}{'═'*64}{X}")
@@ -472,7 +472,7 @@ def _table_row(label, phi, u_exact, u_thomas4, n_iters, converged, wall):
           f"time={wall:.2f}s")
 
 
-# ── Compare orders ────────────────────────────────────────────────────────────
+# -- Compare orders ------------------------------------------------------------
 
 def compare_orders(N_values: list[int]) -> None:
     _header("3D: Second-Order vs Fourth-Order Accuracy Comparison")
@@ -506,7 +506,7 @@ def compare_orders(N_values: list[int]) -> None:
     print()
 
 
-# ── Main run ──────────────────────────────────────────────────────────────────
+# -- Main run ------------------------------------------------------------------
 
 def run_single(
     N: int,
@@ -531,7 +531,7 @@ def run_single(
 
     solutions: dict[str, np.ndarray] = {}
 
-    # ── Thomas 4th-order reference ────────────────────────────────────────────
+    # -- Thomas 4th-order reference --------------------------------------------
     print(f"\n  Running Thomas-4th (reference)...")
     t0 = time.perf_counter()
     phi_thomas4, n_it, conv, _ = jacobi_3d_4th(
@@ -542,7 +542,7 @@ def run_single(
     t_thomas4 = time.perf_counter() - t0
     solutions["Thomas-4th"] = phi_thomas4
 
-    # ── Thomas 2nd-order ─────────────────────────────────────────────────────
+    # -- Thomas 2nd-order -----------------------------------------------------
     t0 = time.perf_counter()
     phi_thomas2 = run_thomas_3d_2nd(N, f_vals, dx)
     t_thomas2 = time.perf_counter() - t0
@@ -554,7 +554,7 @@ def run_single(
     _table_row("Thomas-2nd", phi_thomas2, u_ex, phi_thomas4,
                0, True, t_thomas2)
 
-    # ── Quantum solvers ───────────────────────────────────────────────────────
+    # -- Quantum solvers -------------------------------------------------------
     solvers_to_run = (
         ["vqls", "qsvt", "hhl"] if inner == "all"
         else ([inner] if inner not in ("thomas",) else [])
@@ -590,7 +590,7 @@ def run_single(
         plot_slices(x, y, u_ex, solutions, N, out_dir)
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# -- Entry point ---------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(

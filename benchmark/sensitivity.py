@@ -2,7 +2,7 @@
 One-at-a-time (OAT) sensitivity analysis for quantum linear system solvers.
 
 Design rationale
-────────────────
+----------------
 A sensitivity study varies one parameter at a time while holding all others
 at a fixed baseline. This design is chosen over a full factorial sweep for
 two reasons:
@@ -23,7 +23,7 @@ landscape independently; HHL epsilon and Trotter steps are coupled by
 design but treated as a single parameter), so OAT is appropriate.
 
 Scope
-─────
+-----
 Sensitivity analysis is restricted to N ∈ {4, 8} to keep total runtime
 tractable. At N=4, a single QSVT call takes ~0.5s; at N=8, ~220s. A full
 OAT sweep at N=8 with 5 QSVT parameter values therefore takes ~18 minutes,
@@ -31,7 +31,7 @@ which is acceptable for an overnight HPC run but not for an interactive
 session.
 
 Parameter definitions
-─────────────────────
+---------------------
 HHL:
   epsilon: QPE precision. Range [0.1, 0.001]. Coupled to Trotter steps.
   Note: the coupling n_T = ceil(1/epsilon) means this is effectively a
@@ -53,7 +53,7 @@ QSVT:
     Range [0.1, 0.001]. Affects the polynomial degree required.
 
 References
-──────────
+----------
   Saltelli et al. (2008) Global Sensitivity Analysis: The Primer. Wiley.
   Bravo-Prieto et al. (2023) Quantum 7, 1188.
 """
@@ -79,7 +79,7 @@ from benchmark.equal_accuracy import _build_base_result
 log = logging.getLogger(__name__)
 
 
-# ── Baseline parameter definitions ────────────────────────────────────────────
+# -- Baseline parameter definitions --------------------------------------------
 
 HHL_BASELINE: dict = {
     "epsilon": 0.01,
@@ -97,7 +97,7 @@ QSVT_BASELINE: dict = {
     "angle_method": "auto",
 }
 
-# ── Sensitivity parameter grids ───────────────────────────────────────────────
+# -- Sensitivity parameter grids -----------------------------------------------
 
 HHL_SENSITIVITY_GRIDS: dict[str, list] = {
     "epsilon": [0.1, 0.05, 0.01, 0.005, 0.001],
@@ -115,7 +115,7 @@ QSVT_SENSITIVITY_GRIDS: dict[str, list] = {
 }
 
 
-# ── Result dataclass ──────────────────────────────────────────────────────────
+# -- Result dataclass ----------------------------------------------------------
 
 @dataclass
 class SensitivitySweepResult:
@@ -150,7 +150,7 @@ class SensitivitySweepResult:
     total_sweep_time_s: float
 
 
-# ── HHL sensitivity sweep ─────────────────────────────────────────────────────
+# -- HHL sensitivity sweep -----------------------------------------------------
 
 def sensitivity_sweep_hhl(
     A: np.ndarray,
@@ -281,7 +281,7 @@ def sensitivity_sweep_hhl(
     )
 
 
-# ── VQLS sensitivity sweep ────────────────────────────────────────────────────
+# -- VQLS sensitivity sweep ----------------------------------------------------
 
 def sensitivity_sweep_vqls(
     A: np.ndarray,
@@ -312,7 +312,7 @@ def sensitivity_sweep_vqls(
         Parameter to vary: 'n_layers' | 'n_restarts' | 'cobyla_tol'.
 
     Notes on cobyla_tol
-    ───────────────────
+    -------------------
     Reducing cobyla_tol does NOT guarantee a smaller residual. The COBYLA
     optimiser may converge to a local minimum regardless of the tolerance.
     The residual is always measured from the returned solution vector.
@@ -407,7 +407,7 @@ def sensitivity_sweep_vqls(
     )
 
 
-# ── QSVT sensitivity sweep ────────────────────────────────────────────────────
+# -- QSVT sensitivity sweep ----------------------------------------------------
 
 def sensitivity_sweep_qsvt(
     A: np.ndarray,
@@ -438,13 +438,13 @@ def sensitivity_sweep_qsvt(
         Parameter to vary: 'max_degree' | 'epsilon'.
 
     Notes on max_degree
-    ───────────────────
+    -------------------
     The QSVT residual is not monotone in polynomial degree. A higher degree
     does not guarantee a lower residual. The sweep evaluates all grid points
     and records the residual at each.
 
     Notes on epsilon
-    ────────────────
+    ----------------
     The epsilon parameter governs the target approximation error for the
     1/x polynomial. A smaller epsilon requires a higher polynomial degree,
     which increases circuit depth and wall time. The achieved residual may
@@ -554,7 +554,7 @@ def sensitivity_sweep_qsvt(
     )
 
 
-# ── Convenience: run all sensitivity sweeps for a given solver ────────────────
+# -- Convenience: run all sensitivity sweeps for a given solver ----------------
 
 def run_all_sensitivity_sweeps(
     solver: str,
@@ -629,7 +629,7 @@ def run_all_sensitivity_sweeps(
 
     return all_results
 
-# ── Sensitivity in 2-D and 3-D ────────────────────────────────────────────────
+# -- Sensitivity in 2-D and 3-D ------------------------------------------------
 
 # Parameters swept per solver, identically named as in the `solvers/outer/inner.py`
 # registry. The registry rejects an unknown key rather than ignoring it; therefore,

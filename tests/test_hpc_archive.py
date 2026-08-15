@@ -34,7 +34,7 @@ import pytest
 from benchmark import hpc_archive as rio
 
 
-# ── Fixtures ──────────────────────────────────────────────────────────────────
+# -- Fixtures ------------------------------------------------------------------
 
 @pytest.fixture
 def sweep_1d(tmp_path):
@@ -73,7 +73,7 @@ def sweep_3d(tmp_path):
     return tmp_path
 
 
-# ── Import Hygiene ────────────────────────────────────────────────────────────
+# -- Import Hygiene ------------------------------------------------------------
 
 def test_importing_hpc_archive_does_not_pull_matplotlib():
     """
@@ -102,7 +102,7 @@ def test_importing_hpc_plotting_does_not_pull_matplotlib():
     assert out.stdout.strip() == "False"
 
 
-# ── Filename Convention ───────────────────────────────────────────────────────
+# -- Filename Convention -------------------------------------------------------
 
 class TestFilenames:
 
@@ -128,7 +128,7 @@ class TestFilenames:
             rio.solution_filename("c", "HHL", 8, dim=4)
 
 
-# ── Field Aliases ─────────────────────────────────────────────────────────────
+# -- Field Aliases -------------------------------------------------------------
 
 class TestFieldAliases:
 
@@ -178,7 +178,7 @@ class TestRowFields:
         assert rio.row_field({"case": "c"}, "scheme", "n/a") == "n/a"
 
 
-# ── Sweep Archive ─────────────────────────────────────────────────────────────
+# -- Sweep Archive -------------------------------------------------------------
 
 class TestSweepArchive:
 

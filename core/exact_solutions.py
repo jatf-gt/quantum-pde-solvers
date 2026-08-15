@@ -11,7 +11,7 @@ from typing import Callable
 import numpy as np
 
 
-# ── 1D Analytical Solutions ───────────────────────────────────────────────────
+# -- 1D Analytical Solutions ---------------------------------------------------
 
 def u_fS(x: np.ndarray) -> np.ndarray:
     """
@@ -89,7 +89,7 @@ EXACT_SOLUTIONS: dict[str, Callable[[np.ndarray], np.ndarray]] = {
 }
 
 
-# ── HET Analytical Solutions (Homogeneous Boundaries) ─────────────────────────
+# -- HET Analytical Solutions (Homogeneous Boundaries) -------------------------
 
 def het_phi_linear(
     x:     np.ndarray,
@@ -141,7 +141,7 @@ HET_EXACT_SOLUTIONS = {
 }
 
 
-# ── 2D Analytical Solutions ───────────────────────────────────────────────────
+# -- 2D Analytical Solutions ---------------------------------------------------
 
 def phi_2d_sinusoidal(X: np.ndarray, Y: np.ndarray) -> np.ndarray:
     """

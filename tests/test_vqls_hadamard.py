@@ -42,7 +42,7 @@ def _tst_matrix(N: int, main_diag: float, off_diag: float) -> np.ndarray:
     )
 
 
-# ── Exact-mode equivalence: the central claim ─────────────────────────────────
+# -- Exact-mode equivalence: the central claim ---------------------------------
 
 @pytest.mark.quantum
 class TestExactModeMatchesClassicalReference:
@@ -93,7 +93,7 @@ class TestExactModeMatchesClassicalReference:
         assert abs(diag.denominator_imag_residual) < 1e-9
 
 
-# ── The specific bug this module's docstring documents ───────────────────────
+# -- The specific bug this module's docstring documents -----------------------
 
 class TestDenominatorAnsatzMustBeUnconditional:
     """
@@ -172,7 +172,7 @@ class TestDenominatorAnsatzMustBeUnconditional:
         )
 
 
-# ── circuit_count() ────────────────────────────────────────────────────────────
+# -- circuit_count() ------------------------------------------------------------
 
 class TestCircuitCount:
 
@@ -216,7 +216,7 @@ class TestCircuitCount:
         assert calls["n"] == circuit_count(len(pauli_terms))
 
 
-# ── Shot-based evaluation ─────────────────────────────────────────────────────
+# -- Shot-based evaluation -----------------------------------------------------
 
 @pytest.mark.quantum
 class TestShotBasedEvaluation:

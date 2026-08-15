@@ -121,7 +121,7 @@ from typing import Optional
 
 import numpy as np
 
-# ── Cache ─────────────────────────────────────────────────────────────────────
+# -- Cache ---------------------------------------------------------------------
 
 _PHASE_CACHE: dict[tuple, tuple[np.ndarray, int]] = {}
 
@@ -149,7 +149,7 @@ _ENABLE_DISK_WRITE: bool = False
 _DEGREE_SANITY_LIMIT = 15_000
 
 
-# ── Public interface ──────────────────────────────────────────────────────────
+# -- Public interface ----------------------------------------------------------
 
 def compute_inversion_angles(
     kappa      : float,
@@ -254,7 +254,7 @@ def evaluate_inversion_polynomial(angles: np.ndarray, x: np.ndarray) -> np.ndarr
     return out
 
 
-# ── Private: method canonicalisation ──────────────────────────────────────────
+# -- Private: method canonicalisation ------------------------------------------
 
 def _canonicalise_method(method: str) -> str:
     """
@@ -276,7 +276,7 @@ def _canonicalise_method(method: str) -> str:
     )
 
 
-# ── Private: computation ──────────────────────────────────────────────────────
+# -- Private: computation ------------------------------------------------------
 
 def _fit_capped_reduced_coefs(
     kappa: float, epsilon: float, degree: int,
@@ -537,7 +537,7 @@ def _compute(
     return angles, degree
 
 
-# ── Private: disk cache ───────────────────────────────────────────────────────
+# -- Private: disk cache -------------------------------------------------------
 
 def _cache_key_to_filename(key: tuple) -> Path:
     kappa, epsilon, method, max_deg = key
@@ -572,7 +572,7 @@ def _save_disk(key: tuple, result: tuple[np.ndarray, int]) -> None:
     )
 
 
-# ── Private: circuit-convention unitary (verification only) ───────────────────
+# -- Private: circuit-convention unitary (verification only) -------------------
 
 def _qsp_unitary(angles: np.ndarray, x: float) -> np.ndarray:
     """2x2 QSP unitary matching Qiskit's Rz convention (verification helper)."""

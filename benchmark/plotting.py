@@ -7,7 +7,7 @@ for saving. This separation ensures figures can be previewed interactively
 or saved to any format without modifying the plotting code.
 
 Figure catalogue
-────────────────
+----------------
   solution_profiles_1d       Solution and pointwise error for one (N, case).
   convergence_loglog         Max relative error vs N (log-log).
   residual_vs_N              Relative residual vs N (log-log).
@@ -20,7 +20,7 @@ Figure catalogue
   hardware_vs_simulation     Real hardware vs statevector simulation comparison.
 
 Style conventions
-─────────────────
+-----------------
   Solver colours:  Thomas = black, HHL = royalblue,
                    VQLS = darkorange, QSVT = crimson
   Line styles:     2nd order = solid, 4th order = dashed
@@ -29,7 +29,7 @@ Style conventions
   Font size:       axis labels = 11, tick labels = 9, legend = 9
 
 References
-──────────
+----------
   Ghafourpour & Laizet (2025) Phys. Rev. Applied 24, 024032.
   Bravo-Prieto et al. (2023) Quantum 7, 1188.
 """
@@ -43,7 +43,7 @@ import numpy as np
 # Matplotlib is imported lazily inside each function to allow the module to be
 # imported in headless environments without a display backend.
 
-# ── Style constants ───────────────────────────────────────────────────────────
+# -- Style constants -----------------------------------------------------------
 
 SOLVER_COLOURS: dict[str, str] = {
     "thomas": "black",
@@ -86,7 +86,7 @@ def _apply_style(ax, xlabel: str, ylabel: str, title: str = "") -> None:
     ax.legend(fontsize=_LEGEND_FS, framealpha=0.9)
 
 
-# ── Figure 1: Solution profiles ───────────────────────────────────────────────
+# -- Figure 1: Solution profiles -----------------------------------------------
 
 def solution_profiles_1d(
     x: np.ndarray,
@@ -178,7 +178,7 @@ def solution_profiles_1d(
     return fig
 
 
-# ── Figure 2: Convergence log-log ─────────────────────────────────────────────
+# -- Figure 2: Convergence log-log ---------------------------------------------
 
 def convergence_loglog(
     results,
@@ -268,7 +268,7 @@ def convergence_loglog(
     return fig
 
 
-# ── Figure 3: Residual vs N ───────────────────────────────────────────────────
+# -- Figure 3: Residual vs N ---------------------------------------------------
 
 def residual_vs_N(
     results,
@@ -300,7 +300,7 @@ def residual_vs_N(
     )
 
 
-# ── Figure 4: Wall time vs N ──────────────────────────────────────────────────
+# -- Figure 4: Wall time vs N --------------------------------------------------
 
 def walltime_vs_N(
     results,
@@ -358,7 +358,7 @@ def walltime_vs_N(
     return fig
 
 
-# ── Figure 5: Circuit depth vs N ─────────────────────────────────────────────
+# -- Figure 5: Circuit depth vs N ---------------------------------------------
 
 def circuit_depth_vs_N(
     results,
@@ -472,7 +472,7 @@ def circuit_depth_vs_N(
     return fig
 
 
-# ── Figure 6: Sensitivity curves ─────────────────────────────────────────────
+# -- Figure 6: Sensitivity curves ---------------------------------------------
 
 def sensitivity_curves(
     sweep_results,
@@ -571,7 +571,7 @@ def sensitivity_curves(
     return fig
 
 
-# ── Figure 7: Equal-accuracy bar chart ───────────────────────────────────────
+# -- Figure 7: Equal-accuracy bar chart ---------------------------------------
 
 def equal_accuracy_bar(
     ea_results,
@@ -649,7 +649,7 @@ def equal_accuracy_bar(
     return fig
 
 
-# ── Figure 8: Error decomposition ────────────────────────────────────────────
+# -- Figure 8: Error decomposition --------------------------------------------
 
 def error_decomposition(
     results,
@@ -730,7 +730,7 @@ def error_decomposition(
     return fig
 
 
-# ── Figure 9: Order comparison ────────────────────────────────────────────────
+# -- Figure 9: Order comparison ------------------------------------------------
 
 def order_comparison(
     results_2nd,
@@ -818,7 +818,7 @@ def order_comparison(
     return fig
 
 
-# ── Figure 10: Hardware vs simulation ────────────────────────────────────────
+# -- Figure 10: Hardware vs simulation ----------------------------------------
 
 def hardware_vs_simulation(
     sim_results,
@@ -892,7 +892,7 @@ def hardware_vs_simulation(
     return fig
 
 
-# ── Batch save utility ────────────────────────────────────────────────────────
+# -- Batch save utility --------------------------------------------------------
 
 def save_figure(fig, path, dpi: int = 300, formats: tuple = ("pdf", "png")) -> None:
     """

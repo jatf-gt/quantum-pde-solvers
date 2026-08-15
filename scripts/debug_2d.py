@@ -124,7 +124,7 @@ def _fmt_pct(e: float, good: float = 1.0, ok: float = 5.0) -> str:
     return f"{colour(e, good, ok)}{e:>9.3f}%{RESET}"
 
 
-# ── Scheme comparison ─────────────────────────────────────────────────────────
+# -- Scheme comparison ---------------------------------------------------------
 
 def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
                    tol: float, verbose: bool, criterion: str | None = None,
@@ -174,7 +174,7 @@ def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
             if verbose:
                 print(f"    {inner}/{scheme}: {res}")
 
-    # ── table ─────────────────────────────────────────────────────────────────
+    # -- table -----------------------------------------------------------------
     print(f"\n  {'inner':<9} {'scheme':<13} {'outer':>6} {'solves':>8} "
           f"{'w.cost':>8} {'rho':>6} {'vs exact%':>10} {'vs Thomas%':>11} "
           f"{'time s':>8} {'stop':>16}")
@@ -191,7 +191,7 @@ def run_comparison(case: str, N: int, inners: list[str], schemes: list[str],
     return rows
 
 
-# ── Hierarchy inspection ──────────────────────────────────────────────────────
+# -- Hierarchy inspection ------------------------------------------------------
 
 def show_hierarchy(case: str, N: int):
     prob, _, tag = build_case(case, N)
@@ -211,7 +211,7 @@ def show_hierarchy(case: str, N: int):
     print(f"  keep Nx/Ny close to Lx/Ly.")
 
 
-# ── Order-of-accuracy study ────────────────────────────────────────────────────
+# -- Order-of-accuracy study ----------------------------------------------------
 
 def run_convergence_study(case: str, tol: float) -> None:
     """
@@ -256,7 +256,7 @@ def run_convergence_study(case: str, tol: float) -> None:
     print(f"  refinement - that flatness is the entire point of multigrid.")
 
 
-# ── Field plotting (2-D specific) ─────────────────────────────────────────────
+# -- Field plotting (2-D specific) ---------------------------------------------
 
 def plot_fields(rows, prob, u_exact, case: str, N: int) -> None:
     """Solution and pointwise-error fields, one column per (inner, scheme)."""
@@ -310,7 +310,7 @@ def plot_fields(rows, prob, u_exact, case: str, N: int) -> None:
     print(f"  {GREEN}saved {out}{RESET}")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# -- Main ----------------------------------------------------------------------
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,

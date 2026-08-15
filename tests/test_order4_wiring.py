@@ -55,7 +55,7 @@ def _quiet_runner_logs(monkeypatch):
         monkeypatch.setattr(module, "log", null, raising=False)
 
 
-# ── Inner-solver dispatch ─────────────────────────────────────────────────────
+# -- Inner-solver dispatch -----------------------------------------------------
 
 class TestInnerSolverDispatch:
     """
@@ -117,7 +117,7 @@ class TestInnerOptionsReachTheFourthOrderSolvers:
         assert cfg.for_solver("hhl_4th")["epsilon"] == 0.123
 
 
-# ── Problem conversion ────────────────────────────────────────────────────────
+# -- Problem conversion --------------------------------------------------------
 
 class TestProblemConversion:
 
@@ -178,7 +178,7 @@ class TestProblemConversion:
         assert e4 < e2 / 10.0
 
 
-# ── Face source data from the case registry ───────────────────────────────────
+# -- Face source data from the case registry -----------------------------------
 
 class TestFaceSources:
     """
@@ -226,7 +226,7 @@ class TestFaceSources:
         assert lo[0].shape == (8, 8)
 
 
-# ── The retired path is gone ──────────────────────────────────────────────────
+# -- The retired path is gone --------------------------------------------------
 
 class TestRetiredPathIsGone:
     """

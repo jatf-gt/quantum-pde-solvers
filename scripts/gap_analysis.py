@@ -59,7 +59,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from benchmark.hpc_archive import SweepArchive  # noqa: E402
 
-# ── Policy ────────────────────────────────────────────────────────────────────
+# -- Policy --------------------------------------------------------------------
 
 RUNNER_FOR_DIM: dict[int, str] = {
     1: "hpc/runners/run_1d.py",
@@ -188,7 +188,7 @@ exactly what ``err_vs_thomas`` isolates.
 """
 
 
-# ── Expected grid ─────────────────────────────────────────────────────────────
+# -- Expected grid -------------------------------------------------------------
 
 def discover_case_ids(runner_path: Path) -> list[str]:
     """
@@ -251,7 +251,7 @@ def merge_case_ids(discovered: Iterable[str], observed: Iterable[str]) -> list[s
     )
 
 
-# ── Classification ────────────────────────────────────────────────────────────
+# -- Classification ------------------------------------------------------------
 
 def classify_row(row: dict, strict: bool = False, dim: int = 1
                  ) -> tuple[list[str], list[str]]:
@@ -454,7 +454,7 @@ def _orphan_archives(archive: SweepArchive,
     return {"stale": stale, "unexplained": unexplained}
 
 
-# ── Reporting ─────────────────────────────────────────────────────────────────
+# -- Reporting -----------------------------------------------------------------
 
 def _print_report(manifest: dict, show_keep: int) -> None:
     """Prints the human-readable summary."""
