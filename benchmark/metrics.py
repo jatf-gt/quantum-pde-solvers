@@ -450,7 +450,7 @@ def extract_circuit_metrics(
 
     t0 = time.perf_counter()
 
-    # Raw depth (no transpilation, just count gates)
+    # Raw depth (untranspiled gate count)
     depth_raw = circuit.depth()
 
     # Optimisation level 0: no gate cancellation

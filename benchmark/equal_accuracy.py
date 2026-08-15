@@ -346,10 +346,9 @@ def sweep_hhl_equal_accuracy(
     EqualAccuracyResult
         Sweep result with best BenchmarkResult and all intermediate results.
     """
-    # `hhl_solve_system` takes epsilon positionally and returns the plain tuple
-    # (u, raw_state, prop_const); there is no HHLConfig1D in this codebase. An
-    # earlier draft of this module assumed a config object and an attribute-bearing
-    # result, matching neither, so the HHL half of the protocol raised on import.
+    # hhl_solve_system accepts epsilon positionally and returns the tuple
+    # (u, raw_state, prop_const). A dedicated HHLConfig1D class is absent from this
+    # architecture, necessitating direct parameter passing to avoid interface mismatches.
     from solvers.quantum.hhl_1d import hhl_solve_system
 
     results: list[BenchmarkResult] = []
@@ -881,11 +880,11 @@ def sweep_outer_equal_accuracy(
     # N=8 on the sinusoid, QSVT returned 6.2852e-09 at max_degree 500, 200, 100
     # AND 50, while the wall time fell from 154.6 s to 15.7 s.
     #
-    # Fixing the outer tolerance at r_target instead turns the question into the
-    # one worth asking: given that every configuration reaches the same accuracy,
-    # what does each COST to get there -- and at which point does the inner solver
-    # become too imprecise for the outer iteration to reach the target at all,
-    # which then shows up as a non-converged row rather than a larger residual.
+    # Fixing the outer tolerance at r_target formalises the comparative analysis:
+    # ensuring uniform terminal accuracy permits direct evaluation of computational
+    # cost. It furthermore identifies the threshold at which inner-solver imprecision
+    # stalls outer convergence entirely, manifesting as a non-converged state
+    # rather than an inflated residual.
     scheme_options.setdefault("tol", r_target)
 
     results: list[BenchmarkResult] = []

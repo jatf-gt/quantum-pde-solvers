@@ -4,10 +4,10 @@ write results and the post-processing that reads them.
 
 Relationship to ``benchmark/results_io.py``
 -------------------------------------------
-The package now carries **two** archive abstractions, and they are not
-interchangeable. Both expose a class called ``SweepArchive``; they are told apart
-by module, and the wrong one will fail loudly on its constructor rather than
-silently mis-read a sweep.
+The package currently maintains **two** distinct and non-interchangeable archive
+abstractions. Both expose a class named ``SweepArchive``, distinguished strictly
+by module namespace. Initialising the incorrect class against an archive will
+deterministically raise an exception rather than silently misinterpreting data.
 
 ===============  =========================================================
 This module      The *legacy* schema: the existing per-dimension sweep
@@ -60,12 +60,13 @@ which is what makes a silently empty figure set impossible.
 
 Scope
 -----
-Reader side only, for now. The functions here are written so that the HPC
-runners can adopt them for writing — `solution_filename` is the same convention
-they build by hand — but they are deliberately not yet wired into those drivers,
-because 2D and 3D sweeps are in flight on the cluster and changing what they
-write would strand the results already produced. That migration belongs with the
-move of the runners into `hpc/`.
+Currently implemented for reader functionality exclusively. These methods are
+designed for eventual adoption by the HPC runners for data persistence
+(`solution_filename` formalises the existing manual convention). Integration
+into the write-path is deferred because 2-D and 3-D sweeps are actively
+executing on the cluster; altering output schema mid-flight would orphan
+existing results. Full integration is scheduled alongside the architectural
+migration of the runners into the `hpc/` module.
 
 This module must import no plotting stack. `benchmark/hpc_plotting.py` defers its
 Matplotlib import specifically so that the Agg backend is not forced on a process
@@ -537,10 +538,10 @@ def solver_sort_key(s: str) -> tuple:
 
 # -- Writing -------------------------------------------------------------------
 #
-# Provided so the HPC runners can adopt a single declaration of the schema they
-# currently each construct by hand. Not yet wired into those drivers: 2D and 3D
-# sweeps are in flight, and changing what they write would strand results
-# already produced. See the module docstring.
+# Provided to allow HPC runners to adopt a unified schema declaration, replacing
+# existing manual constructions. Integration into the drivers is deferred to
+# preserve schema compatibility with actively executing 2-D and 3-D sweeps.
+# Refer to the module docstring for architectural details.
 
 def save_summary(results_dir: Path, rows: list[dict]) -> None:
     """

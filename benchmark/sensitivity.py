@@ -194,10 +194,9 @@ def sensitivity_sweep_hhl(
     ValueError
         If param_name is not a recognised HHL sensitivity parameter.
     """
-    # `hhl_solve_system` takes epsilon positionally and returns the plain tuple
-    # (u, raw_state, prop_const); there is no HHLConfig1D in this codebase. An
-    # earlier draft assumed a config object and an attribute-bearing result,
-    # matching neither, so this sweep raised on import.
+    # hhl_solve_system accepts epsilon positionally and returns the tuple
+    # (u, raw_state, prop_const). A dedicated HHLConfig1D class is absent from this
+    # architecture, necessitating direct parameter passing to avoid interface mismatches.
     from solvers.quantum.hhl_1d import hhl_solve_system
 
     if param_name not in HHL_SENSITIVITY_GRIDS:

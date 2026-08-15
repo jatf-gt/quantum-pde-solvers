@@ -305,10 +305,10 @@ def estimate_hardware_feasibility(
     elif solver == "vqls":
         n_qubits_total = n_qubits_log
         # The hardware-efficient ansatz carries one entangling gate per adjacent
-        # qubit pair per layer, so the two-qubit count is (n-1) per layer and the
-        # depth is dominated by the same structure. Defaulting n_layers to 2 when
-        # the caller knows the real value understates the circuit by up to 7x at
-        # the depths this sweep actually runs.
+        # qubit pair per layer; consequently, the two-qubit count is (n-1) per layer
+        # and circuit depth scales proportionally. Defaulting n_layers to 2 when
+        # the true value is known significantly understates the circuit geometry
+        # at the depths executed during this sweep.
         n_layers = 2 if n_layers is None else int(n_layers)
         depth_est = n_layers * n_qubits_log * 3   # ~3 gates per qubit per layer
         two_qubit_est = n_layers * max(0, n_qubits_log - 1)

@@ -61,8 +61,8 @@ from benchmark.hpc_archive import SOLVER_ORDER, SweepArchive, field
 # Bound by `_matplotlib()` on first use rather than imported here. Two reasons,
 # both of which have bitten this code before: the Agg backend must be selected
 # before `pyplot` is first imported, and forcing Agg at import time would break
-# `benchmark/plotting.py`, whose laptop-scale figures call `plt.show()` and need
-# an interactive backend. Importing this module to reach a sweep's contents — to
+# `benchmark/plotting.py`, which produces figures requiring an interactive
+# backend for `plt.show()`. Importing this module to reach a sweep's contents — to
 # list them, say — therefore requires no plotting stack at all, and
 # `benchmark/results_io.py` imports none either.
 plt = None
@@ -128,8 +128,9 @@ AXIS_LABELS = {
 }
 
 # The three orthogonal cutplanes through a 3-D field, each fixing one axis at
-# its midpoint. Together they are the primary diagnostic: a field that looks
-# right in all three is very unlikely to be wrong.
+# its midpoint. Together they serve as the primary diagnostic: a field exhibiting
+# expected structural properties across all three planes provides high confidence
+# in solution correctness.
 #   (name, fixed axis, the two varying axes, whether this is the HET spoke view)
 _PLANES = [
     ("axial-radial",     2, (0, 1), False),   # fix s (or z2), show (axis0, axis1)
@@ -875,9 +876,9 @@ def plot_slices(sweep, case: str, N: int, rows: list[dict], plt, TwoSlopeNorm) -
     out_paths = []
     for plane_name, fixed_ax, (a0, a1), is_spoke in _PLANES:
         idx = shape[fixed_ax] // 2
-        # Coordinate grid for this plane: take the two varying axes' meshgrid
-        # at the fixed slice (coords[a] is already a full 3-D meshgrid, so
-        # slicing it the same way as the field gives the right 2-D grid).
+        # Extract coordinate grid for this plane: slice the two varying axes'
+        # meshgrid at the fixed index. (Since coords[a] is a full 3-D meshgrid,
+        # identically slicing it yields the corresponding 2-D coordinates).
         cx = _slice_at(coords[a0], fixed_ax, idx)
         cy = _slice_at(coords[a1], fixed_ax, idx)
         ref_slice = _slice_at(ref, fixed_ax, idx)
@@ -1175,10 +1176,10 @@ def run_1d(
     _warn_missing(sweep, rows)
     print("Generating plots...")
 
-    # Scoped rather than applied globally. `plt.rcParams.update` leaves the
-    # publication style in force for the rest of the process, so a caller that
-    # ran run_1d and then run_2d would get serif, 300-dpi 2-D figures, which the
-    # 2-D family is explicitly documented not to use.
+    # Applied via context manager rather than globally mutating rcParams. Global
+    # application would leak publication styling into subsequent operations; an
+    # execution of run_1d followed by run_2d would incorrectly yield serif, 300-dpi
+    # 2-D figures, contradicting the documented style for the 2-D family.
     with plt.rc_context(RC_PARAMS_1D):
         plot_solution_profiles(sweep, grouped, save_pdf, N_plot=N_profile)
         plot_error_vs_N(grouped, sweep, save_pdf)

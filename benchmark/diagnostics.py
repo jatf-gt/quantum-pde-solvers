@@ -214,8 +214,8 @@ def polish_study(prob, tag: str, N: int) -> None:
               f"| {fmt(ps):>10} {fmt(pj):>11}")
 
     print(f"\n  A stationary finish reproduces the stationary error, not the")
-    print(f"  multigrid one. If you need more accuracy than multigrid delivers,")
-    print(f"  the lever is the inner solver's per-strip error, not the outer loop.")
+    print(f"  multigrid error. To attain accuracy beyond multigrid limits, reduce")
+    print(f"  the inner solver's per-strip error rather than iterating the outer loop.")
 
 
 # -- Convergence and cost plot -------------------------------------------------
