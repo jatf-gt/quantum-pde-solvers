@@ -166,6 +166,72 @@ class TestAmplificationMeasurement:
         assert sor_spread > fmg_spread
 
 
+class TestDivergenceDetection:
+    """
+    Regression guard for the bug found when a real hardware-measured delta
+    (~0.165, an order of magnitude larger than the delta=0.005 this
+    module's other tests use) was first tried against
+    scripts/delta_amplification_hardware.py: at N=32, delta=0.165, FMG's
+    residual grew monotonically over the run (confirmed: 38 -> 65 -> ... ->
+    631 over 10 iterations) while solvers.outer.core.StagnationMonitor
+    still classified it as "stagnated" -- its median-window test detects a
+    *lack* of improvement, not active divergence, and a smooth exponential
+    blow-up does not trip it. Reporting err/delta from that run as
+    "amplification" presented a snapshot of an undefined process as a
+    physical quantity. This class pins the fix: a late/mid residual-history
+    ratio > 1.5 is treated as divergence, with amplification omitted.
+    """
+
+    def test_small_delta_is_not_flagged_as_diverged(self):
+        prob, _u = analytic_problem(16)
+        res = solve(prob, inner="perturbed", scheme="fmg",
+                    inner_options={"delta": 0.005}, tol=1e-10, max_cycles=50)
+        h = res.residual_history
+        ratio = h[-1] / h[len(h) // 2]
+        assert ratio < 1.5
+
+    def test_large_delta_fmg_diverges_at_N32(self):
+        # The exact case that surfaced the bug: confirmed directly that
+        # this specific (N, delta, scheme) combination diverges.
+        prob, _u = analytic_problem(32)
+        res = solve(prob, inner="perturbed", scheme="fmg",
+                    inner_options={"delta": 0.165}, tol=1e-10, max_cycles=50)
+        h = res.residual_history
+        ratio = h[-1] / h[len(h) // 2]
+        assert ratio > 1.5, (
+            "expected FMG to diverge at N=32, delta=0.165 (the case that "
+            "originally surfaced the need for divergence detection); if "
+            "this no longer diverges, the fix's premise should be re-checked"
+        )
+
+    def test_large_delta_sor_diverges_broadly(self):
+        # SOR has a lower stability threshold than FMG (per
+        # solvers/outer/multigrid.py's own docstring); confirm it diverges
+        # at delta=0.165 even at the smallest N tested here.
+        prob, _u = analytic_problem(8)
+        res = solve(prob, inner="perturbed", scheme="sor",
+                    inner_options={"delta": 0.165}, tol=1e-10, max_iter=800)
+        h = res.residual_history
+        ratio = h[-1] / h[len(h) // 2]
+        assert ratio > 1.5
+
+    def test_diverged_run_residual_is_not_merely_large_but_growing(self):
+        # Distinguishes "large but stable" from "diverging": a stable run
+        # at a bad delta can have a large absolute residual without its
+        # ratio test firing. Confirms the two are genuinely different
+        # phenomena, not the same thing at different scales.
+        prob, _u = analytic_problem(32)
+        stable = solve(prob, inner="perturbed", scheme="fmg",
+                       inner_options={"delta": 0.05}, tol=1e-10, max_cycles=50)
+        diverging = solve(prob, inner="perturbed", scheme="fmg",
+                          inner_options={"delta": 0.165}, tol=1e-10, max_cycles=50)
+        h_stable, h_diverging = stable.residual_history, diverging.residual_history
+        stable_ratio = h_stable[-1] / h_stable[len(h_stable) // 2]
+        diverging_ratio = h_diverging[-1] / h_diverging[len(h_diverging) // 2]
+        assert stable_ratio < 1.5
+        assert diverging_ratio > 1.5
+
+
 # ── Row-operator conditioning claim ───────────────────────────────────────────
 
 class TestRowOperatorConditioning:

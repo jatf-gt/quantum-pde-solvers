@@ -31,15 +31,33 @@ error under a real perturbation, compared against an exact reference),
 which is unambiguous, not the theoretical 1/(1-rho) prediction, which is
 reported alongside only as a rough consistency check.
 
-Directly measured on the unit square, delta=0.005, N in {8,16,32}:
+A second, more serious issue surfaced the same way: at delta large enough
+(confirmed directly at delta ~ 0.165, this project's own unmitigated
+hardware measurement), the outer iteration does not converge to a
+*stable, merely large* fixed point -- it diverges outright. Confirmed by
+inspecting residual_history directly: at N=32, delta=0.165, FMG's residual
+grew monotonically and explosively (38 -> 65 -> 93 -> ... -> 631 over 10
+iterations) while StagnationMonitor still classified the run as
+"stagnated", since its median-window test is built to detect a lack of
+improvement, not active blow-up. Reporting err/delta from a diverged run
+as "amplification" would present a snapshot of an undefined process as if
+it were a physical quantity. measure_amplification therefore checks for
+this directly (residual growing over the run's second half) and reports
+diverged runs as DIVERGED, with amplification omitted (NaN) rather than a
+large, meaningless number.
+
+At small delta (0.005, well inside both schemes' stability region),
+directly measured on the unit square, N in {8,16,32}:
 
     N=  8: FMG amp= 1.75   SOR amp=  5.22
     N= 16: FMG amp= 2.08   SOR amp= 11.04
     N= 32: FMG amp= 2.02   SOR amp= 21.29
 
-FMG's amplification is flat; SOR's roughly doubles when N doubles. This is
-exactly the qualitative claim, now with numbers from this specific solver
-stack rather than only the docstring's prose.
+FMG's amplification is flat; SOR's roughly doubles when N doubles -- the
+qualitative claim holds cleanly here. It does NOT hold, and should not be
+expected to, once delta pushes the iteration past its stability threshold;
+that is a different, more severe regime with its own (DIVERGED) label, not
+a continuation of the same amplification trend to larger numbers.
 
 Discretisation error reference
 -----------------------------------
@@ -75,19 +93,16 @@ real backend run to answer honestly rather than assumed.
 
 A caveat for a future, much smaller delta
 ----------------------------------------------
-The FMG_amp/SOR_amp columns divide the error against the analytic
-reference by delta -- which mixes in discretisation error, not just the
-amplified quantum error. At today's delta~0.18 this is negligible
-(discretisation error at N=8 is ~1e-2, delta is ~0.18: a ~5% contribution
-to the amplification figure). It stops being negligible once delta gets
-small relative to discretisation error, which happens either at small N
-or after substantial error mitigation brings delta down: tested directly
-at N=16, delta=0.001, where discretisation_error/delta = 2.85 was
-comparable to the true amplification (~2.1x, confirmed by comparing
-against a numerical delta=0 reference instead) -- the naive vs-analytic
-ratio read 3.99x, a real but misleading contamination, not a genuine
-amplification effect. If a future run reports a small delta, treat the
-smallest-N rows of the amp columns with this in mind.
+Even within the stable (non-diverged) regime, the FMG_amp/SOR_amp columns
+divide the error against the analytic reference by delta -- which mixes in
+discretisation error, not just the amplified quantum error. This is
+negligible once delta is comfortably larger than discretisation error, but
+was confirmed directly to matter at N=16, delta=0.001, where
+discretisation_error/delta = 2.85 was comparable to the true amplification
+(~2.1x, confirmed by comparing against a numerical delta=0 reference
+instead) -- the naive vs-analytic ratio read 3.99x, a real but misleading
+contamination. If a future, well-mitigated run reports a small delta,
+treat the smallest-N rows of the amp columns with this in mind.
 
 Usage
 -----
@@ -178,9 +193,35 @@ def measure_delta(args) -> float:
 def measure_amplification(N: int, delta: float, scheme: str, max_iter: int = 800):
     """
     Solution error under a real delta-sized perturbation, compared against
-    the analytic reference -- the direct, unambiguous measurement this
-    script's headline numbers are built from (see module docstring on why
-    this is preferred over the 1/(1-rho) prediction).
+    the analytic reference, WITH explicit divergence detection.
+
+    Why this check exists: an earlier version of this function reported the
+    error at whatever point the outer iteration stopped, unconditionally,
+    labelling err/delta as "amplification" regardless of what the iteration
+    was actually doing. At delta ~ 0.16 (this project's own unmitigated
+    hardware measurement), that number is not a stable amplified fixed
+    point -- it is a snapshot of active divergence. Confirmed directly at
+    N=32: residual_history grew monotonically and explosively (38 -> 65 ->
+    93 -> ... -> 631 over 10 iterations), while StagnationMonitor's
+    median-window test still classified the run as "stagnated", because a
+    smooth exponential-looking growth curve does not trip a test built to
+    detect a *lack* of improvement, not active blow-up. Reporting
+    "amplification = 14328x" from a diverged run is not a finding about
+    amplification; it is a snapshot of an undefined quantity mislabelled as
+    one. solvers/outer/multigrid.py's own docstring already flags that both
+    schemes have a finite stability threshold ("SOR diverges at 1% strip
+    error... multigrid still converges to ~5%"); this check is what
+    respects that threshold instead of silently reporting through it.
+
+    Divergence test: compare the residual at the end of the run against the
+    residual at the midpoint. A ratio > 1.5 means the residual grew rather
+    than plateaued -- confirmed empirically to cleanly separate the stable
+    cases (ratio ~1.00 at delta up to 0.10 in testing) from the diverging
+    one (ratio 2.70 at delta=0.165) for this problem.
+
+    Returns
+    -------
+    (error, OuterResult, diverged: bool)
     """
     prob, u_exact = analytic_problem(N)
     kwargs = {"tol": 1e-10}
@@ -190,8 +231,16 @@ def measure_amplification(N: int, delta: float, scheme: str, max_iter: int = 800
         kwargs["max_cycles"] = 50
     res = solve(prob, inner="perturbed", scheme=scheme,
                 inner_options={"delta": delta}, **kwargs)
+
+    h = res.residual_history
+    diverged = False
+    if len(h) > 2:
+        mid = h[len(h) // 2]
+        if mid > 0 and h[-1] / mid > 1.5:
+            diverged = True
+
     err = float(np.linalg.norm(res.u - u_exact) / np.linalg.norm(u_exact))
-    return err, res
+    return err, res, diverged
 
 
 def main() -> None:
@@ -215,53 +264,98 @@ def main() -> None:
         delta = measure_delta(args)
         print(f"\nMeasured delta (per-application infidelity): {delta:.4f}\n")
 
-    print(f"{'N':>4} {'disc_err':>10} {'FMG_err':>10} {'FMG_amp':>8} "
-          f"{'SOR_err':>10} {'SOR_amp':>8} {'binding_constraint':>20}")
+    print(f"{'N':>4} {'disc_err':>10} {'FMG_err':>10} {'FMG_amp':>10} "
+          f"{'SOR_err':>10} {'SOR_amp':>10} {'binding_constraint':>20}")
 
     rows = []
     for N in args.N_values:
         d_err = discretization_error(N)
-        fmg_err, fmg_res = measure_amplification(N, delta, "fmg")
-        sor_err, sor_res = measure_amplification(N, delta, "sor")
-        fmg_amp = fmg_err / delta if delta > 0 else float("nan")
-        sor_amp = sor_err / delta if delta > 0 else float("nan")
+        fmg_err, fmg_res, fmg_diverged = measure_amplification(N, delta, "fmg")
+        sor_err, sor_res, sor_diverged = measure_amplification(N, delta, "sor")
+
+        # Amplification is only a meaningful quantity for a run that
+        # actually stabilised. A diverged run's "error" is a snapshot of
+        # blow-up, not a fixed-point offset -- reporting err/delta for it
+        # would present an artifact of *when the loop stopped* as if it
+        # were a physical amplification factor. See measure_amplification's
+        # docstring for the divergence this was built to catch.
+        fmg_amp = (fmg_err / delta) if (delta > 0 and not fmg_diverged) else float("nan")
+        sor_amp = (sor_err / delta) if (delta > 0 and not sor_diverged) else float("nan")
 
         # The binding constraint: does the amplified quantum error still
         # beat the discretisation error the classical scheme would achieve
-        # anyway? If not, the outer scheme's amplification -- not the
-        # circuit's qubit count -- is what limits usable problem size.
-        fmg_binds = "quantum error" if fmg_err > d_err else "discretisation"
-        sor_binds = "quantum error" if sor_err > d_err else "discretisation"
+        # anyway? Divergence is reported as its own, more severe category --
+        # it means no usable solution is obtained at all, not merely that
+        # quantum error exceeds discretisation error.
+        def _binding(err, d_err, diverged):
+            if diverged:
+                return "DIVERGED"
+            return "quantum error" if err > d_err else "discretisation"
+
+        fmg_binds = _binding(fmg_err, d_err, fmg_diverged)
+        sor_binds = _binding(sor_err, d_err, sor_diverged)
 
         rows.append(dict(N=N, discretization_error=d_err,
                           fmg_error=fmg_err, fmg_amplification=fmg_amp,
-                          fmg_binding=fmg_binds,
+                          fmg_diverged=fmg_diverged, fmg_binding=fmg_binds,
                           sor_error=sor_err, sor_amplification=sor_amp,
-                          sor_binding=sor_binds))
-        print(f"{N:4d} {d_err:10.2e} {fmg_err:10.2e} {fmg_amp:8.2f} "
-              f"{sor_err:10.2e} {sor_amp:8.2f} "
-              f"fmg:{fmg_binds[:4]}/sor:{sor_binds[:4]}")
+                          sor_diverged=sor_diverged, sor_binding=sor_binds))
+
+        fmg_amp_str = "DIVERGED" if fmg_diverged else f"{fmg_amp:.2f}"
+        sor_amp_str = "DIVERGED" if sor_diverged else f"{sor_amp:.2f}"
+        print(f"{N:4d} {d_err:10.2e} {fmg_err:10.2e} {fmg_amp_str:>10} "
+              f"{sor_err:10.2e} {sor_amp_str:>10} "
+              f"fmg:{fmg_binds[:8]}/sor:{sor_binds[:8]}")
+
+    n_diverged = sum(r["fmg_diverged"] or r["sor_diverged"] for r in rows)
+    if n_diverged > 0:
+        print(f"\n*** {n_diverged}/{len(rows)} N-values show at least one "
+              f"scheme DIVERGING (residual growing, not merely large) at "
+              f"delta={delta:.4f}. This is a stronger finding than 'quantum "
+              f"error exceeds discretisation error': it means no usable "
+              f"solution is obtained via this outer scheme at this delta, "
+              f"for these N. Amplification figures are omitted (NaN) for "
+              f"diverged runs -- they are not meaningful quantities to "
+              f"report, see measure_amplification's docstring. ***")
 
     print("\n'binding_constraint' shows which error dominates: if the "
           "amplified quantum error exceeds discretisation error, the outer "
           "scheme's amplification -- not qubit count -- is what limits "
-          "the usable problem size at this delta.")
+          "the usable problem size at this delta. DIVERGED is a distinct, "
+          "more severe outcome (see above).")
 
-    fmg_amps = [r["fmg_amplification"] for r in rows]
-    sor_amps = [r["sor_amplification"] for r in rows]
-    print(f"\nFMG amplification range across N: "
-          f"{min(fmg_amps):.2f}x - {max(fmg_amps):.2f}x "
-          f"({'roughly constant' if max(fmg_amps)/min(fmg_amps) < 2 else 'growing'})")
-    print(f"SOR amplification range across N: "
-          f"{min(sor_amps):.2f}x - {max(sor_amps):.2f}x "
-          f"({'roughly constant' if max(sor_amps)/min(sor_amps) < 2 else 'growing'})")
+    fmg_amps = [r["fmg_amplification"] for r in rows if not r["fmg_diverged"]]
+    sor_amps = [r["sor_amplification"] for r in rows if not r["sor_diverged"]]
+
+    if fmg_amps:
+        print(f"\nFMG amplification range across N (non-diverged runs only): "
+              f"{min(fmg_amps):.2f}x - {max(fmg_amps):.2f}x "
+              f"({'roughly constant' if max(fmg_amps)/min(fmg_amps) < 2 else 'growing'})")
+    else:
+        print("\nFMG diverged at every N tested -- no amplification range to report.")
+
+    if sor_amps:
+        print(f"SOR amplification range across N (non-diverged runs only): "
+              f"{min(sor_amps):.2f}x - {max(sor_amps):.2f}x "
+              f"({'roughly constant' if max(sor_amps)/min(sor_amps) < 2 else 'growing'})")
+    else:
+        print("SOR diverged at every N tested -- no amplification range to report.")
 
     # Maximum N where the FMG-amplified quantum error still beats
-    # discretisation error -- the headline number.
-    feasible = [r["N"] for r in rows if r["fmg_error"] <= r["discretization_error"]]
+    # discretisation error -- the headline number. A diverged run never
+    # counts as feasible, regardless of where its (meaningless) error
+    # snapshot happens to sit relative to discretisation error.
+    feasible = [r["N"] for r in rows
+                if not r["fmg_diverged"] and r["fmg_error"] <= r["discretization_error"]]
     if feasible:
         print(f"\nMax N where FMG-amplified quantum error <= discretisation "
               f"error (delta={delta:.4f}): N={max(feasible)}")
+    elif any(r["fmg_diverged"] for r in rows):
+        print(f"\nAt delta={delta:.4f}, FMG diverges at every N tested -- "
+              f"delta is past FMG's stability threshold here, not merely "
+              f"large enough to dominate discretisation error. Error "
+              f"mitigation to reduce delta is necessary before any N is "
+              f"usable, not just before N can be made larger.")
     else:
         print(f"\nAt delta={delta:.4f}, quantum error exceeds discretisation "
               f"error at every N tested -- delta itself, not N, is the "
