@@ -29,7 +29,7 @@ context/
 # Documentation prose is tracked; generated artefacts under docs/ are not.
 # The directory itself must stay un-excluded, otherwise git will not descend
 # into it and the negation below can never match.
-# They are not prt of the directory tree, just a temporary remainder for myself.
+# Internal artefacts and temporary workspace files are excluded by default.
 docs/*
 
 # Ad hoc backup copies made before a cleanup or a rerun. One such directory was

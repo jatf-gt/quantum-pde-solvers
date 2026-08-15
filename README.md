@@ -120,7 +120,7 @@ poisson_hhl/
 |   +-- qsvt_2d_line_degree_sweep.py # 2D row-matrix QSVT degree vs N
 |   +-- archive/                     # Superseded scripts; see archive/README.md
 |
-+-- tests/                           # Pytest suite: 259 tests, ~26 s
++-- tests/                           # Pytest suite: ~480 tests, ~30 s
 +-- hpc/                             # Cluster deployment for Imperial CX3 -- see hpc/README.md
 |   +-- setup_hpc_env.sh             # One-time env setup: CPU qpde + GPU qpde-gpu venvs
 |   +-- runners/                     # Python driver code (portable)
@@ -273,8 +273,8 @@ python scripts/gap_analysis.py --dim 2 --results-dir results/2Dhpc_run
 ### 3.7 Test suite
 
 ```bash
-pytest                         # 259 tests, ~26 s
-pytest -m "not quantum"        # 201 classical tests, ~7 s, no backend needed
+pytest                         # ~480 tests, ~30 s
+pytest -m "not quantum"        # ~400 classical tests, ~10 s, no backend needed
 pytest tests/test_outer.py -v  # single file
 pytest tests/test_hhl_1d.py::TestHHL1D::test_agrees_with_thomas_loose -v
 ```
@@ -543,8 +543,8 @@ A naive comparison at nominally equal precision parameters is methodologically u
 ## 8. Test suite
 
 ```bash
-pytest                          # 259 tests, ~26 s
-pytest -m "not quantum"         # 201 classical tests, ~7 s
+pytest                          # ~480 tests, ~30 s
+pytest -m "not quantum"         # ~400 classical tests, ~10 s
 pytest tests/test_outer.py -v
 pytest tests/test_hhl_1d.py::TestHHL1D::test_agrees_with_thomas_loose -v
 ```
@@ -564,7 +564,7 @@ pytest tests/test_hhl_1d.py::TestHHL1D::test_agrees_with_thomas_loose -v
 | `test_qsvt_1d.py` | Block-encoding unitarity, QSP angle shape, QSVT solver correctness | 24 | ~4 s |
 | `test_het_problem.py` | HET config derived quantities, matrix structure, solver compatibility | 22 | ~4 s |
 | `test_integration.py` | End-to-end pipelines (1D and 2D), `BenchmarkResult` consistency | 17 | ~5 s |
-| **Total** | | **259** | **~26 s** |
+| **Total** | | **~480** | **~30 s** |
 
 ### Two load-bearing tests
 
