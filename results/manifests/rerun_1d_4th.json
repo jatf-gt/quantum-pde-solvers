@@ -5,7 +5,7 @@
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 2.6981346309185028e-05,
+      "wall_time_s": 2.6470981538295746e-05,
       "reasons": [
         "stale_geometry"
       ]
@@ -15,7 +15,7 @@
       "solver": "HHL",
       "N": 4,
       "flags": [],
-      "wall_time_s": 4.957403531298041,
+      "wall_time_s": 22.791625792975537,
       "reasons": [
         "stale_geometry"
       ]
@@ -25,7 +25,7 @@
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 1.73400944378227,
+      "wall_time_s": 2.355498868972063,
       "reasons": [
         "stale_geometry"
       ]
@@ -35,7 +35,7 @@
       "solver": "QSVT",
       "N": 4,
       "flags": [],
-      "wall_time_s": 0.07096278015524149,
+      "wall_time_s": 0.8256744330283254,
       "reasons": [
         "stale_geometry"
       ]
@@ -45,7 +45,7 @@
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 2.6901252567768097e-05,
+      "wall_time_s": 2.7481000870466232e-05,
       "reasons": [
         "stale_geometry"
       ]
@@ -55,7 +55,7 @@
       "solver": "HHL",
       "N": 8,
       "flags": [],
-      "wall_time_s": 8.709175126627088,
+      "wall_time_s": 54.396151907974854,
       "reasons": [
         "stale_geometry"
       ]
@@ -67,7 +67,7 @@
       "flags": [
         "not_converged"
       ],
-      "wall_time_s": 117.53761464171112,
+      "wall_time_s": 114.13788553897757,
       "reasons": [
         "stale_geometry"
       ]
@@ -77,7 +77,7 @@
       "solver": "QSVT",
       "N": 8,
       "flags": [],
-      "wall_time_s": 0.258861280977726,
+      "wall_time_s": 3.2606577209662646,
       "reasons": [
         "stale_geometry"
       ]
@@ -87,7 +87,7 @@
       "solver": "Thomas",
       "N": 16,
       "flags": [],
-      "wall_time_s": 3.120116889476776e-05,
+      "wall_time_s": 3.055098932236433e-05,
       "reasons": [
         "stale_geometry"
       ]
@@ -97,7 +97,7 @@
       "solver": "HHL",
       "N": 16,
       "flags": [],
-      "wall_time_s": 33.2006163392216,
+      "wall_time_s": 193.52762127202004,
       "reasons": [
         "stale_geometry"
       ]
@@ -110,7 +110,7 @@
         "not_converged",
         "large_error_vs_exact"
       ],
-      "wall_time_s": 268.8561815554276,
+      "wall_time_s": 244.75374197098427,
       "reasons": [
         "stale_geometry"
       ]
@@ -119,10 +119,8 @@
       "case": "HET_1D_3b_gaussian_Vd300",
       "solver": "QSVT",
       "N": 16,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 1.1257275184616446,
+      "flags": [],
+      "wall_time_s": 10.098569263936952,
       "reasons": [
         "stale_geometry"
       ]
@@ -132,7 +130,7 @@
       "solver": "Thomas",
       "N": 32,
       "flags": [],
-      "wall_time_s": 3.8811005651950836e-05,
+      "wall_time_s": 4.68110665678978e-05,
       "reasons": [
         "stale_geometry"
       ]
@@ -141,10 +139,8 @@
       "case": "HET_1D_3b_gaussian_Vd300",
       "solver": "HHL",
       "N": 32,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 230.5279252268374,
+      "flags": [],
+      "wall_time_s": 2550.8131993830903,
       "reasons": [
         "stale_geometry"
       ]
@@ -157,7 +153,7 @@
         "not_converged",
         "large_error_vs_exact"
       ],
-      "wall_time_s": 491.68786134850234,
+      "wall_time_s": 572.3401107559912,
       "reasons": [
         "stale_geometry"
       ]
@@ -166,10 +162,8 @@
       "case": "HET_1D_3b_gaussian_Vd300",
       "solver": "QSVT",
       "N": 32,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 2.5480275452136993,
+      "flags": [],
+      "wall_time_s": 8.940769495093264,
       "reasons": [
         "stale_geometry"
       ]
@@ -181,230 +175,222 @@
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 2.714991569519043e-05
+      "wall_time_s": 2.667098306119442e-05
     },
     {
       "case": "1D_Poisson_fH_hom",
       "solver": "HHL",
       "N": 4,
       "flags": [],
-      "wall_time_s": 3.955691646784544
+      "wall_time_s": 26.83058111090213
     },
     {
       "case": "1D_Poisson_fH_hom",
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 9.062237346544862
+      "wall_time_s": 6.3162207250716165
     },
     {
       "case": "1D_Poisson_fH_hom",
       "solver": "QSVT",
       "N": 4,
       "flags": [],
-      "wall_time_s": 0.1498522674664855
+      "wall_time_s": 0.8406324239913374
     },
     {
       "case": "1D_Poisson_fH_hom",
       "solver": "Thomas",
       "N": 8,
+      "flags": [],
+      "wall_time_s": 2.6430003345012665e-05
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 62.562169517041184
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 114.56443344592117
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 4.546827562036924
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 2.8209993615746498e-05
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 188.27154334797524
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 263.41197522496805
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 9.966815515886992
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 4.218204412609339e-05
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 2529.180140152108
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 585.2402805880411
+    },
+    {
+      "case": "1D_Poisson_fH_hom",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 9.026184987975284
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.467096783220768e-05
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 28.286427221959457
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.3627195660956204
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.8864938359474763
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.7990085072815418e-05
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 50.76141690695658
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "not_converged"
+      ],
+      "wall_time_s": 120.01188254007138
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 3.9292936930432916
+    },
+    {
+      "case": "1D_Poisson_fL_hom",
+      "solver": "Thomas",
+      "N": 16,
       "flags": [],
       "wall_time_s": 2.788100391626358e-05
     },
     {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "HHL",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 9.988096358254552
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "VQLS",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 115.04161999188364
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "QSVT",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 0.25985501147806644
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "Thomas",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 3.1570903956890106e-05
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "HHL",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 29.709667587652802
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "VQLS",
-      "N": 16,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 278.4836337324232
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "QSVT",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 1.346123281866312
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "Thomas",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 3.878958523273468e-05
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "HHL",
-      "N": 32,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 241.39565538335592
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "VQLS",
-      "N": 32,
-      "flags": [
-        "not_converged",
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 496.71771304961294
-    },
-    {
-      "case": "1D_Poisson_fH_hom",
-      "solver": "QSVT",
-      "N": 32,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 2.518025014549494
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "Thomas",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 2.794060856103897e-05
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "HHL",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 3.8510055476799607
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "VQLS",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 1.7623985512182117
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "QSVT",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 0.06969701312482357
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "Thomas",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 2.720113843679428e-05
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "HHL",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 10.906368656083941
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "VQLS",
-      "N": 8,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 124.13438360858709
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "QSVT",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 0.26882618851959705
-    },
-    {
-      "case": "1D_Poisson_fL_hom",
-      "solver": "Thomas",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 3.094132989645004e-05
-    },
-    {
       "case": "1D_Poisson_fL_hom",
       "solver": "HHL",
       "N": 16,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 30.18853697925806
+      "flags": [],
+      "wall_time_s": 180.89275564998388
     },
     {
       "case": "1D_Poisson_fL_hom",
       "solver": "VQLS",
       "N": 16,
       "flags": [
-        "not_converged",
-        "large_error_vs_exact"
+        "not_converged"
       ],
-      "wall_time_s": 282.57318192347884
+      "wall_time_s": 245.46687438199297
     },
     {
       "case": "1D_Poisson_fL_hom",
       "solver": "QSVT",
       "N": 16,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 1.1577890384942293
+      "flags": [],
+      "wall_time_s": 7.938073527999222
     },
     {
       "case": "1D_Poisson_fL_hom",
       "solver": "Thomas",
       "N": 32,
       "flags": [],
-      "wall_time_s": 4.018191248178482e-05
+      "wall_time_s": 3.8732076063752174e-05
     },
     {
       "case": "1D_Poisson_fL_hom",
       "solver": "HHL",
       "N": 32,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 259.1813114127144
+      "flags": [],
+      "wall_time_s": 2449.4689401440555
     },
     {
       "case": "1D_Poisson_fL_hom",
@@ -414,86 +400,84 @@
         "not_converged",
         "large_error_vs_exact"
       ],
-      "wall_time_s": 494.37277156021446
+      "wall_time_s": 565.0428174599074
     },
     {
       "case": "1D_Poisson_fL_hom",
       "solver": "QSVT",
       "N": 32,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 2.5027448451146483
+      "flags": [],
+      "wall_time_s": 9.278151714010164
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 2.7281232178211212e-05
+      "wall_time_s": 2.3280968889594078e-05
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "HHL",
       "N": 4,
       "flags": [],
-      "wall_time_s": 14.325016675516963
+      "wall_time_s": 26.424452362931333
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 2.3837051894515753
+      "wall_time_s": 1.5961426990106702
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "QSVT",
       "N": 4,
       "flags": [],
-      "wall_time_s": 1.938293277285993
+      "wall_time_s": 0.9427839939016849
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 2.7830712497234344e-05
+      "wall_time_s": 2.8330949135124683e-05
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "HHL",
       "N": 8,
       "flags": [],
-      "wall_time_s": 19.914549166336656
+      "wall_time_s": 43.97128886997234
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "VQLS",
       "N": 8,
       "flags": [],
-      "wall_time_s": 123.84562912862748
+      "wall_time_s": 114.16088062501512
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "QSVT",
       "N": 8,
       "flags": [],
-      "wall_time_s": 22.459029517136514
+      "wall_time_s": 3.87393905792851
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "Thomas",
       "N": 16,
       "flags": [],
-      "wall_time_s": 3.087148070335388e-05
+      "wall_time_s": 2.9901042580604553e-05
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "HHL",
       "N": 16,
       "flags": [],
-      "wall_time_s": 30.688229729421437
+      "wall_time_s": 217.9693695739843
     },
     {
       "case": "1D_Poisson_fS_hom",
@@ -502,28 +486,28 @@
       "flags": [
         "not_converged"
       ],
-      "wall_time_s": 258.51799179054797
+      "wall_time_s": 259.5578879090026
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "QSVT",
       "N": 16,
       "flags": [],
-      "wall_time_s": 295.8972565624863
+      "wall_time_s": 7.139684968977235
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "Thomas",
       "N": 32,
       "flags": [],
-      "wall_time_s": 4.1680410504341125e-05
+      "wall_time_s": 4.3801963329315186e-05
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "HHL",
       "N": 32,
       "flags": [],
-      "wall_time_s": 246.88824170734733
+      "wall_time_s": 2413.0807988430606
     },
     {
       "case": "1D_Poisson_fS_hom",
@@ -532,58 +516,56 @@
       "flags": [
         "not_converged"
       ],
-      "wall_time_s": 537.6267522620037
+      "wall_time_s": 537.3713714389596
     },
     {
       "case": "1D_Poisson_fS_hom",
       "solver": "QSVT",
       "N": 32,
       "flags": [],
-      "wall_time_s": 21653.03255167976
+      "wall_time_s": 8.10782273102086
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 2.7340836822986603e-05
+      "wall_time_s": 2.6360969059169292e-05
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "HHL",
       "N": 4,
       "flags": [],
-      "wall_time_s": 14.522036578506231
+      "wall_time_s": 26.256325490074232
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 4.0104857217520475
+      "wall_time_s": 3.1699476040666923
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "QSVT",
       "N": 4,
       "flags": [],
-      "wall_time_s": 1.8746464578434825
+      "wall_time_s": 0.7620482339989394
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 2.830103039741516e-05
+      "wall_time_s": 2.8870999813079834e-05
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "HHL",
       "N": 8,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 9.568178988993168
+      "flags": [],
+      "wall_time_s": 46.081569183967076
     },
     {
       "case": "1D_Poisson_fS_nonhom",
@@ -592,66 +574,59 @@
       "flags": [
         "not_converged"
       ],
-      "wall_time_s": 124.33116929419339
+      "wall_time_s": 117.19064821593929
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "QSVT",
       "N": 8,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 22.345714962109923
+      "flags": [],
+      "wall_time_s": 3.829618260031566
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "Thomas",
       "N": 16,
       "flags": [],
-      "wall_time_s": 3.1400471925735474e-05
+      "wall_time_s": 2.8201029635965824e-05
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "HHL",
       "N": 16,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 29.919315787032247
+      "flags": [],
+      "wall_time_s": 220.4071540470468
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "VQLS",
       "N": 16,
       "flags": [
-        "not_converged"
+        "not_converged",
+        "large_error_vs_exact"
       ],
-      "wall_time_s": 271.9052648283541
+      "wall_time_s": 258.9750891890144
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "QSVT",
       "N": 16,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 295.46682859398425
+      "flags": [],
+      "wall_time_s": 8.607204096042551
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "Thomas",
       "N": 32,
       "flags": [],
-      "wall_time_s": 4.207063466310501e-05
+      "wall_time_s": 4.109193105250597e-05
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "HHL",
       "N": 32,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 268.17420760635287
+      "flags": [],
+      "wall_time_s": 2449.8560626329854
     },
     {
       "case": "1D_Poisson_fS_nonhom",
@@ -661,58 +636,56 @@
         "not_converged",
         "large_error_vs_exact"
       ],
-      "wall_time_s": 554.8645646581426
+      "wall_time_s": 545.397225984023
     },
     {
       "case": "1D_Poisson_fS_nonhom",
       "solver": "QSVT",
       "N": 32,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 21546.646822388284
+      "flags": [],
+      "wall_time_s": 8.088541022967547
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 2.739112824201584e-05
+      "wall_time_s": 2.6950961910188198e-05
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "HHL",
       "N": 4,
       "flags": [],
-      "wall_time_s": 14.033912418410182
+      "wall_time_s": 26.26096833695192
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 7.471318234689534
+      "wall_time_s": 6.766287871054374
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "QSVT",
       "N": 4,
       "flags": [],
-      "wall_time_s": 1.8659455869346857
+      "wall_time_s": 0.7815280890790746
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 2.7921050786972046e-05
+      "wall_time_s": 2.79709929600358e-05
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "HHL",
       "N": 8,
       "flags": [],
-      "wall_time_s": 11.509370308369398
+      "wall_time_s": 46.15384177095257
     },
     {
       "case": "HET_1D_3a_linear_hom",
@@ -721,61 +694,58 @@
       "flags": [
         "not_converged"
       ],
-      "wall_time_s": 114.90238579083234
+      "wall_time_s": 113.10325244895648
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "QSVT",
       "N": 8,
       "flags": [],
-      "wall_time_s": 21.947760722599924
+      "wall_time_s": 3.3566109269158915
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "Thomas",
       "N": 16,
       "flags": [],
-      "wall_time_s": 3.24910506606102e-05
+      "wall_time_s": 3.003107849508524e-05
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "HHL",
       "N": 16,
       "flags": [],
-      "wall_time_s": 29.721427137963474
+      "wall_time_s": 207.13212020799983
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "VQLS",
       "N": 16,
       "flags": [
-        "not_converged",
-        "large_error_vs_exact"
+        "not_converged"
       ],
-      "wall_time_s": 272.853698246181
+      "wall_time_s": 253.63467104895972
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "QSVT",
       "N": 16,
       "flags": [],
-      "wall_time_s": 292.0416289381683
+      "wall_time_s": 7.237454444053583
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "Thomas",
       "N": 32,
       "flags": [],
-      "wall_time_s": 4.1262246668338776e-05
+      "wall_time_s": 4.217098467051983e-05
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "HHL",
       "N": 32,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 244.16849485691637
+      "flags": [],
+      "wall_time_s": 2502.289541184902
     },
     {
       "case": "HET_1D_3a_linear_hom",
@@ -785,16 +755,14 @@
         "not_converged",
         "large_error_vs_exact"
       ],
-      "wall_time_s": 523.5539478985593
+      "wall_time_s": 535.0879352609627
     },
     {
       "case": "HET_1D_3a_linear_hom",
       "solver": "QSVT",
       "N": 32,
-      "flags": [
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 21768.932506073266
+      "flags": [],
+      "wall_time_s": 7.899099578033201
     }
   ],
   "drift": [],
@@ -803,10 +771,10 @@
     "stale": [],
     "unexplained": []
   },
-  "generated": "2026-08-13T12:58:48+00:00",
+  "generated": "2026-08-15T20:22:53+00:00",
   "dim": 1,
   "order": 4,
-  "results_dir": "results\\1Dhpc_run_4th",
+  "results_dir": "results/1Dhpc_run_4th",
   "strict": false,
   "expected": {
     "cases": [
