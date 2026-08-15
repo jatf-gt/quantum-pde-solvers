@@ -285,7 +285,7 @@ def qsvt_solve_system(
     # The QSVT polynomial p(x) approximates 1/x for x in [1/kappa, 1].
     # This requires the matrix to be positive semidefinite after normalisation.
     # The 1-D and 2-D Poisson TST matrices are negative definite (all
-    # eigenvalues negative), so we negate both A and b before proceeding.
+    # eigenvalues negative), necessitating the negation of both A and b.
     # Since (-A)u = -b is equivalent to Au = b, the solution u is unchanged.
     eigs_sign = np.linalg.eigvalsh(A)
     if np.all(eigs_sign < 0):

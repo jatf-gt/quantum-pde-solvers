@@ -132,8 +132,8 @@ def solve_stationary(
     delta = float("nan")
 
     # Enforced inside the sweep, one strip solve at a time. The per-iteration test
-    # below remains as the clean exit; on its own it would let a single sweep of N
-    # expensive quantum solves overrun the budget entirely before being noticed.
+    # below remains as the clean exit; independently, it would permit a single sweep
+    # of N expensive quantum solves to overrun the budget before detection.
     deadline = None if max_wall_s is None else t0 + max_wall_s
 
     for it in range(max_iter):

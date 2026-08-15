@@ -312,9 +312,9 @@ def _fit_capped_reduced_coefs(
     scale = 0.9 / float(np.max(target_raw))
     target = target_raw * scale
 
-    # Fit ONLY the odd-order Chebyshev basis -- enforces odd parity
-    # exactly (coefficients at even indices are exactly zero, not just
-    # numerically small), rather than fitting all orders and hoping.
+    # Fit exclusively the odd-order Chebyshev basis -- enforces odd parity
+    # exactly (coefficients at even indices are exactly zero, rather than
+    # merely numerically small), avoiding unstructured fits over all orders.
     odd_orders = np.arange(1, degree + 1, 2)
     full_vander = np.polynomial.chebyshev.chebvander(x_eval, degree)
     basis_odd = full_vander[:, odd_orders]
@@ -338,7 +338,7 @@ def _fit_capped_reduced_coefs(
     # projected out. QSVT recovers the proportionality constant downstream,
     # so a uniform rescale of the polynomial (which the boundedness step above
     # deliberately applies) is benign and must not be reported as fit error.
-    # Measuring it naively reports ~27% for a fit that is actually exact.
+    # A naive measurement would report ~27% for a fit that is analytically exact.
     fit_vals = np.polynomial.chebyshev.chebval(x_eval, coef_array)
     denom = float(np.dot(fit_vals, fit_vals))
     if denom > 0.0:

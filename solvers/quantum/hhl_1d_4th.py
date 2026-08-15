@@ -175,7 +175,7 @@ def hhl_solve_system_4th(
     num_qubits = int(np.log2(N))
 
     # The interior values are the true Toeplitz entries; boundary rows
-    # differ due to ghost-point reflection. We pass the INTERIOR values
+    # differ due to ghost-point reflection. The INTERIOR values are supplied
     # to PentadiagonalToeplitz (which models the ideal Toeplitz operator)
     # and rely on the Hamiltonian simulation being a good approximation
     # of the full operator including boundary corrections.
@@ -230,7 +230,7 @@ def hhl_solve_system_4th(
     # print(f"    u_thomas                   = {np.linalg.solve(A, b)}")
 
     # Recover physical scale: find c such that c * A @ x_raw_unit ≈ b
-    # We project using b instead of Ax to avoid amplifying high-frequency QPE noise
+    # Projection employs b rather than Ax to avoid amplifying high-frequency QPE noise.
     Ax = A @ x_raw_unit
     denom = float(np.dot(b, Ax))
     numer = float(np.dot(b, b))

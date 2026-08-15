@@ -173,7 +173,7 @@ def assert_tridiagonal(A: np.ndarray, solver: str) -> None:
 
     # Being within the band is necessary but not sufficient. The reconstruction
     # is Toeplitz — one scalar per diagonal — so a tridiagonal matrix whose
-    # diagonals are not constant is corrupted just as completely as a wider
+    # diagonals are not constant is corrupted equivalently to a wider
     # stencil, and by exactly the same mechanism.
     #
     # This is not hypothetical. Sub-case 3c carries a Neumann row at x=0 whose

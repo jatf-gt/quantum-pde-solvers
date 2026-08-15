@@ -123,10 +123,10 @@ __all__ = [
 ]
 
 
-# Controlled single-qubit Pauli gates, keyed by character. Deliberately not
-# including "I": a controlled-identity is a no-op and is skipped entirely
-# rather than emitting a gate, which matters for circuit_count() staying an
-# honest count of what is actually submitted.
+# Controlled single-qubit Pauli gates, keyed by character. Deliberately excluding
+# "I": a controlled-identity is a no-op and is skipped entirely rather than
+# emitting a gate, which ensures circuit_count() remains a rigorous reflection
+# of the submitted execution budget.
 _CTRL_GATE = {"X": qml.CNOT, "Y": qml.CY, "Z": qml.CZ}
 
 

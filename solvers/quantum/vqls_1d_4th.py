@@ -57,8 +57,8 @@ def vqls_solve_4th(
         fields: u, cost_history, n_circuit_evals, converged, wall_time.
     """
     if config is None:
-        # Adapt layers to N. The condition number grows fast.
-        # A simple heuristic: 2 * num_qubits, or maybe just num_qubits.
+        # Adapt layers to N as the condition number grows rapidly.
+        # A simple heuristic scaling: 2 * num_qubits.
         # N=4 (2 qubits) -> 4 layers. N=8 (3 qubits) -> 6 layers. N=16 (4 qubits) -> 8 layers.
         num_qubits = int(np.log2(problem.N))
         config = VQLSConfig1D(n_layers=max(4, num_qubits * 2))

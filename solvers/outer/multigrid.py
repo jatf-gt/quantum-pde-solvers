@@ -332,11 +332,10 @@ def solve_multigrid(
     def _over_budget() -> bool:
         return max_wall_s is not None and (time.perf_counter() - t0) > max_wall_s
 
-    # Absolute perf_counter() deadline, threaded into every _v_cycle call so
-    # the check happens before each sweep and each recursive step, not just
-    # once per (potentially very long) whole V-cycle. See _v_cycle's
-    # docstring for why the coarser granularity used previously let a single
-    # N=64 HHL V-cycle overrun its budget by ~6x.
+    # Absolute perf_counter() deadline, threaded into every _v_cycle call to
+    # ensure the check occurs before each sweep and recursive step, rather than
+    # solely once per whole V-cycle. The coarser granularity used previously
+    # permitted a single N=64 HHL V-cycle to overrun its budget by ~6x.
     deadline = (t0 + max_wall_s) if max_wall_s is not None else None
 
     fmg_timed_out = False

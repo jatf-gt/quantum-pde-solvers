@@ -181,8 +181,8 @@ def build_cost_function(
         value bounded within [0, 1].
     """
     # -- Numerator: <b|A|x(θ)> -------------------------------------------------
-    # We compute this directly using statevector inner products rather than
-    # Hadamard tests, which is valid on a statevector simulator and avoids
+    # This is computed directly via statevector inner products rather than
+    # Hadamard tests; a valid approach on a statevector simulator that avoids
     # the overhead of constructing O(L) separate circuits.
     # On real hardware, Hadamard tests would be required.
 

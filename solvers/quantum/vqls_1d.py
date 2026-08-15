@@ -230,8 +230,8 @@ def _vqls_single_run(
 
     # -- Fresh Random Initialisation -------------------------------------------
     # Each independent run draws a new theta_init from a different seed.
-    # This is the critical difference from sequential refinement: we are
-    # exploring a new basin of the landscape, not refining within the same one.
+    # This fundamentally distinguishes it from sequential refinement: it explores
+    # a new basin in the landscape rather than refining within the current one.
     rng        = np.random.default_rng(seed)
     theta_init = rng.uniform(0, 2 * np.pi, size=n_p)
 
