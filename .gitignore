@@ -41,6 +41,7 @@ results.backup*/
 results_backup*/
 *.backup/
 *.bak
+*.tar.gz
 
 # Generated cluster output, excluded by kind rather than by directory name.
 # The per-directory rules above only protect the six sweep directories that
