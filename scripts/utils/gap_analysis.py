@@ -54,7 +54,7 @@ from typing import Iterable, Optional
 # guarded with ``|| true``, so the failure was silent: the manifest failed to
 # appear. Resolving the root from ``__file__`` makes the invocation location
 # irrelevant, matching what every module under ``hpc/runners/`` already does.
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from benchmark.hpc_archive import SweepArchive  # noqa: E402
