@@ -33,7 +33,7 @@ import argparse
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from core.resources import (
@@ -55,8 +55,8 @@ PRODUCTION_SIZES = [
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--out", type=Path, default=Path("results/hardware_feasibility_1d"),
-        help="Output directory (default: results/hardware_feasibility_1d)",
+        "--out", type=Path, default=Path("results/investigations/hardware_feasibility_1d"),
+        help="Output directory (default: results/investigations/hardware_feasibility_1d)",
     )
     parser.add_argument(
         "--budget", type=int, default=HERON_R2_TWO_QUBIT_GATE_BUDGET,

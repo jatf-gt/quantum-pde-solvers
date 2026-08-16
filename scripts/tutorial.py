@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-tutorial.py — the single entry point for trying this repository out.
+An attempt of an easy entry point for trying this repository out.
 
-Renamed from explore.py. Solves the Poisson equation in one, two or three
-dimensions with any combination of the classical and quantum solvers, and
-prints a comparison table. If you are new to this codebase, start here.
+Solves the Poisson equation in one, two or three dimensions with any 
+combination of the classical and quantum solvers, and prints a 
+comparison table. If you are new to this codebase, start here.
 
     python scripts/tutorial.py --dim 1 --N 8
     python scripts/tutorial.py --dim 2 --N 16 --inner all

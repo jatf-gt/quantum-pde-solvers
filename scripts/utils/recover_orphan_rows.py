@@ -74,7 +74,7 @@ import numpy as np
 
 # ``pytest.ini`` sets ``pythonpath = .``, but a bare ``python3 scripts/...`` puts
 # ``scripts/`` on ``sys.path[0]`` rather than the repository root.
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from solvers.outer.core import OuterResult, WorkLog     # noqa: E402

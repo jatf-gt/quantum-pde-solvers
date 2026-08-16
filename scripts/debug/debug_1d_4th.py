@@ -50,7 +50,7 @@ from typing import Optional
 import numpy as np
 
 # -- Ensure repo root is on sys.path ------------------------------------------
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 # -- Terminal colour codes -----------------------------------------------------

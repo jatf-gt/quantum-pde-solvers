@@ -59,7 +59,7 @@ import numpy as np
 # imports below fail however sound the working directory. Resolving the root from
 # ``__file__`` makes the invocation location irrelevant, matching what every module
 # under ``hpc/runners/`` already does.
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 import core.cases as cases          # noqa: E402

@@ -46,9 +46,9 @@ and F_prep is not a quantity this project relies on.
 Usage
 -----
     # having run the sweep twice, at --resilience_level 1 and 0:
-    python scripts/compare_mitigation.py \\
-        --mitigated results/degree_composition/hardware_<A>.json \\
-        --unmitigated results/degree_composition/hardware_<B>.json
+    python scripts/compare_mitigation.py \
+        --mitigated results/investigations/degree_composition/hardware_<A>.json \
+        --unmitigated results/investigations/degree_composition/hardware_<B>.json
 """
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ import json
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 import numpy as np

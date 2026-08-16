@@ -33,7 +33,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 import numpy as np
@@ -380,7 +380,7 @@ def main() -> None:
     p.add_argument("--seconds_per_job", type=float, default=34.0,
                    help="Measured cost of one comparable job, for the budget "
                         "estimate. Default from this project's ibm_kingston run.")
-    p.add_argument("--out", type=Path, default=Path("results/degree_composition"))
+    p.add_argument("--out", type=Path, default=Path("results/investigations/degree_composition"))
     args = p.parse_args()
 
     if args.reanalyse:
