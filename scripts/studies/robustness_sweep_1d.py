@@ -69,7 +69,7 @@ def main() -> None:
                          help="QSVT polynomial degree (default 11, tractable "
                               "for a direct density-matrix sweep at N=4)")
     parser.add_argument("--shots", type=int, default=8192)
-    parser.add_argument("--out", type=Path, default=Path("results/robustness_1d"))
+    parser.add_argument("--out", type=Path, default=Path("results/investigations/robustness_1d"))
     args = parser.parse_args()
 
     qc   = build_qsvt_circuit(args.N, args.degree)

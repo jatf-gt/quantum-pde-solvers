@@ -55,8 +55,8 @@ PRODUCTION_SIZES = [
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--out", type=Path, default=Path("results/hardware_feasibility_1d"),
-        help="Output directory (default: results/hardware_feasibility_1d)",
+        "--out", type=Path, default=Path("results/investigations/hardware_feasibility_1d"),
+        help="Output directory (default: results/investigations/hardware_feasibility_1d)",
     )
     parser.add_argument(
         "--budget", type=int, default=HERON_R2_TWO_QUBIT_GATE_BUDGET,

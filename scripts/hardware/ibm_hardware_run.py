@@ -326,7 +326,7 @@ def main() -> None:
     p.add_argument("--shots", type=int, default=4096)
     p.add_argument("--resilience_level", type=int, default=1,
                    help="0=none, 1=readout mitigation (TREX), 2=+ZNE.")
-    p.add_argument("--out", type=Path, default=Path("results/hardware_run"))
+    p.add_argument("--out", type=Path, default=Path("results/investigations/hardware_run"))
     args = p.parse_args()
 
     if args.check:
