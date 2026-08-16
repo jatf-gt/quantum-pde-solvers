@@ -579,16 +579,23 @@
       "wall_time_s": 23.200751200318336
     }
   ],
-  "drift": [],
-  "n_rows_recorded": 60,
+  "drift": [
+    "2D_HET_MMS_SPT100",
+    "2D_HET_Sin_MeetingReport",
+    "2D_Poisson_SingleMode_n1m1",
+    "2D_Poisson_TwoGaussian_PlasmaNet",
+    "2D_Poisson_sin_hom"
+  ],
+  "n_rows_recorded": 80,
+  "geometry_rerun_complete": [],
   "orphan_archives": {
     "stale": [],
     "unexplained": []
   },
-  "generated": "2026-08-13T12:58:49+00:00",
+  "generated": "2026-08-16T17:19:14+00:00",
   "dim": 2,
   "order": 4,
-  "results_dir": "results\\2Dhpc_run_4th",
+  "results_dir": "results/2Dhpc_run_4th",
   "strict": false,
   "expected": {
     "cases": [
