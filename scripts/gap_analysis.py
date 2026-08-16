@@ -154,6 +154,12 @@ raised budget carry an explicit ``hhl_timeout:<budget>s`` marker and never reach
 inference, so the two values may diverge freely. Tying them together would have
 meant that raising the runtime budget silently reclassified the historical rows as
 genuine errors and scheduled 13 h of recomputation.
+
+The inference uses a 60 s window above this value (i.e. only rows in [3600, 3660) s
+without an explicit marker are inferred as timed-out). Rows significantly above 3600 s
+but without a marker are genuine slow completions at high κ (e.g. N=32 where
+κ ≈ 440) and must not be misclassified; the 13 historical rows this inference covers
+all fell within 1 s of the budget.
 """
 
 STALE_GEOMETRY_CASES: frozenset[str] = frozenset({
@@ -172,6 +178,14 @@ compares the assembled operator, the strip operator, the spacings, the source an
 reference across both geometries. Note that the 1-D HET cases other than 3b, and
 ``het_2d_boeuf_garrigues``, are provably unaffected and must **not** be listed here —
 adding them would trigger needless recomputation.
+
+Important: this constant is the authoritative set of cases that *ever* required a
+geometry rerun. It must not be shrunk as reruns complete, because it also governs the
+``_orphan_archives`` check (``stale`` vs ``unexplained`` orphans). To exclude
+confirmed-clean cases from the ``stale_geometry`` rerun reason without editing this
+constant, pass them via ``--geometry-rerun-complete`` on the command line or via the
+``geometry_rerun_complete`` argument to ``analyse``. Those cases are removed from the
+*effective* stale set for classification purposes only.
 """
 
 IMPLAUSIBLE_REL_ERR_PCT: float = 100.0
@@ -253,7 +267,8 @@ def merge_case_ids(discovered: Iterable[str], observed: Iterable[str]) -> list[s
 
 # -- Classification ------------------------------------------------------------
 
-def classify_row(row: dict, strict: bool = False, dim: int = 1
+def classify_row(row: dict, strict: bool = False, dim: int = 1,
+                 geometry_rerun_complete: frozenset[str] = frozenset()
                  ) -> tuple[list[str], list[str]]:
     """
     Separates grounds for recomputation from merely notable properties of a row.
@@ -273,6 +288,13 @@ def classify_row(row: dict, strict: bool = False, dim: int = 1
         exceeds an hour in the normal course of a sound run. Applying the 1-D
         timeout inference there would mark most large-N HHL rows as timed out and
         suppress the very reasons that schedule them for rerun.
+    geometry_rerun_complete : frozenset of str
+        Case identifiers whose stale-geometry rerun has been confirmed complete.
+        These are excluded from the effective stale set so that freshly recomputed
+        rows are not classified as outstanding again. Pass via
+        ``--geometry-rerun-complete`` at the command line or directly to
+        ``analyse``. The authoritative ``STALE_GEOMETRY_CASES`` constant is not
+        modified; this is a per-invocation narrowing only.
 
     Returns
     -------
@@ -284,7 +306,8 @@ def classify_row(row: dict, strict: bool = False, dim: int = 1
     flags: list[str] = []
     is_thomas = str(row.get("solver", "")).lower() == "thomas"
 
-    if row.get("case") in STALE_GEOMETRY_CASES:
+    effective_stale = STALE_GEOMETRY_CASES - geometry_rerun_complete
+    if row.get("case") in effective_stale:
         reasons.append("stale_geometry")
 
     notes = str(row.get("notes") or "")
@@ -296,7 +319,8 @@ def classify_row(row: dict, strict: bool = False, dim: int = 1
     timed_out = (
         any(marker in notes for marker in TIMEOUT_MARKERS)
         or (dim == 1 and str(row.get("solver", "")).lower() == "hhl"
-            and wall is not None and float(wall) >= LEGACY_HHL_TIMEOUT_S)
+            and wall is not None
+            and LEGACY_HHL_TIMEOUT_S <= float(wall) < LEGACY_HHL_TIMEOUT_S + 60.0)
     )
     if timed_out:
         flags.append("solver_timeout")
@@ -345,12 +369,13 @@ def classify_row(row: dict, strict: bool = False, dim: int = 1
 
 
 def analyse(
-    archive:  SweepArchive,
-    cases:    Iterable[str],
-    n_values: Iterable[int],
-    solvers:  Iterable[str],
-    strict:   bool = False,
-    dim:      int = 1,
+    archive:                  SweepArchive,
+    cases:                    Iterable[str],
+    n_values:                 Iterable[int],
+    solvers:                  Iterable[str],
+    strict:                   bool = False,
+    dim:                      int = 1,
+    geometry_rerun_complete:  frozenset[str] = frozenset(),
 ) -> dict:
     """
     Classifies every expected combination against the recorded summary.
@@ -366,6 +391,10 @@ def analyse(
     dim : int
         Spatial dimension, forwarded to `classify_row`, whose wall-clock timeout
         inference is valid only for the 1-D schema.
+    geometry_rerun_complete : frozenset of str
+        Case identifiers whose stale-geometry rerun is confirmed complete.
+        Forwarded to `classify_row`; see that function's documentation for the
+        full description. Recorded in the returned manifest for auditability.
 
     Returns
     -------
@@ -392,7 +421,10 @@ def analyse(
                                   "reasons": ["missing"], "flags": [],
                                   "wall_time_s": None})
                     continue
-                reasons, flags = classify_row(row, strict=strict, dim=dim)
+                reasons, flags = classify_row(
+                    row, strict=strict, dim=dim,
+                    geometry_rerun_complete=geometry_rerun_complete,
+                )
                 entry = {"case": case, "solver": solver, "N": int(N),
                          "flags": flags, "wall_time_s": row.get("wall_time_s")}
                 if reasons:
@@ -405,7 +437,9 @@ def analyse(
 
     return {"rerun": rerun, "keep": keep, "drift": drift,
             "n_rows_recorded": len(indexed),
+            "geometry_rerun_complete": sorted(geometry_rerun_complete),
             "orphan_archives": _orphan_archives(archive, indexed)}
+
 
 
 def _orphan_archives(archive: SweepArchive,
@@ -576,6 +610,14 @@ def main() -> None:
                         help="Also recompute rows that stagnated or hit an iteration "
                              "cap. Off by default: stagnation is the designed "
                              "terminal state for a quantum solver at its noise floor.")
+    parser.add_argument("--geometry-rerun-complete", default=None,
+                        help="Comma-separated case identifiers whose stale-geometry "
+                             "rerun has been confirmed complete. Those cases are "
+                             "removed from the effective stale set for this "
+                             "invocation so that freshly recomputed rows are not "
+                             "re-flagged. Must be a subset of STALE_GEOMETRY_CASES. "
+                             "Example: --geometry-rerun-complete "
+                             "HET_1D_3b_gaussian_Vd300")
     parser.add_argument("-o", "--output", type=Path, default=None,
                         help="Write the manifest JSON here.")
     args = parser.parse_args()
@@ -583,6 +625,17 @@ def main() -> None:
     runner = Path(RUNNER_FOR_DIM[args.dim])
     n_values = [int(v) for v in _parse_list(args.n_values)]
     solvers = _parse_list(args.solvers)
+
+    # Parse and validate --geometry-rerun-complete.
+    geom_complete_raw = _parse_list(args.geometry_rerun_complete) or []
+    unknown_geom = [c for c in geom_complete_raw if c not in STALE_GEOMETRY_CASES]
+    if unknown_geom:
+        parser.error(
+            f"--geometry-rerun-complete contains case(s) not in "
+            f"STALE_GEOMETRY_CASES: {unknown_geom}. "
+            f"Valid values: {sorted(STALE_GEOMETRY_CASES)}."
+        )
+    geometry_rerun_complete = frozenset(geom_complete_raw)
 
     archive = SweepArchive(args.results_dir, dim=args.dim,
                            skip_scheme_comparison=True)
@@ -603,10 +656,15 @@ def main() -> None:
     print(f"  cases from {runner} + recorded rows: {len(cases)}")
     if excluded:
         print(f"  excluded at order 4 (unimplemented): {', '.join(excluded)}")
+    if geometry_rerun_complete:
+        print(f"  geometry rerun confirmed complete (excluded from stale check):")
+        for c in sorted(geometry_rerun_complete):
+            print(f"    {c}")
     print(f"  N={n_values}  solvers={solvers}")
     print("=" * 78)
     manifest = analyse(archive, cases, n_values, solvers, strict=args.strict,
-                       dim=args.dim)
+                       dim=args.dim,
+                       geometry_rerun_complete=geometry_rerun_complete)
     manifest.update({
         "generated":   datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "dim":         args.dim,

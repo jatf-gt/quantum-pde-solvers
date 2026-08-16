@@ -119,6 +119,7 @@ echo "  Gap analysis after the run"
 echo "============================================================"
 python3 scripts/gap_analysis.py --dim 1 \
         --results-dir results/1Dhpc_run --n-values 4,8,16,32,64 \
+        --geometry-rerun-complete HET_1D_3b_gaussian_Vd300 \
         -o results/manifests/rerun_1d_after_wave1.json || true
 
 echo ""
