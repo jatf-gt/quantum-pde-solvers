@@ -5,7 +5,7 @@
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 0.003130652941763401,
+      "wall_time_s": 0.0027771033346652985,
       "reasons": [
         "stale_geometry"
       ]
@@ -18,7 +18,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 22.09011960681528,
+      "wall_time_s": 16.93333227559924,
       "reasons": [
         "stale_geometry"
       ]
@@ -28,7 +28,7 @@
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 34.38108211616054,
+      "wall_time_s": 29.03819433413446,
       "reasons": [
         "stale_geometry"
       ]
@@ -38,7 +38,7 @@
       "solver": "QSVT",
       "N": 4,
       "flags": [],
-      "wall_time_s": 0.36092315427958965,
+      "wall_time_s": 0.4795938152819872,
       "reasons": [
         "stale_geometry"
       ]
@@ -48,7 +48,7 @@
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 0.023954364005476236,
+      "wall_time_s": 0.0212755985558033,
       "reasons": [
         "stale_geometry"
       ]
@@ -61,7 +61,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 322.83117921929806,
+      "wall_time_s": 246.623840065673,
       "reasons": [
         "stale_geometry"
       ]
@@ -74,7 +74,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 2071.4562264280394,
+      "wall_time_s": 1814.891440341249,
       "reasons": [
         "stale_geometry"
       ]
@@ -84,7 +84,7 @@
       "solver": "QSVT",
       "N": 8,
       "flags": [],
-      "wall_time_s": 4.348863923922181,
+      "wall_time_s": 5.283796861767769,
       "reasons": [
         "stale_geometry"
       ]
@@ -94,7 +94,7 @@
       "solver": "Thomas",
       "N": 16,
       "flags": [],
-      "wall_time_s": 0.03373251296579838,
+      "wall_time_s": 0.056881729513406754,
       "reasons": [
         "stale_geometry"
       ]
@@ -107,7 +107,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 1334.5284317131154,
+      "wall_time_s": 1360.3540494907647,
       "reasons": [
         "stale_geometry"
       ]
@@ -120,7 +120,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 11505.197595603298,
+      "wall_time_s": 11160.33312602155,
       "reasons": [
         "stale_geometry"
       ]
@@ -130,7 +130,7 @@
       "solver": "QSVT",
       "N": 16,
       "flags": [],
-      "wall_time_s": 7.958540325984359,
+      "wall_time_s": 7.780193546786904,
       "reasons": [
         "stale_geometry"
       ]
@@ -140,7 +140,7 @@
       "solver": "Thomas",
       "N": 32,
       "flags": [],
-      "wall_time_s": 0.06866483064368367,
+      "wall_time_s": 0.12451991997659206,
       "reasons": [
         "stale_geometry"
       ]
@@ -153,7 +153,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 18855.58007767424,
+      "wall_time_s": 15654.60901882872,
       "reasons": [
         "stale_geometry"
       ]
@@ -163,12 +163,12 @@
       "solver": "VQLS",
       "N": 32,
       "flags": [
+        "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 21618.308409529272,
+      "wall_time_s": 57842.6507867109,
       "reasons": [
-        "stale_geometry",
-        "wall_time_exceeded"
+        "stale_geometry"
       ]
     },
     {
@@ -176,7 +176,7 @@
       "solver": "QSVT",
       "N": 32,
       "flags": [],
-      "wall_time_s": 246.15501368278638,
+      "wall_time_s": 263.8700425475836,
       "reasons": [
         "stale_geometry"
       ]
@@ -226,7 +226,7 @@
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 0.0033357879146933556,
+      "wall_time_s": 0.0030855387449264526,
       "reasons": [
         "stale_geometry"
       ]
@@ -239,7 +239,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 22.12222629832104,
+      "wall_time_s": 19.314475754275918,
       "reasons": [
         "stale_geometry"
       ]
@@ -249,7 +249,7 @@
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 37.75126460939646,
+      "wall_time_s": 33.268864069134,
       "reasons": [
         "stale_geometry"
       ]
@@ -259,7 +259,7 @@
       "solver": "QSVT",
       "N": 4,
       "flags": [],
-      "wall_time_s": 0.6984056257642806,
+      "wall_time_s": 0.6583278831094503,
       "reasons": [
         "stale_geometry"
       ]
@@ -269,7 +269,7 @@
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 0.028694460168480873,
+      "wall_time_s": 0.051694655790925026,
       "reasons": [
         "stale_geometry"
       ]
@@ -282,7 +282,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 322.02447555121034,
+      "wall_time_s": 270.16175208613276,
       "reasons": [
         "stale_geometry"
       ]
@@ -295,7 +295,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 1362.05960283475,
+      "wall_time_s": 1294.1688596066087,
       "reasons": [
         "stale_geometry"
       ]
@@ -305,7 +305,7 @@
       "solver": "QSVT",
       "N": 8,
       "flags": [],
-      "wall_time_s": 5.842708528973162,
+      "wall_time_s": 5.359768200665712,
       "reasons": [
         "stale_geometry"
       ]
@@ -315,7 +315,7 @@
       "solver": "Thomas",
       "N": 16,
       "flags": [],
-      "wall_time_s": 0.06494723120704293,
+      "wall_time_s": 0.046303341165184975,
       "reasons": [
         "stale_geometry"
       ]
@@ -328,7 +328,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 1348.8744101990014,
+      "wall_time_s": 1174.4759972337633,
       "reasons": [
         "stale_geometry"
       ]
@@ -341,7 +341,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 11050.996892034076,
+      "wall_time_s": 10934.424981592223,
       "reasons": [
         "stale_geometry"
       ]
@@ -351,7 +351,7 @@
       "solver": "QSVT",
       "N": 16,
       "flags": [],
-      "wall_time_s": 11.08098183106631,
+      "wall_time_s": 12.859402421861887,
       "reasons": [
         "stale_geometry"
       ]
@@ -360,47 +360,41 @@
       "case": "2D_HET_Sin_MeetingReport",
       "solver": "Thomas",
       "N": 32,
-      "flags": [],
-      "wall_time_s": 0.10229528415948153,
       "reasons": [
-        "stale_geometry"
-      ]
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     },
     {
       "case": "2D_HET_Sin_MeetingReport",
       "solver": "HHL",
       "N": 32,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 18887.39394258987,
       "reasons": [
-        "stale_geometry"
-      ]
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     },
     {
       "case": "2D_HET_Sin_MeetingReport",
       "solver": "VQLS",
       "N": 32,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 21607.268398053944,
       "reasons": [
-        "stale_geometry",
-        "wall_time_exceeded"
-      ]
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     },
     {
       "case": "2D_HET_Sin_MeetingReport",
       "solver": "QSVT",
       "N": 32,
-      "flags": [],
-      "wall_time_s": 336.8972713188268,
       "reasons": [
-        "stale_geometry"
-      ]
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     },
     {
       "case": "2D_HET_Sin_MeetingReport",
@@ -444,99 +438,163 @@
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
-      "solver": "HHL",
-      "N": 32,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 21635.11041755695,
+      "solver": "Thomas",
+      "N": 64,
       "reasons": [
-        "wall_time_exceeded"
-      ]
-    },
-    {
-      "case": "2D_Poisson_SingleMode_n1m1",
-      "solver": "VQLS",
-      "N": 32,
-      "flags": [
-        "not_converged"
+        "missing"
       ],
-      "wall_time_s": 21628.182606507093,
-      "reasons": [
-        "wall_time_exceeded"
-      ]
+      "flags": [],
+      "wall_time_s": null
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "HHL",
       "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 22139.310016496107,
       "reasons": [
-        "wall_time_exceeded"
-      ]
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "VQLS",
       "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 21654.588379369583,
       "reasons": [
-        "wall_time_exceeded"
-      ]
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "2D_Poisson_SingleMode_n1m1",
+      "solver": "QSVT",
+      "N": 64,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
+      "solver": "Thomas",
+      "N": 32,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
+      "solver": "HHL",
+      "N": 32,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
+      "solver": "VQLS",
+      "N": 32,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
+      "solver": "QSVT",
+      "N": 32,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
+      "solver": "Thomas",
+      "N": 64,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
       "solver": "HHL",
       "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 22733.83346306719,
       "reasons": [
-        "wall_time_exceeded"
-      ]
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
       "solver": "VQLS",
       "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 21628.06981138885,
       "reasons": [
-        "wall_time_exceeded"
-      ]
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
+      "solver": "QSVT",
+      "N": 64,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "2D_Poisson_sin_hom",
+      "solver": "Thomas",
+      "N": 64,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "HHL",
       "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 22696.05775034614,
       "reasons": [
-        "wall_time_exceeded"
-      ]
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "VQLS",
       "N": 64,
-      "flags": [
-        "not_converged"
-      ],
-      "wall_time_s": 21667.423436362762,
       "reasons": [
-        "wall_time_exceeded"
-      ]
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
+    },
+    {
+      "case": "2D_Poisson_sin_hom",
+      "solver": "QSVT",
+      "N": 64,
+      "reasons": [
+        "missing"
+      ],
+      "flags": [],
+      "wall_time_s": null
     }
   ],
   "keep": [
@@ -545,7 +603,7 @@
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 0.001515156589448452
+      "wall_time_s": 0.003149231895804405
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
@@ -555,28 +613,28 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 31.32310712337494
+      "wall_time_s": 30.466663105413318
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 33.95046482142061
+      "wall_time_s": 38.624398816376925
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "QSVT",
       "N": 4,
       "flags": [],
-      "wall_time_s": 1.1881607109680772
+      "wall_time_s": 1.3827323839068413
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 0.007375628687441349
+      "wall_time_s": 0.017087342217564583
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
@@ -586,7 +644,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 462.1251044552773
+      "wall_time_s": 566.4902984704822
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
@@ -596,21 +654,21 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 1026.3739673793316
+      "wall_time_s": 1138.8091697469354
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "QSVT",
       "N": 8,
       "flags": [],
-      "wall_time_s": 12.413316679187119
+      "wall_time_s": 11.490163346752524
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "Thomas",
       "N": 16,
       "flags": [],
-      "wall_time_s": 0.01857683341950178
+      "wall_time_s": 0.07801542244851589
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
@@ -620,7 +678,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 2248.973417658359
+      "wall_time_s": 2512.2802367340773
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
@@ -630,49 +688,55 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 12627.196458756924
+      "wall_time_s": 9466.577609866858
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "QSVT",
       "N": 16,
       "flags": [],
-      "wall_time_s": 21.9338360670954
+      "wall_time_s": 29.286755139008164
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "Thomas",
       "N": 32,
       "flags": [],
-      "wall_time_s": 0.08742952486500144
+      "wall_time_s": 0.1560775451362133
+    },
+    {
+      "case": "2D_Poisson_SingleMode_n1m1",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 34608.17923662998
+    },
+    {
+      "case": "2D_Poisson_SingleMode_n1m1",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 47040.70701703988
     },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "QSVT",
       "N": 32,
       "flags": [],
-      "wall_time_s": 308.44109618710354
-    },
-    {
-      "case": "2D_Poisson_SingleMode_n1m1",
-      "solver": "Thomas",
-      "N": 64,
-      "flags": [],
-      "wall_time_s": 0.2118983156979084
-    },
-    {
-      "case": "2D_Poisson_SingleMode_n1m1",
-      "solver": "QSVT",
-      "N": 64,
-      "flags": [],
-      "wall_time_s": 561.745735290926
+      "wall_time_s": 312.78934819996357
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 0.0015335073694586754
+      "wall_time_s": 0.0032556336373090744
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
@@ -682,14 +746,14 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 26.88359375204891
+      "wall_time_s": 28.824882827699184
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 38.523970508016646
+      "wall_time_s": 40.72536990791559
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
@@ -699,14 +763,14 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 3.0306312814354897
+      "wall_time_s": 3.0497605986893177
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 0.009277335368096828
+      "wall_time_s": 0.023453479632735252
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
@@ -716,7 +780,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 461.7418142389506
+      "wall_time_s": 430.7871647067368
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
@@ -726,7 +790,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 1585.364819998853
+      "wall_time_s": 1348.8793196864426
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
@@ -736,14 +800,14 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 27.152105535380542
+      "wall_time_s": 26.29839421249926
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
       "solver": "Thomas",
       "N": 16,
       "flags": [],
-      "wall_time_s": 0.01757767330855131
+      "wall_time_s": 0.039252230897545815
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
@@ -753,7 +817,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 2111.027973216027
+      "wall_time_s": 2667.357955019921
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
@@ -763,7 +827,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 18167.111772027798
+      "wall_time_s": 12216.392151989043
     },
     {
       "case": "2D_Poisson_TwoGaussian_PlasmaNet",
@@ -773,62 +837,14 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 51.99520600680262
-    },
-    {
-      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
-      "solver": "Thomas",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 0.042148507200181484
-    },
-    {
-      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
-      "solver": "HHL",
-      "N": 32,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 34196.63161715027
-    },
-    {
-      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
-      "solver": "VQLS",
-      "N": 32,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 48403.247413247824
-    },
-    {
-      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
-      "solver": "QSVT",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 292.80120474193245
-    },
-    {
-      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
-      "solver": "Thomas",
-      "N": 64,
-      "flags": [],
-      "wall_time_s": 0.214812692720443
-    },
-    {
-      "case": "2D_Poisson_TwoGaussian_PlasmaNet",
-      "solver": "QSVT",
-      "N": 64,
-      "flags": [],
-      "wall_time_s": 568.2301822509617
+      "wall_time_s": 60.03339718095958
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "Thomas",
       "N": 4,
       "flags": [],
-      "wall_time_s": 0.001506865955889225
+      "wall_time_s": 0.003201734274625778
     },
     {
       "case": "2D_Poisson_sin_hom",
@@ -838,28 +854,28 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 31.357111802324653
+      "wall_time_s": 30.1817036755383
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "VQLS",
       "N": 4,
       "flags": [],
-      "wall_time_s": 33.78129685111344
+      "wall_time_s": 38.573680551722646
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "QSVT",
       "N": 4,
       "flags": [],
-      "wall_time_s": 1.1982900639995933
+      "wall_time_s": 1.3940811846405268
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "Thomas",
       "N": 8,
       "flags": [],
-      "wall_time_s": 0.007007736712694168
+      "wall_time_s": 0.018121935427188873
     },
     {
       "case": "2D_Poisson_sin_hom",
@@ -869,7 +885,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 416.00461716018617
+      "wall_time_s": 422.1785038243979
     },
     {
       "case": "2D_Poisson_sin_hom",
@@ -879,21 +895,21 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 952.767392963171
+      "wall_time_s": 1107.57611849159
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "QSVT",
       "N": 8,
       "flags": [],
-      "wall_time_s": 8.698241202160716
+      "wall_time_s": 9.126440713182092
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "Thomas",
       "N": 16,
       "flags": [],
-      "wall_time_s": 0.0177942281588912
+      "wall_time_s": 0.07660457119345665
     },
     {
       "case": "2D_Poisson_sin_hom",
@@ -903,7 +919,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 2270.1926664244384
+      "wall_time_s": 2422.469019535929
     },
     {
       "case": "2D_Poisson_sin_hom",
@@ -913,21 +929,21 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 12608.928906953894
+      "wall_time_s": 8657.691114317626
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "QSVT",
       "N": 16,
       "flags": [],
-      "wall_time_s": 27.13628315459937
+      "wall_time_s": 25.3799931704998
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "Thomas",
       "N": 32,
       "flags": [],
-      "wall_time_s": 0.043008703738451004
+      "wall_time_s": 0.15697253867983818
     },
     {
       "case": "2D_Poisson_sin_hom",
@@ -937,7 +953,7 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 34787.18348830566
+      "wall_time_s": 36389.24195732921
     },
     {
       "case": "2D_Poisson_sin_hom",
@@ -947,45 +963,57 @@
         "stagnated",
         "not_converged"
       ],
-      "wall_time_s": 53117.51347725466
+      "wall_time_s": 48596.659286465496
     },
     {
       "case": "2D_Poisson_sin_hom",
       "solver": "QSVT",
       "N": 32,
       "flags": [],
-      "wall_time_s": 353.8495563780889
-    },
-    {
-      "case": "2D_Poisson_sin_hom",
-      "solver": "Thomas",
-      "N": 64,
-      "flags": [],
-      "wall_time_s": 0.21131115080788732
-    },
-    {
-      "case": "2D_Poisson_sin_hom",
-      "solver": "QSVT",
-      "N": 64,
-      "flags": [],
-      "wall_time_s": 568.1191781922244
+      "wall_time_s": 316.19973100349307
     }
   ],
   "drift": [],
-  "n_rows_recorded": 92,
+  "n_rows_recorded": 72,
+  "geometry_rerun_complete": [],
   "orphan_archives": {
     "stale": [
       "solutions_2D_HET_MMS_SPT100_HHL_N64.npz",
+      "solutions_2D_HET_MMS_SPT100_QSVT_N64.npz",
       "solutions_2D_HET_MMS_SPT100_Thomas_N64.npz",
+      "solutions_2D_HET_MMS_SPT100_VQLS_N64.npz",
+      "solutions_2D_HET_Sin_MeetingReport_HHL_N32.npz",
       "solutions_2D_HET_Sin_MeetingReport_HHL_N64.npz",
-      "solutions_2D_HET_Sin_MeetingReport_Thomas_N64.npz"
+      "solutions_2D_HET_Sin_MeetingReport_QSVT_N32.npz",
+      "solutions_2D_HET_Sin_MeetingReport_QSVT_N64.npz",
+      "solutions_2D_HET_Sin_MeetingReport_Thomas_N32.npz",
+      "solutions_2D_HET_Sin_MeetingReport_Thomas_N64.npz",
+      "solutions_2D_HET_Sin_MeetingReport_VQLS_N32.npz",
+      "solutions_2D_HET_Sin_MeetingReport_VQLS_N64.npz"
     ],
-    "unexplained": []
+    "unexplained": [
+      "solutions_2D_Poisson_SingleMode_n1m1_HHL_N64.npz",
+      "solutions_2D_Poisson_SingleMode_n1m1_QSVT_N64.npz",
+      "solutions_2D_Poisson_SingleMode_n1m1_Thomas_N64.npz",
+      "solutions_2D_Poisson_SingleMode_n1m1_VQLS_N64.npz",
+      "solutions_2D_Poisson_TwoGaussian_PlasmaNet_HHL_N32.npz",
+      "solutions_2D_Poisson_TwoGaussian_PlasmaNet_HHL_N64.npz",
+      "solutions_2D_Poisson_TwoGaussian_PlasmaNet_QSVT_N32.npz",
+      "solutions_2D_Poisson_TwoGaussian_PlasmaNet_QSVT_N64.npz",
+      "solutions_2D_Poisson_TwoGaussian_PlasmaNet_Thomas_N32.npz",
+      "solutions_2D_Poisson_TwoGaussian_PlasmaNet_Thomas_N64.npz",
+      "solutions_2D_Poisson_TwoGaussian_PlasmaNet_VQLS_N32.npz",
+      "solutions_2D_Poisson_TwoGaussian_PlasmaNet_VQLS_N64.npz",
+      "solutions_2D_Poisson_sin_hom_HHL_N64.npz",
+      "solutions_2D_Poisson_sin_hom_QSVT_N64.npz",
+      "solutions_2D_Poisson_sin_hom_Thomas_N64.npz",
+      "solutions_2D_Poisson_sin_hom_VQLS_N64.npz"
+    ]
   },
-  "generated": "2026-08-13T12:58:48+00:00",
+  "generated": "2026-08-16T23:54:34+00:00",
   "dim": 2,
   "order": 2,
-  "results_dir": "results\\2Dhpc_run",
+  "results_dir": "results/2Dhpc_run",
   "strict": false,
   "expected": {
     "cases": [
