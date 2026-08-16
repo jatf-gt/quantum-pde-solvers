@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.gap_analysis import (LEGACY_HHL_TIMEOUT_S, classify_row,
-                                  STALE_GEOMETRY_CASES)
+from scripts.utils.gap_analysis import (LEGACY_HHL_TIMEOUT_S, classify_row,
+                                        STALE_GEOMETRY_CASES)
 
 
 def _row(**kwargs) -> dict:
