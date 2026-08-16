@@ -737,7 +737,7 @@ def main() -> int:
             # same reason: a walltime kill should discard at most one case, not the
             # entirety of accumulated results.
             if ea_all:
-                archive.write_equal_accuracy(ea_all)
+                archive.append_equal_accuracy(ea_all)
             for name, sweeps in sens_all.items():
                 archive.write_sensitivity(name, sweeps)
 

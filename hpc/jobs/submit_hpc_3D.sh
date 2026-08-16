@@ -193,8 +193,11 @@ fi
 
 MAX_WORKERS=4
 
+# Per-case wall-clock bound on the outer iteration, forwarded to the scheme as
+# -S max_wall_s. In 3D, FMG should converge quickly, so 10h is a safe generous cap.
+MAX_WALL_S="${MAX_WALL_S:-36000}"
 SCHEME="${OUTER_SCHEME:-fmg}"
-COMMON_ARGS="--scheme ${SCHEME} --max-workers ${MAX_WORKERS}"
+COMMON_ARGS="--scheme ${SCHEME} --max-workers ${MAX_WORKERS} -S max_wall_s=${MAX_WALL_S}"
 [ -n "${OUTER_TOL}" ]        && COMMON_ARGS="${COMMON_ARGS} --tol ${OUTER_TOL}"
 [ -n "${SCHEME_CROSSOVER}" ] && COMMON_ARGS="${COMMON_ARGS} --scheme-crossover ${SCHEME_CROSSOVER}"
 if [ -n "${SECTIONS}" ]; then

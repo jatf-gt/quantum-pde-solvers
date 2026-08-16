@@ -301,7 +301,7 @@ class SweepArchive:
     # -- Equal-accuracy results ------------------------------------------------
 
     def write_equal_accuracy(self, ea_results: list[EqualAccuracyResult]) -> None:
-        """Write equal-accuracy results to JSON."""
+        """Write equal-accuracy results to JSON, overwriting existing."""
         path = self.root / "equal_accuracy.json"
         records = []
         for ear in ea_results:
@@ -320,6 +320,24 @@ class SweepArchive:
             })
         with open(path, "w", encoding="utf-8") as f:
             json.dump(records, f, indent=2, default=str)
+
+    def append_equal_accuracy(self, new_results: list[EqualAccuracyResult]) -> None:
+        """
+        Append new equal-accuracy results, replacing existing ones with the same
+        (case_id, solver, N).
+        """
+        existing = self.read_equal_accuracy()
+        # Find which case/solver combos are in new_results
+        new_keys = {
+            (r.best_result.case_id, r.solver, r.best_result.N)
+            for r in new_results
+        }
+        # Keep existing results that are not being replaced
+        to_keep = [
+            r for r in existing
+            if (r.best_result.case_id, r.solver, r.best_result.N) not in new_keys
+        ]
+        self.write_equal_accuracy(to_keep + new_results)
 
     def read_equal_accuracy(self) -> list[EqualAccuracyResult]:
         """Read equal-accuracy results from JSON."""

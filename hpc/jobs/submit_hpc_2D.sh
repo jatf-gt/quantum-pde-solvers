@@ -233,8 +233,11 @@ fi
 MAX_WORKERS=4
 
 # Common flags shared by both phases.
+# Per-case wall-clock bound on the outer iteration, forwarded to the scheme as
+# -S max_wall_s. Ensures VQLS does not over-run if it stagnates.
+MAX_WALL_S="${MAX_WALL_S:-21600}"
 SCHEME="${OUTER_SCHEME:-fmg}"
-COMMON_ARGS="--scheme ${SCHEME} --max-workers ${MAX_WORKERS}"
+COMMON_ARGS="--scheme ${SCHEME} --max-workers ${MAX_WORKERS} -S max_wall_s=${MAX_WALL_S}"
 
 if [ -n "${OUTER_TOL}" ]; then
     COMMON_ARGS="${COMMON_ARGS} --tol ${OUTER_TOL}"
