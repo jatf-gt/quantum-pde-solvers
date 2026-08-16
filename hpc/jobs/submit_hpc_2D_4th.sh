@@ -257,8 +257,9 @@ echo ""
 echo "============================================================"
 echo "  Gap analysis after the run"
 echo "============================================================"
-python3 scripts/gap_analysis.py --dim 2 \
+python3 scripts/gap_analysis.py --dim 2 --order 4 \
         --results-dir "${RESULTS_SUBDIR}" --n-values "${N_VALUES}" \
+        --geometry-rerun-complete 2D_HET_MMS_SPT100,2D_HET_Sin_MeetingReport \
         -o results/manifests/rerun_2d_order4.json || true
 
 RDS_RESULTS="${HOME}/qpde-results/2Dhpc_run_4th_$(date +%Y%m%d_%H%M%S)"

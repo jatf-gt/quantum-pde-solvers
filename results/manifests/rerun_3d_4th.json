@@ -1,289 +1,216 @@
 {
-  "rerun": [
-    {
-      "case": "3D_HET_Discharge_SPT100",
-      "solver": "Thomas",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 0.01674010418355465,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_Discharge_SPT100",
-      "solver": "HHL",
-      "N": 4,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 240.83794064819813,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_Discharge_SPT100",
-      "solver": "VQLS",
-      "N": 4,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 696.3479846455157,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_Discharge_SPT100",
-      "solver": "QSVT",
-      "N": 4,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 4.941378818824887,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_Discharge_SPT100",
-      "solver": "Thomas",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 0.7209729421883821,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_Discharge_SPT100",
-      "solver": "HHL",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 8011.944562438875,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_Discharge_SPT100",
-      "solver": "VQLS",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 26304.914488442242,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_Discharge_SPT100",
-      "solver": "QSVT",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 113.42457436770201,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_MMS_SPT100",
-      "solver": "Thomas",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 0.03115858882665634,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_MMS_SPT100",
-      "solver": "HHL",
-      "N": 4,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 243.34086016193032,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_MMS_SPT100",
-      "solver": "VQLS",
-      "N": 4,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 866.7816894557327,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_MMS_SPT100",
-      "solver": "QSVT",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 3.4167544655501842,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_MMS_SPT100",
-      "solver": "Thomas",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 0.3541027996689081,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_MMS_SPT100",
-      "solver": "HHL",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 7540.452740138397,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_MMS_SPT100",
-      "solver": "VQLS",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 14608.59118671529,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_MMS_SPT100",
-      "solver": "QSVT",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 60.0036742426455,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_RotatingSpoke_SPT100",
-      "solver": "Thomas",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 0.026660330593585968,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_RotatingSpoke_SPT100",
-      "solver": "HHL",
-      "N": 4,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 297.99209843575954,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_RotatingSpoke_SPT100",
-      "solver": "VQLS",
-      "N": 4,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 618.9894692245871,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_RotatingSpoke_SPT100",
-      "solver": "QSVT",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 4.104518670588732,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_RotatingSpoke_SPT100",
-      "solver": "Thomas",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 0.5292083211243153,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_RotatingSpoke_SPT100",
-      "solver": "HHL",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 8061.334771793336,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_RotatingSpoke_SPT100",
-      "solver": "VQLS",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 19518.760514954105,
-      "reasons": [
-        "stale_geometry"
-      ]
-    },
-    {
-      "case": "3D_HET_RotatingSpoke_SPT100",
-      "solver": "QSVT",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 56.968381356447935,
-      "reasons": [
-        "stale_geometry"
-      ]
-    }
-  ],
+  "rerun": [],
   "keep": [
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.01674010418355465
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 240.83794064819813
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 696.3479846455157
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 4.941378818824887
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.7209729421883821
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 8011.944562438875
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 26304.914488442242
+    },
+    {
+      "case": "3D_HET_Discharge_SPT100",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 113.42457436770201
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.03115858882665634
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 243.34086016193032
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 866.7816894557327
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.4167544655501842
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.3541027996689081
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 7540.452740138397
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 14608.59118671529
+    },
+    {
+      "case": "3D_HET_MMS_SPT100",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 60.0036742426455
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.026660330593585968
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 297.99209843575954
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 618.9894692245871
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 4.104518670588732
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.5292083211243153
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 8061.334771793336
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 19518.760514954105
+    },
+    {
+      "case": "3D_HET_RotatingSpoke_SPT100",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 56.968381356447935
+    },
     {
       "case": "3D_Laplace_BCdriven_cube",
       "solver": "Thomas",
@@ -562,15 +489,19 @@
   ],
   "drift": [],
   "n_rows_recorded": 56,
-  "geometry_rerun_complete": [],
+  "geometry_rerun_complete": [
+    "3D_HET_Discharge_SPT100",
+    "3D_HET_MMS_SPT100",
+    "3D_HET_RotatingSpoke_SPT100"
+  ],
   "orphan_archives": {
     "stale": [],
     "unexplained": []
   },
-  "generated": "2026-08-16T17:19:51+00:00",
+  "generated": "2026-08-16T17:26:08+00:00",
   "dim": 3,
   "order": 4,
-  "results_dir": "results/3Dhpc_run_4th",
+  "results_dir": "results\\3Dhpc_run_4th",
   "strict": false,
   "expected": {
     "cases": [

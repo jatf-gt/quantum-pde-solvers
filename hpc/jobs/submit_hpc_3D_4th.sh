@@ -247,8 +247,9 @@ echo ""
 echo "============================================================"
 echo "  Gap analysis after the run"
 echo "============================================================"
-python3 scripts/gap_analysis.py --dim 3 \
+python3 scripts/gap_analysis.py --dim 3 --order 4 \
         --results-dir "${RESULTS_SUBDIR}" --n-values "${N_VALUES}" \
+        --geometry-rerun-complete 3D_HET_Discharge_SPT100,3D_HET_MMS_SPT100,3D_HET_RotatingSpoke_SPT100 \
         -o results/manifests/rerun_3d_order4.json || true
 
 RDS_RESULTS="${HOME}/qpde-results/3Dhpc_run_4th_$(date +%Y%m%d_%H%M%S)"
