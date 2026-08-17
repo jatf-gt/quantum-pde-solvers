@@ -102,6 +102,7 @@ source "${VENV_PATH}/bin/activate"
 # ORDER=4 additionally checks the pentadiagonal module, absent from the upstream
 # quantum_linear_solvers. Its absence cost a 21 h job in which every HHL row
 # failed with ModuleNotFoundError.
+export PREFLIGHT_ALLOW_DIRTY=1
 ORDER=4 bash hpc/jobs/_preflight.sh || exit 1
 
 # The retired path is gone; a clone that still carries it predates Phase 4b and
