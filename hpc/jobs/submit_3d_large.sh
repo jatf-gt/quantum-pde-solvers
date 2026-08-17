@@ -8,6 +8,8 @@
 #PBS -m abe
 
 cd $PBS_O_WORKDIR
+module load tools/prod
+module load Python/3.12.3-GCCcore-13.3.0
 source ~/venvs/qpde/bin/activate
 
 # Allow dirty tree
