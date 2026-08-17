@@ -204,6 +204,18 @@ if [ -n "${SECTIONS}" ]; then
     COMMON_ARGS="${COMMON_ARGS} --sections ${SECTIONS}"
     echo "INFO: running sections ${SECTIONS} only, both phases."
 fi
+if [ -n "${N_VALUES}" ]; then
+    COMMON_ARGS="${COMMON_ARGS} --n-values ${N_VALUES}"
+    echo "INFO: N_VALUES override = ${N_VALUES}"
+fi
+if [ -n "${SOLVERS}" ]; then
+    COMMON_ARGS="${COMMON_ARGS} --solvers ${SOLVERS}"
+    echo "INFO: SOLVERS override = ${SOLVERS}"
+fi
+if [ -n "${CASES}" ]; then
+    COMMON_ARGS="${COMMON_ARGS} --cases ${CASES}"
+    echo "INFO: CASES override = ${CASES}"
+fi
 
 QSVT_MAX_DEGREE="${QSVT_MAX_DEGREE:-500}"
 PHASE1_EXIT=0

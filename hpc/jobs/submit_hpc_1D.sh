@@ -130,12 +130,30 @@ if [ -n "${MAX_N}" ]; then
     EXTRA_ARGS="${EXTRA_ARGS} --max-n ${MAX_N}"
     echo "INFO: sweep truncated at N=${MAX_N}."
 fi
+if [ -n "${N_VALUES}" ]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --n-values ${N_VALUES}"
+    echo "INFO: N_VALUES = ${N_VALUES}"
+fi
+if [ -n "${SOLVERS}" ]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --solvers ${SOLVERS}"
+    echo "INFO: SOLVERS = ${SOLVERS}"
+fi
+if [ -n "${CASES}" ]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --cases ${CASES}"
+    echo "INFO: CASES = ${CASES}"
+fi
+if [ -n "${HHL_TIMEOUT_S}" ]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --hhl-timeout-s ${HHL_TIMEOUT_S}"
+    echo "INFO: HHL_TIMEOUT_S = ${HHL_TIMEOUT_S}"
+fi
 if [ "${SKIP_QSVT:-0}" = "1" ]; then
     EXTRA_ARGS="${EXTRA_ARGS} --skip-qsvt"
     echo "INFO: QSVT disabled."
 fi
 # Worker count is pinned to the ncpus requested above.
 EXTRA_ARGS="${EXTRA_ARGS} --max-workers 4"
+# Always append to preserve existing rows.
+EXTRA_ARGS="${EXTRA_ARGS} --append"
 
 echo "Starting benchmark at $(date)"
 echo "Arguments: ${EXTRA_ARGS}"
