@@ -162,14 +162,7 @@ but without a marker are genuine slow completions at high κ (e.g. N=32 where
 all fell within 1 s of the budget.
 """
 
-STALE_GEOMETRY_CASES: frozenset[str] = frozenset({
-    "HET_1D_3b_gaussian_Vd300",
-    "2D_HET_MMS_SPT100",
-    "2D_HET_Sin_MeetingReport",
-    "3D_HET_MMS_SPT100",
-    "3D_HET_RotatingSpoke_SPT100",
-    "3D_HET_Discharge_SPT100",
-})
+STALE_GEOMETRY_CASES: frozenset[str] = frozenset()
 """
 Cases proven to change under the SPT-100 geometry correction (commit ``861ff46``).
 
