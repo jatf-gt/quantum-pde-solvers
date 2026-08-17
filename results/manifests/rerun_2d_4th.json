@@ -2,6 +2,151 @@
   "rerun": [
     {
       "case": "2D_HET_MMS_SPT100",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.003309037536382675,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 50.92982064187527,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 34.19648325443268,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.800876384600997,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.019264964386820793,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 781.1707335971296,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 1422.0689331684262,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 3.333337388932705,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 0.026235027238726616,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 5077.801534928381,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 15114.142545836046,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 3.9999104123562574,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 0.04606625437736511,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
       "solver": "HHL",
       "N": 32,
       "flags": [
@@ -9,6 +154,7 @@
       ],
       "wall_time_s": 21627.734506700188,
       "reasons": [
+        "stale_geometry",
         "wall_time_exceeded"
       ]
     },
@@ -21,7 +167,163 @@
       ],
       "wall_time_s": 21666.38085249439,
       "reasons": [
+        "stale_geometry",
         "wall_time_exceeded"
+      ]
+    },
+    {
+      "case": "2D_HET_MMS_SPT100",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 334.84737383387983,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.003709174692630768,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 59.01876378804445,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 38.94472773000598,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.34401616640388966,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 0.02475663088262081,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 766.1866490859538,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 2193.1301527917385,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 3.5735061187297106,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 0.0391351543366909,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 4983.62524211593,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "stagnated",
+        "not_converged"
+      ],
+      "wall_time_s": 11209.782137157395,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 8.659213237464428,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 0.08538385294377804,
+      "reasons": [
+        "stale_geometry"
       ]
     },
     {
@@ -33,6 +335,7 @@
       ],
       "wall_time_s": 21647.18130804971,
       "reasons": [
+        "stale_geometry",
         "wall_time_exceeded"
       ]
     },
@@ -45,7 +348,18 @@
       ],
       "wall_time_s": 21613.671705810353,
       "reasons": [
+        "stale_geometry",
         "wall_time_exceeded"
+      ]
+    },
+    {
+      "case": "2D_HET_Sin_MeetingReport",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 410.77944663353264,
+      "reasons": [
+        "stale_geometry"
       ]
     },
     {
@@ -122,232 +436,6 @@
     }
   ],
   "keep": [
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "Thomas",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 0.003309037536382675
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "HHL",
-      "N": 4,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 50.92982064187527
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "VQLS",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 34.19648325443268
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "QSVT",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 0.800876384600997
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "Thomas",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 0.019264964386820793
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "HHL",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 781.1707335971296
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "VQLS",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 1422.0689331684262
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "QSVT",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 3.333337388932705
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "Thomas",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 0.026235027238726616
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "HHL",
-      "N": 16,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 5077.801534928381
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "VQLS",
-      "N": 16,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 15114.142545836046
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "QSVT",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 3.9999104123562574
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "Thomas",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 0.04606625437736511
-    },
-    {
-      "case": "2D_HET_MMS_SPT100",
-      "solver": "QSVT",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 334.84737383387983
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "Thomas",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 0.003709174692630768
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "HHL",
-      "N": 4,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 59.01876378804445
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "VQLS",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 38.94472773000598
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "QSVT",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 0.34401616640388966
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "Thomas",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 0.02475663088262081
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "HHL",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 766.1866490859538
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "VQLS",
-      "N": 8,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 2193.1301527917385
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "QSVT",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 3.5735061187297106
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "Thomas",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 0.0391351543366909
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "HHL",
-      "N": 16,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 4983.62524211593
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "VQLS",
-      "N": 16,
-      "flags": [
-        "stagnated",
-        "not_converged"
-      ],
-      "wall_time_s": 11209.782137157395
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "QSVT",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 8.659213237464428
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "Thomas",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 0.08538385294377804
-    },
-    {
-      "case": "2D_HET_Sin_MeetingReport",
-      "solver": "QSVT",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 410.77944663353264
-    },
     {
       "case": "2D_Poisson_SingleMode_n1m1",
       "solver": "Thomas",
@@ -699,15 +787,12 @@
   ],
   "drift": [],
   "n_rows_recorded": 80,
-  "geometry_rerun_complete": [
-    "2D_HET_MMS_SPT100",
-    "2D_HET_Sin_MeetingReport"
-  ],
+  "geometry_rerun_complete": [],
   "orphan_archives": {
     "stale": [],
     "unexplained": []
   },
-  "generated": "2026-08-16T17:25:58+00:00",
+  "generated": "2026-08-17T11:15:40+00:00",
   "dim": 2,
   "order": 4,
   "results_dir": "results\\2Dhpc_run_4th",

@@ -1,5 +1,219 @@
 {
-  "rerun": [],
+  "rerun": [
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 3.735092468559742e-05,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 48.67749920801725,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 2.4937745720380917,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 4,
+      "flags": [],
+      "wall_time_s": 0.5094869430176914,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 4.4891959987580776e-05,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 51.6815072739264,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 110.6081354750786,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 8,
+      "flags": [],
+      "wall_time_s": 2.3826549199875444,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 6.298208609223366e-05,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 96.70896632398944,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 16,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 258.83181566593703,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 16,
+      "flags": [],
+      "wall_time_s": 10.132283814018592,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 0.00010046304669231176,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 3884.336062841001,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 32,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 496.4177685310133,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 32,
+      "flags": [],
+      "wall_time_s": 3.2498369819950312,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "Thomas",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 0.00018297508358955383,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "HHL",
+      "N": 64,
+      "flags": [
+        "solver_timeout",
+        "not_converged",
+        "no_error_metric"
+      ],
+      "wall_time_s": 7200.265727731981,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "VQLS",
+      "N": 64,
+      "flags": [
+        "not_converged",
+        "large_error_vs_exact"
+      ],
+      "wall_time_s": 926.0967829460278,
+      "reasons": [
+        "stale_geometry"
+      ]
+    },
+    {
+      "case": "HET_1D_3b_gaussian_Vd300",
+      "solver": "QSVT",
+      "N": 64,
+      "flags": [],
+      "wall_time_s": 3.080496074981056,
+      "reasons": [
+        "stale_geometry"
+      ]
+    }
+  ],
   "keep": [
     {
       "case": "1D_Poisson_fH_hom",
@@ -765,159 +979,6 @@
       "wall_time_s": 2.801830930984579
     },
     {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "Thomas",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 3.735092468559742e-05
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "HHL",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 48.67749920801725
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "VQLS",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 2.4937745720380917
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "QSVT",
-      "N": 4,
-      "flags": [],
-      "wall_time_s": 0.5094869430176914
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "Thomas",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 4.4891959987580776e-05
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "HHL",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 51.6815072739264
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "VQLS",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 110.6081354750786
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "QSVT",
-      "N": 8,
-      "flags": [],
-      "wall_time_s": 2.3826549199875444
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "Thomas",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 6.298208609223366e-05
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "HHL",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 96.70896632398944
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "VQLS",
-      "N": 16,
-      "flags": [
-        "not_converged",
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 258.83181566593703
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "QSVT",
-      "N": 16,
-      "flags": [],
-      "wall_time_s": 10.132283814018592
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "Thomas",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 0.00010046304669231176
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "HHL",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 3884.336062841001
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "VQLS",
-      "N": 32,
-      "flags": [
-        "not_converged",
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 496.4177685310133
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "QSVT",
-      "N": 32,
-      "flags": [],
-      "wall_time_s": 3.2498369819950312
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "Thomas",
-      "N": 64,
-      "flags": [],
-      "wall_time_s": 0.00018297508358955383
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "HHL",
-      "N": 64,
-      "flags": [
-        "solver_timeout",
-        "not_converged",
-        "no_error_metric"
-      ],
-      "wall_time_s": 7200.265727731981
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "VQLS",
-      "N": 64,
-      "flags": [
-        "not_converged",
-        "large_error_vs_exact"
-      ],
-      "wall_time_s": 926.0967829460278
-    },
-    {
-      "case": "HET_1D_3b_gaussian_Vd300",
-      "solver": "QSVT",
-      "N": 64,
-      "flags": [],
-      "wall_time_s": 3.080496074981056
-    },
-    {
       "case": "HET_1D_3c_gaussian_NeumannDirichlet",
       "solver": "Thomas",
       "N": 4,
@@ -1080,14 +1141,12 @@
   ],
   "drift": [],
   "n_rows_recorded": 140,
-  "geometry_rerun_complete": [
-    "HET_1D_3b_gaussian_Vd300"
-  ],
+  "geometry_rerun_complete": [],
   "orphan_archives": {
     "stale": [],
     "unexplained": []
   },
-  "generated": "2026-08-16T16:54:14+00:00",
+  "generated": "2026-08-17T11:15:39+00:00",
   "dim": 1,
   "order": 2,
   "results_dir": "results\\1Dhpc_run",
