@@ -232,15 +232,20 @@ if [ "${SKIP_QSVT:-0}" = "1" ]; then
     echo "INFO: QSVT disabled for Phase 1."
 fi
 
-echo "------------------------------------------------------------"
-echo "PHASE 1 (core): all solvers, N up to ${MAX_N:-16}"
-echo "Starting at $(date)"
-echo "Arguments: ${PHASE1_ARGS}"
-echo "------------------------------------------------------------"
+if [ "${SKIP_PHASE1:-0}" = "1" ]; then
+    echo "INFO: Phase 1 skipped (SKIP_PHASE1=1)."
+    PHASE1_EXIT=0
+else
+    echo "------------------------------------------------------------"
+    echo "PHASE 1 (core): all solvers, N up to ${MAX_N:-16}"
+    echo "Starting at $(date)"
+    echo "Arguments: ${PHASE1_ARGS}"
+    echo "------------------------------------------------------------"
 
-python3 hpc/runners/run_3d.py ${PHASE1_ARGS}
-PHASE1_EXIT=$?
-echo "Phase 1 finished at $(date) with exit code ${PHASE1_EXIT}"
+    python3 hpc/runners/run_3d.py ${PHASE1_ARGS}
+    PHASE1_EXIT=$?
+    echo "Phase 1 finished at $(date) with exit code ${PHASE1_EXIT}"
+fi
 
 # ============================================================
 #  Phase 2 (large): N = 32, QSVT only
