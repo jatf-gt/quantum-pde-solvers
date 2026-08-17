@@ -12,9 +12,12 @@
 #  ---------------
 #  Comparing HHL, VQLS and QSVT at nominally equal precision parameters is
 #  methodologically unsound: the VQLS cost C bounds the residual only as
-#  C >= r^2/kappa^2, HHL's epsilon is coupled to the Trotter count as
-#  n_T = ceil(1/epsilon), and the QSVT residual is non-monotone in polynomial
-#  degree through the oscillatory Chebyshev error. The equal-accuracy protocol
+#  C >= r^2/kappa^2, HHL's epsilon reaches the Trotter count only through the
+#  library's own derivation from eps/6 and an evolution time fixed from the
+#  spectral bounds (NOT as n_T = ceil(1/epsilon), which is what this file
+#  claimed until 2026-08-17 and what the runner recorded), and the QSVT residual
+#  is non-monotone in polynomial degree through the oscillatory Chebyshev error.
+#  The equal-accuracy protocol
 #  sweeps each solver's own knob until its residual reaches a common target and
 #  reports the RESOURCE COST there, which is the defensible comparison.
 #

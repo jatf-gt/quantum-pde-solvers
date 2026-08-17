@@ -83,6 +83,9 @@ log = logging.getLogger(__name__)
 
 HHL_BASELINE: dict = {
     "epsilon": 0.01,
+    # None derives the step count from epsilon, which is the ordinary operating
+    # mode. Set to an integer only when the step count is the swept variable.
+    "trotter_steps": None,
 }
 
 VQLS_BASELINE: dict = {
@@ -100,7 +103,19 @@ QSVT_BASELINE: dict = {
 # -- Sensitivity parameter grids -----------------------------------------------
 
 HHL_SENSITIVITY_GRIDS: dict[str, list] = {
+    # Overall algorithm precision. HHL apportions eps/6 of it to the Hamiltonian
+    # simulation and derives the step count from that, so this axis varies the
+    # step count *and* the reciprocal-rotation and state-preparation tolerances
+    # together — it is the "how accurate do I ask for" axis.
     "epsilon": [0.1, 0.05, 0.01, 0.005, 0.001],
+    # The Hamiltonian-simulation step count on its own, at fixed epsilon. This is
+    # the "how much simulation depth do I pay for" axis, and it is the one that
+    # isolates Trotter error from every other error source in the algorithm. The
+    # grid is geometric because the error falls roughly as 1/n_T²: measured at
+    # N=4, the relative residual runs 3.03e-1, 3.52e-2, 2.12e-2, 1.75e-2, 1.67e-2
+    # across n_T = 1, 2, 4, 8, 16, against a floor set by the phase-estimation
+    # register rather than by the simulation.
+    "trotter_steps": [1, 2, 4, 8, 16, 32],
 }
 
 VQLS_SENSITIVITY_GRIDS: dict[str, list] = {
@@ -178,7 +193,16 @@ def sensitivity_sweep_hhl(
     Parameters
     ----------
     param_name : str
-        Parameter to vary: 'epsilon'.
+        Parameter to vary: 'epsilon' or 'trotter_steps'.
+
+        The two are not interchangeable. 'epsilon' is the algorithm's overall
+        precision, apportioned across the reciprocal rotation, the state
+        preparation and the Hamiltonian simulation together. 'trotter_steps'
+        fixes the simulation depth alone at constant epsilon, isolating Trotter
+        error from every other error source, and is valid only for a Toeplitz
+        tridiagonal operator — the general branch exponentiates exactly and has
+        no Trotter decomposition, so it raises rather than silently ignoring the
+        request.
     param_values : list, optional
         Values to sweep. Defaults to HHL_SENSITIVITY_GRIDS[param_name].
     baseline : dict, optional
@@ -220,14 +244,27 @@ def sensitivity_sweep_hhl(
             N, param_name, val, baseline,
         )
         eps_val = float(cfg_kwargs["epsilon"])
+        n_trotter_req = cfg_kwargs.get("trotter_steps")
+        if n_trotter_req is not None:
+            n_trotter_req = int(n_trotter_req)
 
         try:
             t0 = time.perf_counter()
-            u_sol, raw_state, _prop_const = hhl_solve_system(A, b, eps_val)
+            # `diagnostics` carries back the step count actually simulated. It is
+            # not a function of epsilon that the caller can evaluate: the library
+            # derives it from an evolution time HHL fixes from the spectral
+            # bounds. This sweep previously recorded ceil(1/eps), a number no
+            # circuit ever used.
+            diag: dict = {}
+            u_sol, raw_state, _prop_const = hhl_solve_system(
+                A, b, eps_val,
+                trotter_steps=n_trotter_req,
+                diagnostics=diag,
+            )
             wall = time.perf_counter() - t0
 
             u_sol = np.array(u_sol)
-            n_trotter = int(np.ceil(1.0 / eps_val))
+            n_trotter = diag.get("trotter_steps")
 
             prop_residual = None
             if raw_state is not None:
@@ -636,7 +673,12 @@ def run_all_sensitivity_sweeps(
 # solve rather than executing a null sweep. `cobyla_tol` is specified as `tol` here
 # for consistency.
 OUTER_SENSITIVITY_GRIDS: dict[str, dict[str, list]] = {
-    "hhl":  {"epsilon": [0.1, 0.05, 0.01, 0.005]},
+    # Both HHL axes are available through the outer iteration, because the inner
+    # registry forwards `trotter_steps` to the strip solver. Every 2-D and 3-D
+    # strip is Toeplitz tridiagonal on a uniform mesh, so the pin is valid there
+    # for every case.
+    "hhl":  {"epsilon": [0.1, 0.05, 0.01, 0.005],
+             "trotter_steps": [1, 2, 4, 8, 16]},
     "vqls": {"n_layers": [1, 2, 3, 4, 5],
              "n_restarts": [1, 2, 3, 5]},
     "qsvt": {"max_degree": [50, 100, 200, 500, None]},

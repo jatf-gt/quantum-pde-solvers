@@ -321,7 +321,7 @@ VQLS_SEED: int = 42
 # completion threshold gets located. Whatever it is set to, a timed-out row records
 # the value in its notes, so rows from runs at different budgets stay comparable.
 #
-# `scripts/gap_analysis.py` deliberately does NOT track this value. It keeps its own
+# `scripts/utils/gap_analysis.py` deliberately does NOT track this value. It keeps its own
 # LEGACY_HHL_TIMEOUT_S = 3600, the budget the *existing archive* was produced under,
 # because that is a fact about recorded data and must not move when this default is
 # raised - see the docstring there.
@@ -423,7 +423,7 @@ class RunResult:
     # -- Benchmarking-framework metrics (Phase 8) ------------------------------
     # Fields declared by `benchmark/results_io.BenchmarkResult` that this schema
     # did not previously carry. They are appended rather than replacing anything,
-    # so `benchmark/hpc_archive.py`, `scripts/gap_analysis.py` and
+    # so `benchmark/hpc_archive.py`, `scripts/utils/gap_analysis.py` and
     # `benchmark/hpc_plotting.py` -- all of which read this file by field name --
     # continue to read existing archives unchanged.
 
@@ -885,22 +885,35 @@ def _hhl_worker(A, b, epsilon, q, order: int = 2):
         from solvers.quantum.hhl_1d_4th import hhl_solve_system_4th
         res = hhl_solve_system_4th(A, b, epsilon=epsilon)
         # Matched to the 2nd-order module's (u, x_raw, c) tuple, so that
-        # `_run_hhl` needs no knowledge of which order produced the result.
-        q.put((res.u, res.raw_state, res.prop_const))
+        # `_run_hhl` needs no knowledge of which order produced the result. The
+        # fourth-order module exposes no diagnostics mapping, so the step count
+        # travels back as None and the row records nothing rather than a guess.
+        q.put((res.u, res.raw_state, res.prop_const, {}))
         return
 
     from solvers.quantum.hhl_1d import hhl_solve_system
-    q.put(hhl_solve_system(A, b, epsilon))
+    # The step count is settled inside the solve, from an evolution time HHL
+    # fixes from the spectral bounds, and cannot be recovered from epsilon
+    # afterwards. It is carried back explicitly so that the row records the
+    # count that was simulated.
+    diag: dict = {}
+    u, x_raw, c = hhl_solve_system(A, b, epsilon, diagnostics=diag)
+    q.put((u, x_raw, c, diag))
 
 def _run_hhl(A: np.ndarray, b: np.ndarray, N: int,
              epsilon: float = HHL_EPSILON,
              timeout_s: float = HHL_TIMEOUT_S,
              order: int = 2,
-             ) -> tuple[Optional[np.ndarray], float, float, bool, float, str]:
+             ) -> tuple[Optional[np.ndarray], float, float, bool, float, str,
+                        dict]:
     """
     HHL via the project module solvers/quantum/hhl_1d.py, with a HARD wall-clock timeout.
 
-    Returns (u, residual, wall_s, converged, scale_c, failure_note).
+    Returns (u, residual, wall_s, converged, scale_c, failure_note, diagnostics).
+
+    `diagnostics` carries the Trotter step count and evolution time as actually
+    simulated. Neither is recoverable from epsilon afterwards, and both are empty
+    on a timed-out or failed solve, where no circuit was completed.
 
     `scale_c` is the proportionality-recovery constant. It is NOT derivable
     from the returned solution vector afterwards, so it is propagated rather
@@ -937,18 +950,18 @@ def _run_hhl(A: np.ndarray, b: np.ndarray, N: int,
         # The budget is part of the note, so a one-hour timeout is distinguishable
         # from a six-hour one without consulting the run metadata.
         return (None, float("nan"), time.perf_counter() - t0, False,
-                float("nan"), f"hhl_timeout:{timeout_s:.0f}s")
+                float("nan"), f"hhl_timeout:{timeout_s:.0f}s", {})
 
     try:
-        u, x_raw, c = q.get_nowait()
+        u, x_raw, c, diag = q.get_nowait()
 
     except Exception as exc:
         log.warning("    HHL failed: %s", exc)
         return (None, float("nan"), time.perf_counter() - t0, False,
-                float("nan"), "hhl_error")
+                float("nan"), "hhl_error", {})
 
     wall = time.perf_counter() - t0
-    return u, _relative_residual(A, u, b), wall, True, float(c), ""
+    return u, _relative_residual(A, u, b), wall, True, float(c), "", diag
 
 
 def _run_vqls(A: np.ndarray, b: np.ndarray, N: int
@@ -1334,7 +1347,7 @@ def _run_all_solvers(
 
     # -- HHL -------------------------------------------------------------------
     if sel.wants_solver("hhl"):
-        u_H, res_H, t_H, conv_H, c_H, note_H = _run_hhl(
+        u_H, res_H, t_H, conv_H, c_H, note_H, diag_H = _run_hhl(
             A, b, N, timeout_s=sel.hhl_timeout_s, order=order)
         if u_H is not None:
             if u_ref is not None:
@@ -1350,10 +1363,16 @@ def _run_all_solvers(
                 notes=";".join(filter(None, (ref_note, note_H))),
                 u_thomas=u_T, u_exact=u_exact, order=order,
                 n_qubits=n_data_qubits, hhl_epsilon=HHL_EPSILON,
-                # n_T = ceil(1/epsilon) couples the Trotter count to the QPE
-                # precision; the equal-accuracy protocol treats them as one knob,
-                # so the derived value is recorded rather than left implicit.
-                hhl_trotter_steps=int(np.ceil(1.0 / HHL_EPSILON)),
+                # The step count as actually simulated, carried back from the
+                # solve. It is not ceil(1/epsilon), which is what this column
+                # recorded until 2026-08-17: the library derives the count as
+                # ceil(sqrt((t*|b_off|)^3 / 2*eps_a)) from an evolution time HHL
+                # fixes from the spectral bounds, so no closed form in epsilon
+                # alone is available to the caller. At epsilon = 0.01 the
+                # derived count is 7, against the 100 this column reported.
+                # None on a timed-out solve and on the 4th-order path, both of
+                # which return no diagnostics.
+                hhl_trotter_steps=diag_H.get("trotter_steps"),
                 hhl_scale_c=c_H if u_H is not None else None)
 
     # -- VQLS ------------------------------------------------------------------

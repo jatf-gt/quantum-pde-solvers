@@ -43,9 +43,13 @@ Parameter grids
 ---------------
 HHL:
   Primary parameter: epsilon ∈ {0.1, 0.05, 0.01, 0.005, 0.001}
-  Note: trotter_steps = max(1, ceil(1/epsilon)) is coupled to epsilon.
-  This coupling is documented in the result but not broken, since
-  decoupling requires modifying the TridiagonalToeplitz constructor.
+  epsilon is the algorithm's overall precision. HHL apportions eps/6 of it to
+  the Hamiltonian simulation and derives the Trotter step count from that and
+  the evolution time it fixes from the spectral bounds. The count is therefore
+  coupled to epsilon but is *not* ceil(1/epsilon): at eps = 0.01 the derived
+  count is 7, not 100. The realised value is read back from the solve rather
+  than inferred, and the two can be decoupled where wanted — see the
+  `trotter_steps` argument of `solvers/quantum/hhl_1d.hhl_solve_system`.
 
 VQLS:
   Primary parameter: n_layers ∈ {1, 2, 3, 4, 5}
@@ -95,7 +99,22 @@ VQLS_NRESTARTS_GRID: list[int] = [1, 2, 3, 5]
 
 # Ordered highest-to-lowest accuracy so the first in-band result is the
 # most resource-efficient one that meets the target.
-QSVT_MAXDEGREE_GRID: list[Optional[int]] = [None, 5000, 2000, 1000, 500]
+#
+# The grid extends down to degree 20 because the protocol is meaningless
+# otherwise. QSVT's accuracy is governed by the ratio d/kappa: the residual runs
+# from ~0.9 at d/kappa ~ 0.6, through 3e-2 at ~3 and 5e-5 at ~11, to 1e-11 by
+# ~26. At N=8 (kappa = 32.2) the shallowest previous entry, degree 500, already
+# gives d/kappa = 15.5 and a residual near 5e-7 — three orders below the 1e-3
+# target, so every configuration on the grid overshot and the sweep compared
+# cost at *unequal* accuracy while reporting it as equal. Degrees 20 to 200 put
+# d/kappa in [0.6, 6.2] at that resolution, which is where the target lives.
+#
+# The additional points are close to free: QSVT's cost is linear in the degree,
+# so the four new entries together cost less than the single degree-500 entry
+# they sit below.
+QSVT_MAXDEGREE_GRID: list[Optional[int]] = [
+    None, 5000, 2000, 1000, 500, 200, 100, 50, 20,
+]
 
 # Default equal-accuracy target and acceptance band
 DEFAULT_R_TARGET: float = 1.0e-3
@@ -317,9 +336,9 @@ def sweep_hhl_equal_accuracy(
     Equal-accuracy sweep for the HHL algorithm.
 
     Sweeps epsilon over epsilon_grid, runs the HHL solver at each value,
-    and selects the result closest to r_target. The Trotter step count is
-    coupled to epsilon as n_T = max(1, ceil(1/epsilon)) per the current
-    TridiagonalToeplitz implementation.
+    and selects the result closest to r_target. The Trotter step count follows
+    from epsilon through the library's own derivation and is recorded as
+    realised, not inferred.
 
     Parameters
     ----------
@@ -361,11 +380,15 @@ def sweep_hhl_equal_accuracy(
         )
         try:
             t0 = time.perf_counter()
-            u_sol, raw_state, _prop_const = hhl_solve_system(A, b, eps)
+            # `diagnostics` carries back the step count actually simulated;
+            # ceil(1/eps) is not it. See `solvers/quantum/hhl_1d.py`.
+            diag: dict = {}
+            u_sol, raw_state, _prop_const = hhl_solve_system(
+                A, b, eps, diagnostics=diag)
             wall = time.perf_counter() - t0
 
             u_sol = np.array(u_sol)
-            n_trotter = int(np.ceil(1.0 / eps))
+            n_trotter = diag.get("trotter_steps")
 
             # Proportionality recovery residual (HHL-specific)
             raw_state = np.asarray(raw_state, dtype=float)
@@ -784,7 +807,12 @@ OUTER_PRECISION_KNOB: dict[str, str] = {
 OUTER_EQUAL_ACCURACY_GRIDS: dict[str, list] = {
     "hhl":  [0.1, 0.05, 0.01, 0.005],
     "vqls": [1, 2, 3, 4, 5],
-    "qsvt": [None, 500, 200, 100, 50],
+    # Extended below 50 for the same reason as the 1-D grid, and further,
+    # because the strip operator is far better conditioned: kappa_row is bounded
+    # by 3 in 2-D and by 2 in 3-D, so degree 50 already gives d/kappa ~ 17 and
+    # every previous entry sat at machine precision. Degrees 5 to 20 put the
+    # ratio in [1.7, 6.7], which is the range in which the target is reachable.
+    "qsvt": [None, 500, 200, 100, 50, 20, 10, 5],
 }
 
 
@@ -915,7 +943,12 @@ def sweep_outer_equal_accuracy(
             rec.sensitivity_value = None if val is None else float(val)
             if solver == "hhl":
                 rec.hhl_epsilon = float(val)
-                rec.hhl_trotter_steps = int(np.ceil(1.0 / float(val)))
+                # Left unset rather than filled with ceil(1/eps), which is not
+                # the count the library simulates. This path drives the solver
+                # through the outer iteration, which returns no per-strip
+                # diagnostics, so the realised count is genuinely unavailable
+                # here; recording a wrong number is worse than recording none.
+                rec.hhl_trotter_steps = None
             elif solver == "vqls":
                 rec.vqls_n_layers = int(val)
                 rec.vqls_cost_final = res.diagnostics.get("final_cost_mean")
