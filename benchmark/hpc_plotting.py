@@ -294,9 +294,15 @@ def plot_convergence(sweep, case: str, N: int, rows: list[dict], plt) -> Path | 
         h = sol["residual_history"]
         if len(h) == 0:
             continue
+        # `scheme` is read through .get: a row reconstructed by
+        # `scripts/utils/recover_orphan_rows.py` omits every field that existed
+        # only in the killed process's memory, the outer scheme among them, and
+        # its solution archive is still perfectly plottable. Direct indexing took
+        # the entire 2-D figure set down for want of one absent label.
+        scheme = r.get("scheme") or "scheme unrecorded"
         ax.semilogy(range(1, len(h) + 1), h, lw=1.8,
                     color=SOLVER_COLOUR.get(r["solver"]),
-                    label=f"{r['solver']} ({r['scheme']})")
+                    label=f"{r['solver']} ({scheme})")
         any_curve = True
     if not any_curve:
         plt.close(fig)
@@ -344,13 +350,23 @@ def plot_cost_vs_n(sweep, case: str, by_solver: dict, plt) -> Path | None:
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
     any_line = False
     for solver, rs in sweep.series(by_solver, case):
-        Ns = [r["N"] for r in rs]
+        # Each panel keeps its own abscissa. A recovered row carries the weighted
+        # cost scraped from the log but no wall time at all, so the two series
+        # cover different resolutions; pairing both against one shared list of N
+        # either mismatched in length -- silently suppressing the cost panel --
+        # or passed None to a logarithmic axis.
+        wc_N = [r["N"] for r in rs if r.get("weighted_cost") is not None]
         wc = [r["weighted_cost"] for r in rs if r.get("weighted_cost") is not None]
-        wt = [r["wall_time_s"] for r in rs]
-        if wc and len(wc) == len(Ns):
-            axes[0].loglog(Ns, wc, "o-", color=SOLVER_COLOUR.get(solver), label=solver)
-        axes[1].loglog(Ns, wt, "o-", color=SOLVER_COLOUR.get(solver), label=solver)
-        any_line = True
+        wt_N = [r["N"] for r in rs if r.get("wall_time_s")]
+        wt = [r["wall_time_s"] for r in rs if r.get("wall_time_s")]
+        if wc:
+            axes[0].loglog(wc_N, wc, "o-", color=SOLVER_COLOUR.get(solver),
+                           label=solver)
+            any_line = True
+        if wt:
+            axes[1].loglog(wt_N, wt, "o-", color=SOLVER_COLOUR.get(solver),
+                           label=solver)
+            any_line = True
     if not any_line:
         plt.close(fig)
         return None
@@ -603,8 +619,10 @@ def plot_residual_vs_N(
 ) -> None:
     """Log-log plot of ||Au-b||/||b|| vs N for all solvers and cases."""
     def usable(r):
-        # A failed solve records NaN, which would silently break a log axis.
-        return r["residual"] is not None and not np.isnan(float(r["residual"]))
+        # A failed solve records NaN, which would silently break a log axis; a
+        # row reconstructed from its solution archive omits the field entirely.
+        return (r.get("residual") is not None
+                and not np.isnan(float(r["residual"])))
 
     for case, solver_data in grouped.items():
         fig, ax = plt.subplots(figsize=(7, 5))

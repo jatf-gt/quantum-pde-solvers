@@ -75,6 +75,32 @@ def _fmt_int(val: Optional[int]) -> str:
     return f"{val:,}"
 
 
+def _fmt_float(val: Optional[float], decimals: int = 2) -> str:
+    """
+    Format a fixed-point quantity for console output, or '---' if unrecorded.
+
+    The console counterpart of `_latex_num`. Recovered rows carry None for every
+    quantity that existed only in a killed process's memory — the row condition
+    number among them — and an unguarded format specification raises on None,
+    which takes an entire table down for one absent entry.
+
+    Parameters
+    ----------
+    val : float or None
+        Quantity to render.
+    decimals : int
+        Digits after the decimal point.
+
+    Returns
+    -------
+    str
+        Fixed-point rendering, or '---' where the value is absent or not a number.
+    """
+    if val is None or (isinstance(val, float) and math.isnan(val)):
+        return "---"
+    return f"{val:.{decimals}f}"
+
+
 def _fmt_time(val: Optional[float]) -> str:
     """Format wall time in seconds with adaptive precision."""
     if val is None or (isinstance(val, float) and math.isnan(val)):
@@ -99,7 +125,7 @@ def _solver_label(solver: str) -> str:
 def _latex_sci(val: Optional[float], decimals: int = 2) -> str:
     """Format a float in LaTeX scientific notation for siunitx."""
     if val is None or (isinstance(val, float) and math.isnan(val)):
-        return r"\text{---}"
+        return r"{\text{---}}"
     if val == 0.0:
         return "0"
     exp = int(math.floor(math.log10(abs(val))))
@@ -110,8 +136,83 @@ def _latex_sci(val: Optional[float], decimals: int = 2) -> str:
 def _latex_pct(val: Optional[float], decimals: int = 3) -> str:
     """Format a percentage for LaTeX."""
     if val is None or (isinstance(val, float) and math.isnan(val)):
-        return r"\text{---}"
+        return r"{\text{---}}"
     return f"{val:.{decimals}f}"
+
+
+def _latex_num(val: Optional[float], decimals: int = 1) -> str:
+    """
+    Format a fixed-point quantity for LaTeX, or an em-dash rule if unrecorded.
+
+    Required wherever a column may be populated from a *recovered* row. A sweep
+    killed mid-work-unit loses the instrumented record but not the per-solution
+    archive, and `scripts/utils/recover_orphan_rows.py` deliberately leaves the
+    fields that existed only in the killed process's memory — wall time,
+    strip-solve counts, the row condition number — as None rather than zero. A
+    zero would read as "this solve was free", the opposite of the truth. This
+    formatter renders that absence explicitly instead of raising, which is what
+    an unguarded format specification does on None.
+
+    Parameters
+    ----------
+    val : float or None
+        Quantity to render.
+    decimals : int
+        Digits after the decimal point.
+
+    Returns
+    -------
+    str
+        Fixed-point rendering, or ``\\text{---}`` where the value is absent or
+        not a number.
+    """
+    if val is None or (isinstance(val, float) and math.isnan(val)):
+        return r"{\text{---}}"
+    return f"{val:.{decimals}f}"
+
+
+def _latex_int(val: Optional[int]) -> str:
+    """
+    Format an integer for a siunitx `S` column, or an em-dash rule if unrecorded.
+
+    The LaTeX counterpart of `_fmt_int`. The thousands separator is omitted:
+    siunitx applies its own digit grouping, and a literal comma inside an `S`
+    column is parsed as a decimal marker under several locale settings.
+
+    Parameters
+    ----------
+    val : int or None
+        Quantity to render.
+
+    Returns
+    -------
+    str
+        The integer, or a brace-wrapped em-dash where the value is absent.
+    """
+    if val is None:
+        return r"{\text{---}}"
+    return f"{int(val)}"
+
+
+def _latex_case(case_id: str) -> str:
+    """
+    Render a case identifier as LaTeX text, escaping the underscores.
+
+    Case identifiers are snake_case (`2D_HET_MMS_SPT100`), and an unescaped
+    underscore is a subscript operator in LaTeX maths mode; inside an `S` column
+    from siunitx it aborts the compile outright.
+
+    Parameters
+    ----------
+    case_id : str
+        Case identifier as recorded by the sweep.
+
+    Returns
+    -------
+    str
+        The identifier wrapped in `\\text{}` with every underscore escaped.
+    """
+    return r"\text{" + str(case_id).replace("_", r"\_") + "}"
 
 
 # -- LaTeX table builders ------------------------------------------------------
@@ -139,11 +240,14 @@ def latex_primary_comparison(
     results: list[BenchmarkResult],
     caption: str = (
         "Primary benchmark: maximum relative error, residual, circuit depth, "
-        "qubit count, and wall time for all solvers across problem sizes "
-        r"$N \in \{4, 8, 16, 32\}$. "
+        "qubit count, and wall time for every solver, grouped by case and "
+        "resolution. "
         "Thomas serves as the classical reference; errors are reported "
         "relative to the analytical solution where available, otherwise "
-        "relative to the Thomas solution."
+        "relative to the Thomas solution. "
+        r"An em-dash denotes a quantity the sweep did not record: a solve "
+        r"reconstructed from its solution archive retains every field derived "
+        r"from the field itself and none that existed only in the process."
     ),
     label: str = "tab:primary_comparison",
     N_values: Optional[list[int]] = None,
@@ -177,53 +281,64 @@ def latex_primary_comparison(
     if solvers is None:
         solvers = ["thomas", "hhl", "vqls", "qsvt"]
 
-    col_spec = "S[table-format=2.0] S[table-format=4.1] l S[table-format=3.3] S[table-format=1.2e2] S[table-format=6.0] S[table-format=2.0] S[table-format=4.2]"
+    col_spec = "l S[table-format=3.0] S[table-format=4.1] l S[table-format=3.3] S[table-format=1.2e2] S[table-format=6.0] S[table-format=2.0] S[table-format=4.2]"
 
     buf = io.StringIO()
     buf.write(_latex_header(caption, label, col_spec))
     buf.write(
-        "    {$N$} & {$\\kappa(A)$} & {Solver} & "
+        "    {Case} & {$N$} & {$\\kappa(A)$} & {Solver} & "
         "{$e_\\infty$ [\\%]} & {$r$} & "
         "{Depth} & {$n_q$} & {$t$ [s]} \\\\\n"
         "    \\midrule\n"
     )
 
-    for N in N_values:
-        n_rows = [r for r in results if r.N == N]
-        first_N = True
-        for solver in solvers:
-            row_list = [r for r in n_rows if r.solver.lower() == solver]
-            if not row_list:
-                continue
-            row = row_list[0]
+    # Grouped by case first. The sweeps carry between one and seven cases at each
+    # resolution, and selecting a single row per (N, solver) — as this builder did
+    # while it served the one-case laptop runner — silently discarded every case
+    # but the first, with nothing in the rendered table to indicate which had
+    # survived.
+    cases = sorted({r.case_id for r in results})
+    for case_idx, case_id in enumerate(cases):
+        case_rows = [r for r in results if r.case_id == case_id]
+        first_case = True
+        for N in N_values:
+            n_rows = [r for r in case_rows if r.N == N]
+            first_N = True
+            for solver in solvers:
+                row_list = [r for r in n_rows if r.solver.lower() == solver]
+                if not row_list:
+                    continue
+                row = row_list[0]
 
-            kappa_str = f"{row.kappa:.1f}" if first_N else ""
-            N_str = str(N) if first_N else ""
-            first_N = False
+                case_str = _latex_case(case_id) if first_case else ""
+                first_case = False
+                kappa_str = _latex_num(row.kappa) if first_N else ""
+                N_str = str(N) if first_N else ""
+                first_N = False
 
-            err = row.max_rel_err_vs_exact
-            if err is None:
-                err = row.max_rel_err_vs_thomas
-            err_str = _latex_pct(err)
+                err = row.max_rel_err_vs_exact
+                if err is None:
+                    err = row.max_rel_err_vs_thomas
+                err_str = _latex_pct(err)
 
-            res_str = _latex_sci(row.residual)
-            depth_str = (
-                _fmt_int(row.circuit_metrics.depth_opt1)
-                if row.circuit_metrics else r"\text{---}"
-            )
-            nq_str = (
-                str(row.circuit_metrics.n_qubits)
-                if row.circuit_metrics else r"\text{---}"
-            )
-            time_str = f"{row.wall_time_s:.2f}"
+                res_str = _latex_sci(row.residual)
+                depth_str = (
+                    _latex_int(row.circuit_metrics.depth_opt1)
+                    if row.circuit_metrics else r"{\text{---}}"
+                )
+                nq_str = (
+                    _latex_int(row.circuit_metrics.n_qubits)
+                    if row.circuit_metrics else r"{\text{---}}"
+                )
+                time_str = _latex_num(row.wall_time_s, 2)
 
-            buf.write(
-                f"    {N_str} & {kappa_str} & "
-                f"\\text{{{_solver_label(solver)}}} & "
-                f"{err_str} & ${res_str}$ & "
-                f"{depth_str} & {nq_str} & {time_str} \\\\\n"
-            )
-        if N != N_values[-1]:
+                buf.write(
+                    f"    {case_str} & {N_str} & {kappa_str} & "
+                    f"\\text{{{_solver_label(solver)}}} & "
+                    f"{err_str} & ${res_str}$ & "
+                    f"{depth_str} & {nq_str} & {time_str} \\\\\n"
+                )
+        if case_idx != len(cases) - 1:
             buf.write("    \\midrule\n")
 
     buf.write(_latex_footer())
@@ -288,12 +403,12 @@ def latex_equal_accuracy(
             val_str = "---"
 
         depth_str = (
-            _fmt_int(br.circuit_metrics.depth_opt1)
-            if br.circuit_metrics else r"\text{---}"
+            _latex_int(br.circuit_metrics.depth_opt1)
+            if br.circuit_metrics else r"{\text{---}}"
         )
         nq_str = (
             str(br.circuit_metrics.n_qubits)
-            if br.circuit_metrics else r"\text{---}"
+            if br.circuit_metrics else r"{\text{---}}"
         )
 
         buf.write(
@@ -301,7 +416,7 @@ def latex_equal_accuracy(
             f"{param_label} & "
             f"\\text{{{val_str}}} & "
             f"${_latex_sci(br.residual)}$ & "
-            f"{depth_str} & {nq_str} & {br.wall_time_s:.2f} \\\\\n"
+            f"{depth_str} & {nq_str} & {_latex_num(br.wall_time_s, 2)} \\\\\n"
         )
 
     buf.write(
@@ -383,8 +498,8 @@ def latex_sensitivity(
             err_str = _latex_pct(err)
 
             depth_str = (
-                _fmt_int(res.circuit_metrics.depth_opt1)
-                if res.circuit_metrics else r"\text{---}"
+                _latex_int(res.circuit_metrics.depth_opt1)
+                if res.circuit_metrics else r"{\text{---}}"
             )
 
             buf.write(
@@ -392,7 +507,7 @@ def latex_sensitivity(
                 f"{err_str} & "
                 f"${_latex_sci(res.residual)}$ & "
                 f"{depth_str} & "
-                f"{res.wall_time_s:.2f} \\\\\n"
+                f"{_latex_num(res.wall_time_s, 2)} \\\\\n"
             )
 
     buf.write(_latex_footer())
@@ -419,38 +534,48 @@ def latex_circuit_resources(
     if N_values is None:
         N_values = sorted({r.N for r in results if r.solver != "thomas"})
 
-    col_spec = "S[table-format=2.0] S[table-format=4.1] l S[table-format=6.0] S[table-format=6.0] S[table-format=6.0] S[table-format=5.0] S[table-format=2.0]"
+    col_spec = "l S[table-format=3.0] S[table-format=4.1] l S[table-format=6.0] S[table-format=6.0] S[table-format=6.0] S[table-format=5.0] S[table-format=2.0]"
 
     buf = io.StringIO()
     buf.write(_latex_header(caption, label, col_spec))
     buf.write(
-        "    {$N$} & {$\\kappa$} & {Solver} & "
+        "    {Case} & {$N$} & {$\\kappa$} & {Solver} & "
         "{$d_\\mathrm{raw}$} & {$d_0$} & {$d_1$} & "
         "{$n_\\mathrm{CX}$} & {$n_q$} \\\\\n"
         "    \\midrule\n"
     )
 
-    for N in N_values:
-        n_rows = [r for r in results if r.N == N and r.solver != "thomas"]
-        first_N = True
-        for row in n_rows:
-            if row.circuit_metrics is None:
-                continue
-            cm = row.circuit_metrics
-            N_str = str(N) if first_N else ""
-            kappa_str = f"{row.kappa:.1f}" if first_N else ""
-            first_N = False
+    # Grouped by case for the same reason as the primary comparison: without the
+    # column, a multi-case sweep emits several identically labelled rows per
+    # (N, solver) whose provenance cannot be recovered from the rendered table.
+    cases = sorted({r.case_id for r in results if r.solver != "thomas"})
+    for case_idx, case_id in enumerate(cases):
+        case_rows = [r for r in results
+                     if r.case_id == case_id and r.solver != "thomas"]
+        first_case = True
+        for N in N_values:
+            n_rows = [r for r in case_rows if r.N == N]
+            first_N = True
+            for row in n_rows:
+                if row.circuit_metrics is None:
+                    continue
+                cm = row.circuit_metrics
+                case_str = _latex_case(case_id) if first_case else ""
+                first_case = False
+                N_str = str(N) if first_N else ""
+                kappa_str = _latex_num(row.kappa) if first_N else ""
+                first_N = False
 
-            buf.write(
-                f"    {N_str} & {kappa_str} & "
-                f"\\text{{{_solver_label(row.solver)}}} & "
-                f"{_fmt_int(cm.depth_raw)} & "
-                f"{_fmt_int(cm.depth_opt0)} & "
-                f"{_fmt_int(cm.depth_opt1)} & "
-                f"{_fmt_int(cm.n_cx_gates)} & "
-                f"{cm.n_qubits} \\\\\n"
-            )
-        if N != N_values[-1]:
+                buf.write(
+                    f"    {case_str} & {N_str} & {kappa_str} & "
+                    f"\\text{{{_solver_label(row.solver)}}} & "
+                    f"{_latex_int(cm.depth_raw)} & "
+                    f"{_latex_int(cm.depth_opt0)} & "
+                    f"{_latex_int(cm.depth_opt1)} & "
+                    f"{_latex_int(cm.n_cx_gates)} & "
+                    f"{_latex_int(cm.n_qubits)} \\\\\n"
+                )
+        if case_idx != len(cases) - 1:
             buf.write("    \\midrule\n")
 
     buf.write(_latex_footer())
@@ -493,10 +618,13 @@ def latex_order_comparison(
         if r2 is None or r4 is None:
             continue
 
-        kappa_ratio = r4.kappa / r2.kappa if r2.kappa > 0 else float("nan")
+        kappa_ratio = (
+            r4.kappa / r2.kappa
+            if (r2.kappa and r4.kappa is not None) else float("nan")
+        )
         buf.write(
-            f"    {N} & {r2.kappa:.1f} & {r4.kappa:.1f} & "
-            f"{kappa_ratio:.3f} & "
+            f"    {N} & {_latex_num(r2.kappa)} & {_latex_num(r4.kappa)} & "
+            f"{_latex_num(kappa_ratio, 3)} & "
             f"{_latex_pct(r2.max_rel_err_vs_exact)} & "
             f"{_latex_pct(r4.max_rel_err_vs_exact)} \\\\\n"
         )
@@ -539,14 +667,14 @@ def console_primary_comparison(
 
     if show_circuit:
         header = (
-            f"  {'N':>4}  {'κ':>8}  {'Solver':<8}  "
+            f"  {'Case':<34}{'N':>4}  {'κ':>8}  {'Solver':<8}  "
             f"{'e∞ [%]':>10}  {'r':>10}  "
             f"{'Depth':>8}  {'nq':>4}  {'t':>10}"
         )
         sep = "  " + "─" * (len(header) - 2)
     else:
         header = (
-            f"  {'N':>4}  {'κ':>8}  {'Solver':<8}  "
+            f"  {'Case':<34}{'N':>4}  {'κ':>8}  {'Solver':<8}  "
             f"{'e∞ [%]':>10}  {'r':>10}  {'t':>10}"
         )
         sep = "  " + "─" * (len(header) - 2)
@@ -556,43 +684,53 @@ def console_primary_comparison(
     buf.write(header + "\n")
     buf.write(sep + "\n")
 
-    for N in N_values:
-        n_rows = [r for r in results if r.N == N]
-        for solver in solvers:
-            row_list = [r for r in n_rows if r.solver.lower() == solver]
-            if not row_list:
-                continue
-            row = row_list[0]
+    # Grouped by case, matching `latex_primary_comparison`: a multi-case sweep
+    # otherwise reports only whichever case happened to be listed first.
+    for case_id in sorted({r.case_id for r in results}):
+        case_rows = [r for r in results if r.case_id == case_id]
+        first_case = True
+        for N in N_values:
+            n_rows = [r for r in case_rows if r.N == N]
+            for solver in solvers:
+                row_list = [r for r in n_rows if r.solver.lower() == solver]
+                if not row_list:
+                    continue
+                row = row_list[0]
 
-            err = row.max_rel_err_vs_exact
-            if err is None:
-                err = row.max_rel_err_vs_thomas
-            err_str = _fmt_pct(err) if err is not None else "---"
+                case_str = str(case_id)[:33] if first_case else ""
+                first_case = False
 
-            if show_circuit and row.circuit_metrics:
-                cm = row.circuit_metrics
-                # Formatted through _fmt_int rather than directly: a solver that
-                # timed out or was skipped records no circuit at all, and a
-                # partially populated CircuitMetrics is the normal case when rows
-                # are read back from an archive whose sweep predates a given
-                # column. Direct formatting raises on None instead of printing a
-                # dash, which took the whole table down for one absent entry.
-                buf.write(
-                    f"  {N:>4}  {row.kappa:>8.2f}  "
-                    f"{_solver_label(solver):<8}  "
-                    f"{err_str:>10}  "
-                    f"{_fmt_sci(row.residual):>10}  "
-                    f"{_fmt_int(cm.depth_opt1):>8}  {_fmt_int(cm.n_qubits):>4}  "
-                    f"{_fmt_time(row.wall_time_s):>10}\n"
-                )
-            else:
-                buf.write(
-                    f"  {N:>4}  {row.kappa:>8.2f}  "
-                    f"{_solver_label(solver):<8}  "
-                    f"{err_str:>10}  "
-                    f"{_fmt_sci(row.residual):>10}  "
-                    f"{_fmt_time(row.wall_time_s):>10}\n"
-                )
+                err = row.max_rel_err_vs_exact
+                if err is None:
+                    err = row.max_rel_err_vs_thomas
+                err_str = _fmt_pct(err) if err is not None else "---"
+
+                if show_circuit and row.circuit_metrics:
+                    cm = row.circuit_metrics
+                    # Formatted through _fmt_int rather than directly: a solver
+                    # that timed out or was skipped records no circuit at all, and
+                    # a partially populated CircuitMetrics is the normal case when
+                    # rows are read back from an archive whose sweep predates a
+                    # given column. Direct formatting raises on None instead of
+                    # printing a dash, which took the whole table down for one
+                    # absent entry.
+                    buf.write(
+                        f"  {case_str:<34}{N:>4}  {_fmt_float(row.kappa):>8}  "
+                        f"{_solver_label(solver):<8}  "
+                        f"{err_str:>10}  "
+                        f"{_fmt_sci(row.residual):>10}  "
+                        f"{_fmt_int(cm.depth_opt1):>8}  "
+                        f"{_fmt_int(cm.n_qubits):>4}  "
+                        f"{_fmt_time(row.wall_time_s):>10}\n"
+                    )
+                else:
+                    buf.write(
+                        f"  {case_str:<34}{N:>4}  {_fmt_float(row.kappa):>8}  "
+                        f"{_solver_label(solver):<8}  "
+                        f"{err_str:>10}  "
+                        f"{_fmt_sci(row.residual):>10}  "
+                        f"{_fmt_time(row.wall_time_s):>10}\n"
+                    )
         buf.write(sep + "\n")
 
     return buf.getvalue()
@@ -631,7 +769,7 @@ def console_equal_accuracy(
             f"{val:.3g}" if val is not None else "---"
         )
         depth_str = (
-            f"{br.circuit_metrics.depth_opt1:,}"
+            _fmt_int(br.circuit_metrics.depth_opt1)
             if br.circuit_metrics else "---"
         )
         nq_str = (

@@ -183,6 +183,20 @@ DEFAULT_SCHEME: str = "fmg"
 # error, not machine precision: driving the algebraic residual far below the
 # truncation error buys nothing and, with a quantum inner solver, costs hours.
 # 1e-4 sits roughly one order below the h^2 error across this sweep range.
+#
+# THE RANGE MATTERS, and it ends near N = 64. The truncation error falls as h^2
+# while this tolerance does not fall at all, so the two cross: past that point
+# the solver stops on the tolerance rather than on the discretisation, and the
+# recorded error measures the stopping criterion instead of the scheme. It is
+# visible in the recorded sweep as a convergence order that collapses --
+# 2D_Poisson_TwoGaussian_PlasmaNet holds second order to N = 128 and then rises
+# fortyfold at N = 256 -- and in the extreme case as `n_outer = 0`, which
+# 2D_HET_MMS_SPT100 reports at N = 256: the FMG initial guess already met the
+# tolerance and no outer iteration ran at all.
+#
+# Pass `--tol 1e-6` for any sweep reaching N >= 128. The default is left alone so
+# that a re-run at the resolutions already recorded stays comparable with them;
+# raising it here would silently make every existing row incomparable.
 DEFAULT_TOL: float = 1e-4
 
 # Per-strip-solve cost exponents t(n) ~ n^alpha, fitted from the N=4 / N=8

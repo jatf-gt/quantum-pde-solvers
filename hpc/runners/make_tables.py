@@ -86,10 +86,17 @@ STUDY_DIR: dict[int, str] = {
 
 # -- Hardware feasibility ------------------------------------------------------
 
-# Two-qubit gate error rate representative of current superconducting hardware.
-# Superseded by a device's own calibration where one is available; utilised here
-# exclusively to derive the budget below, which serves as the reported metric.
-DEFAULT_TWO_QUBIT_ERROR: float = 1.0e-3
+# Two-qubit gate error rate. This is the median over the 352 qubit pairs of
+# ibm_kingston in its 2026-08-13 calibration, captured in
+# `results/investigations/degree_composition/calibration_ibm_kingston_20260815.json`
+# and therefore a measurement of the device this project actually submitted to,
+# not a round number.
+#
+# It supersedes the 1e-3 placeholder previously used here, which was optimistic
+# by very nearly a factor of two and correspondingly doubled the reported gate
+# budget: 692 gates against the 353 the device supports. Override with
+# `--two-qubit-error` when reporting against a different machine.
+DEFAULT_TWO_QUBIT_ERROR: float = 1.956349128978227e-3
 
 # Target probability that a circuit completes without a two-qubit fault.
 DEFAULT_SUCCESS_TARGET: float = 0.5
@@ -226,10 +233,18 @@ def latex_hardware_feasibility(rows: list[dict], budget: int) -> str:
         r"  \centering",
         r"  \caption{Two-qubit gate count against a hardware budget of "
         rf"{budget:,} gates, the largest count retaining a 50\% probability of "
-        r"completing without a two-qubit fault at a per-gate error rate of "
-        r"$10^{-3}$. Counts marked \emph{measured} are taken from the recorded "
-        r"circuits; where only a depth was recorded it is used as an upper "
-        r"bound on the two-qubit count.}",
+        r"completing without a two-qubit fault at the median calibrated "
+        r"two-qubit error rate of \texttt{ibm\_kingston}, "
+        rf"$\varepsilon_2 = {DEFAULT_TWO_QUBIT_ERROR:.2e}$. "
+        r"Counts are transpiled to the Heron r2 native basis "
+        r"$\{\mathrm{rz}, \mathrm{sx}, \mathrm{x}, \mathrm{cz}\}$ at "
+        r"optimisation level 3. HHL and VQLS are transpiled directly; the QSVT "
+        r"count is composed as the polynomial degree times the cost of one "
+        r"block-encoding application plus one state preparation, a bound "
+        r"validated against direct transpilation to within 0.4\% at $N=16$. "
+        r"Every route reported here is an upper bound, so a circuit judged "
+        r"infeasible is infeasible, while feasibility at the margin is not "
+        r"claimed.}",
         r"  \label{tab:hardware_feasibility}",
         r"  \begin{tabular}{llrrrrl}",
         r"    \toprule",
@@ -285,6 +300,34 @@ def console_hardware_feasibility(rows: list[dict], budget: int) -> str:
 
 
 # -- Driver --------------------------------------------------------------------
+
+def _study_order(study_dir: Path) -> Optional[int]:
+    """
+    Read the discretisation order a parameter study was run at.
+
+    Returns
+    -------
+    int or None
+        The recorded order, or None where the directory carries no metadata —
+        in which case the caller proceeds, since an unlabelled study is no worse
+        than the situation before this check existed.
+
+    Parameters
+    ----------
+    study_dir : Path
+        A `results/<dim>Dstudies/` directory.
+    """
+    meta = study_dir / "run_metadata.json"
+    if not meta.exists():
+        return None
+    try:
+        payload = json.loads(meta.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    config = payload.get("config", payload)
+    order = config.get("order")
+    return int(order) if order is not None else None
+
 
 def load_sweep(results_dir: Path, dim: int, order: int) -> list:
     """
@@ -364,10 +407,21 @@ def main() -> int:
             results_2nd = results_4th = None
 
     # Parameter studies are optional: the primary tables stand without them.
+    #
+    # They are also recorded per *dimension* but not per discretisation order,
+    # while this driver writes into a per-(dimension, order) directory. Emitting
+    # an order-2 study under `results/1Dhpc_run_4th/tables/` labels it as
+    # fourth-order by its location alone, which is a claim the archive does not
+    # support. The study's own recorded order decides.
     ea_results: list = []
     sens_results: dict[str, list] = {}
     r_target = 1.0e-3
-    if study_dir.exists():
+    study_order = _study_order(study_dir)
+    if study_dir.exists() and study_order is not None and study_order != args.order:
+        log.warning("  %-28s recorded at order %d, not %d; study tables skipped "
+                    "to avoid labelling them by directory", str(study_dir),
+                    study_order, args.order)
+    elif study_dir.exists():
         study = StudyArchive(study_dir)
         try:
             ea_results = study.read_equal_accuracy()
