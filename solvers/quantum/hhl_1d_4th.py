@@ -40,6 +40,7 @@ import numpy as np
 
 from problems.poisson_1d_4th import PoissonProblem1D4th
 from solvers.quantum.result import SolverResult
+from solvers.quantum.trotter_pinning import pin_trotter_steps, pinned_matrix_class
 
 # -- Submodule path ------------------------------------------------------------
 # The quantum_linear_solvers submodule lives at the repo root.
@@ -105,10 +106,15 @@ def hhl_solve_system_4th(
         HHL error tolerance (controls QPE register size and Trotter steps).
         Default 0.01.
     trotter_steps : int or None
-        Number of Trotter steps for the Hamiltonian simulation.  If None,
-        the PentadiagonalToeplitz class auto-computes a value from epsilon
-        and the evolution time.  For small N (4, 8) the auto-computed value
-        is typically 1–3.
+        Number of Trotter steps for the Hamiltonian simulation, fixed exactly
+        and overriding the count epsilon would imply. If None, the count is
+        derived from epsilon and the evolution time in the ordinary way; for
+        small N (4, 8) the derived value is typically 1–3.
+
+        Enforced through `solvers/quantum/trotter_pinning.py`. Assigning the
+        attribute on the vendored object has no effect: `HHL.solve` sets
+        `evolution_time` on every solve, and that setter re-derives the count
+        from the tolerance, discarding whatever was assigned.
 
     Returns
     -------
@@ -186,7 +192,13 @@ def hhl_solve_system_4th(
     b1_norm = float(A_norm[0, 1])      # ±1 off-diagonal: +16/alpha
     b2_norm = float(A_norm[0, 2])      # ±2 off-diagonal: -1/alpha
 
-    matrix = PentadiagonalToeplitz(
+    # Built from the pinning subclass. `PentadiagonalToeplitz` re-derives its
+    # step count inside the `evolution_time` setter, and `HHL.solve` assigns that
+    # attribute on every solve, so a count assigned to the vendored object here
+    # is discarded before a single gate is built. `pin_trotter_steps` is the only
+    # channel that survives; with `trotter_steps=None` the object behaves exactly
+    # as the vendored class does. See `solvers/quantum/trotter_pinning.py`.
+    matrix = pinned_matrix_class(PentadiagonalToeplitz)(
         num_state_qubits=num_qubits,
         main_diag=a_norm,
         off_diag_1=b1_norm,
@@ -194,8 +206,7 @@ def hhl_solve_system_4th(
         tolerance=epsilon / 6.0,   # epsilon_a = epsilon / 6, as in HHL
     )
 
-    if trotter_steps is not None:
-        matrix.trotter_steps = trotter_steps
+    pin_trotter_steps(matrix, trotter_steps)
 
     # -- Run HHL ---------------------------------------------------------------
     hhl = HHL(epsilon=epsilon)

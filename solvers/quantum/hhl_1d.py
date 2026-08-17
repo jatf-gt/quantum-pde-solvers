@@ -36,6 +36,7 @@ from core.execution import default_executor, hhl_spec
 from problems.poisson_1d import PoissonProblem1D
 from solvers.quantum.block_encoding import is_toeplitz_tridiagonal
 from solvers.quantum.result import SolverResult
+from solvers.quantum.trotter_pinning import pin_trotter_steps, pinned_matrix_class
 
 
 # -- Public High-Level Interface -----------------------------------------------
@@ -76,9 +77,11 @@ def hhl_solve(problem: PoissonProblem1D) -> SolverResult:
 # -- Core Algorithmic Sub-Routine ----------------------------------------------
 
 def hhl_solve_system(
-    A:       np.ndarray,
-    b:       np.ndarray,
-    epsilon: float,
+    A:             np.ndarray,
+    b:             np.ndarray,
+    epsilon:       float,
+    trotter_steps: int | None = None,
+    diagnostics:   dict | None = None,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """
     Solves the linear system Au = b by the HHL algorithm, operating directly on
@@ -96,8 +99,42 @@ def hhl_solve_system(
     b : np.ndarray
         Length-N right-hand side vector.
     epsilon : float
-        Precision parameter governing the Trotter approximation. Sets the
-        internal `trotter_steps` allocation as ceil(1/ε).
+        Overall precision parameter of the algorithm, ε. Supplied to `HHL`,
+        which apportions it as ε_r = ε_s = ε/3 to the reciprocal rotation and
+        the state preparation and ε_a = ε/6 to the Hamiltonian simulation, and
+        derives the Trotter step count from ε_a and the evolution time. The
+        default of 0.01 used throughout this repository coincides with the
+        library default, so a solve at that value reproduces every recorded
+        sweep exactly.
+
+        Measured at N = 4 on the second-order operator: ε ∈ {1e-1, 1e-2, 1e-3}
+        gives step counts {3, 7, 21} and relative residuals
+        {2.40e-2, 1.79e-2, 1.65e-2}.
+    trotter_steps : int or None
+        Hamiltonian-simulation step count, fixed exactly and overriding the
+        count ε would imply. None derives it from ε in the ordinary way. Set
+        this only where the step count is itself the independent variable, as in
+        a sensitivity sweep over simulation depth at fixed ε; see
+        `solvers/quantum/trotter_pinning.py` for why the vendored class cannot
+        honour a step count supplied to its constructor.
+    diagnostics : dict or None
+        Optional output mapping, updated in place with quantities that are
+        settled inside the solve and are otherwise unobservable from the return
+        tuple:
+
+          ``trotter_steps``   The step count actually simulated. This is *not*
+                              recoverable from ε by the caller: the library
+                              derives it as ⌈√((t·|b_off|)³ / 2ε_a)⌉ with an
+                              evolution time t that HHL itself computes from the
+                              spectral bounds. Recording ⌈1/ε⌉ instead, as the
+                              sweeps did, reports a number no circuit ever used.
+          ``evolution_time``  The evolution time HHL selected, in the same units.
+          ``simulation``      ``"trotter"`` on the Toeplitz branch,
+                              ``"exact_exponential"`` on the general branch,
+                              where there is no Trotter error to control.
+
+        Supplying nothing leaves the solve unchanged; the return tuple is
+        identical either way.
 
     Returns
     -------
@@ -148,39 +185,75 @@ def hhl_solve_system(
     b_norm = b / b_norm_factor
 
     # -- Phase 2: Operator Construction ----------------------------------------
-    num_qubits    = int(np.log2(N))
-    trotter_steps = max(1, int(np.ceil(1.0 / epsilon)))
+    num_qubits = int(np.log2(N))
 
     if use_toeplitz:
         a_norm = A[0, 0] / A_norm_factor   # Principal diagonal of normalised A
         b_off  = A[0, 1] / A_norm_factor   # Off-diagonal of normalised A
-        matrix = TridiagonalToeplitz(
+
+        # Built from the pinning subclass unconditionally. With no pin requested
+        # it behaves exactly as `TridiagonalToeplitz`; with one it is the only
+        # way the request can survive, because `HHL.solve` re-derives the step
+        # count from the tolerance inside the `evolution_time` setter. The step
+        # count passed here is a placeholder in either case, overwritten by that
+        # derivation before any gate is built.
+        matrix = pinned_matrix_class(TridiagonalToeplitz)(
             num_state_qubits=num_qubits,
             main_diag=a_norm,
             off_diag=b_off,
-            trotter_steps=trotter_steps,
+            trotter_steps=1,
         )
+        pin_trotter_steps(matrix, trotter_steps)
     else:
-        # `NumPyMatrix` exponentiates the supplied operator directly rather than
-        # exploiting a banded structure, so it accepts any Hermitian A at the cost
-        # of a denser evolution circuit. A is normalised by ‖A‖₂ exactly as in the
-        # Toeplitz branch, so every downstream stage -- the QPE register sizing, the
-        # post-selection, the proportionality recovery below -- is unchanged.
+        # `NumPyMatrix` exponentiates the supplied operator directly, via
+        # `scipy.linalg.expm`, rather than exploiting a banded structure. It
+        # accepts any Hermitian A at the cost of a denser evolution circuit, and
+        # A is normalised by ‖A‖₂ exactly as in the Toeplitz branch, so every
+        # downstream stage -- the QPE register sizing, the post-selection, the
+        # proportionality recovery below -- is unchanged.
         #
-        # It exposes `tolerance` where TridiagonalToeplitz exposes `trotter_steps`;
-        # the two are the same knob seen from opposite ends, since the Toeplitz
-        # branch derives its step count as n_T = ceil(1/epsilon). Passing epsilon
-        # directly keeps the two branches driven by one parameter. `evolution_time`
-        # is left at the shared default of 1.0 rather than restated, so the branches
-        # cannot drift apart on a value neither of them varies.
+        # Its Hamiltonian simulation carries **no Trotter error**: the
+        # exponential is formed exactly. A step count is therefore not merely
+        # unsupported on this branch but meaningless, and is rejected rather than
+        # accepted and ignored. `tolerance` is likewise not a simulation
+        # parameter here; it is supplied for consistency with the base class and
+        # is overwritten by `HHL.solve` in any case, ε reaching the algorithm
+        # through the `HHL` constructor below.
+        if trotter_steps is not None:
+            raise ValueError(
+                f"trotter_steps={trotter_steps} was requested, but this operator "
+                "is not Toeplitz tridiagonal and is simulated by exact matrix "
+                "exponentiation, which has no Trotter decomposition to control. "
+                "Vary epsilon instead, or restrict the sweep to Toeplitz cases."
+            )
         matrix = NumPyMatrix(A / A_norm_factor, tolerance=epsilon)
 
     # -- Phase 3: Algorithm Execution ------------------------------------------
-    hhl = HHL()
+    # ε is supplied to the algorithm rather than to the matrix. `HHL.solve`
+    # assigns `matrix.tolerance = self._epsilon_a` before every solve, so a
+    # tolerance set on the matrix is discarded; routing ε through the constructor
+    # is the only path by which it reaches the Hamiltonian simulation, the
+    # reciprocal rotation and the state preparation. The library default is
+    # itself 0.01, so the repository default reproduces every recorded sweep.
+    hhl = HHL(epsilon=epsilon)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         solution = hhl.solve(matrix, b_norm)
+
+    # Read back after the solve, not before: `HHL.solve` fixes the evolution time
+    # from the spectral bounds and re-derives the step count from it, so the
+    # values the matrix carried at construction are not the ones simulated.
+    if diagnostics is not None:
+        diagnostics["evolution_time"] = float(
+            getattr(matrix, "evolution_time", float("nan"))
+        )
+        if use_toeplitz:
+            diagnostics["simulation"] = "trotter"
+            diagnostics["trotter_steps"] = int(matrix.trotter_steps)
+        else:
+            diagnostics["simulation"] = "exact_exponential"
+            diagnostics["trotter_steps"] = None
 
     # -- Phase 4: Statevector Extraction ---------------------------------------
     x_raw = _extract_solution_statevector(solution.state, num_qubits)

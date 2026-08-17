@@ -301,14 +301,24 @@ def _perturbed(delta=0.0, seed=0, **_):
 
 @register("hhl", options={
     "epsilon": Option(float, 0.01,
-                      "Trotter/phase precision. Dominant cost driver: "
-                      "circuit depth grows as 1/epsilon."),
+                      "overall algorithm precision. Apportioned by HHL as "
+                      "eps/3 each to the reciprocal rotation and the state "
+                      "preparation and eps/6 to the Hamiltonian simulation, "
+                      "from which the Trotter step count follows. Dominant "
+                      "cost driver: circuit depth grows as 1/epsilon."),
+    "trotter_steps": Option(int,
+                            help="Hamiltonian-simulation step count, fixed "
+                                 "exactly and overriding the count epsilon "
+                                 "implies. Unset = derived from epsilon. Valid "
+                                 "only for a Toeplitz tridiagonal strip; a "
+                                 "non-Toeplitz operator is simulated by exact "
+                                 "matrix exponentiation and raises."),
 })
-def _hhl(epsilon=0.01, **_):
+def _hhl(epsilon=0.01, trotter_steps=None, **_):
     from solvers.quantum.hhl_1d import hhl_solve_system
 
     def solve(A, b):
-        out = hhl_solve_system(A, b, epsilon)
+        out = hhl_solve_system(A, b, epsilon, trotter_steps=trotter_steps)
         u = np.asarray(out[0], dtype=float)
         c = float(out[2]) if len(out) > 2 else float("nan")
         return u, {"prop_const": c}
@@ -401,14 +411,20 @@ def _qsvt(**opts):
 
 @register("hhl_4th", options={
     "epsilon": Option(float, 0.01,
-                      "Trotter/phase precision. Dominant cost driver: "
-                      "circuit depth grows as 1/epsilon."),
+                      "overall algorithm precision, apportioned as for the "
+                      "2nd-order entry. Dominant cost driver: circuit depth "
+                      "grows as 1/epsilon."),
+    "trotter_steps": Option(int,
+                            help="Hamiltonian-simulation step count, fixed "
+                                 "exactly and overriding the count epsilon "
+                                 "implies. Unset = derived from epsilon."),
 })
-def _hhl_4th(epsilon=0.01, **_):
+def _hhl_4th(epsilon=0.01, trotter_steps=None, **_):
     from solvers.quantum.hhl_1d_4th import hhl_solve_system_4th
 
     def solve(A, b):
-        res = hhl_solve_system_4th(A, b, epsilon=epsilon)
+        res = hhl_solve_system_4th(A, b, epsilon=epsilon,
+                                   trotter_steps=trotter_steps)
         return (np.asarray(res.u, dtype=float),
                 {"prop_const": float(getattr(res, "prop_const", np.nan))})
     return solve
