@@ -2,7 +2,7 @@
 # ============================================================================
 #  submit_2d_wave1.sh   -   2nd-order 2D gap fill
 #
-#  Scope taken from scripts/gap_analysis.py against the current archive
+#  Scope taken from scripts/utils/gap_analysis.py against the current archive
 #  (55 outstanding of 100 expected):
 #
 #      sections 4,5  N=4..64   geometry redo - no rows at any N
@@ -111,7 +111,7 @@ echo ""
 echo "============================================================"
 echo "  Gap analysis after the run"
 echo "============================================================"
-python3 scripts/gap_analysis.py --dim 2 \
+python3 scripts/utils/gap_analysis.py --dim 2 \
         --results-dir results/2Dhpc_run --n-values 4,8,16,32,64 \
         -o results/manifests/rerun_2d_after_wave1.json || true
 

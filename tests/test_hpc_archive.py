@@ -5,7 +5,7 @@ This module was `benchmark/results_io.py` until the professional benchmarking
 framework introduced a second, differently-shaped archive under that name. The
 two are distinguished in `benchmark/hpc_archive.py`'s docstring; the one tested
 here is the read-only, dimension-aware reader for the sweep directories that
-already exist on disk, and it is what `scripts/gap_analysis.py` builds the rerun
+already exist on disk, and it is what `scripts/utils/gap_analysis.py` builds the rerun
 manifests from.
 
 Two things are worth guarding here, and neither is exercised by any other test.

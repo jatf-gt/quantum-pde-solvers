@@ -26,7 +26,7 @@ This module      The *legacy* schema: the existing per-dimension sweep
 ===============  =========================================================
 
 This module must keep working unchanged. It is what
-``scripts/gap_analysis.py`` reads to build the rerun manifests, and those
+``scripts/utils/gap_analysis.py`` reads to build the rerun manifests, and those
 manifests are the only thing standing between a resubmission and the
 recomputation of individual rows costing 25–38 hours of cluster time. It is also
 what ``benchmark/hpc_plotting.py`` reads to regenerate every published HPC

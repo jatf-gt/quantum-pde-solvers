@@ -8,7 +8,7 @@
 #
 #  Why this is 20 rows and not a full sweep
 #  ----------------------------------------
-#  scripts/check_geometry_impact.py --dim 1 proves that the SPT-100 correction
+#  scripts/utils/check_geometry_impact.py --dim 1 proves that the SPT-100 correction
 #  (861ff46) moves exactly one 1D case. The 1D operator is the dimensionless TST
 #  matrix, so kappa is geometry-independent; L_z enters only the source amplitude.
 #  Of the eight het_1d_* cases, only 3b sites its Gaussian against the physical
@@ -117,7 +117,7 @@ echo ""
 echo "============================================================"
 echo "  Gap analysis after the run"
 echo "============================================================"
-python3 scripts/gap_analysis.py --dim 1 \
+python3 scripts/utils/gap_analysis.py --dim 1 \
         --results-dir results/1Dhpc_run --n-values 4,8,16,32,64 \
         --geometry-rerun-complete HET_1D_3b_gaussian_Vd300 \
         -o results/manifests/rerun_1d_after_wave1.json || true

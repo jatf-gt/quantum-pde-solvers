@@ -54,7 +54,7 @@ from typing import Optional
 
 import numpy as np
 
-# ``pytest.ini`` sets ``pythonpath = .``, but a bare ``python3 scripts/check_geometry_impact.py``
+# ``pytest.ini`` sets ``pythonpath = .``, but a bare ``python3 scripts/utils/check_geometry_impact.py``
 # puts ``scripts/`` on ``sys.path[0]`` rather than the repository root, so the local
 # imports below fail however sound the working directory. Resolving the root from
 # ``__file__`` makes the invocation location irrelevant, matching what every module

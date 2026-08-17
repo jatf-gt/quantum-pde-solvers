@@ -229,7 +229,7 @@ echo ""
 echo "============================================================"
 echo "  Gap analysis after the run"
 echo "============================================================"
-python3 scripts/gap_analysis.py --dim 1 --order 4 \
+python3 scripts/utils/gap_analysis.py --dim 1 --order 4 \
         --results-dir "${RESULTS_SUBDIR}" --n-values "${N_VALUES}" \
         --geometry-rerun-complete HET_1D_3b_gaussian_Vd300 \
         -o results/manifests/rerun_1d_order4.json || true
