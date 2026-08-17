@@ -120,7 +120,7 @@ mkdir -p "${RESULTS_SUBDIR}"
 
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
 
-N_VALUES="${N_VALUES:-4,8}"
+N_VALUES="${N_VALUES:-16}"
 SECTIONS="${SECTIONS:-1,2,3,4,5,6,7}"
 SOLVERS="${SOLVERS:-hhl,vqls,qsvt}"
 WORKERS="${WORKERS:-4}"
@@ -135,7 +135,7 @@ ALLOW_INLINE_PHASES="${ALLOW_INLINE_PHASES:-0}"
 # records stop_reason="wall_time_exceeded", which the gap analysis reads as a
 # terminal measurement rather than a defect. 16 h matches the 2nd-order sweep,
 # whose worst sound N=16 case measured 15.0 h.
-MAX_WALL_S="${MAX_WALL_S:-57600}"
+MAX_WALL_S="${MAX_WALL_S:-21600}"
 
 echo ""
 echo "  N_VALUES  : ${N_VALUES}"
