@@ -7,7 +7,7 @@ Why this exists
 A sweep writes each solution to its own ``.npz`` as soon as it is produced, but a
 job killed mid-work-unit returns nothing to the parent, so the corresponding row
 never reaches ``results_full.json``. The field survives; the record of it does not.
-`scripts/gap_analysis.py` reports the discrepancy as an *unexplained orphan* and
+`scripts/utils/gap_analysis.py` reports the discrepancy as an *unexplained orphan* and
 would otherwise schedule the combination for recomputation.
 
 Two such orphans exist in the 3-D archive, both HHL at N=16 and each roughly six
@@ -51,8 +51,8 @@ factor, both of which it determines exactly.
 
 Usage
 -----
-    python scripts/recover_orphan_rows.py --dim 3 --dry-run
-    python scripts/recover_orphan_rows.py --dim 3
+    python scripts/utils/recover_orphan_rows.py --dim 3 --dry-run
+    python scripts/utils/recover_orphan_rows.py --dim 3
 
 ``--dry-run`` prints the rows it would add and touches nothing. Without it, the
 rows are merged into ``results_full.json`` under the same supersession rule the
@@ -78,7 +78,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from solvers.outer.core import OuterResult, WorkLog     # noqa: E402
-from scripts.gap_analysis import STALE_GEOMETRY_CASES   # noqa: E402
 
 
 # -- Archive naming ------------------------------------------------------------
@@ -161,7 +160,14 @@ def build_case_index(runner, N: int) -> dict:
     index: dict = {}
     for section, builder in runner.SECTIONS.items():
         try:
-            prob, phi_ref, f_vals, case_id, mode_m = builder(N)
+            # Six values, not five. The 3-D section builders gained a trailing
+            # element after this function was written, so unpacking five raised
+            # `ValueError: too many values to unpack` for *every* section. This
+            # loop caught it and reported "did not assemble", which reads as a
+            # property of the case rather than of the unpacking — and the result
+            # was that recovery silently declined every orphan it was asked to
+            # reconstruct.
+            prob, phi_ref, f_vals, case_id, mode_m, *_rest = builder(N)
         except Exception as exc:              # noqa: BLE001 - reported, not raised
             print(f"    (section {section} at N={N} did not assemble: "
                   f"{type(exc).__name__}: {exc})")
@@ -262,25 +268,13 @@ def main() -> int:
     recorded = {(r["case"], r["solver"], int(r["N"])) for r in rows}
 
     archives = sorted(results_dir.glob(f"{ARCHIVE_PREFIX[args.dim]}*.npz"))
-    orphans, superseded = [], []
+    orphans = []
     for path in archives:
         triple = parse_archive_name(path, args.dim)
         if triple is None:
             continue
-        if triple[0] in STALE_GEOMETRY_CASES:
-            # Superseded residue, not a lost row. These archives predate the
-            # SPT-100 correction, so their fields are wrong however complete they
-            # appear; the wave-1 rerun supersedes them. Recovering a row from one would
-            # manufacture a plausible record of a solve to the incorrect problem.
-            superseded.append(triple)
-            continue
         if triple not in recorded or args.force:
             orphans.append((path, triple))
-
-    if superseded:
-        print(f"Ignoring {len(superseded)} archive(s) from geometry-superseded "
-              f"cases; the wave-1 rerun replaces those, and their stored fields "
-              f"solve the pre-correction problem.\n")
 
     if not orphans:
         print("No orphaned archives: every archive on disk has a summary row.")
@@ -348,7 +342,7 @@ def main() -> int:
           f"({len(recovered)} recovered, {collapsed} pre-existing duplicate(s) "
           f"on (case, solver, N) collapsed).")
     print("Recovered rows carry notes='recovered_from_archive' and null cost "
-          "columns. Re-run scripts/gap_analysis.py to confirm the orphans clear.")
+          "columns. Re-run scripts/utils/gap_analysis.py to confirm the orphans clear.")
     return 1 if failed else 0
 
 

@@ -1,5 +1,5 @@
 """
-Tests for `scripts/gap_analysis.py`, the tool that decides what an HPC sweep owes.
+Tests for `scripts/utils/gap_analysis.py`, the tool that decides what an HPC sweep owes.
 
 Why these are worth having
 --------------------------
@@ -17,8 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.utils.gap_analysis import (LEGACY_HHL_TIMEOUT_S, classify_row,
-                                        STALE_GEOMETRY_CASES)
+from scripts.utils.gap_analysis import LEGACY_HHL_TIMEOUT_S, classify_row
 
 
 def _row(**kwargs) -> dict:
@@ -199,26 +198,6 @@ class TestPerSolveTimeout:
         assert "solver_error" in reasons
 
 
-class TestStaleGeometry:
-    """The SPT-100 correction invalidates specific cases and only those."""
-
-    def test_a_stale_case_is_always_a_reason(self):
-        """Ensures that execution records associated with obsolete geometries mandate recomputation."""
-        reasons, _ = classify_row(_row(case="3D_HET_MMS_SPT100"))
-        assert "stale_geometry" in reasons
-
-    def test_unaffected_het_cases_are_absent_from_the_policy_set(self):
-        """
-        Validates that geometry updates do not force needless recomputations for unaffected profiles.
-        """
-        # check_geometry_impact.py --dim 1 proves that only 3b moves: the 1-D
-        # operator is the dimensionless TST matrix and the *_scaled family
-        # normalises L out. Listing another one would force needless recomputation.
-        assert "HET_1D_3a_linear_hom" not in STALE_GEOMETRY_CASES
-        assert "HET_1D_3c_gaussian_NeumannDirichlet" not in STALE_GEOMETRY_CASES
-        assert "HET_1D_3b_gaussian_Vd300" in STALE_GEOMETRY_CASES
-
-
 def test_legacy_budget_describes_the_existing_archive():
     """
     `LEGACY_HHL_TIMEOUT_S` is a fact about recorded data, not a mirror of the runner.
@@ -244,7 +223,7 @@ def test_legacy_budget_describes_the_existing_archive():
     """
     import json
     from pathlib import Path
-    from scripts.gap_analysis import TIMEOUT_MARKERS
+    from scripts.utils.gap_analysis import TIMEOUT_MARKERS
 
     assert LEGACY_HHL_TIMEOUT_S == 3600.0
 

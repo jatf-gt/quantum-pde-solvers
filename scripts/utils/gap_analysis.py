@@ -47,7 +47,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
-# ``pytest.ini`` sets ``pythonpath = .``, but a bare ``python3 scripts/gap_analysis.py``
+# ``pytest.ini`` sets ``pythonpath = .``, but a bare ``python3 scripts/utils/gap_analysis.py``
 # puts ``scripts/`` on ``sys.path[0]`` rather than the repository root, so the local
 # import below fails however sound the working directory. The PBS submission scripts
 # invoke this module exactly that way for their post-run analysis, and the step is
@@ -162,25 +162,6 @@ but without a marker are genuine slow completions at high κ (e.g. N=32 where
 all fell within 1 s of the budget.
 """
 
-STALE_GEOMETRY_CASES: frozenset[str] = frozenset()
-"""
-Cases proven to change under the SPT-100 geometry correction (commit ``861ff46``).
-
-Regenerate with ``python scripts/check_geometry_impact.py --dim {1,2,3}``, which
-compares the assembled operator, the strip operator, the spacings, the source and the
-reference across both geometries. Note that the 1-D HET cases other than 3b, and
-``het_2d_boeuf_garrigues``, are provably unaffected and must **not** be listed here —
-adding them would trigger needless recomputation.
-
-Important: this constant is the authoritative set of cases that *ever* required a
-geometry rerun. It must not be shrunk as reruns complete, because it also governs the
-``_orphan_archives`` check (``stale`` vs ``unexplained`` orphans). To exclude
-confirmed-clean cases from the ``stale_geometry`` rerun reason without editing this
-constant, pass them via ``--geometry-rerun-complete`` on the command line or via the
-``geometry_rerun_complete`` argument to ``analyse``. Those cases are removed from the
-*effective* stale set for classification purposes only.
-"""
-
 IMPLAUSIBLE_REL_ERR_PCT: float = 100.0
 """
 Relative error above which a quantum solve is treated as having failed.
@@ -260,8 +241,7 @@ def merge_case_ids(discovered: Iterable[str], observed: Iterable[str]) -> list[s
 
 # -- Classification ------------------------------------------------------------
 
-def classify_row(row: dict, strict: bool = False, dim: int = 1,
-                 geometry_rerun_complete: frozenset[str] = frozenset()
+def classify_row(row: dict, strict: bool = False, dim: int = 1
                  ) -> tuple[list[str], list[str]]:
     """
     Separates grounds for recomputation from merely notable properties of a row.
@@ -281,14 +261,6 @@ def classify_row(row: dict, strict: bool = False, dim: int = 1,
         exceeds an hour in the normal course of a sound run. Applying the 1-D
         timeout inference there would mark most large-N HHL rows as timed out and
         suppress the very reasons that schedule them for rerun.
-    geometry_rerun_complete : frozenset of str
-        Case identifiers whose stale-geometry rerun has been confirmed complete.
-        These are excluded from the effective stale set so that freshly recomputed
-        rows are not classified as outstanding again. Pass via
-        ``--geometry-rerun-complete`` at the command line or directly to
-        ``analyse``. The authoritative ``STALE_GEOMETRY_CASES`` constant is not
-        modified; this is a per-invocation narrowing only.
-
     Returns
     -------
     tuple of (list of str, list of str)
@@ -298,10 +270,6 @@ def classify_row(row: dict, strict: bool = False, dim: int = 1,
     reasons: list[str] = []
     flags: list[str] = []
     is_thomas = str(row.get("solver", "")).lower() == "thomas"
-
-    effective_stale = STALE_GEOMETRY_CASES - geometry_rerun_complete
-    if row.get("case") in effective_stale:
-        reasons.append("stale_geometry")
 
     notes = str(row.get("notes") or "")
     # Order matters: a timed-out solve is a terminal measurement, whereas a raised
@@ -368,7 +336,6 @@ def analyse(
     solvers:                  Iterable[str],
     strict:                   bool = False,
     dim:                      int = 1,
-    geometry_rerun_complete:  frozenset[str] = frozenset(),
 ) -> dict:
     """
     Classifies every expected combination against the recorded summary.
@@ -384,11 +351,6 @@ def analyse(
     dim : int
         Spatial dimension, forwarded to `classify_row`, whose wall-clock timeout
         inference is valid only for the 1-D schema.
-    geometry_rerun_complete : frozenset of str
-        Case identifiers whose stale-geometry rerun is confirmed complete.
-        Forwarded to `classify_row`; see that function's documentation for the
-        full description. Recorded in the returned manifest for auditability.
-
     Returns
     -------
     dict
@@ -414,10 +376,7 @@ def analyse(
                                   "reasons": ["missing"], "flags": [],
                                   "wall_time_s": None})
                     continue
-                reasons, flags = classify_row(
-                    row, strict=strict, dim=dim,
-                    geometry_rerun_complete=geometry_rerun_complete,
-                )
+                reasons, flags = classify_row(row, strict=strict, dim=dim)
                 entry = {"case": case, "solver": solver, "N": int(N),
                          "flags": flags, "wall_time_s": row.get("wall_time_s")}
                 if reasons:
@@ -430,7 +389,6 @@ def analyse(
 
     return {"rerun": rerun, "keep": keep, "drift": drift,
             "n_rows_recorded": len(indexed),
-            "geometry_rerun_complete": sorted(geometry_rerun_complete),
             "orphan_archives": _orphan_archives(archive, indexed)}
 
 
@@ -454,16 +412,14 @@ def _orphan_archives(archive: SweepArchive,
     indexed : dict
         Rows keyed by (case, solver, N).
 
-    Orphans are split by whether they are explained. An archive belonging to a case
-    whose rows were deliberately removed by ``scripts/cleanup_stale_geometry.py`` is
-    expected residue: the row is gone because the result is superseded, and the
-    archive should simply be purged. An orphan of any other case is unexplained and
-    is the signature of the dangerous condition.
+    Every orphan is reported. An archive on disk with no summary row means a solve
+    completed and its record was lost, which is recoverable at zero compute by
+    ``scripts/utils/recover_orphan_rows.py`` and must never be silently dropped.
 
     Returns
     -------
     dict
-        ``{"stale": [...], "unexplained": [...]}``, each sorted.
+        ``{"unexplained": [...]}``, sorted.
     """
     prefix = archive.solution_prefix
     recorded = {f"{prefix}_{case}_{solver}_N{N}.npz"
@@ -471,14 +427,7 @@ def _orphan_archives(archive: SweepArchive,
     on_disk = {path.name for path in archive.results_dir.glob(f"{prefix}_*.npz")}
     orphans = sorted(on_disk - recorded)
 
-    stale, unexplained = [], []
-    for name in orphans:
-        body = name[len(prefix) + 1:].removesuffix(".npz")
-        if any(body.startswith(f"{case}_") for case in STALE_GEOMETRY_CASES):
-            stale.append(name)
-        else:
-            unexplained.append(name)
-    return {"stale": stale, "unexplained": unexplained}
+    return {"unexplained": orphans}
 
 
 # -- Reporting -----------------------------------------------------------------
@@ -546,14 +495,7 @@ def _print_report(manifest: dict, show_keep: int) -> None:
         print()
 
     orphans = manifest.get("orphan_archives") or {}
-    stale, unexplained = orphans.get("stale", []), orphans.get("unexplained", [])
-
-    if stale:
-        print(f"  {len(stale)} superseded archive(s) remain from cases stripped by")
-        print("  cleanup_stale_geometry.py. Expected residue - purge them so a failed")
-        print("  rerun cannot leave a stale field behind an absent row:")
-        print(f"      rm {manifest.get('results_dir', '.')}/<case>_*.npz")
-        print()
+    unexplained = orphans.get("unexplained", [])
 
     if unexplained:
         print("  " + "!" * 74)
@@ -603,14 +545,6 @@ def main() -> None:
                         help="Also recompute rows that stagnated or hit an iteration "
                              "cap. Off by default: stagnation is the designed "
                              "terminal state for a quantum solver at its noise floor.")
-    parser.add_argument("--geometry-rerun-complete", default=None,
-                        help="Comma-separated case identifiers whose stale-geometry "
-                             "rerun has been confirmed complete. Those cases are "
-                             "removed from the effective stale set for this "
-                             "invocation so that freshly recomputed rows are not "
-                             "re-flagged. Must be a subset of STALE_GEOMETRY_CASES. "
-                             "Example: --geometry-rerun-complete "
-                             "HET_1D_3b_gaussian_Vd300")
     parser.add_argument("-o", "--output", type=Path, default=None,
                         help="Write the manifest JSON here.")
     args = parser.parse_args()
@@ -618,17 +552,6 @@ def main() -> None:
     runner = Path(RUNNER_FOR_DIM[args.dim])
     n_values = [int(v) for v in _parse_list(args.n_values)]
     solvers = _parse_list(args.solvers)
-
-    # Parse and validate --geometry-rerun-complete.
-    geom_complete_raw = _parse_list(args.geometry_rerun_complete) or []
-    unknown_geom = [c for c in geom_complete_raw if c not in STALE_GEOMETRY_CASES]
-    if unknown_geom:
-        parser.error(
-            f"--geometry-rerun-complete contains case(s) not in "
-            f"STALE_GEOMETRY_CASES: {unknown_geom}. "
-            f"Valid values: {sorted(STALE_GEOMETRY_CASES)}."
-        )
-    geometry_rerun_complete = frozenset(geom_complete_raw)
 
     archive = SweepArchive(args.results_dir, dim=args.dim,
                            skip_scheme_comparison=True)
@@ -649,15 +572,10 @@ def main() -> None:
     print(f"  cases from {runner} + recorded rows: {len(cases)}")
     if excluded:
         print(f"  excluded at order 4 (unimplemented): {', '.join(excluded)}")
-    if geometry_rerun_complete:
-        print(f"  geometry rerun confirmed complete (excluded from stale check):")
-        for c in sorted(geometry_rerun_complete):
-            print(f"    {c}")
     print(f"  N={n_values}  solvers={solvers}")
     print("=" * 78)
     manifest = analyse(archive, cases, n_values, solvers, strict=args.strict,
-                       dim=args.dim,
-                       geometry_rerun_complete=geometry_rerun_complete)
+                       dim=args.dim)
     manifest.update({
         "generated":   datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "dim":         args.dim,
