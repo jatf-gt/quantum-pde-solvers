@@ -1323,28 +1323,53 @@ def _two_gaussian_reference(N, Lx=0.01, Ly=0.01, n_fine=200, modes=50):
     -------
     np.ndarray
         (N, N) reference potential at the coarse interior nodes.
-    """
-    from scipy.interpolate import RegularGridInterpolator
 
+    Notes
+    -----
+    The fine grid enters the *quadrature only*. The coefficients
+
+        R_nm = (4 / Lx Ly) ∫∫ f(x, y) sin(nπx/Lx) sin(mπy/Ly) dx dy
+
+    are formed on it because a Gaussian of width σ = 0.1 Lx is unresolved on a
+    coarse solver grid, but the series they define is an analytical function and
+    is evaluated directly at the solver's own nodes.
+
+    It was previously evaluated on the fine grid and then *interpolated* to the
+    solver nodes, which capped the reference's accuracy twice over and made this
+    case unusable above N ≈ 128:
+
+    * Linear interpolation from a 200² grid carries an O(h_fine²) error of its
+      own. Once the scheme's truncation error fell below it the measured
+      "discretisation error" was reporting the interpolation, which is why the
+      observed order drifted 3.74 → 3.43 → 2.72 over N = 32 → 128 instead of
+      holding at 2.
+    * The fine grid spans [Lx/201, 200Lx/201] and the solver grid spans
+      [Lx/(N+1), N Lx/(N+1)], so for N > n_fine the outermost ring of solver
+      nodes falls outside it and took ``fill_value=0.0``. At N = 256 that set
+      1020 nodes to zero against a true value near 4.1 on a field peaking at
+      288, and the measured error rose fourteenfold rather than falling.
+
+    Evaluating the series directly removes both, costs the same, and makes the
+    reference exact to the truncation of the series at every resolution.
+    """
     dx_f, dy_f = Lx / (n_fine + 1), Ly / (n_fine + 1)
     x_f = np.arange(1, n_fine + 1) * dx_f
     y_f = np.arange(1, n_fine + 1) * dy_f
     xf, yf = np.meshgrid(x_f, y_f, indexing="ij")
     f_fine = _f_two_gaussian(xf, yf, Lx, Ly)
 
-    phi_fine = np.zeros((n_fine, n_fine))
-    for n in range(1, modes + 1):
-        sin_x = np.sin(n * np.pi * xf / Lx)
-        for m in range(1, modes + 1):
-            sin_y = np.sin(m * np.pi * yf / Ly)
-            R_nm  = (4.0 / (Lx * Ly)) * np.sum(f_fine * sin_x * sin_y) * dx_f * dy_f
-            denom = -np.pi**2 * (n**2 / Lx**2 + m**2 / Ly**2)
-            phi_fine += (R_nm / denom) * sin_x * sin_y
-
-    interp = RegularGridInterpolator((x_f, y_f), phi_fine, method="linear",
-                                     bounds_error=False, fill_value=0.0)
     X, Y, _, _ = _grid_2d(N, Lx, Ly)
-    return interp(np.stack([X.ravel(), Y.ravel()], axis=-1)).reshape(N, N)
+    phi = np.zeros((N, N))
+    for n in range(1, modes + 1):
+        sin_x_fine = np.sin(n * np.pi * xf / Lx)
+        sin_x_node = np.sin(n * np.pi * X / Lx)
+        for m in range(1, modes + 1):
+            sin_y_fine = np.sin(m * np.pi * yf / Ly)
+            R_nm  = ((4.0 / (Lx * Ly))
+                     * np.sum(f_fine * sin_x_fine * sin_y_fine) * dx_f * dy_f)
+            denom = -np.pi**2 * (n**2 / Lx**2 + m**2 / Ly**2)
+            phi += (R_nm / denom) * sin_x_node * np.sin(m * np.pi * Y / Ly)
+    return phi
 
 
 def _build_two_gaussian(N: int) -> BuiltCase:
