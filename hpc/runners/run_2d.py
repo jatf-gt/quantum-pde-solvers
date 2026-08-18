@@ -226,8 +226,26 @@ COST_T8: dict[str, float] = {
 # because kappa_row grows: it is bounded above by 3 and the natural degree stays
 # near 72 at every resolution, which is precisely what makes QSVT the only solver
 # in this benchmark that can reach those meshes at all.
+#
+# UNIFORM ACROSS N AND ORDER (revised 2026-08-18). The table previously held
+# None below N = 32 and 500 at and above it, which switched *construction*
+# mid-curve and produced a ~9x step in QSVT wall time between N = 16 and N = 32
+# that is an artefact of this table, not of the algorithm: 2-D order-4 QSVT
+# measured 24-48 s at N = 16 (degree 11-58, uncapped) against 335-426 s at
+# N = 32 (degree 501, capped), while the unknown count merely quadrupled and
+# kappa_row moved only 3.069 -> 3.116. It also cost accuracy at the low-kappa
+# end, where the uncapped path returns degree 11 at kappa = 1.4151 -- a
+# degree/kappa ratio of 7.8, below the ~11 threshold at which the recorded
+# sweeps show the inverse approximation starting to fail.
+#
+# A single degree at every resolution removes both. 500 specifically, because
+# it is the value the most expensive rows already on disk were produced at
+# (2-D N = 128/256, 2-D order-4 N = 32/64, 3-D N = 32/64), so uniformity is
+# reached without recomputing them; and because it is the most accurate of the
+# degrees in play, giving degree/kappa >= 160 for every strip operator in this
+# sweep against the ~11 needed.
 QSVT_MAX_DEGREE_2D: dict[int, Optional[int]] = {
-    4: None, 8: None, 16: None, 32: 500, 64: 500, 128: 500, 256: 500,
+    4: 500, 8: 500, 16: 500, 32: 500, 64: 500, 128: 500, 256: 500,
 }
 
 HHL_EPSILON_DEFAULT: float = 0.01
@@ -1341,10 +1359,12 @@ def main() -> None:
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         LOG_FILE = RESULTS_DIR / "run.log"
         _redirect_log_file(LOG_FILE)
-        
-        # Uncap N=4 for 4th order QSVT
-        if 4 in QSVT_MAX_DEGREE_2D:
-            QSVT_MAX_DEGREE_2D[4] = None
+
+        # The order-4 run previously reset QSVT_MAX_DEGREE_2D[4] to None here,
+        # which reintroduced the uncapped construction at the one resolution
+        # the table is now uniform over. Removed 2026-08-18: the degree is a
+        # single value at every N and order, for the reasons given where the
+        # table is defined.
 
     _log_session_header(args.phase_tag)
     _banner("QUANTUM PDE SOLVERS - 2D HPC BENCHMARK")

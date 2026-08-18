@@ -210,8 +210,19 @@ COST_T8: dict[str, float] = {"thomas": 2.0e-5, "hhl": 1.36,
 # path. N = 128 is listed so that a QSVT-only run at that resolution, which the
 # bounded kappa_line makes tractable when HHL and VQLS are long past their limit,
 # does not have to be preceded by an edit here.
+#
+# UNIFORM ACROSS N AND ORDER (revised 2026-08-18), for the reasons set out at
+# the corresponding table in hpc/runners/run_2d.py: holding None below N = 32
+# and 500 at and above it switched construction mid-curve, putting a step in
+# the QSVT cost curve that belongs to this table rather than to the algorithm,
+# and left the low-kappa HET strips at a degree/kappa ratio near 8 -- below the
+# ~11 at which the recorded sweeps show the inverse approximation degrading.
+# 500 is chosen because the expensive rows already on disk (N = 32 and N = 64,
+# 16-36 ks per case) were produced at it, so the sweep becomes uniform without
+# recomputing them, and because it is the most accurate degree in play:
+# kappa_line <= 2.11 here, so degree/kappa >= 237 at every strip operator.
 QSVT_MAX_DEGREE_3D: dict[int, Optional[int]] = {
-    4: None, 8: None, 16: None, 32: 500, 64: 500, 128: 500}
+    4: 500, 8: 500, 16: 500, 32: 500, 64: 500, 128: 500}
 
 HHL_EPSILON_DEFAULT: float = 0.01
 
@@ -1275,10 +1286,12 @@ def main() -> None:
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         LOG_FILE = RESULTS_DIR / "run.log"
         _redirect_log_file(LOG_FILE)
-        
-        # Uncap N=4 for 4th order QSVT
-        if 4 in QSVT_MAX_DEGREE_3D:
-            QSVT_MAX_DEGREE_3D[4] = None
+
+        # The order-4 run previously reset QSVT_MAX_DEGREE_3D[4] to None here,
+        # which reintroduced the uncapped construction at the one resolution
+        # the table is now uniform over. Removed 2026-08-18: the degree is a
+        # single value at every N and order, for the reasons given where the
+        # table is defined.
 
     _log_session_header(args.phase_tag)
     _banner("QUANTUM PDE SOLVERS - 3D HPC BENCHMARK")

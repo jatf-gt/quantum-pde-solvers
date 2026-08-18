@@ -73,6 +73,13 @@
 #    export LARGE_N="128"
 #    qsub -v LARGE_N hpc/jobs/submit_hpc_2D.sh
 #
+#    # Explicit N list and solver set, both phases (N_VALUES overrides MAX_N
+#    # and LARGE_N). Use SKIP_LARGE_N=1 alongside an N_VALUES that already
+#    # covers 128/256, or Phase 2 recomputes them:
+#    export N_VALUES="4,8,16,32,64,128,256"; export SOLVERS="qsvt"
+#    export OUTER_TOL="1e-6"; export SKIP_LARGE_N=1
+#    qsub -v N_VALUES,SOLVERS,OUTER_TOL,SKIP_LARGE_N hpc/jobs/submit_hpc_2D.sh
+#
 #    # Use a different outer scheme (default: fmg):
 #    export OUTER_SCHEME=multigrid
 #    qsub -v OUTER_SCHEME hpc/jobs/submit_hpc_2D.sh
@@ -146,6 +153,8 @@ echo "  Node         : $(hostname)"
 echo "  Date/Time    : $(date)"
 echo "  Work dir     : $PBS_O_WORKDIR"
 echo "  MAX_N        : ${MAX_N:-<not set: Phase 1 runs its full range, 4..64>}"
+echo "  N_VALUES     : ${N_VALUES:-<not set: derived from MAX_N / LARGE_N>}"
+echo "  SOLVERS      : ${SOLVERS:-<not set: Thomas, HHL, VQLS, QSVT>}"
 echo "  LARGE_N      : ${LARGE_N:-128,256}"
 echo "  SKIP_QSVT    : ${SKIP_QSVT:-0}"
 echo "  SKIP_LARGE_N : ${SKIP_LARGE_N:-0}"
@@ -249,6 +258,14 @@ if [ -n "${SECTIONS}" ]; then
     COMMON_ARGS="${COMMON_ARGS} --sections ${SECTIONS}"
     echo "INFO: running sections ${SECTIONS} only, both phases."
 fi
+if [ -n "${N_VALUES}" ]; then
+    COMMON_ARGS="${COMMON_ARGS} --n-values ${N_VALUES}"
+    echo "INFO: N_VALUES override = ${N_VALUES}"
+fi
+if [ -n "${SOLVERS}" ]; then
+    COMMON_ARGS="${COMMON_ARGS} --solvers ${SOLVERS}"
+    echo "INFO: SOLVERS override = ${SOLVERS}"
+fi
 
 QSVT_MAX_DEGREE="${QSVT_MAX_DEGREE:-500}"
 
@@ -259,10 +276,20 @@ PHASE2_EXIT=0
 #  Phase 1 (core): N = 4..64, all solvers
 # ============================================================
 
-PHASE1_ARGS="${COMMON_ARGS} --phase-tag core"
+# --append merges the existing results_full.json ahead of this invocation's rows
+# rather than replacing it. Without it a Phase 1 that is killed by the walltime
+# leaves the summary holding only the rows it reached, discarding every earlier
+# row in the directory -- including the N=128/256 tier Phase 2 writes. Rows
+# supersede on (case, solver, N), so a deliberate re-measurement still wins.
+PHASE1_ARGS="${COMMON_ARGS} --phase-tag core --append"
 
+# Pinned rather than left to the runner's default. --max-n defaults to
+# max(N_VALUES_ALL) == 256 inside run_2d.py, so an unset MAX_N previously ran
+# Phase 1 over the whole ladder with every solver -- HHL and VQLS at N=128/256
+# are not practical, which is the entire reason Phase 2 exists. N_VALUES, when
+# given, overrides this via --n-values.
+PHASE1_ARGS="${PHASE1_ARGS} --max-n ${MAX_N:-64}"
 if [ -n "${MAX_N}" ]; then
-    PHASE1_ARGS="${PHASE1_ARGS} --max-n ${MAX_N}"
     echo "INFO: Phase 1 truncated at N=${MAX_N}."
 fi
 
