@@ -18,7 +18,7 @@ qiskit_hw/
 *.png
 *.jpg
 *.egg-info/
-results_hpc/
+results/meetings/
 results/hpc_run/
 results_hpc_copy/
 results/1Dhpc_run/
@@ -30,6 +30,7 @@ results/3Dhpc_run_4th/
 results/1Dstudies/
 results/2Dstudies/
 results/3Dstudies/
+updated*
 CLAUDE.md
 .agents
 .claude
