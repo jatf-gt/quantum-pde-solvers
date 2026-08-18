@@ -225,7 +225,12 @@ PHASE2_EXIT=0
 #  Phase 1 (core): N = 4..16, all solvers
 # ============================================================
 
-PHASE1_ARGS="${COMMON_ARGS} --phase-tag core --max-n ${MAX_N:-16}"
+# --append merges the existing results_full.json ahead of this invocation's rows
+# rather than replacing it, matching Phase 2 below. Without it a scope-restricted
+# Phase 1 -- or one killed by the walltime -- leaves the summary holding only the
+# rows it reached, discarding every earlier row in the directory. Rows supersede
+# on (case, solver, N), so a deliberate re-measurement still wins.
+PHASE1_ARGS="${COMMON_ARGS} --phase-tag core --max-n ${MAX_N:-16} --append"
 PHASE1_ARGS="${PHASE1_ARGS} -I qsvt.max_degree=${QSVT_MAX_DEGREE}"
 if [ "${SKIP_QSVT:-0}" = "1" ]; then
     PHASE1_ARGS="${PHASE1_ARGS} --skip-qsvt"
