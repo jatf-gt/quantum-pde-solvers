@@ -61,14 +61,38 @@ echo "==========================================================================
 # -- Provenance ---------------------------------------------------------------
 if git -C "${REPO_ROOT}" rev-parse --git-dir >/dev/null 2>&1; then
     commit="$(git -C "${REPO_ROOT}" rev-parse --short HEAD)"
-    if [ -z "$(git -C "${REPO_ROOT}" status --porcelain)" ]; then
+    # `-uall` so that a wholly-untracked directory is enumerated file by file
+    # rather than collapsed to a single `?? results/` entry, which the phase-cache
+    # filter below could not then match.
+    dirty="$(git -C "${REPO_ROOT}" status --porcelain -uall)"
+    # The QSVT phase cache is generated output which `.gitignore` deliberately
+    # tracks (`!results/qsvt_phase_cache/*.npz`), so that `git pull` conveys
+    # precomputed angles to the cluster. Executing a precompute consequently
+    # leaves untracked entries in that directory alone, without altering a single
+    # line of code; gating a sweep upon them is a false positive that has already
+    # cost one submission. Job 3822258 (2-D, order 4, 2026-08-18) aborted here
+    # minutes after the very precompute it depended upon, whereas its 3-D twin
+    # proceeded solely because that script exports PREFLIGHT_ALLOW_DIRTY=1.
+    # Untracked ADDITIONS to the cache are therefore reported but do not
+    # constitute a dirty tree; a modified or deleted cache entry still does, as
+    # does every other working-tree change.
+    # `?` is a literal in a basic regular expression; `\?` would make the
+    # preceding character optional and the filter would never match.
+    phase_add='^?? results/qsvt_phase_cache/.*\.npz$'
+    n_phases="$(printf '%s' "${dirty}" | grep -c "${phase_add}")"
+    code_dirty="$(printf '%s' "${dirty}" | grep -v "${phase_add}")"
+    if [ -z "${dirty}" ]; then
         pass "working tree clean at ${commit}"
+    elif [ -z "${code_dirty}" ]; then
+        pass "working tree clean at ${commit} (${n_phases} new QSVT phase-cache entries; generated output, not a source change)"
     elif [ "${PREFLIGHT_ALLOW_DIRTY}" = "1" ]; then
         warn "working tree DIRTY at ${commit} (permitted by PREFLIGHT_ALLOW_DIRTY=1)"
-        git -C "${REPO_ROOT}" status --porcelain | sed 's/^/            /'
+        printf '%s\n' "${code_dirty}" | sed 's/^/            /'
+        [ "${n_phases}" -gt 0 ] && echo "            (+ ${n_phases} new QSVT phase-cache entries; not counted)"
     else
         fail "working tree DIRTY at ${commit}; results would not be reproducible"
-        git -C "${REPO_ROOT}" status --porcelain | sed 's/^/            /'
+        printf '%s\n' "${code_dirty}" | sed 's/^/            /'
+        [ "${n_phases}" -gt 0 ] && echo "            (+ ${n_phases} new QSVT phase-cache entries; not counted)"
         echo "            Commit the changes, or set PREFLIGHT_ALLOW_DIRTY=1 to override."
     fi
 else
