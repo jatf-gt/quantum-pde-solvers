@@ -186,6 +186,19 @@ fi
 echo "------------------------------------------------------------"
 echo "STUDIES START  $(date)"
 echo "------------------------------------------------------------"
+# The exact command, echoed verbatim. A run that quietly used parameters other
+# than those intended is indistinguishable afterwards from one that never ran,
+# because the runner rewrites the same filenames either way; the assembled
+# argument vector is the only record of what was actually requested.
+echo "COMMAND: python3 hpc/runners/run_studies.py --dim ${DIM} --study ${STUDY}" \
+     "--order ${ORDER} --solvers ${SOLVERS}${OPT_ARGS}"
+echo "------------------------------------------------------------"
+
+# Sentinel for the freshness check in the epilogue. `run_studies.py` writes
+# run_metadata.json before its first case, so a metadata file no newer than this
+# marker proves the runner never reached that line, whatever else was printed.
+STAMP="${RESULTS_SUBDIR}/.job_start_marker"
+: > "${STAMP}"
 
 python3 hpc/runners/run_studies.py \
     --dim "${DIM}" \
@@ -199,11 +212,42 @@ echo "------------------------------------------------------------"
 echo "STUDIES FINISHED  $(date)  exit=${RC}"
 echo "------------------------------------------------------------"
 
+# Did this job produce anything at all? A job that aborts in preflight, fails an
+# import, or dies before its first case leaves the PREVIOUS run's files in place
+# untouched -- and the archive step below would then copy those into a directory
+# stamped with today's date, which reads as a completed run and has already been
+# taken for one. Establish the fact before archiving, and state it plainly.
+WROTE_RESULTS=0
+if [ -f "${RESULTS_SUBDIR}/run_metadata.json" ] \
+   && [ "${RESULTS_SUBDIR}/run_metadata.json" -nt "${STAMP}" ]; then
+    WROTE_RESULTS=1
+fi
+rm -f "${STAMP}"
+
+if [ "${WROTE_RESULTS}" = "0" ]; then
+    echo "=============================================================="
+    echo "  WARNING: THIS JOB WROTE NO RESULTS."
+    echo "  run_metadata.json in ${RESULTS_SUBDIR} predates this job, so the"
+    echo "  runner never reached its first case. Whatever that directory holds"
+    echo "  belongs to an EARLIER run: do not copy it off the cluster and read it"
+    echo "  as the output of this submission. The cause is above in this log, and"
+    echo "  in results/studies_pbs_stderr.log."
+    echo "=============================================================="
+fi
+
 # Copy to RDS alongside the sweep results. The runner writes incrementally after
-# every case, so a walltime kill leaves everything completed up to that point.
-DEST="${HOME}/qpde-results/${DIM}Dstudies_$(date +%Y%m%d_%H%M%S)"
+# every case, so a walltime kill leaves everything completed up to that point --
+# which is why a non-zero exit is still archived, but under a name recording it.
+SUFFIX=""
+[ "${RC}" != "0" ]           && SUFFIX="${SUFFIX}_rc${RC}"
+[ "${WROTE_RESULTS}" = "0" ] && SUFFIX="${SUFFIX}_STALE"
+DEST="${HOME}/qpde-results/${DIM}Dstudies_$(date +%Y%m%d_%H%M%S)${SUFFIX}"
 mkdir -p "${DEST}"
 cp -r "${RESULTS_SUBDIR}"/* "${DEST}/" 2>/dev/null || true
-echo "  Results copied to ${DEST}"
+if [ "${WROTE_RESULTS}" = "1" ]; then
+    echo "  Results copied to ${DEST}"
+else
+    echo "  Pre-existing directory copied to ${DEST} (NOT this job's output)."
+fi
 
 exit ${RC}
