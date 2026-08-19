@@ -53,6 +53,16 @@ results_backup*/
 *.bak
 *.tar.gz
 
+# The rules above match a backup FILE ("*.bak") and a directory whose name ends
+# exactly in ".backup", but not the dated convention actually used before a
+# re-run -- results/2Dstudies.bak_20260819 -- whose name ends in the date. Such a
+# directory holds .json and .csv, neither excluded by kind below, so it surfaced
+# as untracked content and the preflight refused the tree: a backup taken to make
+# a submission safe was what stopped the submission. Match the name wherever it
+# occurs and however it is suffixed.
+*.bak*/
+*_backup*/
+
 # Generated cluster output, excluded by kind rather than by directory name.
 # The per-directory rules above only protect the six sweep directories that
 # exist today; a job writing to a new directory (a wave, a resumed sweep, a
