@@ -64,7 +64,11 @@
 # ============================================================================
 
 #PBS -l walltime=24:00:00
-#PBS -l select=1:ncpus=4:mem=128gb
+# Sized from the measured high-water marks reported by the PBS epilogue of
+# every completed run of this sweep, not from a guess. 2-D and 3-D jobs peak
+# at 0.7-1.9 GB and 1-D at 4.8-8.8 GB; memory is a scheduling dimension on
+# CX3, so an over-request buys nothing and delays the job in the queue.
+#PBS -l select=1:ncpus=4:mem=32gb
 #PBS -N quantum_pde_1D_4th
 #PBS -o results/1Dhpc_run_4th/pbs_stdout.log
 #PBS -e results/1Dhpc_run_4th/pbs_stderr.log

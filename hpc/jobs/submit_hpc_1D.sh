@@ -38,7 +38,11 @@
 # NPZ is written as it is produced), but results_full.json / results_summary.csv
 # are written only at the END, so a killed job loses the summary table.
 #PBS -l walltime=24:00:00
-#PBS -l select=1:ncpus=4:mem=128gb
+# Sized from the measured high-water marks reported by the PBS epilogue of
+# every completed run of this sweep, not from a guess. 2-D and 3-D jobs peak
+# at 0.7-1.9 GB and 1-D at 4.8-8.8 GB; memory is a scheduling dimension on
+# CX3, so an over-request buys nothing and delays the job in the queue.
+#PBS -l select=1:ncpus=4:mem=32gb
 
 # --- Job metadata ---
 #PBS -N quantum_pde_1Dfull_run

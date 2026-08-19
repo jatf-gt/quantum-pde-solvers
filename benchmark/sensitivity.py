@@ -125,7 +125,22 @@ VQLS_SENSITIVITY_GRIDS: dict[str, list] = {
 }
 
 QSVT_SENSITIVITY_GRIDS: dict[str, list] = {
-    "max_degree": [500, 1000, 2000, 5000, None],
+    # The grid must straddle the degree at which the QSP polynomial ceases to
+    # invert the spectrum, or the sweep reports a flat line. The QSVT error is
+    # governed by the ratio of degree to κ; below roughly 11·κ the polynomial
+    # no longer approximates 1/x across [1/κ, 1] and the error rises steeply,
+    # while above it the solve is already exact to machine precision and every
+    # further degree buys nothing but circuit depth.
+    #
+    # The former grid began at 500. At the 1-D N=8 operator (κ = 32) the natural
+    # degree is 4923 and *every* one of its points sat in the saturated regime,
+    # so the recorded study showed err_alg ≈ 1e-13 at all five and read as a
+    # parameter with no effect. Measured on that operator, the knee is between
+    # degrees 200 and 1000: the relative residual runs 3.87e-1, 7.07e-2,
+    # 2.48e-3, 7.31e-8, 1.71e-13 across caps of 50, 100, 200, 500, 1000. The
+    # grid below spans that range, and is the one the equal-accuracy study
+    # already uses successfully.
+    "max_degree": [20, 50, 100, 200, 500, 1000, 2000, None],
     "epsilon":    [0.1, 0.05, 0.01, 0.005, 0.001],
 }
 
@@ -408,8 +423,13 @@ def sensitivity_sweep_vqls(
             rec.vqls_n_layers = cfg.n_layers
             rec.vqls_n_restarts = cfg.n_restarts
             rec.vqls_cost_final = float(solver_result.final_cost)
-            rec.vqls_n_evaluations = getattr(solver_result, "n_evaluations", None)
-            rec.vqls_converged = getattr(solver_result, "converged", None)
+            # `VQLSSolverResult` names these `n_circuit_evals` and
+            # `optimiser_success`; the former names matched no field and left
+            # both columns null in every study recorded to date.
+            rec.vqls_n_evaluations = getattr(
+                solver_result, "n_circuit_evals", None)
+            rec.vqls_converged = getattr(
+                solver_result, "optimiser_success", None)
             rec.sensitivity_param = param_name
             rec.sensitivity_value = float(val)
 
@@ -546,7 +566,12 @@ def sensitivity_sweep_qsvt(
             rec.phase_lookup_time_s = getattr(
                 solver_result, "phase_lookup_time_s", None
             )
-            rec.qsvt_polynomial_degree = getattr(solver_result, "degree", None)
+            # `QSVTSolverResult` names this field `polynomial_degree`. The
+            # former `getattr(solver_result, "degree", ...)` matched nothing and
+            # returned the default silently, so every 1-D QSVT study row recorded
+            # a null degree — the one axis a max_degree sweep exists to plot.
+            rec.qsvt_polynomial_degree = getattr(
+                solver_result, "polynomial_degree", None)
             rec.qsvt_max_degree_cap = val if param_name == "max_degree" else baseline.get("max_degree")
             rec.qsvt_subnormalisation = alpha_sub
             rec.qsvt_kappa_eff = kappa_eff
@@ -681,7 +706,14 @@ OUTER_SENSITIVITY_GRIDS: dict[str, dict[str, list]] = {
              "trotter_steps": [1, 2, 4, 8, 16]},
     "vqls": {"n_layers": [1, 2, 3, 4, 5],
              "n_restarts": [1, 2, 3, 5]},
-    "qsvt": {"max_degree": [50, 100, 200, 500, None]},
+    # The 2-D and 3-D strip operators are far better conditioned than the 1-D
+    # one — κ → 3⁻ and 2⁻ respectively against O(N²) — so their QSP knee sits
+    # two orders of magnitude lower and the 1-D grid is useless here. Measured
+    # on the 2-D unit-square strip at N=8 (κ = 2.77), err_alg is 1.46e-2 at
+    # degree 5 and 1.24e-4 from degree 11 upward, unchanged through 501; the
+    # former grid started at 50 and therefore reported a flat line across every
+    # point. The grid below places five points at and below the knee.
+    "qsvt": {"max_degree": [5, 8, 11, 15, 21, 51, 201, 501]},
 }
 
 

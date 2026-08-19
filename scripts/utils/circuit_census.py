@@ -75,6 +75,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import logging
 import shutil
@@ -112,6 +113,121 @@ SWEEP_DIR: dict[tuple[int, int], str] = {
 MEASURED_FIELDS: tuple[str, ...] = (
     "circuit_depth_t", "n_gates_total", "n_gates_2q",
 )
+
+# HPC case identifier -> `core.cases` registry name, mirroring the section
+# functions of `hpc/runners/run_2d.py` and `hpc/runners/run_3d.py`. The census
+# must build each case through the same registry the sweep used, since the strip
+# operator depends on the domain's aspect ratio: the unit square and the SPT-100
+# channel give materially different spectra at equal N.
+CASE_REGISTRY_NAME: dict[str, str] = {
+    # 2-D, hpc/runners/run_2d.py:run_section1..5
+    "2D_Poisson_sin_hom":               "poisson_2d_sin_pi",
+    "2D_Poisson_TwoGaussian_PlasmaNet": "poisson_2d_two_gaussian_plasmanet",
+    "2D_Poisson_SingleMode_n1m1":       "poisson_2d_single_mode_n1m1",
+    "2D_HET_MMS_SPT100":                "het_2d_mms_spt100",
+    "2D_HET_Sin_MeetingReport":         "het_2d_sin_meeting_report",
+    # 3-D, hpc/runners/run_3d.py:case_cube..case_high_mode
+    "3D_Poisson_TripleSin_cube":        "poisson_3d_triple_sin_cube",
+    "3D_HET_MMS_SPT100":                "het_3d_mms_spt100",
+    "3D_HET_RotatingSpoke_SPT100":      "het_3d_rotating_spoke",
+    "3D_HET_Discharge_SPT100":          "het_3d_discharge_spt100",
+    "3D_Laplace_BCdriven_cube":         "poisson_3d_laplace_bc_driven",
+    "3D_Poisson_TwoGaussian_cube":      "poisson_3d_two_gaussian_cube",
+    "3D_Poisson_HighMode_n2m3l4":       "poisson_3d_high_mode_n2m3l4",
+}
+
+
+# ── Sweep Operators ──────────────────────────────────────────────────────────
+
+def sweep_operator(dim: int, order: int, case_id: str, N: int) -> np.ndarray:
+    """
+    Build the exact linear operator a given sweep row's quantum solver received.
+
+    The census measures a circuit, and a circuit is determined by the operator it
+    encodes. Measuring the wrong operator reports resources for a circuit the
+    sweep never built, which is why this function reconstructs each case through
+    `core.cases` — the same registry `run_2d.py` and `run_3d.py` use — rather
+    than approximating with a generic matrix.
+
+    What the operator is, per sweep
+    -------------------------------
+    1-D    The full system matrix. Order 2 is the Toeplitz symmetric tridiagonal
+           operator of `problems/poisson_1d.py`, κ = O(N²); order 4 is the
+           pentadiagonal operator of `problems/poisson_1d_4th.py`, better
+           conditioned at equal N by an asymptotic factor 4/3.
+
+    2-D/3-D
+           The **strip** operator, not the full N² or N³ system: `solvers/outer`
+           decomposes the domain into 1-D strips and hands each to a 1-D quantum
+           solver, so the circuit width is log₂(N) and not log₂(N²). The
+           transverse coupling contributes a diagonal shift that bounds the
+           condition number near 3 in 2-D and 2 in 3-D, which is precisely why
+           the quantum solvers remain tractable there and why the 1-D operator
+           must not be substituted.
+
+    Which strip, at fourth order
+    ----------------------------
+    The odd reflection at a transverse boundary folds the ghost node onto the
+    strip's own diagonal, so a fourth-order sweep requests two distinct strip
+    operators in 2-D and up to four in 3-D. This function returns the **interior**
+    operator, `row_matrix()` — the one the overwhelming majority of strips use and
+    the one `kappa_row` reports, so the measurement is consistent with the κ
+    recorded beside it in the row. The boundary-adjacent families differ only by a
+    diagonal shift and their κ by under 2 %, so their circuits differ negligibly;
+    the interior figure is representative rather than exhaustive.
+
+    Parameters
+    ----------
+    dim : {1, 2, 3}
+        Spatial dimension of the sweep.
+    order : {2, 4}
+        Spatial discretisation order.
+    case_id : str
+        HPC case identifier as recorded in `results_full.json`. Ignored when
+        `dim == 1`, whose operator carries no case dependence.
+    N : int
+        Resolution; the returned operator is (N, N).
+
+    Returns
+    -------
+    np.ndarray
+        (N, N) operator, symmetric and real.
+
+    Raises
+    ------
+    KeyError
+        If `case_id` is absent from `CASE_REGISTRY_NAME`.
+    """
+    if dim == 1:
+        if order == 4:
+            from problems.poisson_1d_4th import PoissonProblem1D4th
+            return PoissonProblem1D4th(N=N, f_vals=np.zeros(N),
+                                       alpha=0.0, beta=0.0).A
+        from problems.poisson_1d import build_tst_matrix
+        return build_tst_matrix(N)
+
+    from core import cases
+
+    if case_id not in CASE_REGISTRY_NAME:
+        raise KeyError(
+            f"No registry name for case {case_id!r}. Add it to "
+            f"CASE_REGISTRY_NAME, taking the mapping from the section function "
+            f"of hpc/runners/run_{dim}d.py that emits this identifier.")
+
+    built = cases.get(CASE_REGISTRY_NAME[case_id]).build(N)
+    problem = built.problem
+
+    if order == 4:
+        # Re-discretised exactly as the runners do, so that the operator carries
+        # the same boundary closure the sweep solved against.
+        if dim == 2:
+            from hpc.runners.run_2d import _to_4th_order_2d
+            problem = _to_4th_order_2d(problem, built.f_faces)
+        else:
+            from hpc.runners.run_3d import _to_4th_order_3d
+            problem = _to_4th_order_3d(problem, built.f_faces)
+
+    return np.asarray(problem.row_matrix(), dtype=float)
 
 
 # ── Circuit Construction ───────────────────────────────────────────────────────
@@ -412,9 +528,10 @@ def _write_csv(json_path: Path, csv_path: Path) -> None:
         writer.writerows(rows)
 
 
-def _merge_and_persist(rows: list[dict], measured: dict[tuple[str, int], dict],
+def _merge_and_persist(rows: list[dict], measured: dict[tuple[str, str, int], dict],
                        sweep: Path, json_path: Path,
-                       backup_made: list[bool]) -> int:
+                       backup_made: list[bool],
+                       op_cache: dict, op_key_fn) -> int:
     """
     Merge the measurements collected so far into the summary and write it out.
 
@@ -442,6 +559,13 @@ def _merge_and_persist(rows: list[dict], measured: dict[tuple[str, int], dict],
         Summary path.
     backup_made : list of bool
         Single-element mutable flag recording whether the backup has been taken.
+    op_cache : dict
+        {(case_id, N): operator}, so that a row is matched to the measurement of
+        the operator it actually presents. In 2-D and 3-D two cases at equal
+        (solver, N) may carry different strip operators, and keying the merge on
+        (solver, N) alone would assign one case the other's circuit.
+    op_key_fn : callable
+        Maps an operator to the digest under which its measurement is filed.
 
     Returns
     -------
@@ -450,7 +574,10 @@ def _merge_and_persist(rows: list[dict], measured: dict[tuple[str, int], dict],
     """
     changed = 0
     for row in rows:
-        key = (str(row.get("solver")), row.get("N"))
+        A = op_cache.get((str(row.get("case")), row.get("N")))
+        if A is None:
+            continue
+        key = (op_key_fn(A), str(row.get("solver")), row.get("N"))
         if key not in measured:
             continue
         got = measured[key]
@@ -488,24 +615,13 @@ def main() -> int:
                          "'estimated'. Unset runs each measurement unbounded.")
     args = ap.parse_args()
 
-    # The operator is built by `build_tst_matrix`, which is the SECOND-ORDER
-    # one-dimensional Toeplitz tridiagonal matrix. It is not the operator of any
-    # other sweep: the order-4 stencil is pentadiagonal, and the 2-D and 3-D
-    # strip operators carry a diagonal shift from the transverse coupling that
-    # bounds their condition number near 3 and 2 respectively. Measuring any of
-    # those against this matrix would report the resources of a circuit the sweep
-    # never built — silently, and with the authority of the word "measured".
-    #
-    # Refused rather than approximated. Extending the census means constructing
-    # the operator per (dimension, order) from `problems/`, which is a change to
-    # this script and not to its caller.
-    if (args.dim, args.order) != (1, 2):
-        log.error("  Only the 1-D second-order sweep is supported. This script "
-                  "builds the 1-D TST operator, which is not the operator of "
-                  "the %d-D order-%d sweep; measuring against it would report a "
-                  "circuit that sweep never built.", args.dim, args.order)
-        return 2
-
+    # Every (dimension, order) is supported. The operator is reconstructed per
+    # sweep by `sweep_operator`, which builds each case through `core.cases` —
+    # the registry the runners themselves use — so the measured circuit is the
+    # circuit the sweep built. Substituting a generic matrix would report
+    # resources for a circuit that never existed, silently and with the authority
+    # of the word "measured"; that is why this script previously refused
+    # everything but the 1-D second-order sweep rather than approximating.
     sweep = REPO_ROOT / SWEEP_DIR[(args.dim, args.order)]
     json_path = sweep / "results_full.json"
     if not json_path.exists():
@@ -523,47 +639,71 @@ def main() -> int:
     log.info("  %-34s %-7s %5s %10s %12s %12s  %s",
              "case", "solver", "N", "depth_t", "gates", "2q gates", "source")
 
-    # One measurement per (solver, N): the circuit depends on the operator's
-    # size and spectrum, not on the source term, so measuring every case would
-    # repeat identical transpilations. The result is applied to every case at
-    # that (solver, N).
-    from problems.poisson_1d import build_tst_matrix
+    # One measurement per (operator, solver, N). The circuit depends on the
+    # operator's size and spectrum and not on the source term, so in 1-D a single
+    # measurement serves every case at that (solver, N). In 2-D and 3-D that no
+    # longer holds: the unit square and the SPT-100 channel have different aspect
+    # ratios and hence different strip spectra, so cases are grouped by the
+    # operator they actually present. Grouping is by the operator's own bytes
+    # rather than by a hand-written domain table, so two cases sharing a geometry
+    # are measured once and no case is ever assigned another's circuit by
+    # assumption.
+    def _op_key(A: np.ndarray) -> str:
+        return hashlib.sha256(np.ascontiguousarray(A, dtype=float)
+                              .tobytes()).hexdigest()[:16]
 
-    # Ascending in N, so that an interrupted run has completed the cheap
-    # resolutions rather than having spent its whole budget on the dearest one.
-    todo: list[tuple[str, int]] = []
-    seen: set[tuple[str, int]] = set()
+    todo: list[tuple[str, str, int, np.ndarray]] = []
+    seen: set[tuple[str, str, int]] = set()
+    op_cache: dict[tuple[str, int], np.ndarray] = {}
     for row in rows:
         solver, N = str(row.get("solver")), row.get("N")
+        case_id = str(row.get("case"))
         if solver == "Thomas" or N is None:
             continue
         if wanted is not None and N not in wanted:
             continue
-        if (solver, N) in seen:
+        if (case_id, N) not in op_cache:
+            try:
+                op_cache[(case_id, N)] = sweep_operator(args.dim, args.order,
+                                                        case_id, N)
+            except Exception as exc:
+                log.warning("  %-34s N=%-5d operator unavailable (%s); skipped",
+                            case_id, N, exc)
+                op_cache[(case_id, N)] = None
+        A = op_cache[(case_id, N)]
+        if A is None:
             continue
-        seen.add((solver, N))
-        todo.append((solver, N))
+        key = (_op_key(A), solver, N)
+        if key in seen:
+            continue
+        seen.add(key)
+        todo.append((key[0], solver, N, A))
     # Ascending in N, and within each N cheapest solver first, so that an
     # interrupted run has banked every measurement it could afford rather than
     # having spent its whole budget on the single dearest one.
-    todo.sort(key=lambda t: (t[1], SOLVER_COST_RANK.get(t[0], 99), t[0]))
+    todo.sort(key=lambda t: (t[2], SOLVER_COST_RANK.get(t[1], 99), t[1]))
 
-    measured: dict[tuple[str, int], dict] = {}
+    measured: dict[tuple[str, str, int], dict] = {}
     backup_made = [False]
     changed = 0
-    for solver, N in todo:
+    for op_key, solver, N, A in todo:
+        # The representative row for this (operator, solver, N): any case whose
+        # operator hashes to `op_key` will do, since they share the circuit. The
+        # None guard must precede the hash, or a case whose operator could not be
+        # built would be hashed.
         row = next(r for r in rows
-                   if str(r.get("solver")) == solver and r.get("N") == N)
-        A = build_tst_matrix(N)
+                   if str(r.get("solver")) == solver and r.get("N") == N
+                   and op_cache.get((str(r.get("case")), N)) is not None
+                   and _op_key(op_cache[(str(r.get("case")), N)]) == op_key)
         b = np.ones(N) / np.sqrt(N)
         kappa = float(row.get("kappa") or row.get("kappa_row") or 1.0)
         got = measure(solver, A, b, N, kappa, row.get("qsvt_degree"),
                       timeout_s=args.timeout_s)
         if got is None:
             continue
-        measured[(solver, N)] = got
+        measured[(op_key, solver, N)] = got
         log.info("  %-34s %-7s %5d %10s %12s %12s  %s",
-                 "(operator-level)", solver, N,
+                 f"op {op_key[:8]} (kappa={kappa:.4f})", solver, N,
                  got["circuit_depth_t"] if got["circuit_depth_t"] else "---",
                  got["n_gates_total"] if got["n_gates_total"] else "---",
                  f"{got['n_gates_2q']:,}", got["source"])
@@ -573,7 +713,7 @@ def main() -> int:
         # measurements already in hand.
         if not args.dry_run:
             changed = _merge_and_persist(rows, measured, sweep, json_path,
-                                         backup_made)
+                                         backup_made, op_cache, _op_key)
 
     if not measured:
         log.error("  Nothing measured; nothing written.")
