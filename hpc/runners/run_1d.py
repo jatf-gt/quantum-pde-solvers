@@ -195,8 +195,27 @@ for _noisy in (
 # N=64" flag, because N=64 is now part of the default sweep.
 N_VALUES_ALL: list[int] = [4, 8, 16, 32, 64]
 
+# -- N values reachable only on explicit request -------------------------------
+# Resolutions the sweep will run when `--n-values` names them, but which are NOT
+# part of the default ladder and are never selected by `--max-n`. They exist for
+# the uniform-degree QSVT experiment: with the cap held at 5000 across the
+# ladder, the degree-to-κ ratio falls from 43 at N=16 through 11.3 at N=32 and
+# 2.9 at N=64 to 0.74 at N=128, spanning the ~11 threshold below which the
+# recorded sweeps show the QSP inverse approximation degrading. N=128 (κ ≈ 6744)
+# is the far end of that span and is the point at which the degradation is
+# expected to be unambiguous.
+#
+# Kept separate from N_VALUES_ALL deliberately: `--max-n` defaults to
+# max(N_VALUES_ALL), so folding N=128 into that list would silently extend every
+# default sweep — and hence the archive — by a resolution at which HHL's clock
+# register makes the solve intractable.
+N_VALUES_EXTRA: list[int] = [128]
+
 # -- QSVT: which N are attempted at all ----------------------------------------
-QSVT_MAX_N: int = 64
+# The bound is the largest resolution reachable at all (see N_VALUES_EXTRA), not
+# the largest in the default ladder: N=128 is opt-in via `--n-values`, so a guard
+# set below it would silently drop the QSVT rows that request exists to produce.
+QSVT_MAX_N: int = 128
 
 # -- QSVT: post-hoc wall-time warning threshold (seconds) ----------------------
 # NOTE: this is a WARNING only. QSVT is not interruptible mid-solve, so this
@@ -1932,7 +1951,8 @@ def main() -> None:
         "--n-values", type=str, default=None,
         help="Comma-separated resolutions to run, e.g. --n-values 32,64. Takes "
              "precedence over --max-n. Required for a gap-fill run, where the "
-             "outstanding resolutions are not a prefix of the sweep.",
+             "outstanding resolutions are not a prefix of the sweep, and the "
+             "only way to reach the opt-in resolutions in N_VALUES_EXTRA.",
     )
     parser.add_argument(
         "--sections", type=str, default=",".join(SECTION_FAMILIES),
@@ -2017,10 +2037,12 @@ def main() -> None:
         except ValueError:
             parser.error(f"--n-values {args.n_values!r} is not a comma-separated "
                          f"list of integers.")
-        unknown = [n for n in N_values if n not in N_VALUES_ALL]
+        permitted = N_VALUES_ALL + N_VALUES_EXTRA
+        unknown = [n for n in N_values if n not in permitted]
         if unknown:
-            parser.error(f"--n-values contains {unknown}, which are not in the "
-                         f"sweep {N_VALUES_ALL}.")
+            parser.error(f"--n-values contains {unknown}, which are neither in "
+                         f"the sweep {N_VALUES_ALL} nor among the opt-in "
+                         f"resolutions {N_VALUES_EXTRA}.")
     else:
         N_values = [n for n in N_VALUES_ALL if n <= args.max_n]
         if not N_values:
