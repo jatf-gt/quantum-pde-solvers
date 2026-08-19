@@ -39,6 +39,11 @@ QLS_FORK_URL="https://github.com/jatf-gt/quantum_linear_solvers.git"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 QLS_LOCAL="${REPO_ROOT}/quantum_linear_solvers"
 ORDER="${ORDER:-2}"
+# Defaulted rather than referenced bare: every submission script sources its
+# environment from PBS, where an unpassed variable is simply unset, and a caller
+# running under `set -u` would abort here on the dirty-tree branch instead of
+# reporting the tree state it exists to report.
+PREFLIGHT_ALLOW_DIRTY="${PREFLIGHT_ALLOW_DIRTY:-0}"
 
 failures=0
 warnings=0
