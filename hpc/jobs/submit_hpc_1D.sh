@@ -17,6 +17,22 @@
 #    export SKIP_QSVT=1
 #    qsub -v SKIP_QSVT hpc/jobs/submit_hpc_1D.sh
 #
+#    # Uniform-degree QSVT ladder, written to its own directory so the rows do
+#    # not supersede the archive's on (case, solver, N). The matching phases
+#    # must already be in results/qsvt_phase_cache/ at THIS cap -- the runner
+#    # honours --qsvt-max-degree only on a cache hit, and falls back silently
+#    # otherwise (see run_1d.py::_resolve_qsvt_max_degree):
+#    export N_VALUES="16,128" SOLVERS="qsvt" QSVT_MAX_DEGREE="5000"
+#    export RESULTS_DIR="results/1Dhpc_run_degcap5000" PHASE_TAG="degcap5000"
+#    qsub -v N_VALUES,SOLVERS,QSVT_MAX_DEGREE,RESULTS_DIR,PHASE_TAG #         hpc/jobs/submit_hpc_1D.sh
+#
+#    N=128 is reachable only by naming it in N_VALUES (see N_VALUES_EXTRA in
+#    run_1d.py); it is deliberately absent from the default sweep.
+#
+#    NOTE: the #PBS -o/-e paths below are resolved by PBS at submission time and
+#    cannot follow RESULTS_DIR, so the PBS logs of a variant run still land in
+#    results/1Dhpc_run/. The run's own log, run.log, follows RESULTS_DIR.
+#
 #  Monitor:
 #    qstat -u $USER
 #    tail -f results/1Dhpc_run/run.log
@@ -65,6 +81,8 @@ echo "  Date/Time : $(date)"
 echo "  Work dir  : $PBS_O_WORKDIR"
 echo "  MAX_N     : ${MAX_N:-<not set: full sweep to N=64>}"
 echo "  SKIP_QSVT : ${SKIP_QSVT:-0}"
+echo "  RESULTS   : ${RESULTS_DIR:-results/1Dhpc_run}"
+echo "  QSVT cap  : ${QSVT_MAX_DEGREE:-<not set: per-N table>}"
 echo "============================================================"
 
 # -- Repository root resolution -------------------------------
@@ -116,7 +134,12 @@ python3 -c "import pyqsp" 2>/dev/null || {
 # The previous version created and archived results/hpc_run/ while the runner
 # wrote to results/1Dhpc_run/, so the RDS copy at the end contained only the
 # PBS logs and none of the actual benchmark output.
-RESULTS_SUBDIR="results/1Dhpc_run"
+# RESULTS_DIR redirects the whole run -- summary, per-solution archives and
+# run.log -- to a variant directory, so that a run at a non-default degree cap
+# does not supersede the archive's rows on (case, solver, N). RESULTS_SUBDIR
+# tracks it, because it is also what gets copied to RDS at the end of the job;
+# left pointing at the default, the archive copy would collect the wrong run.
+RESULTS_SUBDIR="${RESULTS_DIR:-results/1Dhpc_run}"
 mkdir -p "${RESULTS_SUBDIR}"
 
 # Keep Aer's internal OpenMP threading within the allocated core count.
@@ -150,6 +173,18 @@ if [ -n "${HHL_TIMEOUT_S}" ]; then
     EXTRA_ARGS="${EXTRA_ARGS} --hhl-timeout-s ${HHL_TIMEOUT_S}"
     echo "INFO: HHL_TIMEOUT_S = ${HHL_TIMEOUT_S}"
 fi
+if [ -n "${QSVT_MAX_DEGREE}" ]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --qsvt-max-degree ${QSVT_MAX_DEGREE}"
+    echo "INFO: QSVT_MAX_DEGREE = ${QSVT_MAX_DEGREE}"
+fi
+if [ -n "${RESULTS_DIR}" ]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --results-dir ${RESULTS_DIR}"
+    echo "INFO: RESULTS_DIR = ${RESULTS_DIR}"
+fi
+if [ -n "${PHASE_TAG}" ]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --phase-tag ${PHASE_TAG}"
+    echo "INFO: PHASE_TAG = ${PHASE_TAG}"
+fi
 if [ "${SKIP_QSVT:-0}" = "1" ]; then
     EXTRA_ARGS="${EXTRA_ARGS} --skip-qsvt"
     echo "INFO: QSVT disabled."
@@ -172,7 +207,7 @@ echo "Benchmark finished at $(date) with exit code ${EXIT_CODE}"
 # ============================================================
 #  Copy results to permanent RDS storage
 # ============================================================
-RDS_RESULTS="${HOME}/qpde-results/1Dhpc_run_$(date +%Y%m%d_%H%M%S)"
+RDS_RESULTS="${HOME}/qpde-results/$(basename "${RESULTS_SUBDIR}")_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${RDS_RESULTS}"
 cp -r "${RESULTS_SUBDIR}"/* "${RDS_RESULTS}/" 2>/dev/null
 echo "Results copied to: ${RDS_RESULTS}"
