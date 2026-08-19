@@ -307,6 +307,20 @@ def qsvt_max_degree(N: int, order: int = 2) -> Optional[int]:
 QSVT_UNCACHED_FALLBACK_DEGREE: int = 5000
 QSVT_MAX_DEGREE_FALLBACK: int = 5000
 
+# Set by `main` from ``--qsvt-max-degree`` and propagated to workers by
+# `_init_worker`. None leaves QSVT_MAX_DEGREE_BY_N in charge, which is the
+# ordinary operating mode.
+#
+# The table is deliberately non-uniform in N — uncapped below N=32 and capped at
+# 5000 at and above it — because the uncapped degree becomes incomputable as
+# kappa grows as O(N^2). The consequence is that the recorded QSVT cost is *not*
+# comparable across the ladder: at N=16 the sweep runs degree 19289 and takes
+# 9.5 s, while at N=32 it runs the capped 5001 and takes 3.5 s, so the measured
+# cost falls as the mesh is refined. This override exists to re-run one
+# resolution at another cap, so that a uniform-degree ladder can be measured
+# without disturbing the table every other run depends on.
+QSVT_MAX_DEGREE_OVERRIDE: Optional[int] = None
+
 # -- HHL / VQLS configuration --------------------------------------------------
 HHL_EPSILON: float = 0.01
 VQLS_SEED: int = 42
@@ -1042,7 +1056,8 @@ def _resolve_qsvt_max_degree(kappa: float, epsilon: float, N: int,
     """
     import solvers.quantum.qsp_angles as qsp_angles
 
-    candidate = qsvt_max_degree(N, order)
+    candidate = (QSVT_MAX_DEGREE_OVERRIDE if QSVT_MAX_DEGREE_OVERRIDE is not None
+                 else qsvt_max_degree(N, order))
     key = (round(kappa, 4), round(epsilon, 8), "auto",
            candidate if candidate is not None else -1)
     if qsp_angles._load_disk(key) is not None:
@@ -1814,7 +1829,8 @@ def _save_run_metadata(N_values: list[int], sel: RunSelection,
 
 # -- Work unit dispatch --------------------------------------------------------
 
-def _init_worker(results_dir: Path, qsvt_fallback_degree: int) -> None:
+def _init_worker(results_dir: Path, qsvt_fallback_degree: int,
+                 qsvt_max_degree_override: Optional[int] = None) -> None:
     """
     Propagates the main process's resolved configuration into a worker.
 
@@ -1839,9 +1855,10 @@ def _init_worker(results_dir: Path, qsvt_fallback_degree: int) -> None:
         Degree used when no cached QSVT phase set matches, likewise resolved by
         `main` and likewise previously lost on spawn.
     """
-    global RESULTS_DIR, QSVT_UNCACHED_FALLBACK_DEGREE
+    global RESULTS_DIR, QSVT_UNCACHED_FALLBACK_DEGREE, QSVT_MAX_DEGREE_OVERRIDE
     RESULTS_DIR = results_dir
     QSVT_UNCACHED_FALLBACK_DEGREE = qsvt_fallback_degree
+    QSVT_MAX_DEGREE_OVERRIDE = qsvt_max_degree_override
 
 
 def _execute_work_unit(work_type: str, N: int, sel: RunSelection, order: int
@@ -1962,6 +1979,24 @@ def main() -> None:
              f"every remaining solve in the job.",
     )
     parser.add_argument(
+        "--qsvt-max-degree", type=int, default=None,
+        help="Override the QSP degree cap for every resolution in this run, in "
+             "place of the per-N table QSVT_MAX_DEGREE_BY_N. The cap forms part "
+             "of the phase-cache key, so the matching entries must be "
+             "precomputed first (precompute_phases.py --max-degree) or the "
+             "solve falls back to a reduced degree. Exists because the table is "
+             "non-uniform in N by necessity, which leaves the recorded QSVT cost "
+             "incomparable along the ladder; pair it with --results-dir to "
+             "measure a uniform-degree ladder without disturbing the archive.",
+    )
+    parser.add_argument(
+        "--results-dir", type=Path, default=None,
+        help="Write the summary, the per-solution archives and run.log here "
+             "instead of results/1Dhpc_run. Use for a variant run — a different "
+             "degree cap, say — whose rows would otherwise supersede the main "
+             "archive's on (case, solver, N).",
+    )
+    parser.add_argument(
         "--phase-tag", default=None,
         help="Label for this step, recorded in the log session banner and in "
              "run_metadata_<tag>.json. Lets a multi-step PBS job attribute each "
@@ -2020,7 +2055,10 @@ def main() -> None:
     backend = get_aer_backend(prefer_gpu=_USE_GPU)
 
     global RESULTS_DIR, LOG_FILE, QSVT_UNCACHED_FALLBACK_DEGREE
-    
+    global QSVT_MAX_DEGREE_OVERRIDE
+
+    QSVT_MAX_DEGREE_OVERRIDE = args.qsvt_max_degree
+
     if args.order == 4:
         # Avoid overwriting 2nd-order results
         RESULTS_DIR = Path("results") / "1Dhpc_run_4th"
@@ -2028,6 +2066,13 @@ def main() -> None:
         LOG_FILE = RESULTS_DIR / "run.log"
         QSVT_UNCACHED_FALLBACK_DEGREE = 5000
         
+        _redirect_log_file(LOG_FILE)
+
+    # After the order-4 branch, so that an explicit --results-dir wins over it.
+    if args.results_dir is not None:
+        RESULTS_DIR = args.results_dir
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        LOG_FILE = RESULTS_DIR / "run.log"
         _redirect_log_file(LOG_FILE)
 
     _log_session_header(args.phase_tag)
@@ -2105,7 +2150,8 @@ def main() -> None:
             max_workers=args.max_workers,
             max_tasks_per_child=1,   # fresh process per work unit; forces spawn
             initializer=_init_worker,
-            initargs=(RESULTS_DIR, QSVT_UNCACHED_FALLBACK_DEGREE),
+            initargs=(RESULTS_DIR, QSVT_UNCACHED_FALLBACK_DEGREE,
+                      QSVT_MAX_DEGREE_OVERRIDE),
         ) as executor:
             futures = {
                 executor.submit(_execute_work_unit, wt, N, sel, args.order): (wt, N)
