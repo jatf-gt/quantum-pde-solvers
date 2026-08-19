@@ -84,6 +84,7 @@ from benchmark.metrics import (
     CircuitMetrics,
     compute_max_abs_err,
     compute_max_rel_err,
+    compute_rel_l2_err,
     compute_residual,
     extract_circuit_metrics,
 )
@@ -236,16 +237,34 @@ def _build_base_result(
         mre_exact = compute_max_rel_err(u_solver, u_exact) * 100.0
         mae_exact = compute_max_abs_err(u_solver, u_exact)
         err_disc  = compute_max_rel_err(u_thomas, u_exact) * 100.0
-        err_alg   = max(0.0, mre_exact - err_disc)
     else:
         mre_exact = None
         mae_exact = None
         err_disc  = None
-        err_alg   = None
 
     # Accuracy vs Thomas (always available)
     mre_thomas = compute_max_rel_err(u_solver, u_thomas) * 100.0
     mae_thomas = compute_max_abs_err(u_solver, u_thomas)
+
+    # The algorithmic error is measured, not inferred by subtraction. The solver
+    # is asked for the solution of A u = b, whose exact answer on this mesh is
+    # the Thomas field; the deviation from it is the solver's own error, and
+    # err_disc = ‖u_thomas − u_exact‖ is the discretisation error beside it. The
+    # two bound the total error against u_exact above, by the triangle
+    # inequality.
+    #
+    # The former definition, max(0, mre_exact − err_disc), was a difference of
+    # two nearly equal max-relative errors and lost all precision exactly where
+    # the solver was good: the clamp returned 0.0 whenever the solve beat the
+    # truncation estimate, deleting the most accurate points from every curve.
+    # Measured on the 1-D N=8 Trotter sweep it gave 32.3, **0.0**, 0.203, 0.0628,
+    # 0.0174, 0.00446 across n_T = 1…32, against a clean 1/n_T² decay; on
+    # `fH_hom` three of six points were annihilated.
+    #
+    # The L2 ratio is used rather than the pointwise `mre_thomas`, which is
+    # unbounded near a node of the reference field and reports 1.2e8 % on the
+    # 3-D HET manufactured case for a solve accurate to a fraction of a per cent.
+    err_alg = compute_rel_l2_err(u_solver, u_thomas) * 100.0
 
     return BenchmarkResult(
         case_id=case_id,

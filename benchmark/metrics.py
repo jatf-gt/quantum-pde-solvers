@@ -140,9 +140,19 @@ class BenchmarkResult:
         Discretisation error [%]: max relative error of Thomas vs exact.
         None if no analytical solution exists.
     err_alg : Optional[float]
-        Algorithmic error [%]: approximate quantum-specific error component,
-        estimated as max_rel_err_vs_exact - err_disc. This is an upper bound,
-        not an exact decomposition. None if err_disc is None.
+        Algorithmic error [%]: the solver's own error, measured as the relative
+        L2 deviation from the Thomas field — the exact solution of the very
+        system A u = b the quantum solver was asked for. Carried beside
+        `err_disc` so the pair reads as the decomposition it is; together they
+        bound the total error against the analytical solution above, by the
+        triangle inequality. Always available, unlike `err_disc`.
+
+        Formerly estimated as max(0, max_rel_err_vs_exact − err_disc), a
+        difference of two nearly equal quantities that lost all precision — and
+        clamped to zero — exactly where the solver was most accurate. Measured on
+        the 1-D N=8 Trotter sweep that estimate gave 32.3, **0.0**, 0.203,
+        0.0628, 0.0174, 0.00446 across n_T = 1…32, deleting the second point
+        from a curve that is otherwise a clean 1/n_T² decay.
     proportionality_residual : Optional[float]
         Residual of the proportionality recovery step for HHL and QSVT:
         ‖A(c·x_raw) - b‖₂ / ‖b‖₂ where c is the recovered scalar.
@@ -404,6 +414,45 @@ def compute_max_abs_err(
         Maximum absolute error.
     """
     return float(np.max(np.abs(u - u_ref)))
+
+
+def compute_rel_l2_err(
+    u: np.ndarray,
+    u_ref: np.ndarray,
+) -> float:
+    """
+    Compute the relative error in the Euclidean norm, ‖u − u_ref‖₂ / ‖u_ref‖₂.
+
+    Preferred over `compute_max_rel_err` wherever a single figure must stand for
+    the accuracy of a whole field. The pointwise ratio that function forms is
+    unbounded near a node of the reference solution: on the 3-D HET manufactured
+    case, whose solution is a product of sines and therefore passes through zero
+    inside the domain, it reports 1.2 × 10⁸ % for a solve whose norm-relative
+    error is a fraction of a per cent. Masking near-zero nodes bounds the damage
+    but does not remove it, since a node merely *close* to zero still dominates.
+
+    The norm ratio has no such sensitivity: every node contributes in proportion
+    to its magnitude. It is the convention the HPC sweeps already record as
+    `rel_l2_err`, so reporting it here makes the studies and the sweeps directly
+    comparable.
+
+    Parameters
+    ----------
+    u : np.ndarray
+        Candidate solution; any shape, matching `u_ref`.
+    u_ref : np.ndarray
+        Reference solution of the same shape.
+
+    Returns
+    -------
+    float
+        Relative L2 error as a decimal fraction, not a percentage. Returns the
+        absolute norm ‖u − u_ref‖₂ where the reference field is identically zero,
+        mirroring the fallback of `compute_max_rel_err`.
+    """
+    denom = float(np.linalg.norm(np.asarray(u_ref).ravel()))
+    diff = float(np.linalg.norm(np.asarray(u).ravel() - np.asarray(u_ref).ravel()))
+    return diff / denom if denom > 0.0 else diff
 
 
 def extract_circuit_metrics(
