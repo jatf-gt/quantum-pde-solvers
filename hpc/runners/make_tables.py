@@ -80,8 +80,13 @@ RESULTS_DIR: dict[tuple[int, int], str] = {
     (2, 2): "results/2Dhpc_run",   (2, 4): "results/2Dhpc_run_4th",
     (3, 2): "results/3Dhpc_run",   (3, 4): "results/3Dhpc_run_4th",
 }
-STUDY_DIR: dict[int, str] = {
-    1: "results/1Dstudies", 2: "results/2Dstudies", 3: "results/3Dstudies",
+# Parameter studies are recorded per (dimension, order) as well, since the
+# fourth-order submissions of 2026-08-19 landed. The unsuffixed directories hold
+# the second-order studies and predate the convention, so they keep their names.
+STUDY_DIR: dict[tuple[int, int], str] = {
+    (1, 2): "results/1Dstudies",   (1, 4): "results/1Dstudies_4th",
+    (2, 2): "results/2Dstudies",   (2, 4): "results/2Dstudies_4th",
+    (3, 2): "results/3Dstudies",   (3, 4): "results/3Dstudies_4th",
 }
 
 # -- Hardware feasibility ------------------------------------------------------
@@ -385,7 +390,7 @@ def main() -> int:
     args = parser.parse_args()
 
     results_dir = args.results_dir or Path(RESULTS_DIR[(args.dim, args.order)])
-    study_dir = args.study_dir or Path(STUDY_DIR[args.dim])
+    study_dir = args.study_dir or Path(STUDY_DIR[(args.dim, args.order)])
     output_dir = args.output_dir or (results_dir / "tables")
     output_dir.mkdir(parents=True, exist_ok=True)
 

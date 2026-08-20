@@ -131,6 +131,48 @@ DEGREE_KAPPA_THRESHOLD: float = 11.0
 # and understates the true budget by a factor of about two.
 IBM_KINGSTON_TWO_QUBIT_ERROR: float = 1.956349128978227e-3
 
+# Whether a figure carries its own headline. A reference plot read on its own
+# needs one; the same plot set beside a LaTeX caption repeats it, which reads as
+# a duplicated title in the typeset document. Panel labels ("Order-2 stencil",
+# "(a)", "(b)") are not affected — they identify a panel rather than restate the
+# figure, and the caption refers to them.
+DRAW_TITLES: bool = True
+
+
+def set_draw_titles(draw: bool) -> None:
+    """
+    Enable or suppress the figure-level headline on every rendered figure.
+
+    Parameters
+    ----------
+    draw : bool
+        False for figures destined for a LaTeX float, whose caption states what
+        the headline would.
+    """
+    global DRAW_TITLES
+    DRAW_TITLES = bool(draw)
+
+
+def _headline(target, text: str, **kwargs) -> None:
+    """
+    Apply a figure- or axes-level headline unless headlines are suppressed.
+
+    Parameters
+    ----------
+    target : matplotlib.figure.Figure or matplotlib.axes.Axes
+        Receiver of the headline; a Figure takes `suptitle`, an Axes `set_title`.
+    text : str
+        The headline.
+    **kwargs
+        Forwarded to the underlying matplotlib call.
+    """
+    if not DRAW_TITLES:
+        return
+    if hasattr(target, "suptitle"):
+        target.suptitle(text, **kwargs)
+    else:
+        target.set_title(text, **kwargs)
+
 
 # ── Private Utility Methods ────────────────────────────────────────────────────
 
@@ -412,7 +454,7 @@ def figure_accuracy_vs_N(repo_root: Path, out_dir: Path,
         _label_n_axis(ax)
 
     axes[0].set_ylabel(r"total relative error $e_\infty$  [%]")
-    fig.suptitle(f"Accuracy against resolution — {case}  ({dim}-D)",
+    _headline(fig, f"Accuracy against resolution — {case}  ({dim}-D)",
                  fontweight="bold", fontsize=10)
     fig.tight_layout()
 
@@ -498,7 +540,8 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
         _label_n_axis(ax)
 
     axes[0].set_ylabel("relative error  [%]")
-    fig.suptitle(
+    _headline(
+        fig,
         f"Algorithmic against discretisation error — {case}  ({dim}-D)",
         fontweight="bold", fontsize=10)
     fig.tight_layout()
@@ -539,6 +582,16 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
     degree cap set without reference to κ silently converts a converged solver
     into a divergent one, and the ratio says where that happens.
 
+    Capped and uncapped solves are drawn distinctly, because they are not the
+    same algorithm. `max_degree` selects the construction rather than bounding
+    it: uncapped calls `pyqsp.PolyOneOverX.generate`, which targets a prescribed
+    uniform error, whereas a cap fits the truncated Chebyshev expansion of 1/x
+    directly at that degree. The fitted polynomial is the more accurate of the
+    two at equal degree, by nine to ten orders of magnitude in the measurements
+    of `benchmark/sensitivity.py`. Superimposing the two without marking them
+    would show a collapse that fails above d/κ ≈ 26 for a reason the abscissa
+    does not carry.
+
     Parameters
     ----------
     repo_root : Path
@@ -563,7 +616,9 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
     csv_rows: list[list[Any]] = []
     for order, colour in ((2, SOLVER_COLOUR["QSVT"]), (4, "#7f2020")):
         rows = load_rows(repo_root, 1, order)
-        generic_x, generic_y, eig_x, eig_y = [], [], [], []
+        capped: list[tuple[float, float]] = []
+        uncapped: list[tuple[float, float]] = []
+        eig: list[tuple[float, float]] = []
         for r in rows:
             if str(r.get("solver")) != "QSVT":
                 continue
@@ -573,22 +628,28 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
                 continue
             ratio = degree / kappa
             value = max(float(residual), 1e-16)
+            cap = r.get("qsvt_max_degree")
             if r.get("case") in eigenvector_rhs:
-                eig_x.append(ratio)
-                eig_y.append(value)
+                eig.append((ratio, value))
+            elif cap:
+                capped.append((ratio, value))
             else:
-                generic_x.append(ratio)
-                generic_y.append(value)
+                uncapped.append((ratio, value))
             csv_rows.append([order, r.get("case"), r["N"], kappa, degree,
-                             r.get("qsvt_max_degree"), ratio, float(residual),
+                             cap, ratio, float(residual),
                              _pct(r.get("err_alg"), already_pct=False),
                              r.get("case") in eigenvector_rhs])
-        if generic_x:
-            ax.loglog(generic_x, generic_y, "o" if order == 2 else "^",
-                      ms=6.5, mfc="none", alpha=0.9, color=colour, ls="none",
-                      label=f"order {order}")
-        if eig_x:
-            ax.loglog(eig_x, eig_y, "*", ms=9, alpha=0.9, color=colour,
+        marker = "o" if order == 2 else "^"
+        if capped:
+            ax.loglog(*zip(*capped), marker, ms=6.5, mfc="none", alpha=0.9,
+                      color=colour, ls="none",
+                      label=f"order {order}, capped (Chebyshev fit)")
+        if uncapped:
+            ax.loglog(*zip(*uncapped), marker, ms=6.5, mfc=colour, alpha=0.55,
+                      mec=colour, color=colour, ls="none",
+                      label=f"order {order}, uncapped (PolyOneOverX)")
+        if eig:
+            ax.loglog(*zip(*eig), "*", ms=9, alpha=0.9, color=colour,
                       ls="none",
                       label=f"order {order}, eigenvector RHS")
 
@@ -599,7 +660,7 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
                 xycoords="axes fraction", fontsize=8.5, color="dimgrey")
     ax.set_xlabel(r"degree-to-condition-number ratio  $d / \kappa(A)$")
     ax.set_ylabel(r"relative residual  $\|Au - b\|_2 / \|b\|_2$")
-    ax.set_title(r"QSVT accuracy is set by $d/\kappa$, not by $N$ or the case",
+    _headline(ax, r"QSVT accuracy is set by $d/\kappa$, not by $N$ or the case",
                  fontsize=10)
     ax.grid(alpha=0.3, which="both")
     ax.legend(fontsize=7.5, loc="lower left")
@@ -683,7 +744,7 @@ def figure_kappa_scaling(repo_root: Path, out_dir: Path) -> list[Path]:
 
     ax.set_xlabel("$N$")
     ax.set_ylabel(r"condition number")
-    ax.set_title("Strip decomposition bounds the condition number", fontsize=10)
+    _headline(ax, "Strip decomposition bounds the condition number", fontsize=10)
     ax.grid(alpha=0.3, which="both")
     ax.legend(fontsize=7.5, ncol=2)
     fig.tight_layout()
@@ -762,7 +823,7 @@ def figure_cost_vs_N(repo_root: Path, out_dir: Path,
         _label_n_axis(ax)
 
     axes[0].set_ylabel("wall time  [s]")
-    fig.suptitle(f"Computational cost — {case}  ({dim}-D)",
+    _headline(fig, f"Computational cost — {case}  ({dim}-D)",
                  fontweight="bold", fontsize=10)
     fig.tight_layout()
 
@@ -898,7 +959,7 @@ def figure_hardware(repo_root: Path, out_dir: Path) -> list[Path]:
     axes[1].legend(fontsize=7.5)
     axes[1].grid(alpha=0.3, which="both")
 
-    fig.suptitle("Hardware verification, IBM Kingston (156-qubit Heron)",
+    _headline(fig, "Hardware verification, IBM Kingston (156-qubit Heron)",
                  fontweight="bold", fontsize=10)
     fig.tight_layout()
 
@@ -1020,11 +1081,24 @@ def export_profiles_1d(repo_root: Path, out_dir: Path,
     Export the 1-D HET potential profile and the axial electric field.
 
     The electric field is obtained from the potential by central differences,
-    E = −dφ/dz [V/m], one-sided at the two end nodes. It is the quantity the
-    thruster physics is judged on: the potential itself is monotone and
-    forgiving, whereas differentiating it amplifies exactly the high-wavenumber
-    error a quantum solver introduces, so a solver that looks acceptable in φ can
-    be plainly wrong in E.
+    E = −dφ/dz, one-sided at the two end nodes. It is the quantity the thruster
+    physics is judged on: the potential itself is monotone and forgiving,
+    whereas differentiating it amplifies exactly the high-wavenumber error a
+    quantum solver introduces, so a solver that looks acceptable in φ can be
+    plainly wrong in E.
+
+    Units. The axial coordinate recorded in the archive is non-dimensional,
+    ξ = z/L_z on (0, 1); it is converted here to millimetres against the channel
+    length L_z = 40 mm of `core.het_geometry`, which is unambiguous. The
+    potential is **not** converted. Sub-case 3b assembles b = h²f with the
+    source f in physical [V/m²] but h non-dimensional, and absorbs the anode
+    constraint as b[0] −= V_d with V_d in volts, so the recorded φ is not in
+    volts under either reading and the two boundary treatments are not on one
+    scale. The columns are therefore named for what they hold, and
+    `figure_het_profile_1d` normalises every series against the classical
+    solution rather than asserting a unit. Column `phi_V` of revisions before
+    2026-08-20 carried these same numbers under a volt label, and the axial
+    column carried ξ under a metre label; neither was ever quoted in the text.
 
     Parameters
     ----------
@@ -1042,6 +1116,8 @@ def export_profiles_1d(repo_root: Path, out_dir: Path,
     """
     import numpy as np
 
+    from core import het_geometry as geom
+
     sweep = repo_root / SWEEP_DIR[(1, 2)]
     case = HET_CASE[1]
     rows: list[list[Any]] = []
@@ -1050,12 +1126,14 @@ def export_profiles_1d(repo_root: Path, out_dir: Path,
         if not path.exists():
             continue
         data = np.load(path, allow_pickle=False)
-        z = data["x"]
+        xi = data["x"]                       # non-dimensional, z/L_z on (0, 1)
+        z_mm = xi * geom.L_Z * 1.0e3
         phi = data["u_solver"]
-        E = -np.gradient(phi, z)
+        E = -np.gradient(phi, z_mm)
         exact = data["u_exact"] if "u_exact" in data.files else None
-        for k in range(len(z)):
-            rows.append([solver, float(z[k]), float(phi[k]), float(E[k]),
+        for k in range(len(xi)):
+            rows.append([solver, float(xi[k]), float(z_mm[k]), float(phi[k]),
+                         float(E[k]),
                          float(exact[k]) if exact is not None else None])
 
     if not rows:
@@ -1063,9 +1141,222 @@ def export_profiles_1d(repo_root: Path, out_dir: Path,
         return []
     return [write_csv(
         out_dir / f"F8_het_1d_profile_N{N}.csv",
-        ["solver", "z_m", "phi_V", "E_axial_V_per_m", "phi_exact_V"],
+        ["solver", "xi", "z_mm", "phi_code", "E_axial_code_per_mm",
+         "phi_exact_code"],
         rows,
     )]
+
+
+# ── Figures 7 and 8: The Thruster Solution ─────────────────────────────────────
+
+def _read_field_csv(path: Path):
+    """
+    Read one exported field CSV back onto its structured grid.
+
+    Reading the CSV rather than the archive is deliberate: the published figure
+    and the tidy data a reader is given must be the same numbers, and a second
+    extraction path is how the two come to disagree.
+
+    Parameters
+    ----------
+    path : Path
+        A `F7_field_*.csv` written by `export_fields`.
+
+    Returns
+    -------
+    tuple of np.ndarray
+        (X, Y, PHI, ERR), each an (n, n) array on the physical coordinates [m],
+        where ERR is the signed error against the manufactured solution. ERR is
+        all-NaN where the archive carried no exact field.
+    """
+    import numpy as np
+
+    with open(path, encoding="utf-8") as fh:
+        recs = list(csv.DictReader(fh))
+    n = int(round(math.sqrt(len(recs))))
+
+    def grid(key):
+        return np.array(
+            [float(r[key]) if r[key] not in ("", "None") else math.nan
+             for r in recs]).reshape(n, n)
+
+    return grid("x_m"), grid("y_m"), grid("phi_V"), grid("signed_error_V")
+
+
+def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
+    """
+    Thruster potential and each solver's signed error, in two and three
+    dimensions.
+
+    A norm collapses a field to one number and hides where the error sits. A
+    signed map does not: a sign error, a boundary condition imposed on the wrong
+    face, and convergence to the wrong fixed point each have a distinct
+    signature in the map and none in the norm. The top row is the axial–radial
+    plane of the two-dimensional case; the bottom is the mid-plane slice of the
+    three-dimensional case, normal to the azimuthal direction, which is the
+    plane the channel physics lives in.
+
+    The leftmost column carries the manufactured solution itself, so the error
+    maps beside it are read against the field they belong to. Each error map
+    carries its own symmetric scale: the three solvers differ by orders of
+    magnitude, and one shared scale would render two of the three uniformly
+    flat.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root. Unused beyond signature symmetry with the other figure
+        builders; the exported CSVs are read from `out_dir`.
+    out_dir : Path
+        Directory holding the `F7_field_*.csv` files and receiving the figure.
+
+    Returns
+    -------
+    list of Path
+        Files written, empty where the exported fields are absent.
+    """
+    import numpy as np
+
+    plt = _matplotlib()
+
+    panels = []
+    for dim in (2, 3):
+        case = HET_CASE[dim]
+        found = sorted(out_dir.glob(f"F7_field_{dim}D_{case}_*.csv"))
+        by_solver = {p.stem.rsplit("_", 2)[-2]: p for p in found}
+        if "Thomas" not in by_solver:
+            log.warning("  no exported %d-D field for %s", dim, case)
+            continue
+        panels.append((dim, case, by_solver))
+    if not panels:
+        return []
+
+    ncol = 1 + len(QUANTUM_SOLVERS)
+    fig, axes = plt.subplots(len(panels), ncol,
+                             figsize=(3.05 * ncol, 3.0 * len(panels)),
+                             squeeze=False)
+
+    for row, (dim, case, by_solver) in enumerate(panels):
+        X, Y, PHI, _ = _read_field_csv(by_solver["Thomas"])
+        ax = axes[row][0]
+        im = ax.pcolormesh(X * 1e3, Y * 1e3, PHI, shading="auto",
+                           cmap="viridis", rasterized=True)
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
+        ax.set_title(f"{dim}-D manufactured " + r"$\phi$  [V]", fontsize=9)
+        ax.set_ylabel("radial  [mm]" if dim == 2 else "radial, mid-plane  [mm]")
+        ax.grid(False)
+
+        for col, solver in enumerate(QUANTUM_SOLVERS, start=1):
+            ax = axes[row][col]
+            if solver not in by_solver:
+                ax.set_axis_off()
+                ax.text(0.5, 0.5, f"{solver}\nnot recorded", ha="center",
+                        va="center", fontsize=8, color="dimgrey")
+                continue
+            Xs, Ys, _, ERR = _read_field_csv(by_solver[solver])
+            finite = ERR[np.isfinite(ERR)]
+            scale = float(np.max(np.abs(finite))) if finite.size else 0.0
+            scale = scale or 1.0
+            im = ax.pcolormesh(Xs * 1e3, Ys * 1e3, ERR, shading="auto",
+                               cmap="RdBu_r", vmin=-scale, vmax=scale,
+                               rasterized=True)
+            cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
+            cb.formatter.set_powerlimits((-2, 2))
+            ax.set_title(f"{solver}  signed error  [V]", fontsize=9,
+                         color=SOLVER_COLOUR[solver])
+            ax.grid(False)
+
+        for ax in axes[row]:
+            ax.set_xlabel("axial  [mm]")
+            ax.tick_params(labelsize=7)
+
+    _headline(fig, "Thruster potential and where each solver puts its error",
+              fontweight="bold", fontsize=10)
+    fig.tight_layout()
+    return _save(fig, out_dir, "F7_het_fields", plt)
+
+
+def figure_het_profile_1d(repo_root: Path, out_dir: Path,
+                          N: int = 32) -> list[Path]:
+    """
+    Axial potential and the electric field recovered from it, one dimension.
+
+    The point of the figure is the contrast between its two panels. The
+    potential is monotone and forgiving: a solver reproduces it to a fraction of
+    a per cent and looks acceptable. The field E = −dφ/dz is not, because
+    differentiation multiplies each Fourier component of the error by its
+    wavenumber, and the error a truncated Trotter product or a truncated QSP
+    polynomial introduces is concentrated at high wavenumber. A solver can
+    therefore be right in φ and plainly wrong in E, which is the quantity a
+    thruster designer uses.
+
+    Both quantities are drawn normalised against the classical solution's
+    extreme rather than in volts. Sub-case 3b does not carry a consistent
+    physical scale for φ — see `export_profiles_1d` — and a normalised ordinate
+    states exactly what the figure is for without asserting a unit the archive
+    does not support. The axial coordinate is physical.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root. Unused beyond signature symmetry with the other figure
+        builders; the exported CSV is read from `out_dir`.
+    out_dir : Path
+        Directory holding `F8_het_1d_profile_N<N>.csv` and receiving the figure.
+    N : int
+        Resolution whose exported profile is drawn.
+
+    Returns
+    -------
+    list of Path
+        Files written, empty where the exported profile is absent.
+    """
+    import numpy as np
+
+    path = out_dir / f"F8_het_1d_profile_N{N}.csv"
+    if not path.exists():
+        log.warning("  %s absent; F8 not rendered", path)
+        return []
+
+    with open(path, encoding="utf-8") as fh:
+        recs = list(csv.DictReader(fh))
+    series: dict[str, dict[str, list]] = {}
+    for r in recs:
+        s = series.setdefault(r["solver"], {"z": [], "phi": [], "E": []})
+        s["z"].append(float(r["z_mm"]))
+        s["phi"].append(float(r["phi_code"]))
+        s["E"].append(float(r["E_axial_code_per_mm"]))
+    if "Thomas" not in series:
+        log.warning("  no classical reference in %s; F8 not rendered", path)
+        return []
+
+    phi_ref = max(abs(v) for v in series["Thomas"]["phi"]) or 1.0
+    E_ref = max(abs(v) for v in series["Thomas"]["E"]) or 1.0
+
+    plt = _matplotlib()
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.2))
+    for solver in SOLVERS:
+        if solver not in series:
+            continue
+        s = series[solver]
+        style = dict(color=SOLVER_COLOUR[solver], marker=SOLVER_MARKER[solver],
+                     mfc="none", ms=3.5, lw=1.5, label=solver)
+        axes[0].plot(s["z"], np.array(s["phi"]) / phi_ref, **style)
+        axes[1].plot(s["z"], np.array(s["E"]) / E_ref, **style)
+
+    axes[0].set_title("(a)  potential", fontsize=9)
+    axes[0].set_ylabel(r"$\phi\,/\,|\phi|^{\mathrm{Thomas}}_{\max}$")
+    axes[1].set_title("(b)  axial electric field", fontsize=9)
+    axes[1].set_ylabel(r"$E\,/\,|E|^{\mathrm{Thomas}}_{\max}$")
+    for ax in axes:
+        ax.set_xlabel("axial position  [mm]")
+        ax.grid(alpha=0.3)
+        ax.legend(fontsize=7.5)
+
+    _headline(fig, f"HET axial profile, $N={N}$", fontweight="bold",
+              fontsize=10)
+    fig.tight_layout()
+    return _save(fig, out_dir, f"F8_het_1d_profile_N{N}", plt)
 
 
 # ── Table Data ─────────────────────────────────────────────────────────────────
@@ -1242,6 +1533,8 @@ def build_all(repo_root: Path, out_dir: Path) -> list[Path]:
     written += export_fields(repo_root, out_dir, dim=2)
     written += export_fields(repo_root, out_dir, dim=3)
     written += export_profiles_1d(repo_root, out_dir, N=32)
+    written += figure_het_fields(repo_root, out_dir)
+    written += figure_het_profile_1d(repo_root, out_dir, N=32)
     written += table_observed_order(repo_root, out_dir)
     written += table_primary_condensed(repo_root, out_dir)
 

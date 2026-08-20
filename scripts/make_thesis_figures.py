@@ -53,7 +53,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from benchmark.thesis_figures import build_all                       # noqa: E402
+from benchmark.thesis_figures import build_all, set_draw_titles      # noqa: E402
 
 
 def main() -> int:
@@ -64,7 +64,14 @@ def main() -> int:
     ap.add_argument("-o", "--out-dir", type=Path,
                     default=REPO_ROOT / "results" / "thesis",
                     help="Destination for the data tables and reference plots.")
+    ap.add_argument("--no-titles", action="store_true",
+                    help="Suppress the figure-level headline on every plot. Set "
+                         "when the figures are destined for a LaTeX float, whose "
+                         "caption states what the headline would and beside "
+                         "which a headline reads as a duplicated title.")
     args = ap.parse_args()
+
+    set_draw_titles(not args.no_titles)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s",
                         stream=sys.stdout)

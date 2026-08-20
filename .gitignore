@@ -31,6 +31,12 @@ results/3Dhpc_run_4th/
 results/1Dstudies/
 results/2Dstudies/
 results/3Dstudies/
+# Per-order study directories (results/2Dstudies_4th/, ...). The three
+# rules above name only the second-order set; a study directory for a
+# different discretisation order holds .json, which no rule below
+# excludes by kind, so it would surface as untracked and the preflight
+# would refuse the tree -- gating every subsequent submission.
+results/[123]Dstudies_*/
 updated*
 CLAUDE.md
 .agents
