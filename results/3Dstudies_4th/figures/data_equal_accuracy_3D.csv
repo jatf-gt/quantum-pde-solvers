@@ -1,0 +1,3 @@
+case,solver,N,r_target,residual_achieved,wall_time_s,param,param_value,in_band,n_solver_calls
+3D_HET_MMS_SPT100,qsvt,8,0.001,0.0007300250666152203,12.973195195198059,max_degree,5.0,True,8
+3D_Poisson_TripleSin_cube,qsvt,8,0.001,0.0006489903942375782,8.2988327331841,max_degree,5.0,True,8

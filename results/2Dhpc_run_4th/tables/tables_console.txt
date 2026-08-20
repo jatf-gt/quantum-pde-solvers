@@ -1,0 +1,196 @@
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Case                                 N         κ  Solver        e∞ [%]           r     Depth    nq           t
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  2D_HET_MMS_SPT100                    4      1.42  Thomas         0.193    2.48e-05      0.00 s
+                                       4      1.42  HHL            1.640    9.88e-03     3,842   ---     50.93 s
+                                       4      1.42  VQLS           0.193    2.48e-05        12   ---     34.20 s
+                                       4      1.42  QSVT           0.193    2.48e-05    26,560   ---      8.64 s
+                                       8      1.50  Thomas         0.026    2.30e-05      0.02 s
+                                       8      1.50  HHL            2.880    8.18e-03    41,333   ---    13.0 min
+                                       8      1.50  VQLS           0.129    6.68e-04        69   ---    23.7 min
+                                       8      1.50  QSVT           0.026    2.30e-05   186,880   ---     1.3 min
+                                      16      1.52  Thomas         0.018    8.08e-05      0.03 s
+                                      16      1.52  HHL            3.167    5.12e-03   401,083   ---    84.6 min
+                                      16      1.52  VQLS           0.531    2.65e-03        89   ---   251.9 min
+                                      16      1.52  QSVT           0.018    8.08e-05  1,045,094   ---     1.7 min
+                                      32      1.53  Thomas         0.014    4.31e-05      0.05 s
+                                      32      1.53  HHL            2.603    4.20e-03  3,530,632   ---   360.5 min
+                                      32      1.53  VQLS         264.010    3.96e-01       110   ---   361.1 min
+                                      32      1.53  QSVT           0.014    4.31e-05  4,372,236   ---     5.6 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  2D_HET_Sin_MeetingReport             4      1.42  Thomas         0.167    2.15e-05      0.00 s
+                                       4      1.42  HHL            1.147    1.94e-02     3,842   ---     59.02 s
+                                       4      1.42  VQLS           0.168    2.16e-05        12   ---     38.94 s
+                                       4      1.42  QSVT           0.167    2.15e-05    26,560   ---      9.24 s
+                                       8      1.50  Thomas         0.017    2.57e-05      0.03 s
+                                       8      1.50  HHL            2.564    3.36e-02    41,333   ---    12.8 min
+                                       8      1.50  VQLS           0.145    1.96e-03        69   ---    36.6 min
+                                       8      1.50  QSVT           0.017    2.57e-05   186,880   ---     1.4 min
+                                      16      1.52  Thomas         0.006    8.37e-05      0.04 s
+                                      16      1.52  HHL            3.018    4.83e-02   401,083   ---    83.1 min
+                                      16      1.52  VQLS           0.566    2.57e-02        89   ---   186.8 min
+                                      16      1.52  QSVT           0.006    8.37e-05  1,045,094   ---     2.4 min
+                                      32      1.53  Thomas         0.003    3.96e-05      0.09 s
+                                      32      1.53  HHL            2.942    1.02e-01  3,530,632   ---   360.8 min
+                                      32      1.53  VQLS         233.322    1.22e+01       110   ---   360.2 min
+                                      32      1.53  QSVT           0.003    3.96e-05  4,372,236   ---     6.8 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  2D_Poisson_SingleMode_n1m1           4      2.49  Thomas         0.168    3.89e-05      0.00 s
+                                       4      2.49  HHL            1.566    4.76e-02     3,889   ---     1.3 min
+                                       4      2.49  VQLS           0.168    3.90e-05        12   ---     37.47 s
+                                       4      2.49  QSVT           0.168    3.89e-05    26,560   ---      8.16 s
+                                       8      2.91  Thomas         0.016    1.80e-05      0.05 s
+                                       8      2.91  HHL            3.459    7.53e-02    41,391   ---    27.4 min
+                                       8      2.91  VQLS           0.191    4.15e-03        69   ---    23.6 min
+                                       8      2.91  QSVT           0.016    1.80e-05   186,880   ---     1.3 min
+                                      16      3.07  Thomas         0.002    5.88e-05      0.04 s
+                                      16      3.07  HHL            4.009    1.09e-01   396,594   ---   187.0 min
+                                      16      3.07  VQLS           0.288    1.63e-02        89   ---   207.9 min
+                                      16      3.07  QSVT           0.002    5.88e-05  1,045,094   ---     2.2 min
+                                      32      3.12  Thomas         0.001    6.16e-05      0.06 s
+                                      32      3.12  HHL            3.785    1.86e-01  3,530,373   ---   360.6 min
+                                      32      3.12  VQLS         334.295    1.49e+01       110   ---   360.5 min
+                                      32      3.12  QSVT           0.001    6.16e-05  4,372,236   ---     6.2 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  2D_Poisson_TwoGaussian_PlasmaNet     4      2.49  Thomas         5.004    2.93e-05      0.00 s
+                                       4      2.49  HHL           10.533    7.43e-02     3,878   ---     1.2 min
+                                       4      2.49  VQLS           4.996    2.88e-05        12   ---     38.24 s
+                                       4      2.49  QSVT           5.004    2.93e-05    26,560   ---      8.63 s
+                                       8      2.91  Thomas         1.180    5.43e-05      0.02 s
+                                       8      2.91  HHL           23.654    1.18e-01    41,421   ---    27.3 min
+                                       8      2.91  VQLS           1.196    2.92e-03        69   ---    18.9 min
+                                       8      2.91  QSVT           1.180    5.43e-05   186,880   ---     1.2 min
+                                      16      3.07  Thomas         0.123    2.63e-05      0.04 s
+                                      16      3.07  HHL           49.633    1.75e-01   395,340   ---   186.9 min
+                                      16      3.07  VQLS           1.455    2.22e-02        89   ---   319.9 min
+                                      16      3.07  QSVT           0.123    2.63e-05  1,045,094   ---     2.4 min
+                                      32      3.12  Thomas         0.019    3.15e-05      0.07 s
+                                      32      3.12  HHL           28.084    2.07e-01  3,532,027   ---   362.1 min
+                                      32      3.12  VQLS         622.951    8.99e+00       110   ---   360.1 min
+                                      32      3.12  QSVT           0.019    3.15e-05  4,372,236   ---     7.1 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  2D_Poisson_sin_hom                   4      2.49  Thomas         0.168    3.89e-05      0.00 s
+                                       4      2.49  HHL            1.566    4.76e-02     3,889   ---     1.3 min
+                                       4      2.49  VQLS           0.168    3.90e-05        12   ---     38.39 s
+                                       4      2.49  QSVT           0.168    3.89e-05    26,560   ---      8.15 s
+                                       8      2.91  Thomas         0.016    1.80e-05      0.04 s
+                                       8      2.91  HHL            3.459    7.53e-02    41,391   ---    27.6 min
+                                       8      2.91  VQLS           0.191    4.15e-03        69   ---    23.6 min
+                                       8      2.91  QSVT           0.016    1.80e-05   186,880   ---     1.2 min
+                                      16      3.07  Thomas         0.002    5.88e-05      0.04 s
+                                      16      3.07  HHL            4.009    1.09e-01   396,594   ---   187.6 min
+                                      16      3.07  VQLS           0.288    1.63e-02        89   ---   208.6 min
+                                      16      3.07  QSVT           0.002    5.88e-05  1,045,094   ---     2.2 min
+                                      32      3.12  Thomas         0.001    6.16e-05      0.06 s
+                                      32      3.12  HHL            3.785    1.86e-01  3,530,373   ---   361.3 min
+                                      32      3.12  VQLS         334.295    1.49e+01       110   ---   360.7 min
+                                      32      3.12  QSVT           0.001    6.16e-05  4,372,236   ---     6.5 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  Equal-accuracy comparison  (r_target = 1.00e-03)
+  ──────────────────────────────────────────────────────────────────────────────────────
+  Solver    Param              Value    r achieved     Depth    nq           t   In band
+  ──────────────────────────────────────────────────────────────────────────────────────
+  QSVT      max_degree             5      6.43e-04       ---   ---      1.53 s       YES
+  QSVT      max_degree             5      6.95e-04       ---   ---      1.18 s       YES
+  ──────────────────────────────────────────────────────────────────────────────────────
+  * Target not achieved within parameter grid.
+
+
+  Sensitivity analysis — QSVT  N=8
+
+  Varying: max_degree
+  ──────────────────────────────────────────────────────────
+         Value      e∞ [%]           r     Depth           t
+  ──────────────────────────────────────────────────────────
+             5       0.016    9.90e-09       ---      5.85 s
+             8       0.016    8.86e-10       ---      4.80 s
+            11       0.016    6.61e-09       ---      5.25 s
+            15       0.016    6.50e-09       ---      6.20 s
+            21       0.016    6.50e-09       ---      7.33 s
+            51       0.016    6.50e-09       ---     14.65 s
+           201       0.016    6.50e-09       ---     52.72 s
+           501       0.016    6.50e-09       ---     2.6 min
+  ──────────────────────────────────────────────────────────
+
+  Varying: max_degree
+  ──────────────────────────────────────────────────────────
+         Value      e∞ [%]           r     Depth           t
+  ──────────────────────────────────────────────────────────
+             5       0.023    2.92e-06       ---      6.64 s
+             8       0.023    9.64e-08       ---     10.01 s
+            11       0.023    3.06e-08       ---     11.63 s
+            15       0.023    6.65e-09       ---      7.19 s
+            21       0.023    6.66e-09       ---      8.95 s
+            51       0.023    6.65e-09       ---     17.69 s
+           201       0.023    6.65e-09       ---     1.1 min
+           501       0.023    6.65e-09       ---     3.3 min
+  ──────────────────────────────────────────────────────────
+
+  ------------------------------------------------------------------------------------------
+  HARDWARE FEASIBILITY  -  two-qubit gate budget = 353
+  ------------------------------------------------------------------------------------------
+  Case                            Solver      N   nq        n_2Q    ratio  source                      
+  ------------------------------------------------------------------------------------------
+  2D_HET_MMS_SPT100               HHL         4  ---         911     2.58  NO measured (2q count)
+  2D_HET_Sin_MeetingReport        HHL         4  ---         911     2.58  NO measured (2q count)
+  2D_Poisson_SingleMode_n1m1      HHL         4  ---         911     2.58  NO measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe HHL         4  ---         911     2.58  NO measured (2q count)
+  2D_Poisson_sin_hom              HHL         4  ---         911     2.58  NO measured (2q count)
+  2D_HET_MMS_SPT100               HHL         8  ---      10,024     28.4  NO measured (2q count)
+  2D_HET_Sin_MeetingReport        HHL         8  ---      10,024     28.4  NO measured (2q count)
+  2D_Poisson_SingleMode_n1m1      HHL         8  ---      10,024     28.4  NO measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe HHL         8  ---      10,024     28.4  NO measured (2q count)
+  2D_Poisson_sin_hom              HHL         8  ---      10,024     28.4  NO measured (2q count)
+  2D_HET_MMS_SPT100               HHL        16  ---      98,177      278  NO measured (2q count)
+  2D_HET_Sin_MeetingReport        HHL        16  ---      98,177      278  NO measured (2q count)
+  2D_Poisson_SingleMode_n1m1      HHL        16  ---      97,799      277  NO measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe HHL        16  ---      97,673      277  NO measured (2q count)
+  2D_Poisson_sin_hom              HHL        16  ---      97,799      277  NO measured (2q count)
+  2D_HET_MMS_SPT100               HHL        32  ---     872,954 2.47e+03  NO measured (2q count)
+  2D_HET_Sin_MeetingReport        HHL        32  ---     872,954 2.47e+03  NO measured (2q count)
+  2D_Poisson_SingleMode_n1m1      HHL        32  ---     872,958 2.47e+03  NO measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe HHL        32  ---     872,958 2.47e+03  NO measured (2q count)
+  2D_Poisson_sin_hom              HHL        32  ---     872,958 2.47e+03  NO measured (2q count)
+  2D_HET_MMS_SPT100               QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  2D_HET_Sin_MeetingReport        QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  2D_Poisson_SingleMode_n1m1      QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  2D_Poisson_sin_hom              QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  2D_HET_MMS_SPT100               QSVT        8  ---      39,581      112  NO measured (2q count)
+  2D_HET_Sin_MeetingReport        QSVT        8  ---      39,581      112  NO measured (2q count)
+  2D_Poisson_SingleMode_n1m1      QSVT        8  ---      39,581      112  NO measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe QSVT        8  ---      39,581      112  NO measured (2q count)
+  2D_Poisson_sin_hom              QSVT        8  ---      39,581      112  NO measured (2q count)
+  2D_HET_MMS_SPT100               QSVT       16  ---     222,447      630  NO measured (2q count)
+  2D_HET_Sin_MeetingReport        QSVT       16  ---     222,447      630  NO measured (2q count)
+  2D_Poisson_SingleMode_n1m1      QSVT       16  ---     222,447      630  NO measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe QSVT       16  ---     222,447      630  NO measured (2q count)
+  2D_Poisson_sin_hom              QSVT       16  ---     222,447      630  NO measured (2q count)
+  2D_HET_MMS_SPT100               QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  2D_HET_Sin_MeetingReport        QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  2D_Poisson_SingleMode_n1m1      QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  2D_Poisson_sin_hom              QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  2D_HET_MMS_SPT100               VQLS        4  ---           2    0.006  OK measured (2q count)
+  2D_HET_Sin_MeetingReport        VQLS        4  ---           2    0.006  OK measured (2q count)
+  2D_Poisson_SingleMode_n1m1      VQLS        4  ---           2    0.006  OK measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe VQLS        4  ---           2    0.006  OK measured (2q count)
+  2D_Poisson_sin_hom              VQLS        4  ---           2    0.006  OK measured (2q count)
+  2D_HET_MMS_SPT100               VQLS        8  ---          16    0.045  OK measured (2q count)
+  2D_HET_Sin_MeetingReport        VQLS        8  ---          16    0.045  OK measured (2q count)
+  2D_Poisson_SingleMode_n1m1      VQLS        8  ---          16    0.045  OK measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe VQLS        8  ---          16    0.045  OK measured (2q count)
+  2D_Poisson_sin_hom              VQLS        8  ---          16    0.045  OK measured (2q count)
+  2D_HET_MMS_SPT100               VQLS       16  ---          30    0.085  OK measured (2q count)
+  2D_HET_Sin_MeetingReport        VQLS       16  ---          30    0.085  OK measured (2q count)
+  2D_Poisson_SingleMode_n1m1      VQLS       16  ---          30    0.085  OK measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe VQLS       16  ---          30    0.085  OK measured (2q count)
+  2D_Poisson_sin_hom              VQLS       16  ---          30    0.085  OK measured (2q count)
+  2D_HET_MMS_SPT100               VQLS       32  ---          48    0.136  OK measured (2q count)
+  2D_HET_Sin_MeetingReport        VQLS       32  ---          48    0.136  OK measured (2q count)
+  2D_Poisson_SingleMode_n1m1      VQLS       32  ---          48    0.136  OK measured (2q count)
+  2D_Poisson_TwoGaussian_PlasmaNe VQLS       32  ---          48    0.136  OK measured (2q count)
+  2D_Poisson_sin_hom              VQLS       32  ---          48    0.136  OK measured (2q count)
+  ------------------------------------------------------------------------------------------

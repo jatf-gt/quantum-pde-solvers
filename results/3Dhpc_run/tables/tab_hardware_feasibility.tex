@@ -1,0 +1,88 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Two-qubit gate count against a hardware budget of 353 gates, the largest count retaining a 50\% probability of completing without a two-qubit fault at the median calibrated two-qubit error rate of \texttt{ibm\_kingston}, $\varepsilon_2 = 1.96e-03$. Counts are transpiled to the Heron r2 native basis $\{\mathrm{rz}, \mathrm{sx}, \mathrm{x}, \mathrm{cz}\}$ at optimisation level 3. HHL and VQLS are transpiled directly; the QSVT count is composed as the polynomial degree times the cost of one block-encoding application plus one state preparation, a bound validated against direct transpilation to within 0.4\% at $N=16$. Every route reported here is an upper bound, so a circuit judged infeasible is infeasible, while feasibility at the margin is not claimed.}
+  \label{tab:hardware_feasibility}
+  \begin{tabular}{llrrrrl}
+    \toprule
+    Case & Solver & $N$ & $n_q$ & $n_{2Q}$ & $n_{2Q}/\mathrm{budget}$ & Feasible \\
+    \midrule
+    3D\_HET\_Discharge\_SPT100 & HHL & 4 & --- & 697 & 1.98 & $\times$ \\
+    3D\_HET\_MMS\_SPT100 & HHL & 4 & --- & 697 & 1.98 & $\times$ \\
+    3D\_HET\_RotatingSpoke\_SPT100 & HHL & 4 & --- & 697 & 1.98 & $\times$ \\
+    3D\_Laplace\_BCdriven\_cube & HHL & 4 & --- & 1,237 & 3.5 & $\times$ \\
+    3D\_Poisson\_HighMode\_n2m3l4 & HHL & 4 & --- & 1,237 & 3.5 & $\times$ \\
+    3D\_Poisson\_TripleSin\_cube & HHL & 4 & --- & 1,237 & 3.5 & $\times$ \\
+    3D\_Poisson\_TwoGaussian\_cube & HHL & 4 & --- & 1,237 & 3.5 & $\times$ \\
+    3D\_HET\_Discharge\_SPT100 & HHL & 8 & --- & 3,668 & 10.4 & $\times$ \\
+    3D\_HET\_MMS\_SPT100 & HHL & 8 & --- & 3,668 & 10.4 & $\times$ \\
+    3D\_HET\_RotatingSpoke\_SPT100 & HHL & 8 & --- & 3,668 & 10.4 & $\times$ \\
+    3D\_Laplace\_BCdriven\_cube & HHL & 8 & --- & 4,724 & 13.4 & $\times$ \\
+    3D\_Poisson\_HighMode\_n2m3l4 & HHL & 8 & --- & 4,724 & 13.4 & $\times$ \\
+    3D\_Poisson\_TripleSin\_cube & HHL & 8 & --- & 4,724 & 13.4 & $\times$ \\
+    3D\_Poisson\_TwoGaussian\_cube & HHL & 8 & --- & 4,724 & 13.4 & $\times$ \\
+    3D\_HET\_Discharge\_SPT100 & HHL & 16 & --- & 10,167 & 28.8 & $\times$ \\
+    3D\_HET\_MMS\_SPT100 & HHL & 16 & --- & 10,167 & 28.8 & $\times$ \\
+    3D\_HET\_RotatingSpoke\_SPT100 & HHL & 16 & --- & 10,167 & 28.8 & $\times$ \\
+    3D\_Laplace\_BCdriven\_cube & HHL & 16 & --- & 13,295 & 37.7 & $\times$ \\
+    3D\_Poisson\_HighMode\_n2m3l4 & HHL & 16 & --- & 13,295 & 37.7 & $\times$ \\
+    3D\_Poisson\_TripleSin\_cube & HHL & 16 & --- & 13,295 & 37.7 & $\times$ \\
+    3D\_Poisson\_TwoGaussian\_cube & HHL & 16 & --- & 13,295 & 37.7 & $\times$ \\
+    3D\_HET\_Discharge\_SPT100 & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    3D\_HET\_MMS\_SPT100 & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    3D\_HET\_RotatingSpoke\_SPT100 & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    3D\_Laplace\_BCdriven\_cube & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    3D\_Poisson\_HighMode\_n2m3l4 & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    3D\_Poisson\_TripleSin\_cube & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    3D\_Poisson\_TwoGaussian\_cube & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    3D\_HET\_Discharge\_SPT100 & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    3D\_HET\_MMS\_SPT100 & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    3D\_HET\_RotatingSpoke\_SPT100 & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    3D\_Laplace\_BCdriven\_cube & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    3D\_Poisson\_HighMode\_n2m3l4 & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    3D\_Poisson\_TripleSin\_cube & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    3D\_Poisson\_TwoGaussian\_cube & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    3D\_HET\_Discharge\_SPT100 & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    3D\_HET\_MMS\_SPT100 & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    3D\_HET\_RotatingSpoke\_SPT100 & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    3D\_Laplace\_BCdriven\_cube & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    3D\_Poisson\_HighMode\_n2m3l4 & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    3D\_Poisson\_TripleSin\_cube & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    3D\_Poisson\_TwoGaussian\_cube & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    3D\_HET\_Discharge\_SPT100 & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    3D\_HET\_MMS\_SPT100 & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    3D\_HET\_RotatingSpoke\_SPT100 & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    3D\_Laplace\_BCdriven\_cube & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    3D\_Poisson\_HighMode\_n2m3l4 & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    3D\_Poisson\_TripleSin\_cube & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    3D\_Poisson\_TwoGaussian\_cube & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    3D\_HET\_Discharge\_SPT100 & QSVT & 64 & --- & 3,793,076 & 1.07e+04 & $\times$ \\
+    3D\_HET\_MMS\_SPT100 & QSVT & 64 & --- & 3,793,076 & 1.07e+04 & $\times$ \\
+    3D\_HET\_RotatingSpoke\_SPT100 & QSVT & 64 & --- & 3,793,076 & 1.07e+04 & $\times$ \\
+    3D\_Laplace\_BCdriven\_cube & QSVT & 64 & --- & 3,793,076 & 1.07e+04 & $\times$ \\
+    3D\_Poisson\_HighMode\_n2m3l4 & QSVT & 64 & --- & 3,793,076 & 1.07e+04 & $\times$ \\
+    3D\_Poisson\_TripleSin\_cube & QSVT & 64 & --- & 3,793,076 & 1.07e+04 & $\times$ \\
+    3D\_Poisson\_TwoGaussian\_cube & QSVT & 64 & --- & 3,793,076 & 1.07e+04 & $\times$ \\
+    3D\_HET\_Discharge\_SPT100 & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    3D\_HET\_MMS\_SPT100 & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    3D\_HET\_RotatingSpoke\_SPT100 & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    3D\_Laplace\_BCdriven\_cube & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    3D\_Poisson\_HighMode\_n2m3l4 & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    3D\_Poisson\_TripleSin\_cube & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    3D\_Poisson\_TwoGaussian\_cube & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    3D\_HET\_Discharge\_SPT100 & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    3D\_HET\_MMS\_SPT100 & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    3D\_HET\_RotatingSpoke\_SPT100 & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    3D\_Laplace\_BCdriven\_cube & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    3D\_Poisson\_HighMode\_n2m3l4 & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    3D\_Poisson\_TripleSin\_cube & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    3D\_Poisson\_TwoGaussian\_cube & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    3D\_HET\_Discharge\_SPT100 & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    3D\_HET\_MMS\_SPT100 & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    3D\_HET\_RotatingSpoke\_SPT100 & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    3D\_Laplace\_BCdriven\_cube & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    3D\_Poisson\_HighMode\_n2m3l4 & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    3D\_Poisson\_TripleSin\_cube & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    3D\_Poisson\_TwoGaussian\_cube & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    \bottomrule
+  \end{tabular}
+\end{table}

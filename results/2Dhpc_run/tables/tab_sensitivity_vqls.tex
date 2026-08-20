@@ -1,0 +1,39 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Sensitivity analysis for the VQLS algorithm at $N=8$. Each block varies one parameter while holding all others at the baseline value. $e_\infty$ is the maximum relative error against the analytical solution; $r$ is the relative residual.}
+  \label{tab:sensitivity}
+  \begin{tabular}{l S[table-format=3.3] S[table-format=1.2e2] S[table-format=6.0] S[table-format=4.2]}
+    \toprule
+    {Parameter value} & {$e_\infty$ [\%]} & {$r$} & {Depth} & {$t$ [s]} \\
+    \multicolumn{5}{l}{\textit{Varying $n_\mathrm{layers}$}}\\
+    \midrule
+    \text{1} & 48.268 & $1.55 \times 10^{0}$ & {\text{---}} & 3642.55 \\
+    \text{2} & 1.073 & $1.64 \times 10^{-3}$ & {\text{---}} & 3600.47 \\
+    \text{3} & 1.022 & $1.76 \times 10^{-5}$ & {\text{---}} & 1291.13 \\
+    \text{4} & 1.022 & $1.18 \times 10^{-5}$ & {\text{---}} & 1494.87 \\
+    \text{5} & 1.022 & $9.40 \times 10^{-6}$ & {\text{---}} & 2031.09 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $n_\mathrm{restarts}$}}\\
+    \midrule
+    \text{1} & 1.022 & $6.29 \times 10^{-9}$ & {\text{---}} & 758.27 \\
+    \text{2} & 1.022 & $1.18 \times 10^{-5}$ & {\text{---}} & 1512.67 \\
+    \text{3} & 1.022 & $1.18 \times 10^{-5}$ & {\text{---}} & 1445.11 \\
+    \text{5} & 1.022 & $1.18 \times 10^{-5}$ & {\text{---}} & 1381.20 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $n_\mathrm{layers}$}}\\
+    \midrule
+    \text{1} & 59.561 & $3.24 \times 10^{-1}$ & {\text{---}} & 3618.26 \\
+    \text{2} & 0.557 & $1.29 \times 10^{-3}$ & {\text{---}} & 1088.28 \\
+    \text{3} & 0.356 & $4.54 \times 10^{-6}$ & {\text{---}} & 1257.77 \\
+    \text{4} & 0.356 & $2.54 \times 10^{-6}$ & {\text{---}} & 1412.07 \\
+    \text{5} & 0.356 & $2.11 \times 10^{-6}$ & {\text{---}} & 1248.02 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $n_\mathrm{restarts}$}}\\
+    \midrule
+    \text{1} & 0.356 & $3.43 \times 10^{-9}$ & {\text{---}} & 941.13 \\
+    \text{2} & 0.356 & $2.54 \times 10^{-6}$ & {\text{---}} & 1660.24 \\
+    \text{3} & 0.356 & $2.54 \times 10^{-6}$ & {\text{---}} & 1661.48 \\
+    \text{5} & 0.356 & $2.54 \times 10^{-6}$ & {\text{---}} & 1593.21 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

@@ -1,0 +1,116 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Two-qubit gate count against a hardware budget of 353 gates, the largest count retaining a 50\% probability of completing without a two-qubit fault at the median calibrated two-qubit error rate of \texttt{ibm\_kingston}, $\varepsilon_2 = 1.96e-03$. Counts are transpiled to the Heron r2 native basis $\{\mathrm{rz}, \mathrm{sx}, \mathrm{x}, \mathrm{cz}\}$ at optimisation level 3. HHL and VQLS are transpiled directly; the QSVT count is composed as the polynomial degree times the cost of one block-encoding application plus one state preparation, a bound validated against direct transpilation to within 0.4\% at $N=16$. Every route reported here is an upper bound, so a circuit judged infeasible is infeasible, while feasibility at the margin is not claimed.}
+  \label{tab:hardware_feasibility}
+  \begin{tabular}{llrrrrl}
+    \toprule
+    Case & Solver & $N$ & $n_q$ & $n_{2Q}$ & $n_{2Q}/\mathrm{budget}$ & Feasible \\
+    \midrule
+    1D\_Poisson\_fH\_hom & HHL & 4 & 2 & 3,153 & 8.93 & $\times$ \\
+    1D\_Poisson\_fL\_hom & HHL & 4 & 2 & 3,153 & 8.93 & $\times$ \\
+    1D\_Poisson\_fS\_hom & HHL & 4 & 2 & 3,153 & 8.93 & $\times$ \\
+    1D\_Poisson\_fS\_nonhom & HHL & 4 & 2 & 3,153 & 8.93 & $\times$ \\
+    HET\_1D\_3a\_linear\_hom & HHL & 4 & 2 & 3,153 & 8.93 & $\times$ \\
+    HET\_1D\_3b\_gaussian\_Vd300 & HHL & 4 & 2 & 3,153 & 8.93 & $\times$ \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & HHL & 4 & 2 & 3,153 & 8.93 & $\times$ \\
+    1D\_Poisson\_fH\_hom & HHL & 8 & 3 & 13,360 & 37.8 & $\times$ \\
+    1D\_Poisson\_fL\_hom & HHL & 8 & 3 & 13,360 & 37.8 & $\times$ \\
+    1D\_Poisson\_fS\_hom & HHL & 8 & 3 & 13,360 & 37.8 & $\times$ \\
+    1D\_Poisson\_fS\_nonhom & HHL & 8 & 3 & 13,360 & 37.8 & $\times$ \\
+    HET\_1D\_3a\_linear\_hom & HHL & 8 & 3 & 13,360 & 37.8 & $\times$ \\
+    HET\_1D\_3b\_gaussian\_Vd300 & HHL & 8 & 3 & 13,360 & 37.8 & $\times$ \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & HHL & 8 & 3 & 13,360 & 37.8 & $\times$ \\
+    1D\_Poisson\_fH\_hom & HHL & 16 & 4 & 76,067 & 215 & $\times$ \\
+    1D\_Poisson\_fL\_hom & HHL & 16 & 4 & 76,067 & 215 & $\times$ \\
+    1D\_Poisson\_fS\_hom & HHL & 16 & 4 & 76,067 & 215 & $\times$ \\
+    1D\_Poisson\_fS\_nonhom & HHL & 16 & 4 & 76,067 & 215 & $\times$ \\
+    HET\_1D\_3a\_linear\_hom & HHL & 16 & 4 & 76,067 & 215 & $\times$ \\
+    HET\_1D\_3b\_gaussian\_Vd300 & HHL & 16 & 4 & 76,067 & 215 & $\times$ \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & HHL & 16 & 4 & 76,067 & 215 & $\times$ \\
+    1D\_Poisson\_fH\_hom & HHL & 32 & 5 & 234,478 & 664 & $\times$ \\
+    1D\_Poisson\_fL\_hom & HHL & 32 & 5 & 234,478 & 664 & $\times$ \\
+    1D\_Poisson\_fS\_hom & HHL & 32 & 5 & 234,478 & 664 & $\times$ \\
+    1D\_Poisson\_fS\_nonhom & HHL & 32 & 5 & 234,478 & 664 & $\times$ \\
+    HET\_1D\_3a\_linear\_hom & HHL & 32 & 5 & 234,478 & 664 & $\times$ \\
+    HET\_1D\_3b\_gaussian\_Vd300 & HHL & 32 & 5 & 234,478 & 664 & $\times$ \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & HHL & 32 & 5 & 234,478 & 664 & $\times$ \\
+    1D\_Poisson\_fH\_hom & HHL & 64 & 6 & 712,173 & 2.02e+03 & $\times$ \\
+    1D\_Poisson\_fL\_hom & HHL & 64 & 6 & 712,173 & 2.02e+03 & $\times$ \\
+    1D\_Poisson\_fS\_hom & HHL & 64 & 6 & 712,173 & 2.02e+03 & $\times$ \\
+    1D\_Poisson\_fS\_nonhom & HHL & 64 & 6 & 712,173 & 2.02e+03 & $\times$ \\
+    HET\_1D\_3a\_linear\_hom & HHL & 64 & 6 & 712,173 & 2.02e+03 & $\times$ \\
+    HET\_1D\_3b\_gaussian\_Vd300 & HHL & 64 & 6 & 712,173 & 2.02e+03 & $\times$ \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & HHL & 64 & 6 & 712,173 & 2.02e+03 & $\times$ \\
+    1D\_Poisson\_fH\_hom & QSVT & 4 & 2 & 12,992 & 36.8 & $\times$ \\
+    1D\_Poisson\_fL\_hom & QSVT & 4 & 2 & 12,992 & 36.8 & $\times$ \\
+    1D\_Poisson\_fS\_hom & QSVT & 4 & 2 & 12,992 & 36.8 & $\times$ \\
+    1D\_Poisson\_fS\_nonhom & QSVT & 4 & 2 & 12,992 & 36.8 & $\times$ \\
+    HET\_1D\_3a\_linear\_hom & QSVT & 4 & 2 & 12,992 & 36.8 & $\times$ \\
+    HET\_1D\_3b\_gaussian\_Vd300 & QSVT & 4 & 2 & 12,992 & 36.8 & $\times$ \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & QSVT & 4 & 2 & 12,992 & 36.8 & $\times$ \\
+    1D\_Poisson\_fH\_hom & QSVT & 8 & 3 & 388,919 & 1.1e+03 & $\times$ \\
+    1D\_Poisson\_fL\_hom & QSVT & 8 & 3 & 388,919 & 1.1e+03 & $\times$ \\
+    1D\_Poisson\_fS\_hom & QSVT & 8 & 3 & 388,919 & 1.1e+03 & $\times$ \\
+    1D\_Poisson\_fS\_nonhom & QSVT & 8 & 3 & 388,919 & 1.1e+03 & $\times$ \\
+    HET\_1D\_3a\_linear\_hom & QSVT & 8 & 3 & 388,919 & 1.1e+03 & $\times$ \\
+    HET\_1D\_3b\_gaussian\_Vd300 & QSVT & 8 & 3 & 388,919 & 1.1e+03 & $\times$ \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & QSVT & 8 & 3 & 388,919 & 1.1e+03 & $\times$ \\
+    1D\_Poisson\_fH\_hom & QSVT & 16 & 4 & 8,564,319 & 2.43e+04 & $\times$ \\
+    1D\_Poisson\_fL\_hom & QSVT & 16 & 4 & 8,564,319 & 2.43e+04 & $\times$ \\
+    1D\_Poisson\_fS\_hom & QSVT & 16 & 4 & 8,564,319 & 2.43e+04 & $\times$ \\
+    1D\_Poisson\_fS\_nonhom & QSVT & 16 & 4 & 8,564,319 & 2.43e+04 & $\times$ \\
+    HET\_1D\_3a\_linear\_hom & QSVT & 16 & 4 & 8,564,319 & 2.43e+04 & $\times$ \\
+    HET\_1D\_3b\_gaussian\_Vd300 & QSVT & 16 & 4 & 8,564,319 & 2.43e+04 & $\times$ \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & QSVT & 16 & 4 & 8,564,319 & 2.43e+04 & $\times$ \\
+    1D\_Poisson\_fH\_hom & QSVT & 32 & 5 & 9,341,872 & 2.65e+04 & $\times$ \\
+    1D\_Poisson\_fL\_hom & QSVT & 32 & 5 & 9,341,872 & 2.65e+04 & $\times$ \\
+    1D\_Poisson\_fS\_hom & QSVT & 32 & 5 & 9,341,872 & 2.65e+04 & $\times$ \\
+    1D\_Poisson\_fS\_nonhom & QSVT & 32 & 5 & 9,341,872 & 2.65e+04 & $\times$ \\
+    HET\_1D\_3a\_linear\_hom & QSVT & 32 & 5 & 9,341,872 & 2.65e+04 & $\times$ \\
+    HET\_1D\_3b\_gaussian\_Vd300 & QSVT & 32 & 5 & 9,341,872 & 2.65e+04 & $\times$ \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & QSVT & 32 & 5 & 9,341,872 & 2.65e+04 & $\times$ \\
+    1D\_Poisson\_fH\_hom & QSVT & 64 & 6 & 37,862,576 & 1.07e+05 & $\times$ \\
+    1D\_Poisson\_fL\_hom & QSVT & 64 & 6 & 37,862,576 & 1.07e+05 & $\times$ \\
+    1D\_Poisson\_fS\_hom & QSVT & 64 & 6 & 37,862,576 & 1.07e+05 & $\times$ \\
+    1D\_Poisson\_fS\_nonhom & QSVT & 64 & 6 & 37,862,576 & 1.07e+05 & $\times$ \\
+    HET\_1D\_3a\_linear\_hom & QSVT & 64 & 6 & 37,862,576 & 1.07e+05 & $\times$ \\
+    HET\_1D\_3b\_gaussian\_Vd300 & QSVT & 64 & 6 & 37,862,576 & 1.07e+05 & $\times$ \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & QSVT & 64 & 6 & 37,862,576 & 1.07e+05 & $\times$ \\
+    1D\_Poisson\_fH\_hom & VQLS & 4 & 2 & 2 & 0.006 & \checkmark \\
+    1D\_Poisson\_fL\_hom & VQLS & 4 & 2 & 2 & 0.006 & \checkmark \\
+    1D\_Poisson\_fS\_hom & VQLS & 4 & 2 & 2 & 0.006 & \checkmark \\
+    1D\_Poisson\_fS\_nonhom & VQLS & 4 & 2 & 2 & 0.006 & \checkmark \\
+    HET\_1D\_3a\_linear\_hom & VQLS & 4 & 2 & 2 & 0.006 & \checkmark \\
+    HET\_1D\_3b\_gaussian\_Vd300 & VQLS & 4 & 2 & 2 & 0.006 & \checkmark \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & VQLS & 4 & 2 & 2 & 0.006 & \checkmark \\
+    1D\_Poisson\_fH\_hom & VQLS & 8 & 3 & 16 & 0.045 & \checkmark \\
+    1D\_Poisson\_fL\_hom & VQLS & 8 & 3 & 16 & 0.045 & \checkmark \\
+    1D\_Poisson\_fS\_hom & VQLS & 8 & 3 & 16 & 0.045 & \checkmark \\
+    1D\_Poisson\_fS\_nonhom & VQLS & 8 & 3 & 16 & 0.045 & \checkmark \\
+    HET\_1D\_3a\_linear\_hom & VQLS & 8 & 3 & 16 & 0.045 & \checkmark \\
+    HET\_1D\_3b\_gaussian\_Vd300 & VQLS & 8 & 3 & 16 & 0.045 & \checkmark \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & VQLS & 8 & 3 & 16 & 0.045 & \checkmark \\
+    1D\_Poisson\_fH\_hom & VQLS & 16 & 4 & 30 & 0.085 & \checkmark \\
+    1D\_Poisson\_fL\_hom & VQLS & 16 & 4 & 30 & 0.085 & \checkmark \\
+    1D\_Poisson\_fS\_hom & VQLS & 16 & 4 & 30 & 0.085 & \checkmark \\
+    1D\_Poisson\_fS\_nonhom & VQLS & 16 & 4 & 30 & 0.085 & \checkmark \\
+    HET\_1D\_3a\_linear\_hom & VQLS & 16 & 4 & 30 & 0.085 & \checkmark \\
+    HET\_1D\_3b\_gaussian\_Vd300 & VQLS & 16 & 4 & 30 & 0.085 & \checkmark \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & VQLS & 16 & 4 & 30 & 0.085 & \checkmark \\
+    1D\_Poisson\_fH\_hom & VQLS & 32 & 5 & 48 & 0.136 & \checkmark \\
+    1D\_Poisson\_fL\_hom & VQLS & 32 & 5 & 48 & 0.136 & \checkmark \\
+    1D\_Poisson\_fS\_hom & VQLS & 32 & 5 & 48 & 0.136 & \checkmark \\
+    1D\_Poisson\_fS\_nonhom & VQLS & 32 & 5 & 48 & 0.136 & \checkmark \\
+    HET\_1D\_3a\_linear\_hom & VQLS & 32 & 5 & 48 & 0.136 & \checkmark \\
+    HET\_1D\_3b\_gaussian\_Vd300 & VQLS & 32 & 5 & 48 & 0.136 & \checkmark \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & VQLS & 32 & 5 & 48 & 0.136 & \checkmark \\
+    1D\_Poisson\_fH\_hom & VQLS & 64 & 6 & 70 & 0.198 & \checkmark \\
+    1D\_Poisson\_fL\_hom & VQLS & 64 & 6 & 70 & 0.198 & \checkmark \\
+    1D\_Poisson\_fS\_hom & VQLS & 64 & 6 & 70 & 0.198 & \checkmark \\
+    1D\_Poisson\_fS\_nonhom & VQLS & 64 & 6 & 70 & 0.198 & \checkmark \\
+    HET\_1D\_3a\_linear\_hom & VQLS & 64 & 6 & 70 & 0.198 & \checkmark \\
+    HET\_1D\_3b\_gaussian\_Vd300 & VQLS & 64 & 6 & 70 & 0.198 & \checkmark \\
+    HET\_1D\_3c\_gaussian\_NeumannDirichlet & VQLS & 64 & 6 & 70 & 0.198 & \checkmark \\
+    \bottomrule
+  \end{tabular}
+\end{table}

@@ -1,0 +1,214 @@
+{
+  "run_tag": "o4",
+  "timestamp": "2026-08-19T20:42:04",
+  "python_version": "3.12.3 (main, Oct 30 2024, 13:22:10) [GCC 13.3.0]",
+  "platform": "Linux-4.18.0-553.76.1.el8_10.x86_64-x86_64-with-glibc2.28",
+  "config": {
+    "timestamp": "2026-08-19 20:42:00",
+    "hostname": "cx3-12-20",
+    "python": "3.12.3 (main, Oct 30 2024, 13:22:10) [GCC 13.3.0]",
+    "numpy": "2.5.1",
+    "pbs_jobid": "unknown (3831760 displaced it; see provenance_note)",
+    "study": "both",
+    "dim": 3,
+    "scheme": "fmg",
+    "max_wall_s": 3600.0,
+    "order": 4,
+    "cases": [
+      "poisson_3d_triple_sin_cube",
+      "het_3d_mms_spt100"
+    ],
+    "n_values": [
+      8,
+      16
+    ],
+    "solvers": [
+      "qsvt"
+    ],
+    "r_target": 0.001,
+    "grids": {
+      "equal_accuracy": {
+        "hhl_epsilon": [
+          0.1,
+          0.05,
+          0.01,
+          0.005,
+          0.001
+        ],
+        "vqls_n_layers": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "vqls_n_restarts": [
+          1,
+          2,
+          3,
+          5
+        ],
+        "qsvt_max_degree": [
+          null,
+          5000,
+          2000,
+          1000,
+          500,
+          200,
+          100,
+          50,
+          20
+        ],
+        "band_factor": 3.0
+      },
+      "sensitivity": {
+        "hhl": {
+          "epsilon": [
+            0.1,
+            0.05,
+            0.01,
+            0.005,
+            0.001
+          ],
+          "trotter_steps": [
+            1,
+            2,
+            4,
+            8,
+            16,
+            32
+          ]
+        },
+        "vqls": {
+          "n_layers": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "n_restarts": [
+            1,
+            2,
+            3,
+            5,
+            8
+          ],
+          "cobyla_tol": [
+            0.0001,
+            1e-06,
+            1e-08,
+            1e-10
+          ]
+        },
+        "qsvt": {
+          "max_degree": [
+            20,
+            50,
+            100,
+            200,
+            500,
+            1000,
+            2000,
+            null
+          ],
+          "epsilon": [
+            0.1,
+            0.05,
+            0.01,
+            0.005,
+            0.001
+          ]
+        },
+        "baselines": {
+          "hhl": {
+            "epsilon": 0.01,
+            "trotter_steps": null
+          },
+          "vqls": {
+            "n_layers": 2,
+            "n_restarts": 3,
+            "cobyla_tol": 1e-08
+          },
+          "qsvt": {
+            "max_degree": null,
+            "epsilon": 0.01,
+            "angle_method": "auto"
+          }
+        }
+      },
+      "equal_accuracy_outer": {
+        "hhl": [
+          0.1,
+          0.05,
+          0.01,
+          0.005
+        ],
+        "vqls": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "qsvt": [
+          null,
+          500,
+          200,
+          100,
+          50,
+          20,
+          10,
+          5
+        ]
+      },
+      "sensitivity_outer": {
+        "hhl": {
+          "epsilon": [
+            0.1,
+            0.05,
+            0.01,
+            0.005
+          ],
+          "trotter_steps": [
+            1,
+            2,
+            4,
+            8,
+            16
+          ]
+        },
+        "vqls": {
+          "n_layers": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "n_restarts": [
+            1,
+            2,
+            3,
+            5
+          ]
+        },
+        "qsvt": {
+          "max_degree": [
+            5,
+            8,
+            11,
+            15,
+            21,
+            51,
+            201,
+            501
+          ]
+        }
+      }
+    },
+    "git_commit": "a6b6e0312c34aecba7c6e8c80c0274e13dc74080",
+    "git_dirty": false
+  },
+  "provenance_note": "Reconstructed 2026-08-20. The arriving run_metadata.json recorded job 3831760.pbs-7 (DIM=3 SOLVERS=qsvt RUN_TAG=grid_fix, order 2), which shares results/3Dstudies on the cluster and overwrote the metadata of the order-4 job whose data this directory holds. order, n_values and run_tag are corrected from the records themselves; timestamp and pbs_jobid below still belong to 3831760 and are NOT this data's provenance. The verbatim file is kept as run_metadata.grid_fix_3831760.json."
+}

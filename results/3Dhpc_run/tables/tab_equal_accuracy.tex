@@ -1,0 +1,14 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Equal-accuracy comparison: circuit depth, qubit count, and wall time for each quantum solver at a matched relative residual target $r_\mathrm{target}$. The parameter value required to achieve the target is shown for each algorithm. Entries marked $\dagger$ did not achieve the target within the parameter grid; the closest result is reported.}
+  \label{tab:equal_accuracy}
+  \begin{tabular}{l l S[table-format=1.3] S[table-format=1.2e2] S[table-format=6.0] S[table-format=2.0] S[table-format=4.2]}
+    \toprule
+    {Solver} & {Parameter} & {Value} & {$r$ achieved} & {Depth} & {$n_q$} & {$t$ [s]} \\
+    \midrule
+    \text{QSVT} & $d_\mathrm{max}$ & \text{5} & $3.33 \times 10^{-4}$ & {\text{---}} & {\text{---}} & 9.00 \\
+    \text{QSVT} & $d_\mathrm{max}$ & \text{5} & $5.41 \times 10^{-4}$ & {\text{---}} & {\text{---}} & 15.63 \\
+    \multicolumn{7}{l}{\footnotesize $r_\mathrm{target} = 1.00 \times 10^{-3}$; $\dagger$ target not achieved within parameter grid.}\\
+    \bottomrule
+  \end{tabular}
+\end{table}

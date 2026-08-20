@@ -1,0 +1,94 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Circuit resource metrics for quantum solvers across problem sizes. $d_0$: circuit depth at Qiskit optimisation level 0 (logical). $d_1$: circuit depth at optimisation level 1 (light compilation). $n_\mathrm{CX}$: two-qubit gate count at level 1. $n_q$: total qubit count.}
+  \label{tab:circuit_resources}
+  \begin{tabular}{l S[table-format=3.0] S[table-format=4.1] l S[table-format=6.0] S[table-format=6.0] S[table-format=6.0] S[table-format=5.0] S[table-format=2.0]}
+    \toprule
+    {Case} & {$N$} & {$\kappa$} & {Solver} & {$d_\mathrm{raw}$} & {$d_0$} & {$d_1$} & {$n_\mathrm{CX}$} & {$n_q$} \\
+    \midrule
+    \text{3D\_HET\_Discharge\_SPT100} & 4 & 1.4 & \text{HHL} & {\text{---}} & {\text{---}} & 2418 & 697 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 12 & 2 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 26560 & 5512 & {\text{---}} \\
+     & 8 & 1.5 & \text{HHL} & {\text{---}} & {\text{---}} & 11921 & 3668 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 186880 & 39581 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 69 & 16 & {\text{---}} \\
+     & 16 & 1.5 & \text{HHL} & {\text{---}} & {\text{---}} & 32723 & 10167 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 1045094 & 222447 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 89 & 30 & {\text{---}} \\
+     & 32 & 1.5 & \text{QSVT} & {\text{---}} & {\text{---}} & 4372236 & 935872 & {\text{---}} \\
+     & 64 & 1.5 & \text{QSVT} & {\text{---}} & {\text{---}} & 17728897 & 3793076 & {\text{---}} \\
+    \midrule
+    \text{3D\_HET\_MMS\_SPT100} & 4 & 1.4 & \text{HHL} & {\text{---}} & {\text{---}} & 2418 & 697 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 12 & 2 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 26560 & 5512 & {\text{---}} \\
+     & 8 & 1.5 & \text{HHL} & {\text{---}} & {\text{---}} & 11921 & 3668 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 186880 & 39581 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 69 & 16 & {\text{---}} \\
+     & 16 & 1.5 & \text{HHL} & {\text{---}} & {\text{---}} & 32723 & 10167 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 1045094 & 222447 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 89 & 30 & {\text{---}} \\
+     & 32 & 1.5 & \text{QSVT} & {\text{---}} & {\text{---}} & 4372236 & 935872 & {\text{---}} \\
+     & 64 & 1.5 & \text{QSVT} & {\text{---}} & {\text{---}} & 17728897 & 3793076 & {\text{---}} \\
+    \midrule
+    \text{3D\_HET\_RotatingSpoke\_SPT100} & 4 & 1.4 & \text{HHL} & {\text{---}} & {\text{---}} & 2418 & 697 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 12 & 2 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 26560 & 5512 & {\text{---}} \\
+     & 8 & 1.5 & \text{HHL} & {\text{---}} & {\text{---}} & 11921 & 3668 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 186880 & 39581 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 69 & 16 & {\text{---}} \\
+     & 16 & 1.5 & \text{HHL} & {\text{---}} & {\text{---}} & 32723 & 10167 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 1045094 & 222447 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 89 & 30 & {\text{---}} \\
+     & 32 & 1.5 & \text{QSVT} & {\text{---}} & {\text{---}} & 4372236 & 935872 & {\text{---}} \\
+     & 64 & 1.5 & \text{QSVT} & {\text{---}} & {\text{---}} & 17728897 & 3793076 & {\text{---}} \\
+    \midrule
+    \text{3D\_Laplace\_BCdriven\_cube} & 4 & 1.7 & \text{HHL} & {\text{---}} & {\text{---}} & 4248 & 1237 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 12 & 2 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 26560 & 5512 & {\text{---}} \\
+     & 8 & 1.9 & \text{HHL} & {\text{---}} & {\text{---}} & 15342 & 4724 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 186880 & 39581 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 69 & 16 & {\text{---}} \\
+     & 16 & 2.0 & \text{HHL} & {\text{---}} & {\text{---}} & 42708 & 13295 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 1045094 & 222447 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 89 & 30 & {\text{---}} \\
+     & 32 & 2.0 & \text{QSVT} & {\text{---}} & {\text{---}} & 4372236 & 935872 & {\text{---}} \\
+     & 64 & 2.0 & \text{QSVT} & {\text{---}} & {\text{---}} & 17728897 & 3793076 & {\text{---}} \\
+    \midrule
+    \text{3D\_Poisson\_HighMode\_n2m3l4} & 4 & 1.7 & \text{HHL} & {\text{---}} & {\text{---}} & 4248 & 1237 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 12 & 2 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 26560 & 5512 & {\text{---}} \\
+     & 8 & 1.9 & \text{HHL} & {\text{---}} & {\text{---}} & 15342 & 4724 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 186880 & 39581 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 69 & 16 & {\text{---}} \\
+     & 16 & 2.0 & \text{HHL} & {\text{---}} & {\text{---}} & 42708 & 13295 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 1045094 & 222447 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 89 & 30 & {\text{---}} \\
+     & 32 & 2.0 & \text{QSVT} & {\text{---}} & {\text{---}} & 4372236 & 935872 & {\text{---}} \\
+     & 64 & 2.0 & \text{QSVT} & {\text{---}} & {\text{---}} & 17728897 & 3793076 & {\text{---}} \\
+    \midrule
+    \text{3D\_Poisson\_TripleSin\_cube} & 4 & 1.7 & \text{HHL} & {\text{---}} & {\text{---}} & 4248 & 1237 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 12 & 2 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 26560 & 5512 & {\text{---}} \\
+     & 8 & 1.9 & \text{HHL} & {\text{---}} & {\text{---}} & 15342 & 4724 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 186880 & 39581 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 69 & 16 & {\text{---}} \\
+     & 16 & 2.0 & \text{HHL} & {\text{---}} & {\text{---}} & 42708 & 13295 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 1045094 & 222447 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 89 & 30 & {\text{---}} \\
+     & 32 & 2.0 & \text{QSVT} & {\text{---}} & {\text{---}} & 4372236 & 935872 & {\text{---}} \\
+     & 64 & 2.0 & \text{QSVT} & {\text{---}} & {\text{---}} & 17728897 & 3793076 & {\text{---}} \\
+    \midrule
+    \text{3D\_Poisson\_TwoGaussian\_cube} & 4 & 1.7 & \text{HHL} & {\text{---}} & {\text{---}} & 4248 & 1237 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 12 & 2 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 26560 & 5512 & {\text{---}} \\
+     & 8 & 1.9 & \text{HHL} & {\text{---}} & {\text{---}} & 15342 & 4724 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 186880 & 39581 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 69 & 16 & {\text{---}} \\
+     & 16 & 2.0 & \text{HHL} & {\text{---}} & {\text{---}} & 42708 & 13295 & {\text{---}} \\
+     &  &  & \text{QSVT} & {\text{---}} & {\text{---}} & 1045094 & 222447 & {\text{---}} \\
+     &  &  & \text{VQLS} & {\text{---}} & {\text{---}} & 89 & 30 & {\text{---}} \\
+     & 32 & 2.0 & \text{QSVT} & {\text{---}} & {\text{---}} & 4372236 & 935872 & {\text{---}} \\
+     & 64 & 2.0 & \text{QSVT} & {\text{---}} & {\text{---}} & 17728897 & 3793076 & {\text{---}} \\
+    \bottomrule
+  \end{tabular}
+\end{table}

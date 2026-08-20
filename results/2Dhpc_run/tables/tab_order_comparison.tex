@@ -1,0 +1,15 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Comparison of second-order (tridiagonal TST) and fourth-order (pentadiagonal) discretisations at matched solution accuracy. $\kappa_\mathrm{ratio} = \kappa_\mathrm{4th} / \kappa_\mathrm{2nd}$ quantifies the condition number penalty of the higher-order stencil.}
+  \label{tab:order_comparison}
+  \begin{tabular}{S[table-format=2.0] S[table-format=4.1] S[table-format=4.1] S[table-format=1.3] S[table-format=3.3] S[table-format=3.3]}
+    \toprule
+    {$N$} & {$\kappa_\mathrm{2nd}$} & {$\kappa_\mathrm{4th}$} & {$\kappa_\mathrm{ratio}$} & {$e_\infty^\mathrm{2nd}$ [\%]} & {$e_\infty^\mathrm{4th}$ [\%]} \\
+    \midrule
+    4 & 1.4 & 2.5 & 1.797 & 1.131 & 0.168 \\
+    8 & 2.8 & 2.9 & 1.050 & 1.022 & 0.016 \\
+    16 & 2.9 & 1.5 & 0.519 & 0.285 & 0.018 \\
+    32 & 3.0 & 3.1 & 1.045 & 0.076 & 0.001 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

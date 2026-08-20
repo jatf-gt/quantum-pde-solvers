@@ -1,0 +1,79 @@
+{
+  "timestamp": "2026-08-18 01:58:06",
+  "hostname": "cx3-12-13",
+  "python": "3.12.3 (main, Oct 30 2024, 13:22:10) [GCC 13.3.0]",
+  "numpy": "2.5.1",
+  "cpu_count": 128,
+  "pbs_jobid": "3796992.pbs-7",
+  "slurm_jobid": null,
+  "dimension": 3,
+  "N_values": [
+    16
+  ],
+  "sections": [
+    "section1",
+    "section2",
+    "section3",
+    "section4",
+    "section5",
+    "section6",
+    "section7"
+  ],
+  "max_workers": 4,
+  "sweep_config": {
+    "scheme": "fmg",
+    "tol": 1e-06,
+    "max_outer": 500,
+    "solvers": [
+      "qsvt"
+    ],
+    "inner_options": {},
+    "scheme_options": {
+      "max_wall_s": 21600
+    },
+    "save_solutions": true,
+    "save_history": true,
+    "estimate_only": false,
+    "order": 4,
+    "scheme_crossover": null
+  },
+  "qsvt_max_degree_default": {
+    "4": null,
+    "8": null,
+    "16": null,
+    "32": 500,
+    "64": 500,
+    "128": 500
+  },
+  "hhl_epsilon_default": 0.01,
+  "cost_model_alpha": {
+    "thomas": 1.0,
+    "hhl": 2.35,
+    "vqls": 1.29,
+    "qsvt": 0.6
+  },
+  "cost_model_t8_s": {
+    "thomas": 2e-05,
+    "hhl": 1.36,
+    "vqls": 1.965,
+    "qsvt": 0.0393
+  },
+  "spt100": {
+    "Lz_m": 0.04,
+    "Lr_m": 0.020000000000000004,
+    "Ls_m": 0.25132741228718347,
+    "r_in_m": 0.03,
+    "r_out_m": 0.05,
+    "V_anode": 300.0,
+    "V_cathode": 0.0,
+    "V_wall": -20.0,
+    "spoke_m": 2,
+    "spoke_eps": 0.3
+  },
+  "qiskit": "1.4.6",
+  "qiskit_aer": "0.17.2",
+  "pennylane": "0.45.0",
+  "scipy": "1.18.0",
+  "git_commit": "db04a6470a35ee8b4eb77a84d9975ed936cf8191",
+  "git_dirty": false
+}

@@ -1,0 +1,10 @@
+case,solver,N,r_target,residual_achieved,wall_time_s,param,param_value,in_band,n_solver_calls
+1D_Poisson_fH_hom,hhl,8,0.001,0.0017997141891354488,3.37548054382205,epsilon,0.01,True,5
+1D_Poisson_fS_hom,hhl,8,0.001,0.002445574873190294,9.796634869650006,epsilon,0.001,True,5
+HET_1D_3a_linear_hom,hhl,8,0.001,0.007788351180912387,4.40914561226964,epsilon,0.005,False,5
+1D_Poisson_fH_hom,vqls,8,0.001,0.0016454383952718451,86.78946057707071,n_layers,5.0,True,5
+1D_Poisson_fS_hom,vqls,8,0.001,0.0002057128330448836,13.268163753673434,n_layers,3.0,False,7
+HET_1D_3a_linear_hom,vqls,8,0.001,0.0015719804795480646,54.14041068404913,n_layers,2.0,True,5
+1D_Poisson_fH_hom,qsvt,8,0.001,7.310692846577868e-08,0.2089190073311329,max_degree,500.0,False,8
+1D_Poisson_fS_hom,qsvt,8,0.001,1.0164065364831429e-13,2.7514380011707544,max_degree,-1.0,False,8
+HET_1D_3a_linear_hom,qsvt,8,0.001,0.001771775652227811,0.08764056488871574,max_degree,200.0,True,8

@@ -1,0 +1,5 @@
+N,kappa,degree,unit_two_qubit_count,prep_two_qubit_count,total_two_qubit_count,budget,feasible,validated,overshoot_factor
+4,9.0,63,11,1,694,5000,True,False,0.1388
+8,32.0,127,79,2,10035,5000,False,False,2.007
+16,117.0,255,444,3,113223,5000,False,False,22.6446
+32,441.0,511,1868,4,954552,5000,False,False,190.9104

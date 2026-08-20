@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-08-19 16:54:25",
+  "hostname": "cx3-4-4",
+  "platform": "Linux-4.18.0-553.76.1.el8_10.x86_64-x86_64-with-glibc2.28",
+  "python": "3.12.3 (main, Oct 30 2024, 13:22:10) [GCC 13.3.0]",
+  "numpy": "2.5.1",
+  "cpu_count": 128,
+  "omp_threads": "1",
+  "use_gpu": true,
+  "pbs_jobid": "3830177.pbs-7",
+  "pbs_queue": "v1_small24",
+  "N_values": [
+    16,
+    128
+  ],
+  "order": 2,
+  "sections": [
+    "1",
+    "1b",
+    "2"
+  ],
+  "solvers": [
+    "qsvt"
+  ],
+  "cases_filter": [],
+  "hhl_timeout_s": 7200.0,
+  "phase_tag": "degcap5000",
+  "skip_qsvt": false,
+  "max_workers": 4,
+  "qsvt_max_n": 128,
+  "qsvt_time_limit_s": 1800.0,
+  "qsvt_max_degree_by_N": {
+    "4": null,
+    "8": null,
+    "16": null,
+    "32": 5000,
+    "64": 5000
+  },
+  "qsvt_uncached_fallback_degree": 5000,
+  "qsvt_max_degree_fallback": 5000,
+  "hhl_epsilon": 0.01,
+  "vqls_seed": 42,
+  "thomas_timing_repeats": 10,
+  "qiskit": "1.4.6",
+  "qiskit_aer": "0.17.2",
+  "pyqsp": "not installed",
+  "scipy": "1.18.0",
+  "git_commit": "6f1f82047e846093f9e38300d0eacdbac28befaf",
+  "git_dirty": false
+}

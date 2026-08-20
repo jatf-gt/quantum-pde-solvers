@@ -1,0 +1,25 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Sensitivity analysis for the QSVT algorithm at $N=8$. Each block varies one parameter while holding all others at the baseline value. $e_\infty$ is the maximum relative error against the analytical solution; $r$ is the relative residual.}
+  \label{tab:sensitivity}
+  \begin{tabular}{l S[table-format=3.3] S[table-format=1.2e2] S[table-format=6.0] S[table-format=4.2]}
+    \toprule
+    {Parameter value} & {$e_\infty$ [\%]} & {$r$} & {Depth} & {$t$ [s]} \\
+    \multicolumn{5}{l}{\textit{Varying $d_\mathrm{max}$}}\\
+    \midrule
+    \text{50} & 1.022 & $3.91 \times 10^{-9}$ & {\text{---}} & 89.88 \\
+    \text{100} & 1.022 & $3.91 \times 10^{-9}$ & {\text{---}} & 168.33 \\
+    \text{200} & 1.022 & $3.91 \times 10^{-9}$ & {\text{---}} & 330.73 \\
+    \text{500} & 1.022 & $3.91 \times 10^{-9}$ & {\text{---}} & 794.38 \\
+    \text{---} & 1.022 & $3.92 \times 10^{-9}$ & {\text{---}} & 63.40 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $d_\mathrm{max}$}}\\
+    \midrule
+    \text{50} & 1.103 & $3.55 \times 10^{-9}$ & {\text{---}} & 176.87 \\
+    \text{100} & 1.103 & $3.55 \times 10^{-9}$ & {\text{---}} & 321.78 \\
+    \text{200} & 1.103 & $3.55 \times 10^{-9}$ & {\text{---}} & 612.69 \\
+    \text{500} & 1.103 & $3.55 \times 10^{-9}$ & {\text{---}} & 1480.46 \\
+    \text{---} & 1.103 & $3.84 \times 10^{-9}$ & {\text{---}} & 81.47 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

@@ -1,0 +1,228 @@
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Case                                 N         κ  Solver        e∞ [%]           r     Depth    nq           t
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  3D_HET_Discharge_SPT100              4      1.41  Thomas         0.000    8.67e-07      0.03 s
+                                       4      1.41  HHL          315.064    2.40e-01     3,893   ---     3.2 min
+                                       4      1.41  VQLS           0.002    1.64e-06        12   ---    11.0 min
+                                       4      1.41  QSVT           0.000    8.67e-07    26,560   ---     46.51 s
+                                       8      1.49  Thomas         0.000    9.07e-07      0.74 s
+                                       8      1.49  HHL          240.945    1.74e-01    41,090   ---   128.4 min
+                                       8      1.49  VQLS           0.285    1.01e-03        69   ---   352.4 min
+                                       8      1.49  QSVT           0.000    9.07e-07   186,880   ---    26.7 min
+                                      16      1.52  Thomas         0.000    4.73e-07      2.14 s
+                                      16      1.52  QSVT           0.000    4.73e-07  1,045,094   ---   113.1 min
+                                      32      1.53  Thomas         0.000    8.54e-07      8.35 s
+                                      32      1.53  QSVT           0.008    1.34e-05  4,372,236   ---   360.0 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  3D_HET_MMS_SPT100                    4      1.41  Thomas         0.273    7.01e-07      0.02 s
+                                       4      1.41  HHL            1.031    1.90e-02     3,893   ---     3.4 min
+                                       4      1.41  VQLS           0.273    1.55e-06        12   ---    13.5 min
+                                       4      1.41  QSVT           0.273    7.01e-07    26,560   ---     48.29 s
+                                       8      1.49  Thomas         0.024    3.01e-07      0.50 s
+                                       8      1.49  HHL            2.539    3.26e-02    41,090   ---   119.1 min
+                                       8      1.49  VQLS           0.128    9.54e-04        69   ---   226.8 min
+                                       8      1.49  QSVT           0.024    3.01e-07   186,880   ---    20.3 min
+                                      16      1.52  Thomas         0.002    7.19e-07      1.48 s
+                                      16      1.52  QSVT           0.002    7.19e-07  1,045,094   ---    79.7 min
+                                      32      1.53  Thomas         0.000    7.26e-07      5.54 s
+                                      32      1.53  QSVT           0.000    7.26e-07  4,372,236   ---   282.5 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  3D_HET_RotatingSpoke_SPT100          4      1.41  Thomas         1.362    2.45e-07      0.02 s
+                                       4      1.41  HHL            2.665    1.93e-02     3,893   ---     3.4 min
+                                       4      1.41  VQLS           1.362    1.98e-06        12   ---     9.1 min
+                                       4      1.41  QSVT           1.362    2.45e-07    26,560   ---     50.75 s
+                                       8      1.49  Thomas         0.159    3.30e-07      0.52 s
+                                       8      1.49  HHL            2.741    3.32e-02    41,090   ---   112.8 min
+                                       8      1.49  VQLS           0.209    8.98e-04        69   ---   287.0 min
+                                       8      1.49  QSVT           0.159    3.30e-07   186,880   ---    19.5 min
+                                      16      1.52  Thomas         0.012    7.45e-07      1.43 s
+                                      16      1.52  QSVT           0.012    7.45e-07  1,045,094   ---    81.0 min
+                                      32      1.53  Thomas         0.001    7.46e-07      5.54 s
+                                      32      1.53  QSVT           0.001    7.46e-07  4,372,236   ---   302.9 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  3D_Laplace_BCdriven_cube             4      1.80  Thomas         1.839    3.98e-07      0.02 s
+                                       4      1.80  HHL            3.730    1.63e-02     3,897   ---     4.4 min
+                                       4      1.80  VQLS           1.839    8.84e-07        12   ---     3.7 min
+                                       4      1.80  QSVT           1.839    3.98e-07    26,560   ---     44.39 s
+                                       8      1.98  Thomas         0.141    7.64e-07      0.28 s
+                                       8      1.98  HHL            3.372    1.28e-02    41,142   ---   164.0 min
+                                       8      1.98  VQLS           0.166    2.85e-04        69   ---   153.7 min
+                                       8      1.98  QSVT           0.141    7.64e-07   186,880   ---    10.7 min
+                                      16      2.04  Thomas         0.009    5.22e-07      0.78 s
+                                      16      2.04  QSVT           0.009    5.22e-07  1,045,094   ---    34.4 min
+                                      32      2.06  Thomas         0.005    3.29e-07      5.69 s
+                                      32      2.06  QSVT           0.005    3.29e-07  4,372,236   ---   141.2 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  3D_Poisson_HighMode_n2m3l4           4      1.80  Thomas        21.289    6.42e-07      0.01 s
+                                       4      1.80  HHL           21.715    2.76e-03     3,897   ---     4.9 min
+                                       4      1.80  VQLS          21.289    6.80e-07        12   ---     3.4 min
+                                       4      1.80  QSVT          21.289    6.42e-07    26,560   ---     42.24 s
+                                       8      1.98  Thomas         2.428    5.02e-07      0.23 s
+                                       8      1.98  HHL            2.695    6.50e-03    41,142   ---   163.1 min
+                                       8      1.98  VQLS           2.728    3.05e-04        69   ---   151.6 min
+                                       8      1.98  QSVT           2.428    5.02e-07   186,880   ---    10.6 min
+                                      16      2.04  Thomas         0.211    5.95e-07      0.74 s
+                                      16      2.04  QSVT           0.211    5.95e-07  1,045,094   ---    40.4 min
+                                      32      2.06  Thomas         0.016    3.55e-07      3.27 s
+                                      32      2.06  QSVT           0.016    3.55e-07  4,372,236   ---   173.5 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  3D_Poisson_TripleSin_cube            4      1.80  Thomas         0.167    5.31e-07      0.04 s
+                                       4      1.80  HHL            1.541    3.49e-02     3,897   ---     4.5 min
+                                       4      1.80  VQLS           0.168    1.65e-06        12   ---    10.5 min
+                                       4      1.80  QSVT           0.167    5.31e-07    26,560   ---     50.38 s
+                                       8      1.98  Thomas         0.016    7.67e-07      0.19 s
+                                       8      1.98  HHL            3.184    5.00e-02    41,142   ---   137.1 min
+                                       8      1.98  VQLS           0.069    8.06e-04        69   ---   117.6 min
+                                       8      1.98  QSVT           0.016    7.67e-07   186,880   ---    10.2 min
+                                      16      2.04  Thomas         0.001    7.23e-07      0.60 s
+                                      16      2.04  QSVT           0.001    7.23e-07  1,045,094   ---    33.0 min
+                                      32      2.06  Thomas         0.000    6.14e-07      2.58 s
+                                      32      2.06  QSVT           0.000    6.14e-07  4,372,236   ---   138.1 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  3D_Poisson_TwoGaussian_cube          4      1.80  Thomas    109419.936    3.37e-07      0.02 s
+                                       4      1.80  HHL       788534.319    9.36e-02     3,897   ---     4.3 min
+                                       4      1.80  VQLS      109421.252    9.13e-07        12   ---     3.7 min
+                                       4      1.80  QSVT      109419.936    3.37e-07    26,560   ---     46.14 s
+                                       8      1.98  Thomas     15429.224    6.64e-07      0.43 s
+                                       8      1.98  HHL       22967140.867    1.23e-01    41,142   ---   171.7 min
+                                       8      1.98  VQLS       19282.671    5.99e-04        69   ---   187.6 min
+                                       8      1.98  QSVT       15429.224    6.64e-07   186,880   ---    11.2 min
+                                      16      2.04  Thomas    392079.971    7.15e-07      0.76 s
+                                      16      2.04  QSVT      392079.975    7.15e-07  1,045,094   ---    40.4 min
+                                      32      2.06  Thomas      7540.414    5.09e-07      7.03 s
+                                      32      2.06  QSVT        7540.415    5.09e-07  4,372,236   ---   184.5 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  Equal-accuracy comparison  (r_target = 1.00e-03)
+  ──────────────────────────────────────────────────────────────────────────────────────
+  Solver    Param              Value    r achieved     Depth    nq           t   In band
+  ──────────────────────────────────────────────────────────────────────────────────────
+  QSVT      max_degree             5      6.49e-04       ---   ---      8.30 s       YES
+  QSVT      max_degree             5      7.30e-04       ---   ---     12.97 s       YES
+  QSVT      max_degree             5      8.53e-04       ---   ---     32.04 s       YES
+  QSVT      max_degree             5      4.04e-04       ---   ---     1.2 min       YES
+  ──────────────────────────────────────────────────────────────────────────────────────
+  * Target not achieved within parameter grid.
+
+
+  Sensitivity analysis — QSVT  N=8
+
+  Varying: max_degree
+  ──────────────────────────────────────────────────────────
+         Value      e∞ [%]           r     Depth           t
+  ──────────────────────────────────────────────────────────
+             5       0.016    7.11e-09       ---     30.28 s
+             8       0.016    6.75e-09       ---     31.63 s
+            11       0.016    6.51e-09       ---     34.43 s
+            15       0.016    6.48e-09       ---     41.07 s
+            21       0.016    6.48e-09       ---     50.03 s
+            51       0.016    6.48e-09       ---     1.6 min
+           201       0.016    6.48e-09       ---     5.8 min
+           501       0.016    6.48e-09       ---    15.1 min
+  ──────────────────────────────────────────────────────────
+
+  Varying: max_degree
+  ──────────────────────────────────────────────────────────
+         Value      e∞ [%]           r     Depth           t
+  ──────────────────────────────────────────────────────────
+             5       0.024    4.48e-09       ---     41.66 s
+             8       0.024    6.49e-09       ---     53.11 s
+            11       0.024    6.50e-09       ---     57.57 s
+            15       0.024    6.45e-09       ---     1.2 min
+            21       0.024    6.45e-09       ---     1.4 min
+            51       0.024    6.45e-09       ---     2.8 min
+           201       0.024    6.45e-09       ---     9.9 min
+           501       0.024    6.45e-09       ---    25.0 min
+  ──────────────────────────────────────────────────────────
+
+  Varying: max_degree
+  ──────────────────────────────────────────────────────────
+         Value      e∞ [%]           r     Depth           t
+  ──────────────────────────────────────────────────────────
+             5       0.001    5.79e-09       ---     2.5 min
+             8       0.001    4.30e-09       ---     2.4 min
+            11       0.001    4.24e-09       ---     2.6 min
+            15       0.001    4.07e-09       ---     2.9 min
+            21       0.001    4.03e-09       ---     3.3 min
+            51       0.001    4.03e-09       ---     5.9 min
+           201       0.001    4.03e-09       ---    19.2 min
+           501       0.001    4.03e-09       ---    47.0 min
+  ──────────────────────────────────────────────────────────
+
+  Varying: max_degree
+  ──────────────────────────────────────────────────────────
+         Value      e∞ [%]           r     Depth           t
+  ──────────────────────────────────────────────────────────
+             5       0.002    7.06e-09       ---     4.2 min
+             8       0.002    6.53e-09       ---     4.5 min
+            11       0.002    6.37e-09       ---     4.9 min
+            15       0.002    6.37e-09       ---     5.7 min
+            21       0.002    6.36e-09       ---     6.7 min
+            51       0.002    6.36e-09       ---    12.4 min
+           201       0.002    6.36e-09       ---    41.3 min
+           501       0.002    3.07e-06       ---    60.0 min
+  ──────────────────────────────────────────────────────────
+
+  ------------------------------------------------------------------------------------------
+  HARDWARE FEASIBILITY  -  two-qubit gate budget = 353
+  ------------------------------------------------------------------------------------------
+  Case                            Solver      N   nq        n_2Q    ratio  source                      
+  ------------------------------------------------------------------------------------------
+  3D_HET_Discharge_SPT100         HHL         4  ---         911     2.58  NO measured (2q count)
+  3D_HET_MMS_SPT100               HHL         4  ---         911     2.58  NO measured (2q count)
+  3D_HET_RotatingSpoke_SPT100     HHL         4  ---         911     2.58  NO measured (2q count)
+  3D_Laplace_BCdriven_cube        HHL         4  ---         911     2.58  NO measured (2q count)
+  3D_Poisson_HighMode_n2m3l4      HHL         4  ---         911     2.58  NO measured (2q count)
+  3D_Poisson_TripleSin_cube       HHL         4  ---         911     2.58  NO measured (2q count)
+  3D_Poisson_TwoGaussian_cube     HHL         4  ---         911     2.58  NO measured (2q count)
+  3D_HET_Discharge_SPT100         HHL         8  ---      10,024     28.4  NO measured (2q count)
+  3D_HET_MMS_SPT100               HHL         8  ---      10,024     28.4  NO measured (2q count)
+  3D_HET_RotatingSpoke_SPT100     HHL         8  ---      10,024     28.4  NO measured (2q count)
+  3D_Laplace_BCdriven_cube        HHL         8  ---      10,024     28.4  NO measured (2q count)
+  3D_Poisson_HighMode_n2m3l4      HHL         8  ---      10,024     28.4  NO measured (2q count)
+  3D_Poisson_TripleSin_cube       HHL         8  ---      10,024     28.4  NO measured (2q count)
+  3D_Poisson_TwoGaussian_cube     HHL         8  ---      10,024     28.4  NO measured (2q count)
+  3D_HET_Discharge_SPT100         QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  3D_HET_MMS_SPT100               QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  3D_HET_RotatingSpoke_SPT100     QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  3D_Laplace_BCdriven_cube        QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  3D_Poisson_HighMode_n2m3l4      QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  3D_Poisson_TripleSin_cube       QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  3D_Poisson_TwoGaussian_cube     QSVT        4  ---       5,512     15.6  NO measured (2q count)
+  3D_HET_Discharge_SPT100         QSVT        8  ---      39,581      112  NO measured (2q count)
+  3D_HET_MMS_SPT100               QSVT        8  ---      39,581      112  NO measured (2q count)
+  3D_HET_RotatingSpoke_SPT100     QSVT        8  ---      39,581      112  NO measured (2q count)
+  3D_Laplace_BCdriven_cube        QSVT        8  ---      39,581      112  NO measured (2q count)
+  3D_Poisson_HighMode_n2m3l4      QSVT        8  ---      39,581      112  NO measured (2q count)
+  3D_Poisson_TripleSin_cube       QSVT        8  ---      39,581      112  NO measured (2q count)
+  3D_Poisson_TwoGaussian_cube     QSVT        8  ---      39,581      112  NO measured (2q count)
+  3D_HET_Discharge_SPT100         QSVT       16  ---     222,447      630  NO measured (2q count)
+  3D_HET_MMS_SPT100               QSVT       16  ---     222,447      630  NO measured (2q count)
+  3D_HET_RotatingSpoke_SPT100     QSVT       16  ---     222,447      630  NO measured (2q count)
+  3D_Laplace_BCdriven_cube        QSVT       16  ---     222,447      630  NO measured (2q count)
+  3D_Poisson_HighMode_n2m3l4      QSVT       16  ---     222,447      630  NO measured (2q count)
+  3D_Poisson_TripleSin_cube       QSVT       16  ---     222,447      630  NO measured (2q count)
+  3D_Poisson_TwoGaussian_cube     QSVT       16  ---     222,447      630  NO measured (2q count)
+  3D_HET_Discharge_SPT100         QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  3D_HET_MMS_SPT100               QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  3D_HET_RotatingSpoke_SPT100     QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  3D_Laplace_BCdriven_cube        QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  3D_Poisson_HighMode_n2m3l4      QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  3D_Poisson_TripleSin_cube       QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  3D_Poisson_TwoGaussian_cube     QSVT       32  ---     935,872 2.65e+03  NO measured (2q count)
+  3D_HET_Discharge_SPT100         VQLS        4  ---           2    0.006  OK measured (2q count)
+  3D_HET_MMS_SPT100               VQLS        4  ---           2    0.006  OK measured (2q count)
+  3D_HET_RotatingSpoke_SPT100     VQLS        4  ---           2    0.006  OK measured (2q count)
+  3D_Laplace_BCdriven_cube        VQLS        4  ---           2    0.006  OK measured (2q count)
+  3D_Poisson_HighMode_n2m3l4      VQLS        4  ---           2    0.006  OK measured (2q count)
+  3D_Poisson_TripleSin_cube       VQLS        4  ---           2    0.006  OK measured (2q count)
+  3D_Poisson_TwoGaussian_cube     VQLS        4  ---           2    0.006  OK measured (2q count)
+  3D_HET_Discharge_SPT100         VQLS        8  ---          16    0.045  OK measured (2q count)
+  3D_HET_MMS_SPT100               VQLS        8  ---          16    0.045  OK measured (2q count)
+  3D_HET_RotatingSpoke_SPT100     VQLS        8  ---          16    0.045  OK measured (2q count)
+  3D_Laplace_BCdriven_cube        VQLS        8  ---          16    0.045  OK measured (2q count)
+  3D_Poisson_HighMode_n2m3l4      VQLS        8  ---          16    0.045  OK measured (2q count)
+  3D_Poisson_TripleSin_cube       VQLS        8  ---          16    0.045  OK measured (2q count)
+  3D_Poisson_TwoGaussian_cube     VQLS        8  ---          16    0.045  OK measured (2q count)
+  ------------------------------------------------------------------------------------------

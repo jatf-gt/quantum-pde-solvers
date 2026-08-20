@@ -1,0 +1,95 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Primary benchmark: maximum relative error, residual, circuit depth, qubit count, and wall time for every solver, grouped by case and resolution. Thomas serves as the classical reference; errors are reported relative to the analytical solution where available, otherwise relative to the Thomas solution. An em-dash denotes a quantity the sweep did not record: a solve reconstructed from its solution archive retains every field derived from the field itself and none that existed only in the process.}
+  \label{tab:primary_comparison}
+  \begin{tabular}{l S[table-format=3.0] S[table-format=4.1] l S[table-format=3.3] S[table-format=1.2e2] S[table-format=6.0] S[table-format=2.0] S[table-format=4.2]}
+    \toprule
+    {Case} & {$N$} & {$\kappa(A)$} & {Solver} & {$e_\infty$ [\%]} & {$r$} & {Depth} & {$n_q$} & {$t$ [s]} \\
+    \midrule
+    \text{2D\_HET\_MMS\_SPT100} & 4 & 1.4 & \text{Thomas} & 0.193 & $2.48 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.00 \\
+     &  &  & \text{HHL} & 1.640 & $9.88 \times 10^{-3}$ & 3842 & {\text{---}} & 50.93 \\
+     &  &  & \text{VQLS} & 0.193 & $2.48 \times 10^{-5}$ & 12 & {\text{---}} & 34.20 \\
+     &  &  & \text{QSVT} & 0.193 & $2.48 \times 10^{-5}$ & 26560 & {\text{---}} & 8.64 \\
+     & 8 & 1.5 & \text{Thomas} & 0.026 & $2.30 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.02 \\
+     &  &  & \text{HHL} & 2.880 & $8.18 \times 10^{-3}$ & 41333 & {\text{---}} & 781.17 \\
+     &  &  & \text{VQLS} & 0.129 & $6.68 \times 10^{-4}$ & 69 & {\text{---}} & 1422.07 \\
+     &  &  & \text{QSVT} & 0.026 & $2.30 \times 10^{-5}$ & 186880 & {\text{---}} & 75.54 \\
+     & 16 & 1.5 & \text{Thomas} & 0.018 & $8.08 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.03 \\
+     &  &  & \text{HHL} & 3.167 & $5.12 \times 10^{-3}$ & 401083 & {\text{---}} & 5077.80 \\
+     &  &  & \text{VQLS} & 0.531 & $2.65 \times 10^{-3}$ & 89 & {\text{---}} & 15114.14 \\
+     &  &  & \text{QSVT} & 0.018 & $8.08 \times 10^{-5}$ & 1045094 & {\text{---}} & 101.20 \\
+     & 32 & 1.5 & \text{Thomas} & 0.014 & $4.31 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.05 \\
+     &  &  & \text{HHL} & 2.603 & $4.20 \times 10^{-3}$ & 3530632 & {\text{---}} & 21627.73 \\
+     &  &  & \text{VQLS} & 264.010 & $3.96 \times 10^{-1}$ & 110 & {\text{---}} & 21666.38 \\
+     &  &  & \text{QSVT} & 0.014 & $4.31 \times 10^{-5}$ & 4372236 & {\text{---}} & 334.85 \\
+    \midrule
+    \text{2D\_HET\_Sin\_MeetingReport} & 4 & 1.4 & \text{Thomas} & 0.167 & $2.15 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.00 \\
+     &  &  & \text{HHL} & 1.147 & $1.94 \times 10^{-2}$ & 3842 & {\text{---}} & 59.02 \\
+     &  &  & \text{VQLS} & 0.168 & $2.16 \times 10^{-5}$ & 12 & {\text{---}} & 38.94 \\
+     &  &  & \text{QSVT} & 0.167 & $2.15 \times 10^{-5}$ & 26560 & {\text{---}} & 9.24 \\
+     & 8 & 1.5 & \text{Thomas} & 0.017 & $2.57 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.03 \\
+     &  &  & \text{HHL} & 2.564 & $3.36 \times 10^{-2}$ & 41333 & {\text{---}} & 766.19 \\
+     &  &  & \text{VQLS} & 0.145 & $1.96 \times 10^{-3}$ & 69 & {\text{---}} & 2193.13 \\
+     &  &  & \text{QSVT} & 0.017 & $2.57 \times 10^{-5}$ & 186880 & {\text{---}} & 86.85 \\
+     & 16 & 1.5 & \text{Thomas} & 0.006 & $8.37 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.04 \\
+     &  &  & \text{HHL} & 3.018 & $4.83 \times 10^{-2}$ & 401083 & {\text{---}} & 4983.63 \\
+     &  &  & \text{VQLS} & 0.566 & $2.57 \times 10^{-2}$ & 89 & {\text{---}} & 11209.78 \\
+     &  &  & \text{QSVT} & 0.006 & $8.37 \times 10^{-5}$ & 1045094 & {\text{---}} & 141.77 \\
+     & 32 & 1.5 & \text{Thomas} & 0.003 & $3.96 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.09 \\
+     &  &  & \text{HHL} & 2.942 & $1.02 \times 10^{-1}$ & 3530632 & {\text{---}} & 21647.18 \\
+     &  &  & \text{VQLS} & 233.322 & $1.22 \times 10^{1}$ & 110 & {\text{---}} & 21613.67 \\
+     &  &  & \text{QSVT} & 0.003 & $3.96 \times 10^{-5}$ & 4372236 & {\text{---}} & 410.78 \\
+    \midrule
+    \text{2D\_Poisson\_SingleMode\_n1m1} & 4 & 2.5 & \text{Thomas} & 0.168 & $3.89 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.00 \\
+     &  &  & \text{HHL} & 1.566 & $4.76 \times 10^{-2}$ & 3889 & {\text{---}} & 80.79 \\
+     &  &  & \text{VQLS} & 0.168 & $3.90 \times 10^{-5}$ & 12 & {\text{---}} & 37.47 \\
+     &  &  & \text{QSVT} & 0.168 & $3.89 \times 10^{-5}$ & 26560 & {\text{---}} & 8.16 \\
+     & 8 & 2.9 & \text{Thomas} & 0.016 & $1.80 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.05 \\
+     &  &  & \text{HHL} & 3.459 & $7.53 \times 10^{-2}$ & 41391 & {\text{---}} & 1646.03 \\
+     &  &  & \text{VQLS} & 0.191 & $4.15 \times 10^{-3}$ & 69 & {\text{---}} & 1413.15 \\
+     &  &  & \text{QSVT} & 0.016 & $1.80 \times 10^{-5}$ & 186880 & {\text{---}} & 75.49 \\
+     & 16 & 3.1 & \text{Thomas} & 0.002 & $5.88 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.04 \\
+     &  &  & \text{HHL} & 4.009 & $1.09 \times 10^{-1}$ & 396594 & {\text{---}} & 11217.60 \\
+     &  &  & \text{VQLS} & 0.288 & $1.63 \times 10^{-2}$ & 89 & {\text{---}} & 12474.17 \\
+     &  &  & \text{QSVT} & 0.002 & $5.88 \times 10^{-5}$ & 1045094 & {\text{---}} & 133.79 \\
+     & 32 & 3.1 & \text{Thomas} & 0.001 & $6.16 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.06 \\
+     &  &  & \text{HHL} & 3.785 & $1.86 \times 10^{-1}$ & 3530373 & {\text{---}} & 21634.71 \\
+     &  &  & \text{VQLS} & 334.295 & $1.49 \times 10^{1}$ & 110 & {\text{---}} & 21631.33 \\
+     &  &  & \text{QSVT} & 0.001 & $6.16 \times 10^{-5}$ & 4372236 & {\text{---}} & 369.42 \\
+    \midrule
+    \text{2D\_Poisson\_TwoGaussian\_PlasmaNet} & 4 & 2.5 & \text{Thomas} & 5.004 & $2.93 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.00 \\
+     &  &  & \text{HHL} & 10.533 & $7.43 \times 10^{-2}$ & 3878 & {\text{---}} & 73.51 \\
+     &  &  & \text{VQLS} & 4.996 & $2.88 \times 10^{-5}$ & 12 & {\text{---}} & 38.24 \\
+     &  &  & \text{QSVT} & 5.004 & $2.93 \times 10^{-5}$ & 26560 & {\text{---}} & 8.63 \\
+     & 8 & 2.9 & \text{Thomas} & 1.180 & $5.43 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.02 \\
+     &  &  & \text{HHL} & 23.654 & $1.18 \times 10^{-1}$ & 41421 & {\text{---}} & 1638.49 \\
+     &  &  & \text{VQLS} & 1.196 & $2.92 \times 10^{-3}$ & 69 & {\text{---}} & 1133.53 \\
+     &  &  & \text{QSVT} & 1.180 & $5.43 \times 10^{-5}$ & 186880 & {\text{---}} & 70.86 \\
+     & 16 & 3.1 & \text{Thomas} & 0.123 & $2.63 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.04 \\
+     &  &  & \text{HHL} & 49.633 & $1.75 \times 10^{-1}$ & 395340 & {\text{---}} & 11215.13 \\
+     &  &  & \text{VQLS} & 1.455 & $2.22 \times 10^{-2}$ & 89 & {\text{---}} & 19194.06 \\
+     &  &  & \text{QSVT} & 0.123 & $2.63 \times 10^{-5}$ & 1045094 & {\text{---}} & 144.02 \\
+     & 32 & 3.1 & \text{Thomas} & 0.019 & $3.15 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.07 \\
+     &  &  & \text{HHL} & 28.084 & $2.07 \times 10^{-1}$ & 3532027 & {\text{---}} & 21727.80 \\
+     &  &  & \text{VQLS} & 622.951 & $8.99 \times 10^{0}$ & 110 & {\text{---}} & 21604.85 \\
+     &  &  & \text{QSVT} & 0.019 & $3.15 \times 10^{-5}$ & 4372236 & {\text{---}} & 426.03 \\
+    \midrule
+    \text{2D\_Poisson\_sin\_hom} & 4 & 2.5 & \text{Thomas} & 0.168 & $3.89 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.00 \\
+     &  &  & \text{HHL} & 1.566 & $4.76 \times 10^{-2}$ & 3889 & {\text{---}} & 80.91 \\
+     &  &  & \text{VQLS} & 0.168 & $3.90 \times 10^{-5}$ & 12 & {\text{---}} & 38.39 \\
+     &  &  & \text{QSVT} & 0.168 & $3.89 \times 10^{-5}$ & 26560 & {\text{---}} & 8.15 \\
+     & 8 & 2.9 & \text{Thomas} & 0.016 & $1.80 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.04 \\
+     &  &  & \text{HHL} & 3.459 & $7.53 \times 10^{-2}$ & 41391 & {\text{---}} & 1655.27 \\
+     &  &  & \text{VQLS} & 0.191 & $4.15 \times 10^{-3}$ & 69 & {\text{---}} & 1415.41 \\
+     &  &  & \text{QSVT} & 0.016 & $1.80 \times 10^{-5}$ & 186880 & {\text{---}} & 70.98 \\
+     & 16 & 3.1 & \text{Thomas} & 0.002 & $5.88 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.04 \\
+     &  &  & \text{HHL} & 4.009 & $1.09 \times 10^{-1}$ & 396594 & {\text{---}} & 11255.82 \\
+     &  &  & \text{VQLS} & 0.288 & $1.63 \times 10^{-2}$ & 89 & {\text{---}} & 12517.24 \\
+     &  &  & \text{QSVT} & 0.002 & $5.88 \times 10^{-5}$ & 1045094 & {\text{---}} & 133.23 \\
+     & 32 & 3.1 & \text{Thomas} & 0.001 & $6.16 \times 10^{-5}$ & {\text{---}} & {\text{---}} & 0.06 \\
+     &  &  & \text{HHL} & 3.785 & $1.86 \times 10^{-1}$ & 3530373 & {\text{---}} & 21678.83 \\
+     &  &  & \text{VQLS} & 334.295 & $1.49 \times 10^{1}$ & 110 & {\text{---}} & 21641.46 \\
+     &  &  & \text{QSVT} & 0.001 & $6.16 \times 10^{-5}$ & 4372236 & {\text{---}} & 391.79 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

@@ -1,0 +1,71 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Two-qubit gate count against a hardware budget of 353 gates, the largest count retaining a 50\% probability of completing without a two-qubit fault at the median calibrated two-qubit error rate of \texttt{ibm\_kingston}, $\varepsilon_2 = 1.96e-03$. Counts are transpiled to the Heron r2 native basis $\{\mathrm{rz}, \mathrm{sx}, \mathrm{x}, \mathrm{cz}\}$ at optimisation level 3. HHL and VQLS are transpiled directly; the QSVT count is composed as the polynomial degree times the cost of one block-encoding application plus one state preparation, a bound validated against direct transpilation to within 0.4\% at $N=16$. Every route reported here is an upper bound, so a circuit judged infeasible is infeasible, while feasibility at the margin is not claimed.}
+  \label{tab:hardware_feasibility}
+  \begin{tabular}{llrrrrl}
+    \toprule
+    Case & Solver & $N$ & $n_q$ & $n_{2Q}$ & $n_{2Q}/\mathrm{budget}$ & Feasible \\
+    \midrule
+    2D\_HET\_MMS\_SPT100 & HHL & 4 & --- & 911 & 2.58 & $\times$ \\
+    2D\_HET\_Sin\_MeetingReport & HHL & 4 & --- & 911 & 2.58 & $\times$ \\
+    2D\_Poisson\_SingleMode\_n1m1 & HHL & 4 & --- & 911 & 2.58 & $\times$ \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & HHL & 4 & --- & 911 & 2.58 & $\times$ \\
+    2D\_Poisson\_sin\_hom & HHL & 4 & --- & 911 & 2.58 & $\times$ \\
+    2D\_HET\_MMS\_SPT100 & HHL & 8 & --- & 10,024 & 28.4 & $\times$ \\
+    2D\_HET\_Sin\_MeetingReport & HHL & 8 & --- & 10,024 & 28.4 & $\times$ \\
+    2D\_Poisson\_SingleMode\_n1m1 & HHL & 8 & --- & 10,024 & 28.4 & $\times$ \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & HHL & 8 & --- & 10,024 & 28.4 & $\times$ \\
+    2D\_Poisson\_sin\_hom & HHL & 8 & --- & 10,024 & 28.4 & $\times$ \\
+    2D\_HET\_MMS\_SPT100 & HHL & 16 & --- & 98,177 & 278 & $\times$ \\
+    2D\_HET\_Sin\_MeetingReport & HHL & 16 & --- & 98,177 & 278 & $\times$ \\
+    2D\_Poisson\_SingleMode\_n1m1 & HHL & 16 & --- & 97,799 & 277 & $\times$ \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & HHL & 16 & --- & 97,673 & 277 & $\times$ \\
+    2D\_Poisson\_sin\_hom & HHL & 16 & --- & 97,799 & 277 & $\times$ \\
+    2D\_HET\_MMS\_SPT100 & HHL & 32 & --- & 872,954 & 2.47e+03 & $\times$ \\
+    2D\_HET\_Sin\_MeetingReport & HHL & 32 & --- & 872,954 & 2.47e+03 & $\times$ \\
+    2D\_Poisson\_SingleMode\_n1m1 & HHL & 32 & --- & 872,958 & 2.47e+03 & $\times$ \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & HHL & 32 & --- & 872,958 & 2.47e+03 & $\times$ \\
+    2D\_Poisson\_sin\_hom & HHL & 32 & --- & 872,958 & 2.47e+03 & $\times$ \\
+    2D\_HET\_MMS\_SPT100 & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    2D\_HET\_Sin\_MeetingReport & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    2D\_Poisson\_SingleMode\_n1m1 & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    2D\_Poisson\_sin\_hom & QSVT & 4 & --- & 5,512 & 15.6 & $\times$ \\
+    2D\_HET\_MMS\_SPT100 & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    2D\_HET\_Sin\_MeetingReport & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    2D\_Poisson\_SingleMode\_n1m1 & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    2D\_Poisson\_sin\_hom & QSVT & 8 & --- & 39,581 & 112 & $\times$ \\
+    2D\_HET\_MMS\_SPT100 & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    2D\_HET\_Sin\_MeetingReport & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    2D\_Poisson\_SingleMode\_n1m1 & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    2D\_Poisson\_sin\_hom & QSVT & 16 & --- & 222,447 & 630 & $\times$ \\
+    2D\_HET\_MMS\_SPT100 & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    2D\_HET\_Sin\_MeetingReport & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    2D\_Poisson\_SingleMode\_n1m1 & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    2D\_Poisson\_sin\_hom & QSVT & 32 & --- & 935,872 & 2.65e+03 & $\times$ \\
+    2D\_HET\_MMS\_SPT100 & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    2D\_HET\_Sin\_MeetingReport & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    2D\_Poisson\_SingleMode\_n1m1 & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    2D\_Poisson\_sin\_hom & VQLS & 4 & --- & 2 & 0.006 & \checkmark \\
+    2D\_HET\_MMS\_SPT100 & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    2D\_HET\_Sin\_MeetingReport & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    2D\_Poisson\_SingleMode\_n1m1 & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    2D\_Poisson\_sin\_hom & VQLS & 8 & --- & 16 & 0.045 & \checkmark \\
+    2D\_HET\_MMS\_SPT100 & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    2D\_HET\_Sin\_MeetingReport & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    2D\_Poisson\_SingleMode\_n1m1 & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    2D\_Poisson\_sin\_hom & VQLS & 16 & --- & 30 & 0.085 & \checkmark \\
+    2D\_HET\_MMS\_SPT100 & VQLS & 32 & --- & 48 & 0.136 & \checkmark \\
+    2D\_HET\_Sin\_MeetingReport & VQLS & 32 & --- & 48 & 0.136 & \checkmark \\
+    2D\_Poisson\_SingleMode\_n1m1 & VQLS & 32 & --- & 48 & 0.136 & \checkmark \\
+    2D\_Poisson\_TwoGaussian\_PlasmaNet & VQLS & 32 & --- & 48 & 0.136 & \checkmark \\
+    2D\_Poisson\_sin\_hom & VQLS & 32 & --- & 48 & 0.136 & \checkmark \\
+    \bottomrule
+  \end{tabular}
+\end{table}

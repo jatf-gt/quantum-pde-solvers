@@ -1,0 +1,262 @@
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Case                                 N         κ  Solver        e∞ [%]           r     Depth    nq           t
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  1D_Poisson_fH_hom                    4     11.95  Thomas       889.952    1.66e-16     0.03 ms
+                                       4     11.95  HHL         1000.126    3.33e-02     7,771     2     26.83 s
+                                       4     11.95  VQLS         938.202    7.55e-04        12     2      6.32 s
+                                       4     11.95  QSVT         889.952    1.16e-13    85,390     2      0.84 s
+                                       8     42.14  Thomas       482.016    5.43e-16     0.03 ms
+                                       8     42.14  HHL          692.056    5.56e-02   168,288     3     1.0 min
+                                       8     42.14  VQLS        2649.508    1.98e-02        69     3     1.9 min
+                                       8     42.14  QSVT         482.016    8.13e-13  2,452,482     3      4.55 s
+                                      16    154.51  Thomas       251.901    1.53e-15     0.03 ms
+                                      16    154.51  HHL          529.249    8.11e-02  3,228,747     4     3.1 min
+                                      16    154.51  VQLS       10105.821    1.98e-01        89     4     4.4 min
+                                      16    154.51  QSVT         251.901    1.73e-12  31,287,922     4      9.97 s
+                                      32    586.81  Thomas       128.921    6.30e-15     0.04 ms
+                                      32    586.81  HHL         1221.081    3.27e-01       ---     5    42.2 min
+                                      32    586.81  VQLS       10219.002    8.93e-01       110     5     9.8 min
+                                      32    586.81  QSVT         128.921    2.07e-11  130,896,282     5      9.03 s
+                                      64   2281.44  Thomas        65.238    2.65e-14     0.07 ms
+                                      64   2281.44  HHL              ---         ---       ---     6   120.0 min
+                                      64   2281.44  VQLS       10050.289    9.62e-01       128     6    18.3 min
+                                      64   2281.44  QSVT          65.030    2.35e-03  530,769,623     6      8.33 s
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  1D_Poisson_fL_hom                    4     11.95  Thomas         0.000    5.49e-16     0.02 ms
+                                       4     11.95  HHL          319.244    7.55e-02     7,771     2     28.29 s
+                                       4     11.95  VQLS           0.007    9.91e-07        12     2      2.36 s
+                                       4     11.95  QSVT           3.538    3.54e-04    85,390     2      0.89 s
+                                       8     42.14  Thomas         0.000    1.58e-15     0.03 ms
+                                       8     42.14  HHL          427.811    1.28e-01   168,288     3     50.76 s
+                                       8     42.14  VQLS         420.234    3.18e-02        69     3     2.0 min
+                                       8     42.14  QSVT           1.242    1.10e-04  2,452,482     3      3.93 s
+                                      16    154.51  Thomas         0.000    6.83e-15     0.03 ms
+                                      16    154.51  HHL         5814.367    4.79e-01  3,228,747     4     3.0 min
+                                      16    154.51  VQLS        5081.667    5.03e-01        89     4     4.1 min
+                                      16    154.51  QSVT           0.000    5.21e-12  31,287,922     4      7.94 s
+                                      32    586.81  Thomas         0.000    2.91e-14     0.04 ms
+                                      32    586.81  HHL         1849.714    3.69e-01       ---     5    40.8 min
+                                      32    586.81  VQLS       10051.167    9.25e-01       110     5     9.4 min
+                                      32    586.81  QSVT           0.000    1.44e-11  130,896,282     5      9.28 s
+                                      64   2281.44  Thomas         0.000    1.11e-13     0.08 ms
+                                      64   2281.44  HHL              ---         ---       ---     6   120.0 min
+                                      64   2281.44  VQLS       10017.847    9.76e-01       128     6    17.2 min
+                                      64   2281.44  QSVT         551.357    4.43e-02  530,769,623     6      7.72 s
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  1D_Poisson_fS_hom                    4     11.95  Thomas        16.746    3.02e-16     0.02 ms
+                                       4     11.95  HHL          169.972    9.32e-02     7,771     2     26.42 s
+                                       4     11.95  VQLS          16.757    2.52e-06        12     2      1.60 s
+                                       4     11.95  QSVT          16.746    1.00e-14    85,390     2      0.94 s
+                                       8     42.14  Thomas         1.632    2.46e-15     0.03 ms
+                                       8     42.14  HHL          381.910    1.53e-01   168,288     3     43.97 s
+                                       8     42.14  VQLS           4.216    6.77e-04        69     3     1.9 min
+                                       8     42.14  QSVT           1.632    8.52e-14  2,452,482     3      3.87 s
+                                      16    154.51  Thomas         0.129    8.41e-15     0.03 ms
+                                      16    154.51  HHL          397.513    1.85e-01  3,228,747     4     3.6 min
+                                      16    154.51  VQLS        3045.199    4.32e-01        89     4     4.3 min
+                                      16    154.51  QSVT           0.129    7.25e-13  31,287,922     4      7.14 s
+                                      32    586.81  Thomas         0.009    3.16e-14     0.04 ms
+                                      32    586.81  HHL          664.443    3.55e-01       ---     5    40.2 min
+                                      32    586.81  VQLS        9923.678    9.93e-01       110     5     9.0 min
+                                      32    586.81  QSVT           0.009    3.13e-12  130,896,282     5      8.11 s
+                                      64   2281.44  Thomas         0.001    1.16e-13     0.09 ms
+                                      64   2281.44  HHL              ---         ---       ---     6   120.0 min
+                                      64   2281.44  VQLS       10001.438   10.00e-01       128     6    18.5 min
+                                      64   2281.44  QSVT           0.001    1.27e-11  530,769,623     6      8.22 s
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  1D_Poisson_fS_nonhom                 4     11.95  Thomas         1.238    2.98e-16     0.03 ms
+                                       4     11.95  HHL           80.034    8.34e-03     7,771     2     26.26 s
+                                       4     11.95  VQLS           1.380    4.89e-06        12     2      3.17 s
+                                       4     11.95  QSVT          10.222    3.12e-04    85,390     2      0.76 s
+                                       8     42.14  Thomas         0.121    7.20e-16     0.03 ms
+                                       8     42.14  HHL          432.449    1.44e-02   168,288     3     46.08 s
+                                       8     42.14  VQLS        1972.824    2.67e-02        69     3     2.0 min
+                                       8     42.14  QSVT           3.150    4.13e-05  2,452,482     3      3.83 s
+                                      16    154.51  Thomas         0.010    6.89e-16     0.03 ms
+                                      16    154.51  HHL         8209.440    6.45e-02  3,228,747     4     3.7 min
+                                      16    154.51  VQLS       14199.348    8.00e-02        89     4     4.3 min
+                                      16    154.51  QSVT           0.010    6.22e-12  31,287,922     4      8.61 s
+                                      32    586.81  Thomas         0.001    7.96e-16     0.04 ms
+                                      32    586.81  HHL         3726.737    7.59e-02       ---     5    40.8 min
+                                      32    586.81  VQLS       11645.637    1.41e-01       110     5     9.1 min
+                                      32    586.81  QSVT           0.001    3.80e-11  130,896,282     5      8.09 s
+                                      64   2281.44  Thomas         0.000    1.46e-15     0.08 ms
+                                      64   2281.44  HHL              ---         ---       ---     6   360.1 min
+                                      64   2281.44  VQLS       12556.574    1.96e-01       128     6    18.6 min
+                                      64   2281.44  QSVT        1187.558    9.01e-03  530,769,623     6      8.40 s
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  HET_1D_3a_linear_hom                 4     11.95  Thomas         0.000    6.42e-17     0.03 ms
+                                       4     11.95  HHL           33.393    3.54e-03     7,771     2     26.26 s
+                                       4     11.95  VQLS           9.944    1.30e-04        12     2      6.77 s
+                                       4     11.95  QSVT           0.000    1.56e-13    85,390     2      0.78 s
+                                       8     42.14  Thomas         0.000    4.67e-16     0.03 ms
+                                       8     42.14  HHL          292.200    4.33e-02   168,288     3     46.15 s
+                                       8     42.14  VQLS         686.856    4.35e-03        69     3     1.9 min
+                                       8     42.14  QSVT           0.000    1.54e-12  2,452,482     3      3.36 s
+                                      16    154.51  Thomas         0.000    1.91e-15     0.03 ms
+                                      16    154.51  HHL          636.869    7.20e-02  3,228,747     4     3.5 min
+                                      16    154.51  VQLS        7436.173    2.01e-01        89     4     4.2 min
+                                      16    154.51  QSVT           0.000    3.53e-12  31,287,922     4      7.24 s
+                                      32    586.81  Thomas         0.000    5.20e-15     0.04 ms
+                                      32    586.81  HHL         1747.445    2.82e-01       ---     5    41.7 min
+                                      32    586.81  VQLS       10612.216    8.52e-01       110     5     8.9 min
+                                      32    586.81  QSVT           0.000    1.96e-11  130,896,282     5      7.90 s
+                                      64   2281.44  Thomas         0.000    2.49e-14     0.10 ms
+                                      64   2281.44  HHL              ---         ---       ---     6   120.0 min
+                                      64   2281.44  VQLS       10925.194    9.53e-01       128     6    18.7 min
+                                      64   2281.44  QSVT           7.786    2.94e-03  530,769,623     6      8.83 s
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  HET_1D_3b_gaussian_Vd300             4     11.95  Thomas           ---    4.47e-16     0.03 ms
+                                       4     11.95  HHL          474.149    7.58e-02     7,771     2     42.28 s
+                                       4     11.95  VQLS           0.020    1.65e-06        12     2      3.29 s
+                                       4     11.95  QSVT           5.389    3.88e-04    85,390     2      0.76 s
+                                       8     42.14  Thomas           ---    2.05e-15     0.03 ms
+                                       8     42.14  HHL          721.672    1.19e-01   168,288     3     57.98 s
+                                       8     42.14  VQLS         677.729    4.78e-02        69     3     1.9 min
+                                       8     42.14  QSVT           1.626    1.10e-04  2,452,482     3      3.00 s
+                                      16    154.51  Thomas           ---    7.78e-15     0.03 ms
+                                      16    154.51  HHL         7254.564    5.24e-01  3,228,747     4     3.3 min
+                                      16    154.51  VQLS       11695.774    8.03e-01        89     4     4.3 min
+                                      16    154.51  QSVT           0.000    4.26e-12  31,287,922     4      7.28 s
+                                      32    586.81  Thomas           ---    2.72e-14     0.04 ms
+                                      32    586.81  HHL         1829.408    3.52e-01       ---     5    38.9 min
+                                      32    586.81  VQLS       10983.147    9.14e-01       110     5     8.5 min
+                                      32    586.81  QSVT           0.000    8.98e-12  130,896,282     5      7.87 s
+                                      64   2281.44  Thomas           ---    1.00e-13     0.08 ms
+                                      64   2281.44  HHL              ---         ---       ---     6   120.0 min
+                                      64   2281.44  VQLS       10094.154    9.98e-01       128     6    17.1 min
+                                      64   2281.44  QSVT         672.883    4.25e-02  530,769,623     6      7.67 s
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  HET_1D_3c_gaussian_NeumannDirichl    4     37.84  Thomas        38.247    1.48e-15     0.03 ms
+                                       4     37.84  HHL         8329.278    6.12e-01     7,771     2     41.09 s
+                                       4     37.84  VQLS          40.337    1.23e-04        12     2      7.62 s
+                                       4     37.84  QSVT          38.248    1.60e-07    85,390     2     17.48 s
+                                       8    149.86  Thomas        10.508    5.18e-15     0.03 ms
+                                       8    149.86  HHL         9137.936    8.78e-01   168,288     3     52.61 s
+                                       8    149.86  VQLS       11042.915    5.96e-01        69     3     1.9 min
+                                       8    149.86  QSVT          10.519    7.15e-07  2,452,482     3     4.4 min
+                                      16    581.97  Thomas         2.692    1.99e-14     0.03 ms
+                                      16    581.97  HHL         9678.440    9.85e-01  3,228,747     4     1.9 min
+                                      16    581.97  VQLS       11072.011    6.81e-01        89     4     4.4 min
+                                      16    581.97  QSVT         519.864    3.42e-02  31,287,922     4    26.0 min
+                                      32   2276.52  Thomas         0.676    1.66e-13     0.04 ms
+                                      32   2276.52  HHL         9912.328    9.36e-01       ---     5     4.2 min
+                                      32   2276.52  VQLS       10009.804    9.85e-01       110     5     9.5 min
+                                      32   2276.52  QSVT         437.877    3.94e-02  130,896,282     5    17.9 min
+                                      64   8985.83  Thomas         0.169    3.82e-13     0.07 ms
+                                      64   8985.83  HHL         9968.013    1.16e+00       ---     6    16.8 min
+                                      64   8985.83  VQLS       10002.961   10.00e-01       128     6    19.7 min
+                                      64   8985.83  QSVT        8511.505    9.16e-01  530,769,623     6    13.7 min
+  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  ------------------------------------------------------------------------------------------
+  HARDWARE FEASIBILITY  -  two-qubit gate budget = 353
+  ------------------------------------------------------------------------------------------
+  Case                            Solver      N   nq        n_2Q    ratio  source                      
+  ------------------------------------------------------------------------------------------
+  1D_Poisson_fH_hom               HHL         4    2       1,839     5.21  NO measured (2q count)
+  1D_Poisson_fL_hom               HHL         4    2       1,839     5.21  NO measured (2q count)
+  1D_Poisson_fS_hom               HHL         4    2       1,839     5.21  NO measured (2q count)
+  1D_Poisson_fS_nonhom            HHL         4    2       1,839     5.21  NO measured (2q count)
+  HET_1D_3a_linear_hom            HHL         4    2       1,839     5.21  NO measured (2q count)
+  HET_1D_3b_gaussian_Vd300        HHL         4    2       1,839     5.21  NO measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric HHL         4    2       1,839     5.21  NO measured (2q count)
+  1D_Poisson_fH_hom               HHL         8    3      40,852      116  NO measured (2q count)
+  1D_Poisson_fL_hom               HHL         8    3      40,852      116  NO measured (2q count)
+  1D_Poisson_fS_hom               HHL         8    3      40,852      116  NO measured (2q count)
+  1D_Poisson_fS_nonhom            HHL         8    3      40,852      116  NO measured (2q count)
+  HET_1D_3a_linear_hom            HHL         8    3      40,852      116  NO measured (2q count)
+  HET_1D_3b_gaussian_Vd300        HHL         8    3      40,852      116  NO measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric HHL         8    3      40,852      116  NO measured (2q count)
+  1D_Poisson_fH_hom               HHL        16    4     793,553 2.25e+03  NO measured (2q count)
+  1D_Poisson_fL_hom               HHL        16    4     793,553 2.25e+03  NO measured (2q count)
+  1D_Poisson_fS_hom               HHL        16    4     793,553 2.25e+03  NO measured (2q count)
+  1D_Poisson_fS_nonhom            HHL        16    4     793,553 2.25e+03  NO measured (2q count)
+  HET_1D_3a_linear_hom            HHL        16    4     793,553 2.25e+03  NO measured (2q count)
+  HET_1D_3b_gaussian_Vd300        HHL        16    4     793,553 2.25e+03  NO measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric HHL        16    4     793,553 2.25e+03  NO measured (2q count)
+  1D_Poisson_fH_hom               HHL        32    5       8,000     22.7  NO estimated
+  1D_Poisson_fL_hom               HHL        32    5       8,000     22.7  NO estimated
+  1D_Poisson_fS_hom               HHL        32    5       8,000     22.7  NO estimated
+  1D_Poisson_fS_nonhom            HHL        32    5       8,000     22.7  NO estimated
+  HET_1D_3a_linear_hom            HHL        32    5       8,000     22.7  NO estimated
+  HET_1D_3b_gaussian_Vd300        HHL        32    5       8,000     22.7  NO estimated
+  HET_1D_3c_gaussian_NeumannDiric HHL        32    5       9,000     25.5  NO estimated
+  1D_Poisson_fH_hom               HHL        64    6      10,800     30.6  NO estimated
+  1D_Poisson_fL_hom               HHL        64    6      10,800     30.6  NO estimated
+  1D_Poisson_fS_hom               HHL        64    6      10,800     30.6  NO estimated
+  1D_Poisson_fS_nonhom            HHL        64    6      10,800     30.6  NO estimated
+  HET_1D_3a_linear_hom            HHL        64    6      10,800     30.6  NO estimated
+  HET_1D_3b_gaussian_Vd300        HHL        64    6      10,800     30.6  NO estimated
+  HET_1D_3c_gaussian_NeumannDiric HHL        64    6      12,000       34  NO estimated
+  1D_Poisson_fH_hom               QSVT        4    2      17,722     50.2  NO measured (2q count)
+  1D_Poisson_fL_hom               QSVT        4    2      17,722     50.2  NO measured (2q count)
+  1D_Poisson_fS_hom               QSVT        4    2      17,722     50.2  NO measured (2q count)
+  1D_Poisson_fS_nonhom            QSVT        4    2      17,722     50.2  NO measured (2q count)
+  HET_1D_3a_linear_hom            QSVT        4    2      17,722     50.2  NO measured (2q count)
+  HET_1D_3b_gaussian_Vd300        QSVT        4    2      17,722     50.2  NO measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric QSVT        4    2      17,722     50.2  NO measured (2q count)
+  1D_Poisson_fH_hom               QSVT        8    3     519,427 1.47e+03  NO measured (2q count)
+  1D_Poisson_fL_hom               QSVT        8    3     519,427 1.47e+03  NO measured (2q count)
+  1D_Poisson_fS_hom               QSVT        8    3     519,427 1.47e+03  NO measured (2q count)
+  1D_Poisson_fS_nonhom            QSVT        8    3     519,427 1.47e+03  NO measured (2q count)
+  HET_1D_3a_linear_hom            QSVT        8    3     519,427 1.47e+03  NO measured (2q count)
+  HET_1D_3b_gaussian_Vd300        QSVT        8    3     519,427 1.47e+03  NO measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric QSVT        8    3     519,427 1.47e+03  NO measured (2q count)
+  1D_Poisson_fH_hom               QSVT       16    4   6,659,559 1.89e+04  NO measured (2q count)
+  1D_Poisson_fL_hom               QSVT       16    4   6,659,559 1.89e+04  NO measured (2q count)
+  1D_Poisson_fS_hom               QSVT       16    4   6,659,559 1.89e+04  NO measured (2q count)
+  1D_Poisson_fS_nonhom            QSVT       16    4   6,659,559 1.89e+04  NO measured (2q count)
+  HET_1D_3a_linear_hom            QSVT       16    4   6,659,559 1.89e+04  NO measured (2q count)
+  HET_1D_3b_gaussian_Vd300        QSVT       16    4   6,659,559 1.89e+04  NO measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric QSVT       16    4   6,659,559 1.89e+04  NO measured (2q count)
+  1D_Poisson_fH_hom               QSVT       32    5  28,018,136 7.94e+04  NO measured (2q count)
+  1D_Poisson_fL_hom               QSVT       32    5  28,018,136 7.94e+04  NO measured (2q count)
+  1D_Poisson_fS_hom               QSVT       32    5  28,018,136 7.94e+04  NO measured (2q count)
+  1D_Poisson_fS_nonhom            QSVT       32    5  28,018,136 7.94e+04  NO measured (2q count)
+  HET_1D_3a_linear_hom            QSVT       32    5  28,018,136 7.94e+04  NO measured (2q count)
+  HET_1D_3b_gaussian_Vd300        QSVT       32    5  28,018,136 7.94e+04  NO measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric QSVT       32    5  28,018,136 7.94e+04  NO measured (2q count)
+  1D_Poisson_fH_hom               QSVT       64    6 113,557,434 3.22e+05  NO measured (2q count)
+  1D_Poisson_fL_hom               QSVT       64    6 113,557,434 3.22e+05  NO measured (2q count)
+  1D_Poisson_fS_hom               QSVT       64    6 113,557,434 3.22e+05  NO measured (2q count)
+  1D_Poisson_fS_nonhom            QSVT       64    6 113,557,434 3.22e+05  NO measured (2q count)
+  HET_1D_3a_linear_hom            QSVT       64    6 113,557,434 3.22e+05  NO measured (2q count)
+  HET_1D_3b_gaussian_Vd300        QSVT       64    6 113,557,434 3.22e+05  NO measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric QSVT       64    6 113,557,434 3.22e+05  NO measured (2q count)
+  1D_Poisson_fH_hom               VQLS        4    2           2    0.006  OK measured (2q count)
+  1D_Poisson_fL_hom               VQLS        4    2           2    0.006  OK measured (2q count)
+  1D_Poisson_fS_hom               VQLS        4    2           2    0.006  OK measured (2q count)
+  1D_Poisson_fS_nonhom            VQLS        4    2           2    0.006  OK measured (2q count)
+  HET_1D_3a_linear_hom            VQLS        4    2           2    0.006  OK measured (2q count)
+  HET_1D_3b_gaussian_Vd300        VQLS        4    2           2    0.006  OK measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric VQLS        4    2           2    0.006  OK measured (2q count)
+  1D_Poisson_fH_hom               VQLS        8    3          16    0.045  OK measured (2q count)
+  1D_Poisson_fL_hom               VQLS        8    3          16    0.045  OK measured (2q count)
+  1D_Poisson_fS_hom               VQLS        8    3          16    0.045  OK measured (2q count)
+  1D_Poisson_fS_nonhom            VQLS        8    3          16    0.045  OK measured (2q count)
+  HET_1D_3a_linear_hom            VQLS        8    3          16    0.045  OK measured (2q count)
+  HET_1D_3b_gaussian_Vd300        VQLS        8    3          16    0.045  OK measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric VQLS        8    3          16    0.045  OK measured (2q count)
+  1D_Poisson_fH_hom               VQLS       16    4          30    0.085  OK measured (2q count)
+  1D_Poisson_fL_hom               VQLS       16    4          30    0.085  OK measured (2q count)
+  1D_Poisson_fS_hom               VQLS       16    4          30    0.085  OK measured (2q count)
+  1D_Poisson_fS_nonhom            VQLS       16    4          30    0.085  OK measured (2q count)
+  HET_1D_3a_linear_hom            VQLS       16    4          30    0.085  OK measured (2q count)
+  HET_1D_3b_gaussian_Vd300        VQLS       16    4          30    0.085  OK measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric VQLS       16    4          30    0.085  OK measured (2q count)
+  1D_Poisson_fH_hom               VQLS       32    5          48    0.136  OK measured (2q count)
+  1D_Poisson_fL_hom               VQLS       32    5          48    0.136  OK measured (2q count)
+  1D_Poisson_fS_hom               VQLS       32    5          48    0.136  OK measured (2q count)
+  1D_Poisson_fS_nonhom            VQLS       32    5          48    0.136  OK measured (2q count)
+  HET_1D_3a_linear_hom            VQLS       32    5          48    0.136  OK measured (2q count)
+  HET_1D_3b_gaussian_Vd300        VQLS       32    5          48    0.136  OK measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric VQLS       32    5          48    0.136  OK measured (2q count)
+  1D_Poisson_fH_hom               VQLS       64    6          70    0.198  OK measured (2q count)
+  1D_Poisson_fL_hom               VQLS       64    6          70    0.198  OK measured (2q count)
+  1D_Poisson_fS_hom               VQLS       64    6          70    0.198  OK measured (2q count)
+  1D_Poisson_fS_nonhom            VQLS       64    6          70    0.198  OK measured (2q count)
+  HET_1D_3a_linear_hom            VQLS       64    6          70    0.198  OK measured (2q count)
+  HET_1D_3b_gaussian_Vd300        VQLS       64    6          70    0.198  OK measured (2q count)
+  HET_1D_3c_gaussian_NeumannDiric VQLS       64    6          70    0.198  OK measured (2q count)
+  ------------------------------------------------------------------------------------------

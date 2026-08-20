@@ -1,0 +1,21 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Equal-accuracy comparison: circuit depth, qubit count, and wall time for each quantum solver at a matched relative residual target $r_\mathrm{target}$. The parameter value required to achieve the target is shown for each algorithm. Entries marked $\dagger$ did not achieve the target within the parameter grid; the closest result is reported.}
+  \label{tab:equal_accuracy}
+  \begin{tabular}{l l S[table-format=1.3] S[table-format=1.2e2] S[table-format=6.0] S[table-format=2.0] S[table-format=4.2]}
+    \toprule
+    {Solver} & {Parameter} & {Value} & {$r$ achieved} & {Depth} & {$n_q$} & {$t$ [s]} \\
+    \midrule
+    \text{HHL} & $\varepsilon$ & \text{0.001} & $2.45 \times 10^{-3}$ & {\text{---}} & {\text{---}} & 9.80 \\
+    \text{VQLS}$^\dagger$ & $n_\mathrm{layers}$ & \text{3} & $2.06 \times 10^{-4}$ & {\text{---}} & {\text{---}} & 13.27 \\
+    \text{QSVT}$^\dagger$ & $d_\mathrm{max}$ & \text{uncapped} & $1.02 \times 10^{-13}$ & {\text{---}} & {\text{---}} & 2.75 \\
+    \text{HHL} & $\varepsilon$ & \text{0.01} & $1.80 \times 10^{-3}$ & {\text{---}} & {\text{---}} & 3.38 \\
+    \text{VQLS} & $n_\mathrm{layers}$ & \text{5} & $1.65 \times 10^{-3}$ & {\text{---}} & {\text{---}} & 86.79 \\
+    \text{QSVT}$^\dagger$ & $d_\mathrm{max}$ & \text{500} & $7.31 \times 10^{-8}$ & {\text{---}} & {\text{---}} & 0.21 \\
+    \text{HHL}$^\dagger$ & $\varepsilon$ & \text{0.005} & $7.79 \times 10^{-3}$ & {\text{---}} & {\text{---}} & 4.41 \\
+    \text{VQLS} & $n_\mathrm{layers}$ & \text{2} & $1.57 \times 10^{-3}$ & {\text{---}} & {\text{---}} & 54.14 \\
+    \text{QSVT} & $d_\mathrm{max}$ & \text{200} & $1.77 \times 10^{-3}$ & {\text{---}} & {\text{---}} & 0.09 \\
+    \multicolumn{7}{l}{\footnotesize $r_\mathrm{target} = 1.00 \times 10^{-3}$; $\dagger$ target not achieved within parameter grid.}\\
+    \bottomrule
+  \end{tabular}
+\end{table}

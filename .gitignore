@@ -21,22 +21,24 @@ qiskit_hw/
 results/meetings/
 results/hpc_run/
 results_hpc_copy/
-results/1Dhpc_run/
-results/1Dhpc_run_degcap5000/
-results/1Dhpc_run_4th/
-results/2Dhpc_run/
-results/2Dhpc_run_4th/
-results/3Dhpc_run/
-results/3Dhpc_run_4th/
-results/1Dstudies/
-results/2Dstudies/
-results/3Dstudies/
-# Per-order study directories (results/2Dstudies_4th/, ...). The three
-# rules above name only the second-order set; a study directory for a
-# different discretisation order holds .json, which no rule below
-# excludes by kind, so it would surface as untracked and the preflight
-# would refuse the tree -- gating every subsequent submission.
-results/[123]Dstudies_*/
+# The sweep and study directories are NOT excluded wholesale. They were until
+# 2026-08-20, which kept every recorded number out of the repository: a reader
+# checking a figure had no way to reach the archive it was drawn from. What is
+# excluded instead is the BULK, by kind, in the rules further down --- the
+# per-solution `.npz` fields (182 MB), the cluster logs (162 MB) and the
+# diagnostic figure sets (48 MB). The summaries, tables and tidy figure datasets
+# that remain come to about 7 MB, and are the provenance of every number quoted
+# in the dissertation.
+#
+# Excluding by kind rather than by directory is deliberate and not
+# interchangeable with it. Git does not descend into an excluded directory, so a
+# negation beneath one can never match --- which is exactly why the `docs/*`
+# rule below has never tracked anything despite promising to. Any rule added
+# here that names a directory forfeits the ability to keep anything inside it.
+#
+# The full set including the `.npz` fields belongs in a data deposit; see
+# results/README.md.
+!results/**/*.csv
 updated*
 CLAUDE.md
 .agents
