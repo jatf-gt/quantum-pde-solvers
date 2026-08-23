@@ -70,34 +70,38 @@ if git -C "${REPO_ROOT}" rev-parse --git-dir >/dev/null 2>&1; then
     # rather than collapsed to a single `?? results/` entry, which the phase-cache
     # filter below could not then match.
     dirty="$(git -C "${REPO_ROOT}" status --porcelain -uall)"
-    # The QSVT phase cache is generated output which `.gitignore` deliberately
-    # tracks (`!results/qsvt_phase_cache/*.npz`), so that `git pull` conveys
-    # precomputed angles to the cluster. Executing a precompute consequently
-    # leaves untracked entries in that directory alone, without altering a single
-    # line of code; gating a sweep upon them is a false positive that has already
-    # cost one submission. Job 3822258 (2-D, order 4, 2026-08-18) aborted here
-    # minutes after the very precompute it depended upon, whereas its 3-D twin
-    # proceeded solely because that script exports PREFLIGHT_ALLOW_DIRTY=1.
-    # Untracked ADDITIONS to the cache are therefore reported but do not
-    # constitute a dirty tree; a modified or deleted cache entry still does, as
-    # does every other working-tree change.
-    # `?` is a literal in a basic regular expression; `\?` would make the
-    # preceding character optional and the filter would never match.
-    phase_add='^?? results/qsvt_phase_cache/.*\.npz$'
-    n_phases="$(printf '%s' "${dirty}" | grep -c "${phase_add}")"
-    code_dirty="$(printf '%s' "${dirty}" | grep -v "${phase_add}")"
+    # Everything beneath results/ is generated output -- sweeps, studies,
+    # figures, tables and the QSVT phase cache alike -- and since 79f086f the
+    # repository TRACKS the summaries among it. Every completed job therefore
+    # leaves the tree dirty and would gate the next submission. That is a false
+    # positive, and it has already cost an allocation: job 3822258 (2-D, order 4,
+    # 2026-08-18) aborted here minutes after the very precompute it depended
+    # upon, whereas its 3-D twin proceeded solely because that script exports
+    # PREFLIGHT_ALLOW_DIRTY=1. What must be reproducible is the CODE that
+    # produced a result, and that is what the rest of the tree records; a result
+    # file is by construction an output of it. Changes under results/ are
+    # consequently reported but do not constitute a dirty tree. Every other
+    # working-tree change still does.
+    #
+    # `.. ` matches the two status characters and their separator, so the filter
+    # catches an untracked addition, a modification and a deletion alike --
+    # `-uall` above is what enumerates an untracked directory file by file, so
+    # that its entries are individually matchable here.
+    generated='^.. results/'
+    n_generated="$(printf '%s' "${dirty}" | grep -c "${generated}")"
+    code_dirty="$(printf '%s' "${dirty}" | grep -v "${generated}")"
     if [ -z "${dirty}" ]; then
         pass "working tree clean at ${commit}"
     elif [ -z "${code_dirty}" ]; then
-        pass "working tree clean at ${commit} (${n_phases} new QSVT phase-cache entries; generated output, not a source change)"
+        pass "working tree clean at ${commit} (${n_generated} changed files under results/; generated output, not a source change)"
     elif [ "${PREFLIGHT_ALLOW_DIRTY}" = "1" ]; then
         warn "working tree DIRTY at ${commit} (permitted by PREFLIGHT_ALLOW_DIRTY=1)"
         printf '%s\n' "${code_dirty}" | sed 's/^/            /'
-        [ "${n_phases}" -gt 0 ] && echo "            (+ ${n_phases} new QSVT phase-cache entries; not counted)"
+        [ "${n_generated}" -gt 0 ] && echo "            (+ ${n_generated} changed files under results/; not counted)"
     else
         fail "working tree DIRTY at ${commit}; results would not be reproducible"
         printf '%s\n' "${code_dirty}" | sed 's/^/            /'
-        [ "${n_phases}" -gt 0 ] && echo "            (+ ${n_phases} new QSVT phase-cache entries; not counted)"
+        [ "${n_generated}" -gt 0 ] && echo "            (+ ${n_generated} changed files under results/; not counted)"
         echo "            Commit the changes, or set PREFLIGHT_ALLOW_DIRTY=1 to override."
     fi
 else
