@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: "If you use this software or its data, please cite both the software and the dataset."
+title: "quantum-pde-solvers: quantum linear solvers for the Poisson equation and Hall-effect thruster electrostatics"
+abstract: >-
+  A computational framework benchmarking three quantum linear system algorithms
+  — HHL, VQLS and QSVT — against the classical Thomas algorithm, on the Poisson
+  equation in one, two and three dimensions and on a Hall-effect thruster
+  (SPT-100) electrostatics model. Two and three dimensions are decomposed into
+  one-dimensional strips solved by an outer classical iteration, which bounds the
+  condition number each quantum solve sees.
+type: software
+authors:
+  - family-names: "Trobajo Flecha"
+    given-names: "Juan"
+    affiliation: "Department of Aeronautics, Imperial College London"
+repository-code: "https://github.com/jatf-gt/quantum-pde-solvers"
+# No LICENSE file exists in the repository, so none is asserted here. Add one
+# and name it on this line before citing the software: a public repository
+# without a licence grants no rights to reuse it, whatever the citation says.
+keywords:
+  - quantum computing
+  - quantum linear systems
+  - HHL
+  - variational quantum linear solver
+  - quantum singular value transformation
+  - Poisson equation
+  - Hall-effect thruster
+  - plasma electrostatics
+  - Qiskit
+references:
+  - type: data
+    title: >-
+      Per-solution field archives for quantum linear-solver benchmarks on the
+      Poisson equation and Hall-effect thruster electrostatics
+    authors:
+      - family-names: "Trobajo Flecha"
+        given-names: "Juan"
+        affiliation: "Department of Aeronautics, Imperial College London"
+    doi: "PENDING"
+    notes: >-
+      The per-solution solution, exact and Thomas fields behind every figure and
+      table in this repository. Replace the placeholder DOI once the deposit is
+      published.

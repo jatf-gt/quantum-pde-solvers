@@ -1,0 +1,35 @@
+{
+  "upload_type": "dataset",
+  "title": "Per-solution field archives for quantum linear-solver benchmarks on the Poisson equation and Hall-effect thruster electrostatics",
+  "creators": [
+    {
+      "name": "Trobajo Flecha, Juan",
+      "affiliation": "Department of Aeronautics, Imperial College London"
+    }
+  ],
+  "description": "<p>Solution fields from a benchmark of three quantum linear system algorithms &mdash; HHL, VQLS and QSVT &mdash; against the classical Thomas algorithm, on the Poisson equation in one, two and three dimensions and on a Hall-effect thruster (SPT-100) electrostatics model.</p><p>694 archives, 179 MB, across seven sweeps: second- and fourth-order discretisations in each dimension, plus a uniform-degree QSVT ladder in one dimension. Each archive holds the solver's solution field, the exact solution where one exists, and the Thomas reference on the same nodes. Each zip additionally carries that sweep's <code>results_full.json</code> &mdash; one row per (case, solver, resolution), with every recorded metric &mdash; and its <code>run_metadata.json</code>, recording the environment, the resolved configuration and the git commit, so that a single archive is self-describing.</p><p>Two and three dimensions are solved by an outer classical iteration over one-dimensional strips, each strip an independent quantum sub-problem; the fields deposited here are the assembled outer solutions. All circuits are deterministic statevector simulations, so the fields carry no shot noise. Produced on Imperial College London's CX3 cluster.</p><p>The source code, every summary, table and tidy figure dataset, and the QSP phase-angle cache are in the accompanying repository. These fields are deposited separately because they cannot be regenerated without days of cluster time and are too large to version in git.</p>",
+  "keywords": [
+    "quantum computing",
+    "quantum linear systems",
+    "HHL",
+    "variational quantum linear solver",
+    "quantum singular value transformation",
+    "Poisson equation",
+    "Hall-effect thruster",
+    "plasma electrostatics",
+    "computational fluid dynamics",
+    "Qiskit"
+  ],
+  "license": "cc-by-4.0",
+  "access_right": "open",
+  "language": "eng",
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/jatf-gt/quantum-pde-solvers",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "url"
+    }
+  ],
+  "notes": "Produced for an MSc thesis in the Department of Aeronautics, Imperial College London."
+}

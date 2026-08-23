@@ -36,10 +36,14 @@ The `.npz` fields are the one thing here that cannot be regenerated without a
 cluster allocation — a full re-run is measured in days of CPU time. They are not
 in the repository for the size reason above.
 
-> **Data deposit: not yet created.** The intended home is a Zenodo record with a
-> DOI, cited from the dissertation. Until that exists the `.npz` archives live
-> only on the author's machine and on the CX3 RDS allocation. Replace this
-> paragraph with the DOI once the deposit is made.
+> **Data deposit: prepared, not yet published.** The deposit is built by
+> `python scripts/utils/make_zenodo_package.py --out <dir>` — 694 fields, 179 MB,
+> one zip per sweep, each carrying that sweep's `results_full.json` and
+> `run_metadata.json` so it is self-describing — and uploaded by
+> `python scripts/utils/zenodo_upload.py --package <dir>`, which stops short of
+> publishing. Its metadata is `.zenodo.json` at the repository root. Publishing
+> mints the DOI; replace this paragraph with it, and the `PENDING` in
+> `CITATION.cff`, once that is done.
 
 Nothing in the dissertation depends on them: every figure and table is built
 from the tracked summaries and tidy CSVs. They are needed only to re-render a
