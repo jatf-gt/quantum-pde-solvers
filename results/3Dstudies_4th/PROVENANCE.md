@@ -25,10 +25,15 @@ tables at `--order 4` and emitted them, mislabelled, at `--order 2`.
 
 `run_metadata.json` here has `run_tag`, `config.order` and `config.n_values`
 corrected from the records themselves, `config.pbs_jobid` marked unknown, and a
-`provenance_note` field stating the above. The displaced file is preserved
-verbatim as `run_metadata.grid_fix_3831760.json`. The recorded parameter grids
-were identical between the two submissions and match the data, so nothing else
+`provenance_note` field stating the above. The recorded parameter grids were
+identical between the two submissions and match the data, so nothing else
 required correction.
+
+The displaced file was kept for a time as `run_metadata.grid_fix_3831760.json`
+and was **deleted on 2026-08-23**: job 3831760 produced no retrievable data, and
+the second-order sweep it was meant to record has since been re-run successfully
+as job 3834215 and installed in `results/3Dstudies`. Its identifying details are
+recorded in the paragraph above; nothing else referred to the file.
 
 ## Wall-clock cap on one record
 

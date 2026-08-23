@@ -3,5 +3,5 @@ case,solver,N,r_target,residual_achieved,wall_time_s,param,param_value,in_band,n
 2D_Poisson_sin_hom,hhl,8,0.001,0.003861446186554572,629.286877354607,epsilon,0.005,False,4
 2D_HET_MMS_SPT100,vqls,8,0.001,0.0005608231381643649,203.35819504410028,n_layers,3.0,True,5
 2D_Poisson_sin_hom,vqls,8,0.001,7.287276600102311e-05,285.00786529667675,n_layers,3.0,True,5
-2D_HET_MMS_SPT100,qsvt,8,0.001,0.0005717761744134137,1.3602798599749804,max_degree,5.0,True,8
-2D_Poisson_sin_hom,qsvt,8,0.001,0.0002689687987794778,1.8477704301476479,max_degree,5.0,True,8
+2D_HET_MMS_SPT100,qsvt,8,0.001,0.0005717761744134137,1.139576816931367,max_degree,5.0,True,8
+2D_Poisson_sin_hom,qsvt,8,0.001,0.0002689687987794778,1.6237792279571295,max_degree,5.0,True,8

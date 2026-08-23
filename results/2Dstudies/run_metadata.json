@@ -1,14 +1,14 @@
 {
-  "run_tag": "final",
-  "timestamp": "2026-08-17T22:12:01",
+  "run_tag": "grid_fix",
+  "timestamp": "2026-08-20T11:26:29",
   "python_version": "3.12.3 (main, Oct 30 2024, 13:22:10) [GCC 13.3.0]",
   "platform": "Linux-4.18.0-553.76.1.el8_10.x86_64-x86_64-with-glibc2.28",
   "config": {
-    "timestamp": "2026-08-17 22:12:00",
-    "hostname": "cx3-5-29",
+    "timestamp": "2026-08-20 11:26:27",
+    "hostname": "cx3-4-15",
     "python": "3.12.3 (main, Oct 30 2024, 13:22:10) [GCC 13.3.0]",
     "numpy": "2.5.1",
-    "pbs_jobid": "3797112.pbs-7",
+    "pbs_jobid": "3834214.pbs-7",
     "study": "both",
     "dim": 2,
     "scheme": "fmg",
@@ -102,10 +102,13 @@
         },
         "qsvt": {
           "max_degree": [
+            20,
+            50,
+            100,
+            200,
             500,
             1000,
             2000,
-            5000,
             null
           ],
           "epsilon": [
@@ -191,16 +194,20 @@
         },
         "qsvt": {
           "max_degree": [
-            50,
-            100,
-            200,
-            500,
-            null
+            5,
+            8,
+            11,
+            15,
+            21,
+            51,
+            201,
+            501
           ]
         }
       }
     },
-    "git_commit": "db04a6470a35ee8b4eb77a84d9975ed936cf8191",
+    "git_commit": "a6b6e0312c34aecba7c6e8c80c0274e13dc74080",
     "git_dirty": false
-  }
+  },
+  "provenance_note": "This metadata describes the QSVT records only (grid_fix submission 3834214.pbs-7). The HHL, VQLS records in this directory come from earlier submissions; see PROVENANCE.md for their origin and status."
 }
