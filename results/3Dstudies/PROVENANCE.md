@@ -18,16 +18,23 @@ past the saturation knee. The replacement sweeps
 `{5, 8, 11, 15, 21, 51, 201, 501}` and resolves it, in agreement with the
 fourth-order result in `results/3Dstudies_4th/`:
 
-| case | κ | err_alg at d/κ ≈ 2.6–3.4 | floor reached at |
-|---|---|---|---|
-| `3D_Poisson_TripleSin_cube` | 1.9122 | 1.40 × 10⁻⁷ % | d/κ ≈ 27 |
-| `3D_HET_MMS_SPT100` | 1.4606 | 3.35 × 10⁻⁸ % | d/κ ≈ 14 |
+The quantity below is `max_rel_err_vs_thomas` [%], which is what the figures
+plot and label `err_alg_pct`. The JSON field named `err_alg` is a different
+measure — a relative L² error against Thomas, also in per cent. The two differ
+by orders of magnitude wherever the reference field has an interior node, and
+must not be conflated.
 
-`max_rel_err_vs_thomas` on the HET case is not a usable accuracy measure: it is a
-pointwise maximum of a relative error taken against a reference field with an
-interior node, and reads 1.59 × 10² % at d/κ = 3.42 falling only to 5.4 × 10⁻³ %
-at saturation, while `err_alg` — a relative L² error — reaches the 10⁻¹² % floor.
-Quote `err_alg`, which is what the figures plot.
+| case | κ | error at the lowest degree | error at the knee | floor by |
+|---|---|---|---|---|
+| `3D_Poisson_TripleSin_cube` | 1.9122 | 3.46 × 10⁻⁶ % at d/κ = 2.61 | 1.17 × 10⁻⁸ % at 5.75 | d/κ ≈ 27 |
+| `3D_HET_MMS_SPT100` | 1.4606 | 1.59 × 10² % at d/κ = 3.42 | 2.31 × 10⁻² % at 10.27 | see below |
+
+The HET case never reaches the 10⁻¹² % floor on this measure: it plateaus at
+4 × 10⁻³ – 6 × 10⁻³ % from d/κ ≈ 14 upward. That plateau is an artefact of the
+measure, not of the solver. `max_rel_err_vs_thomas` is a pointwise maximum of a
+relative error taken against a field with an interior node, so it is unbounded
+there; the L²-based `err_alg` falls to 7 × 10⁻¹³ % over the same range. Report the
+knee position, which both measures agree on, rather than the plateau value.
 
 The equal-accuracy grid was already correct, so those records were re-measured
 rather than re-sited; they agree with the superseded ones to eleven significant

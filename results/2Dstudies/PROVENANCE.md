@@ -21,10 +21,19 @@ every grid point, so the sweep resolved nothing. The replacement sweeps
 `{5, 8, 11, 15, 21, 51, 201, 501}` and resolves the knee, in agreement with the
 fourth-order result in `results/2Dstudies_4th/`:
 
-| case | κ | err_alg at d/κ ≈ 1.8–3.4 | floor reached at |
-|---|---|---|---|
-| `2D_Poisson_sin_hom` | 2.7725 | 2.25 × 10⁻⁷ % | d/κ ≈ 18 |
-| `2D_HET_MMS_SPT100` | 1.4629 | 1.33 × 10⁻⁷ % | d/κ ≈ 10 |
+The quantity below is `max_rel_err_vs_thomas` [%], which is what the figures
+plot and label `err_alg_pct`. The JSON field named `err_alg` is a different
+measure — a relative L² error against Thomas, also in per cent. The two differ
+by orders of magnitude wherever the reference field has an interior node, and
+must not be conflated.
+
+| case | κ | error at the lowest degree | error at the knee | floor (10⁻¹² %) by |
+|---|---|---|---|---|
+| `2D_Poisson_sin_hom` | 2.7725 | 5.51 × 10⁻⁷ % at d/κ = 1.80 | 3.50 × 10⁻⁸ % at 3.97 | d/κ ≈ 18 |
+| `2D_HET_MMS_SPT100` | 1.4629 | 5.63 × 10⁻⁷ % at d/κ = 3.42 | 5.39 × 10⁻⁹ % at 7.52 | d/κ ≈ 14 |
+
+Wall time over the same sweep rises from 4.9 s at cap 5 to 117.1 s at cap 501 on
+the manufactured strip: above the knee the cap is a pure cost knob.
 
 The equal-accuracy grid was already correct, so those records were re-measured
 rather than re-sited; they agree with the superseded ones to eleven significant
