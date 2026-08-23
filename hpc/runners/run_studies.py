@@ -51,6 +51,11 @@ new-format files. Products, under ``results/1Dstudies/``:
   sensitivity_<solver>.json   One record per (case, N, parameter).
   run_metadata.json        Environment, git state and the resolved grids.
 
+The directory name carries the dimension, the discretisation order and the run
+tag — `results/2Dstudies`, `results/2Dstudies_4th`, `results/3Dstudies_grid_fix`
+— since none of the three is recoverable from the filenames within it. See
+`results_dir_for`, and `--results-dir` to override.
+
 References
 ----------
 Bravo-Prieto, C., LaRose, R., Cerezo, M., Subasi, Y., Cincio, L. & Coles, P. J.
@@ -145,6 +150,44 @@ DEFAULT_N_BY_DIM: dict[int, tuple[int, ...]] = {1: (8,), 2: (8,), 3: (8,)}
 RESULTS_DIR_BY_DIM: dict[int, str] = {
     1: "1Dstudies", 2: "2Dstudies", 3: "3Dstudies",
 }
+
+
+def results_dir_for(dim: int, order: int, run_tag: str = "") -> Path:
+    """
+    Resolve the output directory for one studies invocation.
+
+    The name carries the dimension, the discretisation order and the run tag,
+    because none of the three is recorded in a filename: `write_sensitivity`
+    overwrites `sensitivity_<solver>.json` wholesale, `append_equal_accuracy`
+    merges on `(case_id, solver, N)` — a key that omits the order — and
+    `run_metadata.json` is written before the first case. Two submissions
+    differing only in `--order` that share a directory therefore destroy each
+    other's records and cross-stamp each other's metadata, which is what
+    happened to the second-order `grid_fix` pair of 2026-08-19.
+
+    The fourth-order suffix is `_4th`, matching the directory names
+    `hpc/runners/make_tables.py::STUDY_DIRS` already resolves for `--order 4`.
+
+    Parameters
+    ----------
+    dim : int
+        Spatial dimension, 1, 2 or 3.
+    order : int
+        Discretisation order, 2 or 4.
+    run_tag : str, optional
+        Short identifier for the invocation; appended when non-empty.
+
+    Returns
+    -------
+    Path
+        Directory under `results/`, e.g. `results/2Dstudies_4th_o4`.
+    """
+    name = RESULTS_DIR_BY_DIM[dim]
+    if order != 2:
+        name += f"_{order}th"
+    if run_tag:
+        name += f"_{run_tag}"
+    return Path("results") / name
 
 # HPC case identifiers, matching what run_1d.py records, so a studies row can be
 # joined to its primary-sweep counterpart without a lookup table.
@@ -655,13 +698,40 @@ def main() -> int:
                         help="Equal-accuracy residual target "
                              f"(default: {ea.DEFAULT_R_TARGET:g}).")
     parser.add_argument("--run-tag", default="",
-                        help="Suffix distinguishing this invocation's outputs.")
+                        help="Suffix distinguishing this invocation's outputs. "
+                             "Also appended to the output directory name, so "
+                             "two concurrent invocations cannot overwrite one "
+                             "another's records.")
+    parser.add_argument("--results-dir", type=Path, default=None,
+                        help="Output directory. Default: derived from --dim, "
+                             "--order and --run-tag by results_dir_for().")
     args = parser.parse_args()
 
-    # Output directory is per-dimension, resolved before the archive is opened so
-    # that a 2-D study cannot overwrite a 1-D one.
-    RESULTS_DIR = Path("results") / RESULTS_DIR_BY_DIM[args.dim]
+    # Output directory carries the dimension, the order and the run tag, so that
+    # neither a 2-D study nor a fourth-order one can overwrite another's records;
+    # see results_dir_for() for why none of the three is separable afterwards.
+    RESULTS_DIR = (args.results_dir if args.results_dir is not None
+                   else results_dir_for(args.dim, args.order, args.run_tag))
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # An explicit --results-dir, or a directory reused across orders, can still
+    # pair records of one order with metadata of another. Refuse rather than
+    # merge: make_tables.py reads config.order to decide which order's tables a
+    # study directory may be emitted under, so a mismatch here surfaces later as
+    # a mislabelled table rather than as an error.
+    prior = RESULTS_DIR / "run_metadata.json"
+    if prior.exists():
+        try:
+            recorded = json.loads(prior.read_text(encoding="utf-8"))
+            prior_order = (recorded.get("config") or {}).get("order")
+        except (OSError, json.JSONDecodeError):
+            prior_order = None
+        if prior_order is not None and int(prior_order) != args.order:
+            parser.error(
+                f"{RESULTS_DIR} holds records of discretisation order "
+                f"{prior_order}; this run is order {args.order}. Writing here "
+                f"would displace them. Direct this run elsewhere with "
+                f"--results-dir, or give it a distinct --run-tag.")
 
     n_default = ",".join(str(n) for n in DEFAULT_N_BY_DIM[args.dim])
     n_values = [int(v) for v in (args.n_values or n_default).split(",") if v.strip()]

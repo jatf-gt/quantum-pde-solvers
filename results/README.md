@@ -75,8 +75,12 @@ quoting anything from a directory you did not write yourself.
   place, and the archive step then copies those under today's date. Check
   `run_metadata.json`'s `timestamp` and `pbs_jobid` against the job you
   submitted; never compare result values.
-- Every studies submission for a given dimension writes into one shared
+- Every studies submission for a given dimension used to write into one shared
   directory, and the merge key does not include the discretisation order, so two
-  jobs differing only in `ORDER` overwrite each other. `3Dstudies_4th/` carries
-  the evidence: one job's metadata, preserved as
-  `run_metadata.grid_fix_3831760.json`, sitting on another job's results.
+  jobs differing only in `ORDER` overwrote each other. That destroyed the
+  second-order `grid_fix` pair of 2026-08-19 and left `3Dstudies_4th/` holding
+  one job's metadata on another job's results. **Fixed 2026-08-23**: the output
+  directory now carries the dimension, the order and the run tag
+  (`run_studies.py::results_dir_for`), and the runner refuses to write into a
+  directory whose recorded order differs from its own. Archives predating that
+  date still warrant the check above.

@@ -86,6 +86,14 @@
 #  `-v NAME` (bare name, value taken from the exported shell variable). The form
 #  `-v NAME=value` breaks on PBS's comma-splitting.
 #
+#  Output directory
+#  ----------------
+#  One per (DIM, ORDER, RUN_TAG): `results/2Dstudies`, `results/2Dstudies_4th`,
+#  `results/3Dstudies_grid_fix`. Submissions differing in any of the three are
+#  therefore independent, and two that differ in NONE are a deliberate re-run of
+#  the same configuration. Retrieval installs the directory over its laptop
+#  counterpart, dropping the tag: `2Dstudies_grid_fix` -> `results/2Dstudies`.
+#
 #  Monitor:
 #    qstat -u $USER
 #    tail -f results/studies_pbs_stdout.log       # studies.log may be unreadable
@@ -141,7 +149,19 @@ ORDER="${ORDER:-2}"
 ORDER="${ORDER}" bash hpc/jobs/_preflight.sh || exit 1
 
 DIM="${DIM:-1}"
+RUN_TAG="${RUN_TAG:-}"
+
+# One directory per (dimension, order, run tag). None of the three is recorded in
+# a filename: run_studies.py overwrites sensitivity_<solver>.json wholesale,
+# merges equal_accuracy.json on a key that omits the order, and writes
+# run_metadata.json before its first case. Two submissions sharing a directory
+# and differing only in ORDER therefore destroy each other's records and
+# cross-stamp each other's metadata -- which is what befell the grid_fix pair of
+# 2026-08-19. The rule below mirrors run_studies.py::results_dir_for, and the
+# runner is told the answer with --results-dir, so the two cannot disagree.
 RESULTS_SUBDIR="results/${DIM}Dstudies"
+[ "${ORDER}" != "2" ] && RESULTS_SUBDIR="${RESULTS_SUBDIR}_${ORDER}th"
+[ -n "${RUN_TAG}" ]   && RESULTS_SUBDIR="${RESULTS_SUBDIR}_${RUN_TAG}"
 mkdir -p "${RESULTS_SUBDIR}"
 
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
@@ -158,7 +178,6 @@ SCHEME="${SCHEME:-fmg}"
 # solve, so without a bound one non-converging point can consume the whole job.
 # 1 h suits QSVT comfortably and caps HHL and VQLS at a defensible measurement.
 MAX_WALL_S="${MAX_WALL_S:-3600}"
-RUN_TAG="${RUN_TAG:-}"
 
 echo ""
 echo "  DIM       : ${DIM}"
@@ -168,13 +187,15 @@ echo "  N_VALUES  : ${N_VALUES:-<runner default: 8>}"
 echo "  SOLVERS   : ${SOLVERS}"
 echo "  CASES     : ${CASES:-<runner per-dimension default>}"
 echo "  R_TARGET  : ${R_TARGET:-<runner default>}"
+echo "  RUN_TAG   : ${RUN_TAG:-<none>}"
+echo "  OUTPUT    : ${RESULTS_SUBDIR}"
 if [ "${DIM}" != "1" ]; then
     echo "  SCHEME    : ${SCHEME}"
     echo "  MAX_WALL_S: ${MAX_WALL_S}"
 fi
 echo ""
 
-OPT_ARGS=""
+OPT_ARGS=" --results-dir ${RESULTS_SUBDIR}"
 [ -n "${N_VALUES}" ] && OPT_ARGS="${OPT_ARGS} --n-values ${N_VALUES}"
 [ -n "${CASES}" ]    && OPT_ARGS="${OPT_ARGS} --cases ${CASES}"
 [ -n "${R_TARGET}" ] && OPT_ARGS="${OPT_ARGS} --r-target ${R_TARGET}"
@@ -241,7 +262,7 @@ fi
 SUFFIX=""
 [ "${RC}" != "0" ]           && SUFFIX="${SUFFIX}_rc${RC}"
 [ "${WROTE_RESULTS}" = "0" ] && SUFFIX="${SUFFIX}_STALE"
-DEST="${HOME}/qpde-results/${DIM}Dstudies_$(date +%Y%m%d_%H%M%S)${SUFFIX}"
+DEST="${HOME}/qpde-results/$(basename "${RESULTS_SUBDIR}")_$(date +%Y%m%d_%H%M%S)${SUFFIX}"
 mkdir -p "${DEST}"
 cp -r "${RESULTS_SUBDIR}"/* "${DEST}/" 2>/dev/null || true
 if [ "${WROTE_RESULTS}" = "1" ]; then
