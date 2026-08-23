@@ -36,14 +36,17 @@ The `.npz` fields are the one thing here that cannot be regenerated without a
 cluster allocation — a full re-run is measured in days of CPU time. They are not
 in the repository for the size reason above.
 
-> **Data deposit: prepared, not yet published.** The deposit is built by
-> `python scripts/utils/make_zenodo_package.py --out <dir>` — 694 fields, 179 MB,
-> one zip per sweep, each carrying that sweep's `results_full.json` and
-> `run_metadata.json` so it is self-describing — and uploaded by
-> `python scripts/utils/zenodo_upload.py --package <dir>`, which stops short of
-> publishing. Its metadata is `.zenodo.json` at the repository root. Publishing
-> mints the DOI; replace this paragraph with it, and the `PENDING` in
-> `CITATION.cff`, once that is done.
+They are deposited on Zenodo, under **[10.5281/zenodo.22071066](https://doi.org/10.5281/zenodo.22071066)**
+— 694 fields, 179 MB, one zip per sweep, each carrying that sweep's
+`results_full.json` and `run_metadata.json` so a single downloaded archive is
+self-describing, plus a `MANIFEST.csv` indexing every field by case, solver and
+resolution with its SHA-256. Cite that DOI for these exact bytes; the concept
+DOI [10.5281/zenodo.22071065](https://doi.org/10.5281/zenodo.22071065) always
+resolves to the newest version.
+
+The deposit is rebuilt by `python scripts/utils/make_zenodo_package.py --out <dir>`
+and uploaded by `python scripts/utils/zenodo_upload.py --package <dir>`, whose
+metadata is `.zenodo.json` at the repository root.
 
 Nothing in the dissertation depends on them: every figure and table is built
 from the tracked summaries and tidy CSVs. They are needed only to re-render a

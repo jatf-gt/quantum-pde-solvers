@@ -36,8 +36,9 @@ references:
       - family-names: "Trobajo Flecha"
         given-names: "Juan"
         affiliation: "Department of Aeronautics, Imperial College London"
-    doi: "PENDING"
+    doi: "10.5281/zenodo.22071066"
     notes: >-
       The per-solution solution, exact and Thomas fields behind every figure and
-      table in this repository. Replace the placeholder DOI once the deposit is
-      published.
+      table in this repository. This is the version DOI, naming these exact
+      bytes; 10.5281/zenodo.22071065 is the concept DOI and always resolves to
+      the newest version.
