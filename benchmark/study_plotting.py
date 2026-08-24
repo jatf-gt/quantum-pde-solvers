@@ -503,7 +503,25 @@ def plot_sensitivity(
         ax_cost.set_ylabel("wall time  [s]")
         ax_err.set_title(f"Accuracy — varying {param}")
         ax_cost.set_title(f"Cost — varying {param}")
-        ax_err.legend(fontsize=6.5, loc="best")
+
+        # A sweep can legitimately carry no records: every solve in it may have
+        # been refused by the solver. The 1-D fourth-order HHL `trotter_steps`
+        # sweep is the standing example — a pentadiagonal operator is not
+        # Toeplitz tridiagonal, so its Hamiltonian simulation is an exact matrix
+        # exponential with no Trotter decomposition to control, and the step
+        # count is rejected rather than accepted and ignored. Say so on the
+        # panel: an unannotated empty axis reads as a broken figure, and
+        # `legend()` on one emits a warning and returns nothing.
+        if ax_err.get_legend_handles_labels()[1]:
+            ax_err.legend(fontsize=6.5, loc="best")
+        else:
+            for ax in (ax_err, ax_cost):
+                ax.text(0.5, 0.5,
+                        "\n".join(("no records:",
+                                   f"every solve over {param}",
+                                   "was refused by the solver")),
+                        transform=ax.transAxes, ha="center", va="center",
+                        fontsize=8, color="grey", style="italic")
 
     fig.suptitle(
         f"Parameter sensitivity, {solver.upper()}, {dim}-D  "
