@@ -457,6 +457,7 @@ def vqls_solve_system(
     # found across all restarts. This polishes the solution within the
     # identified global minimum basin without risking escape to a worse basin
     # (rhobeg=0.001 is too small to cross basin boundaries).
+    refined = False
     if best_cost_global > config.tol:
         cost_fn_final = build_cost_function(
             pauli_terms  = pauli_terms,
@@ -480,6 +481,7 @@ def vqls_solve_system(
         total_evals_global += int(opt_final.nfev)
         final_cost_refined  = float(opt_final.fun)
         all_cost_histories.append([final_cost_refined])
+        refined = True
 
         if final_cost_refined < best_cost_global:
             best_cost_global   = final_cost_refined
@@ -495,12 +497,25 @@ def vqls_solve_system(
     final_cost        = best_cost_global
     optimiser_success = final_cost <= config.tol * 10
 
+    # Partition the telemetry into exploration restarts and the optional Phase 2
+    # entry. The refinement pass is executed only when the tolerance was not
+    # already met, so the trailing entry exists conditionally and the split must
+    # be made on `refined` rather than by an unconditional [:-1] slice. With
+    # n_restarts = 1 the early-exit branch pads nothing and Phase 2 is skipped,
+    # leaving a single history; the unconditional slice then yielded an empty
+    # sequence and np.argmin raised ValueError. Under the outer iteration that
+    # exception is absorbed by the classical fallback in
+    # `solvers.outer.inner.InnerSolverWrapper`, so every strip returned the
+    # Thomas solution and the failure presented as a flawless VQLS result.
+    restart_histories  = all_cost_histories[:-1] if refined else all_cost_histories
+    refinement_history = [all_cost_histories[-1]] if refined else []
+
     if config.verbose:
         print(
             f"  VQLS final: cost={final_cost:.6e}, "
             f"total_evals={total_evals_global}, "
             f"converged={optimiser_success}, "
-            f"best_seed_idx={np.argmin([h[-1] for h in all_cost_histories[:-1]])}"
+            f"best_seed_idx={np.argmin([h[-1] for h in restart_histories])}"
         )
 
     # -- Solution Recovery -----------------------------------------------------
@@ -520,11 +535,11 @@ def vqls_solve_system(
     # Flatten cost history: best-run history first, then remaining runs,
     # then global refinement. This preserves the full optimisation trajectory
     # for diagnostic purposes whilst keeping the primary history accessible.
-    best_run_idx     = int(np.argmin([h[-1] for h in all_cost_histories[:-1]]))
+    best_run_idx     = int(np.argmin([h[-1] for h in restart_histories]))
     ordered_histories = (
-        [all_cost_histories[best_run_idx]]
-        + [h for i, h in enumerate(all_cost_histories[:-1]) if i != best_run_idx]
-        + [all_cost_histories[-1]]
+        [restart_histories[best_run_idx]]
+        + [h for i, h in enumerate(restart_histories) if i != best_run_idx]
+        + refinement_history
     )
     flat_cost_history = [c for h in ordered_histories for c in h]
 

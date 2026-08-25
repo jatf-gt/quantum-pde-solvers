@@ -145,6 +145,43 @@ class TestVQLSSolve1D:
         with pytest.raises(ValueError, match="Hermitian"):
             vqls_solve_system(A, b, vqls_cfg_fast)
 
+    def test_single_restart_meeting_tolerance_returns(self, problem_1d_N4_fS):
+        """
+        Regression guard: a single restart that meets the tolerance must return.
+
+        With n_restarts = 1 the early-exit branch pads no telemetry slots and the
+        Phase 2 refinement is skipped, so the cost-history list holds exactly one
+        entry. The previous unconditional [:-1] slice reduced that to an empty
+        sequence and np.argmin raised ValueError. Under the 2-D/3-D outer
+        iteration the exception was absorbed by the classical fallback in
+        `solvers.outer.inner.InnerSolverWrapper`, so every strip silently
+        returned the Thomas solution and the failure was recorded as a VQLS
+        result of exactly zero error. A loose tolerance forces the branch.
+        """
+        cfg = VQLSConfig1D(n_layers=2, max_iter=50, tol=1e-1,
+                           n_restarts=1, random_seed=42, verbose=False)
+        r = vqls_solve(problem_1d_N4_fS, config=cfg)
+        assert np.isfinite(r.final_cost)
+        assert len(r.cost_history) >= 1
+
+    def test_single_restart_matches_first_of_many(self, problem_1d_N4_fS):
+        """
+        Confirms n_restarts = 1 reproduces the first restart of a longer run.
+
+        Child seeds are drawn in sequence from the master seed, so the opening
+        restart is identical for any n_restarts. Where that restart already meets
+        the tolerance the remaining ones are skipped, and the two configurations
+        must therefore agree on the solution, not merely be close.
+        """
+        common = dict(n_layers=2, max_iter=50, tol=1e-1,
+                      random_seed=42, verbose=False)
+        r1 = vqls_solve(problem_1d_N4_fS,
+                        config=VQLSConfig1D(n_restarts=1, **common))
+        r3 = vqls_solve(problem_1d_N4_fS,
+                        config=VQLSConfig1D(n_restarts=3, **common))
+        assert r1.final_cost == pytest.approx(r3.final_cost, rel=1e-12)
+        assert np.allclose(r1.u, r3.u, atol=1e-12)
+
     def test_reproducible_with_same_seed(self, problem_1d_N4_fS):
         """
         Confirms that identical pseudo-random initialization seeds yield perfectly deterministic solution vectors.
