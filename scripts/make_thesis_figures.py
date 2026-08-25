@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""
+# The module docstring is raw: it quotes LaTeX, whose backslashes are not escapes.
+r"""
 make_thesis_figures.py
 
 Assembles the main-body thesis figures and their underlying data from the
@@ -29,19 +30,31 @@ Written to `results/thesis/` unless redirected:
   F4_kappa_scaling             Condition number, 1-D against 2-D and 3-D strips.
   F5_cost_vs_N_1D              Wall time, with terminated solves marked.
   F6_hardware_verification     Measured fidelity and gate count on ibm_kingston.
-  F7_field_*                   2-D and 3-D solution fields and signed error.
+  F7_het_fields                3-D thruster field and each solver's signed error.
+  F7_field_*                   The 2-D and 3-D field data behind it.
   F8_het_1d_profile_*          HET potential and axial electric field.
+  F9_resolution_grid_2D        Solver against resolution, 2-D thruster channel.
   T2_primary_condensed         The condensed comparison table's data.
   T3_observed_order            Observed order of accuracy per case.
+  T4_equal_accuracy_2D3D       Cost at a matched residual, 2-D and 3-D.
 
 Each figure that has a rendered form is written as both PNG and vector PDF. A
 series whose sweep has not yet landed is drawn as a labelled placeholder rather
 than omitted, so the figure keeps its shape and its axes while the run completes.
 
+Sizing
+------
+Figures are rendered at the exact width of the dissertation's text block and are
+placed there with `\includegraphics[width=\textwidth]`, so the scale factor is
+one and the point sizes calibrated in `benchmark.thesis_figures` hold on the
+page. Reducing that fraction in the LaTeX source shrinks the axis text below the
+caption text; render a narrower canvas instead. See `docs/THESIS_FIGURE_PLAN.md`.
+
 Usage
 -----
     python scripts/make_thesis_figures.py
     python scripts/make_thesis_figures.py --out-dir results/thesis
+    python scripts/make_thesis_figures.py --no-titles --out-dir <dissertation>/figures
 """
 from __future__ import annotations
 

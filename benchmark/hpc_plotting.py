@@ -75,17 +75,22 @@ ticker = None
 # a property of the schema, not of the presentation, and both the grouping and
 # the figure column order must agree on it.
 
-# 2-D and 3-D palette.
-SOLVER_COLOUR = {"Thomas": "#444444", "HHL": "#d62728",
-                 "VQLS": "#2ca02c", "QSVT": "#1f77b4"}
+# Okabe--Ito, shared verbatim with `benchmark/thesis_figures.py` and
+# `benchmark/study_plotting.py` so that a solver keeps one colour across every
+# figure the project produces. The two dictionaries below previously disagreed --
+# `SOLVER_COLOUR` gave HHL red and QSVT blue where `SOLVER_STYLE` gave QSVT red
+# and Thomas blue -- so the same solver changed colour between the 1-D and the
+# 2-D figures of one report. They now agree by construction.
+SOLVER_COLOUR = {"Thomas": "#000000", "HHL": "#0072B2",
+                 "VQLS": "#009E73", "QSVT": "#D55E00"}
 
-# 1-D palette, with markers and line styles so the curves remain separable in
-# greyscale print.
+# The same palette with markers and line styles, so the curves remain separable
+# in greyscale print as well as under colour blindness.
 SOLVER_STYLE = {
-    "Thomas": {"color": "#1f77b4", "marker": "o",  "ls": "-",  "label": "Thomas (classical)"},
-    "HHL":    {"color": "#ff7f0e", "marker": "s",  "ls": "--", "label": "HHL"},
-    "VQLS":   {"color": "#2ca02c", "marker": "^",  "ls": "-.", "label": "VQLS"},
-    "QSVT":   {"color": "#d62728", "marker": "D",  "ls": ":",  "label": "QSVT"},
+    "Thomas": {"color": SOLVER_COLOUR["Thomas"], "marker": "o", "ls": "-",  "label": "Thomas (classical)"},
+    "HHL":    {"color": SOLVER_COLOUR["HHL"],    "marker": "s", "ls": "--", "label": "HHL"},
+    "VQLS":   {"color": SOLVER_COLOUR["VQLS"],   "marker": "^", "ls": "-.", "label": "VQLS"},
+    "QSVT":   {"color": SOLVER_COLOUR["QSVT"],   "marker": "D", "ls": ":",  "label": "QSVT"},
 }
 
 CASE_LABELS = {
