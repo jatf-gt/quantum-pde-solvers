@@ -107,6 +107,15 @@ HET_CASE: dict[int, str] = {
 }
 
 SOLVERS: tuple[str, ...] = ("Thomas", "HHL", "VQLS", "QSVT")
+
+# Solvers drawn in the one-dimensional thruster profile, F8. VQLS is excluded
+# there and only there. At N = 32 its solution has already collapsed, so it
+# contributes a flat line near zero in both panels — a reader spends longer
+# working out why a curve is horizontal than the omission would have cost, and
+# the finding it would carry is made far better by F9, which shows the same
+# collapse developing across four resolutions. The exported CSV retains all four
+# solvers; this governs the rendering only.
+PROFILE_SOLVERS_1D: tuple[str, ...] = ("Thomas", "HHL", "QSVT")
 QUANTUM_SOLVERS: tuple[str, ...] = ("HHL", "VQLS", "QSVT")
 
 SOLVER_COLOUR: dict[str, str] = {
@@ -282,6 +291,120 @@ def _is_recovered(row: dict) -> bool:
     return "recovered" in str(row.get("notes") or "")
 
 
+def _qsvt_construction(row: dict) -> str:
+    """
+    Which QSP polynomial a recorded QSVT row was built from.
+
+    Two constructions are in use and they are not interchangeable. An *uncapped*
+    solve calls `pyqsp`'s 1/x generator, which targets a prescribed uniform error
+    ε and returns whatever degree that demands. A *capped* solve fits the
+    truncated Chebyshev expansion of 1/x directly at the degree given, padding up
+    to the cap where the natural degree is lower. At equal degree the capped
+    construction is the more accurate by seven to nine orders of magnitude on any
+    right-hand side with broadband spectral content, so a curve that mixes the
+    two is not a curve in one variable and must not be drawn as one.
+
+    Which construction a row used is not recorded directly; it follows from
+    whether a cap was set, since the cap is what selects the Chebyshev path.
+
+    Parameters
+    ----------
+    row : dict
+        One summary row.
+
+    Returns
+    -------
+    str
+        'capped' or 'uncapped'.
+    """
+    return "capped" if row.get("qsvt_max_degree") is not None else "uncapped"
+
+
+def _degree_over_kappa(row: dict) -> Optional[float]:
+    """
+    Ratio of QSP polynomial degree to operator condition number for one row.
+
+    Parameters
+    ----------
+    row : dict
+        One summary row.
+
+    Returns
+    -------
+    float or None
+        d/κ, or None where either quantity is unrecorded.
+    """
+    d = row.get("qsvt_degree")
+    k = row.get("kappa") or row.get("kappa_row")
+    if d is None or not k:
+        return None
+    try:
+        return float(d) / float(k)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+# Drawing style for the two QSP constructions, shared by F1 and F2 so the two
+# figures cannot come to disagree about which series is which.
+QSVT_CONSTRUCTION_STYLE: dict[str, dict] = {
+    "capped":   {"linestyle": "-",  "mfc": "none",
+                 "label": "QSVT (capped)"},
+    "uncapped": {"linestyle": ":",  "mfc": SOLVER_COLOUR["QSVT"],
+                 "label": "QSVT (uncapped)"},
+}
+
+
+def _plot_qsvt_by_construction(ax, recs: list[dict], value_of,
+                               annotate: bool = True) -> list[tuple]:
+    """
+    Draw the QSVT series as one line per QSP construction.
+
+    Parameters
+    ----------
+    ax : matplotlib axis
+        Target axis.
+    recs : list of dict
+        QSVT rows for one case and order, ordered by resolution.
+    value_of : callable
+        Maps a row to the ordinate in per cent, or to None to drop it.
+    annotate : bool
+        Whether to label each point with its d/κ ratio. The ratio is what
+        governs whether the polynomial inverts the operator at all, and it is
+        not recoverable from the abscissa.
+
+    Returns
+    -------
+    list of tuple
+        (construction, N, value, degree, d_over_kappa) per drawn point.
+    """
+    drawn: list[tuple] = []
+    for construction, style in QSVT_CONSTRUCTION_STYLE.items():
+        sub = [r for r in recs if _qsvt_construction(r) == construction]
+        pts = [(r["N"], value_of(r)) for r in sub]
+        keep = [(n, e) for n, e in pts if e is not None and e > 0.0]
+        if not keep:
+            continue
+        ax.loglog(*zip(*keep), marker=SOLVER_MARKER["QSVT"], lw=1.7,
+                  color=SOLVER_COLOUR["QSVT"],
+                  linestyle=style["linestyle"], mfc=style["mfc"],
+                  label=style["label"])
+        for (n, e), r in zip(keep, sub):
+            ratio = _degree_over_kappa(r)
+            drawn.append((construction, n, e, r.get("qsvt_degree"), ratio))
+            if annotate and ratio is not None:
+                # Offset away from the line on the side the construction sits,
+                # and set on an opaque patch: these labels cross the Thomas
+                # curve at several resolutions.
+                dy = 9 if construction == "uncapped" else -13
+                ax.annotate(
+                    f"{ratio:.0f}", (n, e), textcoords="offset points",
+                    xytext=(4, dy), fontsize=6.5,
+                    color=SOLVER_COLOUR["QSVT"],
+                    bbox=dict(boxstyle="round,pad=0.12", fc="white",
+                              ec="none", alpha=0.75))
+    return drawn
+
+
 def _pct(value: Optional[float], already_pct: bool) -> Optional[float]:
     """
     Normalise an error to per cent.
@@ -430,6 +553,25 @@ def figure_accuracy_vs_N(repo_root: Path, out_dir: Path,
         for solver in SOLVERS:
             recs = [r for r in _series(rows, case, solver)
                     if not _is_recovered(r)]
+            if solver == "QSVT":
+                # Drawn as one line per QSP construction rather than one line
+                # per solver: see `_qsvt_construction`. The two differ by seven
+                # to nine orders at equal degree, so a single curve through both
+                # reports a change of algorithm as though it were a change of
+                # resolution.
+                for construction, n, e, degree, ratio in (
+                        _plot_qsvt_by_construction(
+                            ax, recs,
+                            lambda r: _pct(r.get("max_rel_err"),
+                                           already_pct=True))):
+                    src = next(r for r in recs if r["N"] == n)
+                    csv_rows.append([
+                        case, order, f"QSVT ({construction})", n,
+                        src.get("kappa") or src.get("kappa_row"), e,
+                        _pct(src.get("err_alg"), already_pct=False),
+                        _pct(src.get("err_disc"), already_pct=False),
+                        degree, ratio])
+                continue
             pts = [(r["N"], _pct(r.get("max_rel_err"), already_pct=True))
                    for r in recs]
             pts = [(n, e) for n, e in pts if e is not None and e > 0.0]
@@ -444,7 +586,8 @@ def figure_accuracy_vs_N(repo_root: Path, out_dir: Path,
                 csv_rows.append([case, order, solver, n, r.get("kappa")
                                  or r.get("kappa_row"), e,
                                  _pct(r.get("err_alg"), already_pct=False),
-                                 _pct(r.get("err_disc"), already_pct=False)])
+                                 _pct(r.get("err_disc"), already_pct=False),
+                                 None, None])
         _reference_slope(ax, anchor_N, anchor_e, order,
                          rf"$\mathcal{{O}}(h^{order})$")
         ax.set_title(f"Order-{order} stencil")
@@ -462,7 +605,8 @@ def figure_accuracy_vs_N(repo_root: Path, out_dir: Path,
     written.append(write_csv(
         out_dir / f"F1_accuracy_vs_N_{dim}D.csv",
         ["case", "order", "solver", "N", "kappa",
-         "err_total_pct", "err_alg_pct", "err_disc_pct"],
+         "err_total_pct", "err_alg_pct", "err_disc_pct",
+         "qsvt_degree", "d_over_kappa"],
         csv_rows,
     ))
     return written
@@ -517,11 +661,21 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
             ax.loglog(*zip(*disc), "k--s", lw=1.8, mfc="none",
                       label=r"$e_\mathrm{disc}$  (Thomas vs. exact)")
             for n, e in disc:
-                csv_rows.append([case, order, "Thomas", n, None, e])
+                csv_rows.append([case, order, "Thomas", n, None, e,
+                                 None, None])
 
         for solver in QUANTUM_SOLVERS:
             recs = [r for r in _series(rows, case, solver)
                     if not _is_recovered(r)]
+            if solver == "QSVT":
+                for construction, n, e, degree, ratio in (
+                        _plot_qsvt_by_construction(
+                            ax, recs,
+                            lambda r: _pct(r.get("err_alg"),
+                                           already_pct=False))):
+                    csv_rows.append([case, order, f"QSVT ({construction})",
+                                     n, e, None, degree, ratio])
+                continue
             pts = [(r["N"], _pct(r.get("err_alg"), already_pct=False))
                    for r in recs]
             pts = [(n, e) for n, e in pts if e is not None and e > 0.0]
@@ -531,7 +685,7 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
                       color=SOLVER_COLOUR[solver], mfc="none",
                       label=rf"$e_\mathrm{{alg}}$  {solver}")
             for n, e in pts:
-                csv_rows.append([case, order, solver, n, e, None])
+                csv_rows.append([case, order, solver, n, e, None, None, None])
 
         ax.set_title(f"Order-{order} stencil")
         ax.set_xlabel("$N$")
@@ -549,7 +703,8 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
     written = _save(fig, out_dir, f"F2_error_decomposition_{dim}D", plt)
     written.append(write_csv(
         out_dir / f"F2_error_decomposition_{dim}D.csv",
-        ["case", "order", "solver", "N", "err_alg_pct", "err_disc_pct"],
+        ["case", "order", "solver", "N", "err_alg_pct", "err_disc_pct",
+         "qsvt_degree", "d_over_kappa"],
         csv_rows,
     ))
     return written
@@ -1183,18 +1338,32 @@ def _read_field_csv(path: Path):
     return grid("x_m"), grid("y_m"), grid("phi_V"), grid("signed_error_V")
 
 
+# Dimensions drawn in F7. Two dimensions was dropped from the main body once
+# `figure_resolution_grid_2d` covered the same case at four resolutions with its
+# error and cost attached; the CSVs for both are still exported, so widening this
+# back to (2, 3) restores the earlier two-row figure unchanged.
+DIMENSIONS_F7: tuple[int, ...] = (3,)
+
+
 def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
     """
-    Thruster potential and each solver's signed error, in two and three
-    dimensions.
+    Thruster potential and each solver's signed error, three dimensions.
 
     A norm collapses a field to one number and hides where the error sits. A
     signed map does not: a sign error, a boundary condition imposed on the wrong
     face, and convergence to the wrong fixed point each have a distinct
-    signature in the map and none in the norm. The top row is the axial–radial
-    plane of the two-dimensional case; the bottom is the mid-plane slice of the
-    three-dimensional case, normal to the azimuthal direction, which is the
-    plane the channel physics lives in.
+    signature in the map and none in the norm. The plane drawn is the mid-plane
+    slice of the three-dimensional case, normal to the azimuthal direction,
+    which is the plane the channel physics lives in.
+
+    The two-dimensional row this figure used to carry has been removed, not
+    lost: `figure_resolution_grid_2d` shows the same case across four
+    resolutions with per-panel error and cost, which subsumes a single-resolution
+    view of it. Restricting F7 to three dimensions leaves each figure with one
+    job — where the error sits, against how the solvers separate as the mesh
+    refines — and recovers most of a page in a chapter that has none to spare.
+    `DIMENSIONS_F7` governs this; the exported CSVs are still written for both
+    dimensions, so restoring the row is a one-line change.
 
     The leftmost column carries the manufactured solution itself, so the error
     maps beside it are read against the field they belong to. Each error map
@@ -1220,7 +1389,7 @@ def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
     plt = _matplotlib()
 
     panels = []
-    for dim in (2, 3):
+    for dim in DIMENSIONS_F7:
         case = HET_CASE[dim]
         found = sorted(out_dir.glob(f"F7_field_{dim}D_{case}_*.csv"))
         by_solver = {p.stem.rsplit("_", 2)[-2]: p for p in found}
@@ -1333,16 +1502,34 @@ def figure_het_profile_1d(repo_root: Path, out_dir: Path,
     phi_ref = max(abs(v) for v in series["Thomas"]["phi"]) or 1.0
     E_ref = max(abs(v) for v in series["Thomas"]["E"]) or 1.0
 
+    def _rel_l2(values: list[float], reference: list[float]) -> float:
+        """Relative L² error against the classical reference, in per cent."""
+        a = np.asarray(values, dtype=float)
+        b = np.asarray(reference, dtype=float)
+        denom = float(np.linalg.norm(b))
+        return 100.0 * float(np.linalg.norm(a - b)) / denom if denom else np.nan
+
     plt = _matplotlib()
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.2))
-    for solver in SOLVERS:
+    for solver in PROFILE_SOLVERS_1D:
         if solver not in series:
             continue
         s = series[solver]
         style = dict(color=SOLVER_COLOUR[solver], marker=SOLVER_MARKER[solver],
-                     mfc="none", ms=3.5, lw=1.5, label=solver)
-        axes[0].plot(s["z"], np.array(s["phi"]) / phi_ref, **style)
-        axes[1].plot(s["z"], np.array(s["E"]) / E_ref, **style)
+                     mfc="none", ms=3.5, lw=1.5)
+        # The error is carried in the legend of each panel separately, which is
+        # the whole argument of the figure: the same solve is accurate in the
+        # potential and inaccurate in the field derived from it.
+        if solver == "Thomas":
+            lab_phi = lab_E = "Thomas  (reference)"
+        else:
+            lab_phi = (rf"{solver}   $e_\phi$ = "
+                       f"{_rel_l2(s['phi'], series['Thomas']['phi']):.2g}%")
+            lab_E = (f"{solver}   $e_E$ = "
+                     f"{_rel_l2(s['E'], series['Thomas']['E']):.2g}%")
+        axes[0].plot(s["z"], np.array(s["phi"]) / phi_ref,
+                     label=lab_phi, **style)
+        axes[1].plot(s["z"], np.array(s["E"]) / E_ref, label=lab_E, **style)
 
     axes[0].set_title("(a)  potential", fontsize=9)
     axes[0].set_ylabel(r"$\phi\,/\,|\phi|^{\mathrm{Thomas}}_{\max}$")
@@ -1359,7 +1546,343 @@ def figure_het_profile_1d(repo_root: Path, out_dir: Path,
     return _save(fig, out_dir, f"F8_het_1d_profile_N{N}", plt)
 
 
+# ── Figure 9: Resolution Against Solver Quality ────────────────────────────────
+
+# Resolutions carried in the F9 panel grid. Chosen as the four at which every
+# solver has an archive, and as the range over which the VQLS collapse develops:
+# it is invisible at N = 8, first legible at N = 32 and complete by N = 64.
+PANEL_RESOLUTIONS_2D: tuple[int, ...] = (8, 16, 32, 64)
+
+
+def _format_seconds(wall: Optional[float]) -> str:
+    """
+    Render a wall time for a figure annotation, at two significant figures.
+
+    A fixed number of decimal places cannot serve a range that runs from tens of
+    milliseconds for the classical solve to sixteen hours for VQLS at N = 64;
+    rounding the classical row to whole seconds prints "0 s", which reads as an
+    unmeasured entry rather than as a fast one.
+
+    Parameters
+    ----------
+    wall : float or None
+        Recorded simulation wall time in seconds, or None where not preserved.
+
+    Returns
+    -------
+    str
+        A mathtext label such as ``$t$ = 0.037 s`` or ``$t$ = n/a``.
+    """
+    if wall is None:
+        return "$t$ = n/a"
+    if wall >= 100.0:
+        return f"$t$ = {wall:.0f} s"
+    if wall >= 1.0:
+        return f"$t$ = {wall:.1f} s"
+    return f"$t$ = {wall:.2g} s"
+
+
+def figure_resolution_grid_2d(repo_root: Path, out_dir: Path) -> list[Path]:
+    """
+    Solver against resolution for the two-dimensional thruster potential.
+
+    A grid of solved fields, one row per solver and one column per resolution, on
+    a single shared colour scale. It carries two things at once that the scalar
+    figures separate. Down a column it shows what each algorithm does to the same
+    problem; across a row it shows the mesh resolving the potential. The two
+    together make the failure of a variational solver legible as a picture —
+    VQLS passes from indistinguishable at N = 8 to visibly granular at N = 32 and
+    to noise at N = 64 — where a table of norms records it only as a number
+    growing.
+
+    Every panel is annotated with the quantity diagnostic for its row. The
+    classical row carries the discretisation error e_disc against the analytical
+    solution, which is the floor the mesh alone achieves and the reason that row
+    sharpens from left to right. The quantum rows carry the algorithmic error
+    e_alg against the classical solution on the same mesh, which isolates the
+    solver from the stencil. The distinction is not cosmetic: at N = 8 the total
+    error of all four solvers agrees to two significant figures because the mesh
+    dominates it, so a total-error annotation would print four near-identical
+    numbers across a column whose algorithms differ by ten orders of magnitude.
+
+    Wall time is reported per panel as state-vector simulation time. Two panels
+    carry none: their summary rows were reconstructed from the solution archive
+    after the recording process was killed, and the instrumentation did not
+    survive the recovery.
+
+    The colour scale is fixed once from the classical field and shared by every
+    panel. A per-panel scale would renormalise a diverged solution back into the
+    same colours as a converged one and conceal precisely what the figure is for.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root.
+    out_dir : Path
+        Destination for the CSV files and the rendered figure.
+
+    Returns
+    -------
+    list of Path
+        Files written; empty where no field archive is present.
+    """
+    import numpy as np
+
+    sweep = repo_root / SWEEP_DIR[(2, 2)]
+    case = HET_CASE[2]
+    rows = load_rows(repo_root, 2, 2)
+
+    fields: dict[tuple[str, int], dict] = {}
+    for solver in SOLVERS:
+        for N in PANEL_RESOLUTIONS_2D:
+            path = sweep / f"solutions_{case}_{solver}_N{N}.npz"
+            if not path.exists():
+                continue
+            data = np.load(path, allow_pickle=False)
+            fields[(solver, N)] = {
+                "x":     data["x"],
+                "y":     data["y"],
+                "phi":   (data["phi_solver"] if "phi_solver" in data.files
+                          else data["u_solver"]),
+                "exact": (data["phi_exact"] if "phi_exact" in data.files
+                          else None),
+            }
+    if not fields:
+        log.warning("  no 2-D field archives for %s in %s; F9 not rendered",
+                    case, sweep)
+        return []
+
+    def _rel_l2(a, b) -> Optional[float]:
+        """Relative L2 error of `a` against `b`, in per cent."""
+        if a is None or b is None:
+            return None
+        denom = float(np.linalg.norm(b))
+        if denom == 0.0:
+            return None
+        return 100.0 * float(np.linalg.norm(a - b)) / denom
+
+    def _wall(solver: str, N: int) -> Optional[float]:
+        """Recorded simulation wall time, or None where it was not preserved."""
+        match = [r for r in rows if r.get("case") == case
+                 and r.get("solver") == solver and r.get("N") == N]
+        if not match:
+            return None
+        value = match[0].get("wall_time_s")
+        return None if value is None else float(value)
+
+    ref_key = max((k for k in fields if k[0] == "Thomas"),
+                  key=lambda k: k[1], default=None)
+    if ref_key is None:
+        log.warning("  no classical reference field for F9")
+        return []
+    ref_phi = fields[ref_key]["phi"]
+    vmin, vmax = float(np.min(ref_phi)), float(np.max(ref_phi))
+
+    plt = _matplotlib()
+    ncol = len(PANEL_RESOLUTIONS_2D)
+    nrow = len(SOLVERS)
+    # The channel cross-section is roughly twice as long axially as it is deep
+    # radially. Panels are drawn at equal aspect, so the canvas has to be sized
+    # from the domain or the figure is mostly margin.
+    ref_x, ref_y = fields[ref_key]["x"], fields[ref_key]["y"]
+    span_x = float(ref_x.max() - ref_x.min()) or 1.0
+    span_y = float(ref_y.max() - ref_y.min()) or 1.0
+    panel_w = 2.30
+    panel_h = panel_w * (span_y / span_x)
+    fig, axes = plt.subplots(nrow, ncol,
+                             figsize=(panel_w * ncol + 1.0,
+                                      panel_h * nrow + 1.9))
+
+    scalar_rows: list[list[Any]] = []
+    field_rows: list[list[Any]] = []
+    mesh = None
+    for i, solver in enumerate(SOLVERS):
+        for j, N in enumerate(PANEL_RESOLUTIONS_2D):
+            ax = axes[i][j]
+            entry = fields.get((solver, N))
+            if entry is None:
+                ax.text(0.5, 0.5, "no archive", transform=ax.transAxes,
+                        ha="center", va="center", fontsize=8, color="grey")
+                ax.set_xticks([])
+                ax.set_yticks([])
+                ax.grid(False)
+                continue
+
+            mesh = ax.pcolormesh(entry["x"] * 1e3, entry["y"] * 1e3,
+                                 entry["phi"], shading="auto",
+                                 vmin=vmin, vmax=vmax, rasterized=True)
+            ax.grid(False)
+            ax.set_aspect("equal")
+            ax.tick_params(labelsize=6)
+            if i != nrow - 1:
+                ax.set_xticklabels([])
+            if j != 0:
+                ax.set_yticklabels([])
+
+            classical = fields.get(("Thomas", N))
+            if solver == "Thomas":
+                err = _rel_l2(entry["phi"], entry["exact"])
+                err_label, err_kind = r"$e_\mathrm{disc}$", "disc"
+            else:
+                err = _rel_l2(entry["phi"],
+                              classical["phi"] if classical else None)
+                err_label, err_kind = r"$e_\mathrm{alg}$", "alg"
+            wall = _wall(solver, N)
+
+            parts = [f"{err_label} = {err:.2g}%" if err is not None
+                     else f"{err_label} = n/a"]
+            parts.append(_format_seconds(wall))
+            ax.set_title("   ".join(parts), fontsize=7,
+                         color=SOLVER_COLOUR[solver], pad=3)
+
+            scalar_rows.append([case, solver, N, err_kind, err, wall])
+            xx, yy, pp = entry["x"], entry["y"], entry["phi"]
+            for a in range(pp.shape[0]):
+                for b in range(pp.shape[1]):
+                    field_rows.append([solver, N, float(xx[a, b] * 1e3),
+                                       float(yy[a, b] * 1e3), float(pp[a, b])])
+
+    for j, N in enumerate(PANEL_RESOLUTIONS_2D):
+        axes[0][j].text(0.5, 1.30, f"$N = {N}$",
+                        transform=axes[0][j].transAxes,
+                        ha="center", va="bottom", fontsize=10)
+    for i, solver in enumerate(SOLVERS):
+        axes[i][0].set_ylabel(f"{solver}\nradial  [mm]", fontsize=8,
+                              color=SOLVER_COLOUR[solver])
+    for j in range(ncol):
+        axes[-1][j].set_xlabel("axial  [mm]", fontsize=8)
+
+    if mesh is not None:
+        cb = fig.colorbar(mesh, ax=axes, fraction=0.020, pad=0.015)
+        cb.set_label(r"$\phi$  [V]", fontsize=8)
+        cb.ax.tick_params(labelsize=7)
+
+    _headline(fig, "Resolution against solver quality - two-dimensional "
+                   "thruster channel", fontweight="bold", fontsize=10)
+
+    written = _save(fig, out_dir, "F9_resolution_grid_2D", plt)
+    written.append(write_csv(
+        out_dir / "F9_resolution_grid_2D_metrics.csv",
+        ["case", "solver", "N", "error_kind", "error_pct", "wall_time_s"],
+        scalar_rows,
+    ))
+    written.append(write_csv(
+        out_dir / "F9_resolution_grid_2D_fields.csv",
+        ["solver", "N", "z_mm", "r_mm", "phi"],
+        field_rows,
+    ))
+    return written
+
+
 # ── Table Data ─────────────────────────────────────────────────────────────────
+
+# Parameter-study archives holding the equal-accuracy sweeps, per dimension, at
+# second order. One directory per dimension; the fourth-order studies live in the
+# `_4th` siblings and are not carried in the main body.
+STUDY_DIR_2ND: dict[int, str] = {
+    2: "results/2Dstudies",
+    3: "results/3Dstudies",
+}
+
+# The knob each solver is swept over by the equal-accuracy protocol, and how it
+# is written in a table. The protocol varies one parameter per solver and reports
+# the setting whose achieved residual first meets the target.
+EA_PARAMETER: dict[str, str] = {
+    "hhl":  r"$\varepsilon$",
+    "vqls": r"$n_\mathrm{layers}$",
+    "qsvt": r"$d_\mathrm{max}$",
+}
+
+
+def table_equal_accuracy_multi_d(repo_root: Path, out_dir: Path) -> list[Path]:
+    """
+    Cost at a matched residual target in two and three dimensions.
+
+    The one-dimensional equal-accuracy comparison is reported from the primary
+    sweep. This is its higher-dimensional counterpart, assembled from the
+    parameter studies, and it is the comparison the architecture of this work
+    actually delivers: every two- and three-dimensional solve is an outer
+    iteration over strips, so the quantity being priced is a whole coupled solve
+    rather than one inversion.
+
+    Reported per (dimension, case, solver): the swept parameter and the setting
+    the protocol selected, the residual achieved there, whether that residual
+    fell inside the acceptance band, and the wall time. A solver whose best
+    setting never reaches the band is recorded with `in_band` false rather than
+    omitted — an algorithm that cannot be made accurate enough at any available
+    setting is a result, and dropping it would flatter the comparison.
+
+    Two caveats travel with these numbers and are carried in the CSV so a reader
+    cannot separate them from it. `wall_clamped` marks a row whose outer
+    iteration was stopped at the study's wall-clock budget rather than
+    converging, so its wall time is the budget and its residual an upper bound.
+    `error_measure` names the error column deliberately: `max_rel_err_vs_thomas`
+    is a pointwise maximum of a relative error and is unbounded near a node of
+    the reference field, which on the three-dimensional thruster case makes it
+    read in the millions of per cent while the L² measure `err_alg` reads
+    10⁻³ %. Both are written; quote `err_alg` on that case.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root.
+    out_dir : Path
+        Destination for the CSV.
+
+    Returns
+    -------
+    list of Path
+        Files written; empty where no study archive is present.
+    """
+    rows: list[list[Any]] = []
+    for dim, rel in STUDY_DIR_2ND.items():
+        path = repo_root / rel / "equal_accuracy.json"
+        if not path.exists():
+            log.warning("  %s absent; skipped in the equal-accuracy table", path)
+            continue
+        meta = repo_root / rel / "run_metadata.json"
+        budgets: dict[str, float] = {}
+        for candidate in sorted((repo_root / rel).glob("run_metadata*.json")):
+            try:
+                payload = json.loads(candidate.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            config = payload.get("config", {})
+            budget = config.get("max_wall_s")
+            for solver in config.get("solvers", []):
+                if budget is not None:
+                    budgets[str(solver).lower()] = float(budget)
+        del meta
+
+        with open(path, encoding="utf-8") as fh:
+            records = json.load(fh)
+        for rec in records:
+            solver = str(rec.get("solver", "")).lower()
+            best = rec.get("best_result") or {}
+            budget = budgets.get(solver)
+            wall = best.get("wall_time_s")
+            clamped = (budget is not None and wall is not None
+                       and float(wall) >= budget - 5.0)
+            rows.append([
+                dim, best.get("case_id"), solver.upper(),
+                EA_PARAMETER.get(solver, ""), best.get("sensitivity_value"),
+                best.get("residual"), rec.get("r_target"), rec.get("in_band"),
+                wall, clamped,
+                best.get("err_alg"), best.get("max_rel_err_vs_thomas"),
+                rec.get("n_solver_calls"), rec.get("notes"),
+            ])
+
+    if not rows:
+        return []
+    rows.sort(key=lambda r: (r[0], str(r[1]), str(r[2])))
+    return [write_csv(
+        out_dir / "T4_equal_accuracy_2D3D.csv",
+        ["dim", "case", "solver", "parameter", "setting", "residual",
+         "r_target", "in_band", "wall_time_s", "wall_clamped",
+         "err_alg_pct", "max_rel_err_vs_thomas_pct", "n_solver_calls", "notes"],
+        rows,
+    )]
+
 
 def table_observed_order(repo_root: Path, out_dir: Path) -> list[Path]:
     """
@@ -1535,7 +2058,9 @@ def build_all(repo_root: Path, out_dir: Path) -> list[Path]:
     written += export_profiles_1d(repo_root, out_dir, N=32)
     written += figure_het_fields(repo_root, out_dir)
     written += figure_het_profile_1d(repo_root, out_dir, N=32)
+    written += figure_resolution_grid_2d(repo_root, out_dir)
     written += table_observed_order(repo_root, out_dir)
     written += table_primary_condensed(repo_root, out_dir)
+    written += table_equal_accuracy_multi_d(repo_root, out_dir)
 
     return written

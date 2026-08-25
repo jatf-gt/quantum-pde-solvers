@@ -85,7 +85,15 @@ def main() -> int:
 
     log.info("-" * 78)
     for path in written:
-        log.info("    wrote %s", path.relative_to(REPO_ROOT))
+        # `--out-dir` accepts any path, including one outside the repository —
+        # the untitled render destined for the dissertation tree is written that
+        # way. `relative_to` raises rather than falling back on such a path, so
+        # the report is shortened only where shortening is defined.
+        try:
+            shown = path.relative_to(REPO_ROOT)
+        except ValueError:
+            shown = path
+        log.info("    wrote %s", shown)
     log.info("  %d file(s) under %s", len(written), args.out_dir)
     log.info("=" * 78)
     return 0
