@@ -1,3 +1,7 @@
 case,solver,N,r_target,residual_achieved,wall_time_s,param,param_value,in_band,n_solver_calls
+3D_HET_MMS_SPT100,hhl,8,0.001,0.005049725975219426,2984.86148895137,epsilon,0.005,False,4
+3D_Poisson_TripleSin_cube,hhl,8,0.001,0.004967125530461522,3240.7218282986432,epsilon,0.005,False,4
+3D_HET_MMS_SPT100,vqls,8,0.001,0.0005357706950295655,1962.6610847499687,n_layers,3.0,True,5
+3D_Poisson_TripleSin_cube,vqls,8,0.001,0.0002998454569075168,1413.7366603878327,n_layers,3.0,True,5
 3D_HET_MMS_SPT100,qsvt,8,0.001,0.0005410779721373106,12.151336422073655,max_degree,5.0,True,8
 3D_Poisson_TripleSin_cube,qsvt,8,0.001,0.0003328699476130944,7.378460307954811,max_degree,5.0,True,8

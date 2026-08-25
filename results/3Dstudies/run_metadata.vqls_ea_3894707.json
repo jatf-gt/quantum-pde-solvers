@@ -1,18 +1,18 @@
 {
-  "run_tag": "grid_fix",
-  "timestamp": "2026-08-20T11:13:10",
+  "run_tag": "vqls_ea",
+  "timestamp": "2026-08-23T19:15:19",
   "python_version": "3.12.3 (main, Oct 30 2024, 13:22:10) [GCC 13.3.0]",
   "platform": "Linux-4.18.0-553.144.1.el8_10.x86_64-x86_64-with-glibc2.28",
   "config": {
-    "timestamp": "2026-08-20 11:13:09",
-    "hostname": "cx3-3-13",
+    "timestamp": "2026-08-23 19:15:15",
+    "hostname": "cx3-12-16",
     "python": "3.12.3 (main, Oct 30 2024, 13:22:10) [GCC 13.3.0]",
     "numpy": "2.5.1",
-    "pbs_jobid": "3834215.pbs-7",
-    "study": "both",
+    "pbs_jobid": "3894707.pbs-7",
+    "study": "equal-accuracy",
     "dim": 3,
     "scheme": "fmg",
-    "max_wall_s": 3600.0,
+    "max_wall_s": 9000.0,
     "order": 2,
     "cases": [
       "poisson_3d_triple_sin_cube",
@@ -22,7 +22,7 @@
       8
     ],
     "solvers": [
-      "qsvt"
+      "vqls"
     ],
     "r_target": 0.001,
     "grids": {
@@ -206,8 +206,7 @@
         }
       }
     },
-    "git_commit": "a6b6e0312c34aecba7c6e8c80c0274e13dc74080",
-    "git_dirty": false
-  },
-  "provenance_note": "This metadata describes the QSVT records only (grid_fix submission 3834215.pbs-7). The HHL records come from job 3894705.pbs-7 and the VQLS equal-accuracy records from job 3894707.pbs-7, both of 2026-08-23 and installed 2026-08-24. No 3-D VQLS sensitivity sweep is installed here; the partial one is held in results/3Dstudies_vqls_sens/. See PROVENANCE.md."
+    "git_commit": "a50ebfb62dcfabf1b3f316609964836d00b9e3ae",
+    "git_dirty": true
+  }
 }

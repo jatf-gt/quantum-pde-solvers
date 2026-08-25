@@ -209,5 +209,5 @@
     "git_commit": "a6b6e0312c34aecba7c6e8c80c0274e13dc74080",
     "git_dirty": false
   },
-  "provenance_note": "This metadata describes the QSVT records only (grid_fix submission 3834214.pbs-7). The HHL, VQLS records in this directory come from earlier submissions; see PROVENANCE.md for their origin and status."
+  "provenance_note": "This metadata describes the QSVT records only (grid_fix submission 3834214.pbs-7). The HHL and VQLS records in this directory come from separate submissions -- VQLS from job 3894682.pbs-7 of 2026-08-23, installed 2026-08-24. See PROVENANCE.md for the origin and status of every file."
 }
