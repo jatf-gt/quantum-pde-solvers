@@ -118,6 +118,13 @@ SOLVERS: tuple[str, ...] = ("Thomas", "HHL", "VQLS", "QSVT")
 # orders of magnitude. The exported CSV retains all four solvers at both.
 PROFILE_SOLVERS_1D: tuple[str, ...] = ("Thomas", "HHL", "VQLS", "QSVT")
 PROFILE_RESOLUTIONS_1D: tuple[int, ...] = (8, 32)
+
+# Solvers omitted from a given row of F8. VQLS at N = 32 carries 99 % error in
+# the potential, so what it draws is not a profile: a flat band of noise that
+# spends the panel's vertical range and says only what the text already says.
+# It stays in the N = 8 row, where it tracks the classical solution, and the
+# contrast between the two rows is then stated rather than drawn.
+PROFILE_OMIT_1D: dict[int, tuple[str, ...]] = {32: ("VQLS",)}
 QUANTUM_SOLVERS: tuple[str, ...] = ("HHL", "VQLS", "QSVT")
 
 # Okabe--Ito, the qualitative palette designed to stay separable under the three
@@ -206,16 +213,27 @@ BODY_FONT_STACK: tuple[str, ...] = (
 
 # Point sizes, all measured on the page because the scale factor is unity.
 #
-# The body and caption are set at 11 pt scaled by 0.95, so caption glyphs are
-# 10.45 pt. Axis labels and tick labels are therefore set at or above that: the
-# reader must not have to magnify the page to read an axis. Legends, in-panel
-# annotations and small-multiple titles are subordinate labelling and are allowed
-# below it, but not far below — 8 pt is the floor adopted here.
-AXIS_PT:   float = 11.0     # axis labels, panel titles
-TICK_PT:   float = 10.5     # tick labels; equals the caption glyph size exactly
+# The body is 11 pt scaled by 0.95, so it reaches the page at 10.45 pt, and the
+# caption is that at \small, near 9.5 pt. Axis text belongs between the two: a
+# figure whose axis labels are larger than the body text it sits in reads as a
+# poster rather than as an illustration, which is what the first calibration
+# produced at 11 and 10.5 pt. Legends, in-panel annotations and small-multiple
+# titles are subordinate labelling and sit at or below the caption.
+AXIS_PT:   float = 10.0     # axis labels, panel titles
+TICK_PT:   float =  9.5     # tick labels; the caption glyph size, the floor
 LEGEND_PT: float =  9.0     # legends
-ANNOT_PT:  float =  8.5     # in-panel annotations and small-multiple titles
+ANNOT_PT:  float =  8.0     # in-panel annotations and small-multiple titles
 SMALL_PT:  float =  8.0     # densest small-multiple labelling only
+
+# Widths for figures placed at less than \textwidth. A figure is rendered at
+# exactly the width it is placed at, so the scale factor stays one and the point
+# sizes above hold on the page; the LaTeX fraction and the fraction here must
+# therefore be kept equal. Narrowing is worth it where a plot has more width
+# than it has data to fill.
+def width_in(fraction: float) -> float:
+    """Canvas width in inches for a figure placed at `fraction` of the text
+    block. Mirror the same fraction in the `\\includegraphics` call."""
+    return TEXT_WIDTH_IN * fraction
 
 
 def _body_face() -> str:
@@ -745,7 +763,7 @@ def figure_accuracy_vs_N(repo_root: Path, out_dir: Path,
     """
     plt = _matplotlib()
     case = PRIMARY_CASE[dim]
-    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 3.65), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 2.90), sharey=True)
 
     csv_rows: list[list[Any]] = []
     for ax, order in zip(axes, (2, 4)):
@@ -856,7 +874,7 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
     """
     plt = _matplotlib()
     case = PRIMARY_CASE[dim]
-    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 3.65), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 2.90), sharey=True)
 
     csv_rows: list[list[Any]] = []
     for ax, order in zip(axes, (2, 4)):
@@ -979,7 +997,7 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
         Files written.
     """
     plt = _matplotlib()
-    fig, ax = plt.subplots(figsize=(TEXT_WIDTH_IN, 4.30))
+    fig, ax = plt.subplots(figsize=(width_in(0.88), 3.62))
 
     # Right-hand sides that are eigenvectors of the discrete operator. The
     # inversion is then a single scalar division, exact for any polynomial that
@@ -1029,15 +1047,21 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
 
     ax.axvline(DEGREE_KAPPA_THRESHOLD, color="black", ls="--", lw=1.3,
                label=rf"$d/\kappa = {DEGREE_KAPPA_THRESHOLD:g}$")
-    ax.axvspan(1e-2, DEGREE_KAPPA_THRESHOLD, color="grey", alpha=0.13)
-    ax.annotate("under-resolved polynomial", xy=(0.04, 0.94),
+    ax.axvspan(1e-3, DEGREE_KAPPA_THRESHOLD, color="grey", alpha=0.13)
+    # No solve sits below d/kappa = 0.6, so a decade of empty grey on the left
+    # spends width the narrowed canvas no longer has.
+    ax.set_xlim(0.35, 4.0e2)
+    ax.annotate("under-resolved polynomial", xy=(0.03, 0.80),
                 xycoords="axes fraction", fontsize=ANNOT_PT, color="dimgrey")
     ax.set_xlabel(r"degree-to-condition-number ratio  $d / \kappa(A)$")
     ax.set_ylabel(r"relative residual  $\|Au - b\|_2 / \|b\|_2$")
     _headline(ax, r"QSVT accuracy is set by $d/\kappa$, not by $N$ or the case",
                  fontsize=10)
     ax.grid(alpha=0.3, which="both")
-    ax.legend(fontsize=SMALL_PT, loc="lower left", ncol=2)
+    # One column, not two: the lower left is empty below 10^-10, and a single
+    # column reads as a list rather than as a block of small print.
+    ax.legend(fontsize=LEGEND_PT, loc="lower left", ncol=1,
+              labelspacing=0.3, handletextpad=0.5, borderpad=0.4)
 
     written = _save(fig, out_dir, "F3_qsvt_degree_threshold", plt)
     written.append(write_csv(
@@ -1082,7 +1106,7 @@ def figure_kappa_scaling(repo_root: Path, out_dir: Path) -> list[Path]:
         Files written.
     """
     plt = _matplotlib()
-    fig, ax = plt.subplots(figsize=(TEXT_WIDTH_IN, 4.05))
+    fig, ax = plt.subplots(figsize=(width_in(0.80), 2.95))
 
     styles = {dim: (DIMENSION_COLOUR[dim], marker)
               for dim, marker in ((1, "o"), (2, "s"), (3, "^"))}
@@ -1120,7 +1144,8 @@ def figure_kappa_scaling(repo_root: Path, out_dir: Path) -> list[Path]:
     ax.set_ylabel(r"condition number")
     _headline(ax, "Strip decomposition bounds the condition number", fontsize=10)
     ax.grid(alpha=0.3, which="both")
-    ax.legend(fontsize=SMALL_PT, ncol=2)
+    ax.legend(fontsize=LEGEND_PT, ncol=2, labelspacing=0.3,
+              handletextpad=0.5, columnspacing=1.0, borderpad=0.4)
     # The 2-D strip operator is measured out to N = 256, so this axis carries two
     # resolutions beyond the 1-D sweep's range; the default decade ticks label
     # none of the six actually run.
@@ -1166,7 +1191,7 @@ def figure_cost_vs_N(repo_root: Path, out_dir: Path,
     """
     plt = _matplotlib()
     case = PRIMARY_CASE[dim]
-    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 3.65), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 2.90), sharey=True)
 
     csv_rows: list[list[Any]] = []
     for ax, order in zip(axes, (2, 4)):
@@ -1254,7 +1279,8 @@ def figure_hardware(repo_root: Path, out_dir: Path) -> list[Path]:
         Files written.
     """
     plt = _matplotlib()
-    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 3.85))
+    fig, ax0 = plt.subplots(figsize=(width_in(0.74), 3.05))
+    axes = [ax0]
 
     inv = repo_root / "results" / "investigations"
     csv_rows: list[list[Any]] = []
@@ -1307,46 +1333,23 @@ def figure_hardware(repo_root: Path, out_dir: Path) -> list[Path]:
     axes[0].set_xlim(-1.5, 65)
     axes[0].set_xlabel("QSVT polynomial degree $d$")
     axes[0].set_ylabel("measured state fidelity $F_d$")
-    axes[0].set_title("(a)  Error composition")
-    axes[0].legend(fontsize=SMALL_PT)
+    axes[0].legend(fontsize=LEGEND_PT, labelspacing=0.3,
+                   handletextpad=0.5, borderpad=0.4)
     axes[0].grid(alpha=0.3, which="both")
 
-    # -- Right: transpiled gate count against the calibrated budget ------------
+    # The transpiled gate count against the calibrated budget was a second
+    # panel here until 2026-08-26. It carried one monotone line and one
+    # horizontal budget over four resolutions, which `tab:hardware_feasibility`
+    # already states for three solvers at five resolutions and in exact
+    # figures. Its CSV rows are kept, since they are the table's source.
     feas = inv / "hardware_feasibility_1d" / "results_full.json"
-    budget = int(math.log(0.5) / math.log(1.0 - IBM_KINGSTON_TWO_QUBIT_ERROR))
     if feas.exists():
         with open(feas, encoding="utf-8") as fh:
             rows = json.load(fh)
-        Ns = [r["N"] for r in rows]
-        counts = [r["total_two_qubit_count"] for r in rows]
-        axes[1].loglog(Ns, counts, "D-", lw=1.7, mfc="none",
-                       color=SOLVER_COLOUR["QSVT"],
-                       label="transpiled two-qubit count, 1-D QSVT")
         for r in rows:
             csv_rows.append(["two_qubit_vs_N", "transpiled", None, r["N"],
                              r["total_two_qubit_count"], r["degree"],
                              r["kappa"], None])
-        axes[1].axhline(budget, color="black", ls="--", lw=1.3)
-        axes[1].annotate(
-            f"budget {budget} gates   "
-            rf"($\varepsilon_2 = {_sci(IBM_KINGSTON_TWO_QUBIT_ERROR)}$, "
-            rf"$p = 0.5$)",
-            xy=(0.03, budget * 1.2), xycoords=("axes fraction", "data"),
-            fontsize=SMALL_PT)
-    else:
-        axes[1].text(0.5, 0.5, "transpiled feasibility sweep pending",
-                     transform=axes[1].transAxes, ha="center", va="center",
-                     fontsize=AXIS_PT, color="grey")
-
-    axes[1].set_xlabel("$N$")
-    axes[1].set_ylabel("two-qubit gate count")
-    # Without this the logarithmic axis labels the decade minor ticks, which over
-    # N = 4..32 is five overlapping "4 x 10^0"-style strings and no tick on any
-    # resolution that was actually run.
-    _label_n_axis(axes[1], ticks=(4, 8, 16, 32))
-    axes[1].set_title("(b)  Circuit size vs. budget")
-    axes[1].legend(fontsize=SMALL_PT)
-    axes[1].grid(alpha=0.3, which="both")
 
     _headline(fig, "Hardware verification, IBM Kingston (156-qubit Heron)",
                  fontweight="bold", fontsize=10)
@@ -1673,7 +1676,8 @@ def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
     # 2.5 in, which can.
     ncol = 2
     fig, axes = plt.subplots(2 * len(panels), ncol,
-                             figsize=(TEXT_WIDTH_IN, 2.85 * 2 * len(panels)),
+                             figsize=(width_in(0.84),
+                                      2.25 * 2 * len(panels)),
                              squeeze=False)
 
     for block, (dim, case, by_solver) in enumerate(panels):
@@ -1825,14 +1829,15 @@ def figure_het_profile_1d(repo_root: Path, out_dir: Path,
     # gives most of it back, and the figure stays under half the text block, so
     # it can share a page with the paragraphs that read it. The curves are a
     # bump and a sigmoid, both of which survive a squarer panel.
-    fig, axes = plt.subplots(2, 2, figsize=(TEXT_WIDTH_IN, 4.66),
+    fig, axes = plt.subplots(2, 2, figsize=(width_in(0.86), 4.05),
                              sharex=True, squeeze=False)
     letters = "abcdefgh"
     for i, (N, series) in enumerate(rows):
         phi_ref = max(abs(v) for v in series["Thomas"]["phi"]) or 1.0
         E_ref = max(abs(v) for v in series["Thomas"]["E"]) or 1.0
+        omit = PROFILE_OMIT_1D.get(N, ())
         for solver in PROFILE_SOLVERS_1D:
-            if solver not in series:
+            if solver not in series or solver in omit:
                 continue
             s = series[solver]
             style = dict(color=SOLVER_COLOUR[solver],
@@ -1859,18 +1864,20 @@ def figure_het_profile_1d(repo_root: Path, out_dir: Path,
         axes[i][1].set_title(
             f"({letters[2 * i + 1]})  axial electric field,  $N = {N}$")
         axes[i][1].set_ylabel(r"$E\,/\,|E|^{\mathrm{Thomas}}_{\max}$")
-        # The potential rises to its maximum near mid-channel and the field is a
-        # monotone sigmoid, so the free corner differs between the two columns.
-        # The potential occupies (0, 1] with nothing below it, and the collapsed
-        # VQLS trace runs along the axis, so its legend needs a reserved band
-        # rather than a corner. Opening the ordinate to the same lower limit the
-        # field panel needs anyway costs no information and puts every panel of
-        # the figure on one normalised scale.
-        axes[i][0].set_ylim(-0.78, 1.06)
+        # The potential rises to its maximum near mid-channel and the field is
+        # a monotone sigmoid, so the free region differs between the two
+        # columns. The potential occupies (0, 1] with nothing below it, so its
+        # legend needs a reserved band rather than a corner; opening the
+        # ordinate to roughly the lower limit the field panel needs anyway
+        # costs no information and puts every panel on one normalised scale.
+        axes[i][0].set_ylim(-0.86, 1.06)
         axes[i][0].set_yticks([0.0, 0.5, 1.0])
-        axes[i][0].legend(fontsize=SMALL_PT, loc="lower center", ncol=2,
-                          handlelength=1.4, labelspacing=0.25,
-                          columnspacing=1.0, borderpad=0.3, framealpha=0.85)
+        # One column, centred: two columns overflowed the panel, and the
+        # potential is a single bump, so the band it leaves clear runs the full
+        # width beneath it rather than sitting in a corner.
+        axes[i][0].legend(fontsize=SMALL_PT, loc="lower center", ncol=1,
+                          handlelength=1.4, labelspacing=0.22,
+                          borderpad=0.3, framealpha=0.85)
         axes[i][1].legend(fontsize=SMALL_PT, loc="upper left",
                           handlelength=1.4, labelspacing=0.25,
                           borderpad=0.3, framealpha=0.85)
@@ -2090,7 +2097,7 @@ def figure_resolution_grid_2d(repo_root: Path, out_dir: Path) -> list[Path]:
     for j, N in enumerate(PANEL_RESOLUTIONS_2D):
         axes[0][j].text(0.5, 1.62, f"$N = {N}$",
                         transform=axes[0][j].transAxes,
-                        ha="center", va="bottom", fontsize=AXIS_PT)
+                        ha="center", va="bottom", fontsize=ANNOT_PT)
     for i, solver in enumerate(SOLVERS):
         axes[i][0].set_ylabel(f"{solver}\nradial  [mm]", fontsize=ANNOT_PT,
                               color=SOLVER_COLOUR[solver])
