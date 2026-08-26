@@ -66,15 +66,19 @@ log = logging.getLogger("study_plotting")
 
 # ── Presentation Constants ─────────────────────────────────────────────────────
 
-# Shared with benchmark/hpc_plotting.py so that a solver keeps one colour across
-# every figure in the thesis. Restated rather than imported: importing that module
-# binds its matplotlib globals as a side effect, which is precisely the backend
-# coupling its own `_matplotlib` helper exists to avoid.
+# Shared with benchmark/hpc_plotting.py and benchmark/thesis_figures.py so that a
+# solver keeps one colour across every figure in the thesis. Restated rather than
+# imported: importing either module binds its matplotlib globals as a side effect,
+# which is precisely the backend coupling its own `_matplotlib` helper exists to
+# avoid. The hues are Okabe--Ito, chosen so that VQLS and QSVT -- the two curves
+# every accuracy figure asks the reader to separate -- stay separable under the
+# common forms of colour blindness, which the matplotlib default green and red do
+# not.
 SOLVER_COLOUR: dict[str, str] = {
-    "thomas": "#000000",
-    "hhl":    "#1f77b4",
-    "vqls":   "#2ca02c",
-    "qsvt":   "#d62728",
+    "thomas": "#000000",   # black
+    "hhl":    "#0072B2",   # blue
+    "vqls":   "#009E73",   # bluish green
+    "qsvt":   "#D55E00",   # vermillion
 }
 
 SOLVER_ORDER: tuple[str, ...] = ("hhl", "vqls", "qsvt")
@@ -174,6 +178,56 @@ def _param_axis(values: list[float]) -> tuple[list[float], list[str], bool]:
         ]
         return positions, labels, True
     return [float(v) for v in values], [], False
+
+
+# Tolerance below which an error against Thomas is indistinguishable from zero,
+# in per cent. A quantum solve reaching this against the classical reference of
+# the same discretisation has not solved the system well; it has been replaced by
+# it. See `_is_classical_fallback`.
+FALLBACK_ERR_TOL_PCT: float = 1.0e-6
+
+
+def _is_classical_fallback(result) -> bool:
+    """
+    Report whether a VQLS record holds the classical solution rather than a
+    variational one.
+
+    `solvers.outer.inner.InnerSolverWrapper` catches an exception from the inner
+    solver and substitutes the Thomas solve, so a strip that raised is recorded
+    as a strip that succeeded. Where every strip raised, the outer result is the
+    exact classical field and reads as a flawless quantum result: error against
+    Thomas at round-off, residual at the outer tolerance, cost far below the
+    working configurations. Plotted unfiltered it is the most accurate point on
+    the panel by ten orders of magnitude.
+
+    The tell is that the fallback's `extra` dictionary carries no `final_cost`,
+    so `vqls_cost_final` never aggregates and stays null, where every genuine
+    VQLS solve populates it. Null cost *and* an error against Thomas at round-off
+    together identify the substitution; neither alone does.
+
+    The known instances are the `n_restarts = 1` records of the 2-D and 3-D
+    studies, produced by the defect fixed in `solvers/quantum/vqls_1d.py` on
+    2026-08-24 — after those jobs were submitted, so their archives still carry
+    it. Detection is by signature rather than by parameter value so that a
+    re-measured `n_restarts = 1` point is admitted without an edit here, and so
+    that any future exception path absorbed by the same wrapper is caught too.
+
+    Parameters
+    ----------
+    result : BenchmarkResult
+        One record from a sensitivity sweep or an equal-accuracy grid.
+
+    Returns
+    -------
+    bool
+        True where the record is the classical fallback in quantum clothing.
+    """
+    if (result.solver or "").lower() != "vqls":
+        return False
+    if result.vqls_cost_final is not None:
+        return False
+    err = result.max_rel_err_vs_thomas
+    return err is not None and err < FALLBACK_ERR_TOL_PCT
 
 
 def _err_alg(result) -> Optional[float]:
@@ -436,7 +490,8 @@ def plot_sensitivity(
                           and any(r.case_id == case for r in s.results)), None)
             if sweep is None:
                 continue
-            records = [r for r in sweep.results if r.case_id == case]
+            records = [r for r in sweep.results
+                       if r.case_id == case and not _is_classical_fallback(r)]
             if not records:
                 continue
 
@@ -503,7 +558,25 @@ def plot_sensitivity(
         ax_cost.set_ylabel("wall time  [s]")
         ax_err.set_title(f"Accuracy — varying {param}")
         ax_cost.set_title(f"Cost — varying {param}")
-        ax_err.legend(fontsize=6.5, loc="best")
+
+        # A sweep can legitimately carry no records: every solve in it may have
+        # been refused by the solver. The 1-D fourth-order HHL `trotter_steps`
+        # sweep is the standing example — a pentadiagonal operator is not
+        # Toeplitz tridiagonal, so its Hamiltonian simulation is an exact matrix
+        # exponential with no Trotter decomposition to control, and the step
+        # count is rejected rather than accepted and ignored. Say so on the
+        # panel: an unannotated empty axis reads as a broken figure, and
+        # `legend()` on one emits a warning and returns nothing.
+        if ax_err.get_legend_handles_labels()[1]:
+            ax_err.legend(fontsize=6.5, loc="best")
+        else:
+            for ax in (ax_err, ax_cost):
+                ax.text(0.5, 0.5,
+                        "\n".join(("no records:",
+                                   f"every solve over {param}",
+                                   "was refused by the solver")),
+                        transform=ax.transAxes, ha="center", va="center",
+                        fontsize=8, color="grey", style="italic")
 
     fig.suptitle(
         f"Parameter sensitivity, {solver.upper()}, {dim}-D  "

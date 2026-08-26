@@ -1,0 +1,42 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Sensitivity analysis for the HHL algorithm at $N=8$. Each block varies one parameter while holding all others at the baseline value. $e_\infty$ is the maximum relative error against the analytical solution; $r$ is the relative residual.}
+  \label{tab:sensitivity}
+  \begin{tabular}{l S[table-format=3.3] S[table-format=1.2e2] S[table-format=6.0] S[table-format=4.2]}
+    \toprule
+    {Parameter value} & {$e_\infty$ [\%]} & {$r$} & {Depth} & {$t$ [s]} \\
+    \multicolumn{5}{l}{\textit{Varying $\varepsilon$}}\\
+    \midrule
+    \text{0.1} & 0.016 & $7.08 \times 10^{-14}$ & {\text{---}} & 9.36 \\
+    \text{0.05} & 0.016 & $7.08 \times 10^{-14}$ & {\text{---}} & 8.92 \\
+    \text{0.01} & 0.016 & $7.08 \times 10^{-14}$ & {\text{---}} & 8.93 \\
+    \text{0.005} & 0.016 & $7.08 \times 10^{-14}$ & {\text{---}} & 8.62 \\
+    \text{0.001} & 0.016 & $7.08 \times 10^{-14}$ & {\text{---}} & 8.90 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying trotter_steps}}\\
+    \midrule
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $\varepsilon$}}\\
+    \midrule
+    \text{0.1} & 4.835 & $1.20 \times 10^{-3}$ & {\text{---}} & 8.87 \\
+    \text{0.05} & 4.835 & $1.20 \times 10^{-3}$ & {\text{---}} & 8.62 \\
+    \text{0.01} & 4.835 & $1.20 \times 10^{-3}$ & {\text{---}} & 9.16 \\
+    \text{0.005} & 4.835 & $1.20 \times 10^{-3}$ & {\text{---}} & 8.96 \\
+    \text{0.001} & 4.835 & $1.20 \times 10^{-3}$ & {\text{---}} & 9.21 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying trotter_steps}}\\
+    \midrule
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $\varepsilon$}}\\
+    \midrule
+    \text{0.1} & 0.275 & $2.26 \times 10^{-3}$ & {\text{---}} & 8.85 \\
+    \text{0.05} & 0.275 & $2.26 \times 10^{-3}$ & {\text{---}} & 8.87 \\
+    \text{0.01} & 0.275 & $2.26 \times 10^{-3}$ & {\text{---}} & 9.00 \\
+    \text{0.005} & 0.275 & $2.26 \times 10^{-3}$ & {\text{---}} & 8.95 \\
+    \text{0.001} & 0.275 & $2.26 \times 10^{-3}$ & {\text{---}} & 9.14 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying trotter_steps}}\\
+    \midrule
+    \bottomrule
+  \end{tabular}
+\end{table}

@@ -1,0 +1,66 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Sensitivity analysis for the QSVT algorithm at $N=8$. Each block varies one parameter while holding all others at the baseline value. $e_\infty$ is the maximum relative error against the analytical solution; $r$ is the relative residual.}
+  \label{tab:sensitivity}
+  \begin{tabular}{l S[table-format=3.3] S[table-format=1.2e2] S[table-format=6.0] S[table-format=4.2]}
+    \toprule
+    {Parameter value} & {$e_\infty$ [\%]} & {$r$} & {Depth} & {$t$ [s]} \\
+    \multicolumn{5}{l}{\textit{Varying $d_\mathrm{max}$}}\\
+    \midrule
+    \text{20} & 0.016 & $4.77 \times 10^{-14}$ & {\text{---}} & 0.01 \\
+    \text{50} & 0.016 & $3.48 \times 10^{-14}$ & {\text{---}} & 0.02 \\
+    \text{100} & 0.016 & $2.25 \times 10^{-14}$ & {\text{---}} & 0.05 \\
+    \text{200} & 0.016 & $3.16 \times 10^{-14}$ & {\text{---}} & 0.08 \\
+    \text{500} & 0.016 & $4.29 \times 10^{-14}$ & {\text{---}} & 0.43 \\
+    \text{1e+03} & 0.016 & $8.33 \times 10^{-14}$ & {\text{---}} & 0.41 \\
+    \text{2e+03} & 0.016 & $8.39 \times 10^{-14}$ & {\text{---}} & 1.16 \\
+    \text{uncapped} & 0.016 & $8.52 \times 10^{-14}$ & {\text{---}} & 4.53 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $\varepsilon$}}\\
+    \midrule
+    \text{0.1} & 0.016 & $4.97 \times 10^{-14}$ & {\text{---}} & 4.01 \\
+    \text{0.05} & 0.016 & $1.74 \times 10^{-13}$ & {\text{---}} & 1778.88 \\
+    \text{0.01} & 0.016 & $8.52 \times 10^{-14}$ & {\text{---}} & 4.27 \\
+    \text{0.005} & 0.016 & $8.81 \times 10^{-14}$ & {\text{---}} & 2402.43 \\
+    \text{0.001} & 0.016 & $1.07 \times 10^{-13}$ & {\text{---}} & 2861.54 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $d_\mathrm{max}$}}\\
+    \midrule
+    \text{20} & 11.315 & $3.88 \times 10^{-1}$ & {\text{---}} & 0.01 \\
+    \text{50} & 2.632 & $1.58 \times 10^{-1}$ & {\text{---}} & 0.02 \\
+    \text{100} & 4.431 & $2.81 \times 10^{-2}$ & {\text{---}} & 0.04 \\
+    \text{200} & 4.877 & $1.34 \times 10^{-2}$ & {\text{---}} & 0.08 \\
+    \text{500} & 4.820 & $3.91 \times 10^{-6}$ & {\text{---}} & 0.43 \\
+    \text{1e+03} & 4.820 & $3.83 \times 10^{-11}$ & {\text{---}} & 0.62 \\
+    \text{2e+03} & 4.820 & $2.33 \times 10^{-13}$ & {\text{---}} & 0.96 \\
+    \text{uncapped} & 4.820 & $8.13 \times 10^{-13}$ & {\text{---}} & 3.50 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $\varepsilon$}}\\
+    \midrule
+    \text{0.1} & 4.820 & $7.01 \times 10^{-13}$ & {\text{---}} & 3.29 \\
+    \text{0.05} & 4.820 & $7.58 \times 10^{-13}$ & {\text{---}} & 3.49 \\
+    \text{0.01} & 4.820 & $8.13 \times 10^{-13}$ & {\text{---}} & 3.72 \\
+    \text{0.005} & 4.820 & $8.55 \times 10^{-13}$ & {\text{---}} & 4.69 \\
+    \text{0.001} & 4.820 & $9.10 \times 10^{-13}$ & {\text{---}} & 4.33 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $d_\mathrm{max}$}}\\
+    \midrule
+    \text{20} & 18.489 & $2.81 \times 10^{-1}$ & {\text{---}} & 0.02 \\
+    \text{50} & 22.879 & $2.25 \times 10^{-1}$ & {\text{---}} & 0.03 \\
+    \text{100} & 14.525 & $1.48 \times 10^{-1}$ & {\text{---}} & 0.05 \\
+    \text{200} & 0.310 & $9.90 \times 10^{-3}$ & {\text{---}} & 0.09 \\
+    \text{500} & 0.002 & $1.38 \times 10^{-5}$ & {\text{---}} & 0.21 \\
+    \text{1e+03} & 0.000 & $2.84 \times 10^{-11}$ & {\text{---}} & 0.77 \\
+    \text{2e+03} & 0.000 & $4.91 \times 10^{-13}$ & {\text{---}} & 1.18 \\
+    \text{uncapped} & 0.000 & $1.54 \times 10^{-12}$ & {\text{---}} & 4.43 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $\varepsilon$}}\\
+    \midrule
+    \text{0.1} & 0.000 & $1.31 \times 10^{-12}$ & {\text{---}} & 2.73 \\
+    \text{0.05} & 0.000 & $1.38 \times 10^{-12}$ & {\text{---}} & 3.35 \\
+    \text{0.01} & 0.000 & $1.54 \times 10^{-12}$ & {\text{---}} & 3.48 \\
+    \text{0.005} & 0.000 & $1.59 \times 10^{-12}$ & {\text{---}} & 3.79 \\
+    \text{0.001} & 0.000 & $1.73 \times 10^{-12}$ & {\text{---}} & 4.47 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

@@ -107,14 +107,61 @@ HET_CASE: dict[int, str] = {
 }
 
 SOLVERS: tuple[str, ...] = ("Thomas", "HHL", "VQLS", "QSVT")
+
+# Solvers drawn in the one-dimensional thruster profile, F8. VQLS is excluded
+# there and only there. At N = 32 its solution has already collapsed, so it
+# contributes a flat line near zero in both panels — a reader spends longer
+# working out why a curve is horizontal than the omission would have cost, and
+# the finding it would carry is made far better by F9, which shows the same
+# collapse developing across four resolutions. The exported CSV retains all four
+# solvers; this governs the rendering only.
+PROFILE_SOLVERS_1D: tuple[str, ...] = ("Thomas", "HHL", "QSVT")
 QUANTUM_SOLVERS: tuple[str, ...] = ("HHL", "VQLS", "QSVT")
 
+# Okabe--Ito, the qualitative palette designed to stay separable under the three
+# common forms of colour blindness. It replaces matplotlib's default cycle, whose
+# green (#2ca02c) and red (#d62728) are the pair deuteranopes cannot separate --
+# and those were VQLS and QSVT, the two curves every accuracy figure asks the
+# reader to tell apart. The hue families are unchanged, so the text's "the red
+# QSVT curve" still reads correctly. Marker shape carries the same distinction
+# independently, so the figures also survive being printed in greyscale.
 SOLVER_COLOUR: dict[str, str] = {
-    "Thomas": "#000000",
-    "HHL":    "#1f77b4",
-    "VQLS":   "#2ca02c",
-    "QSVT":   "#d62728",
+    "Thomas": "#000000",   # black
+    "HHL":    "#0072B2",   # blue
+    "VQLS":   "#009E73",   # bluish green
+    "QSVT":   "#D55E00",   # vermillion
 }
+
+# Second series colour where a figure separates by discretisation order rather
+# than by solver. Reddish purple against vermillion is separable for every form
+# of colour blindness the palette covers, which two shades of red would not be.
+ORDER_COLOUR: dict[int, str] = {2: SOLVER_COLOUR["QSVT"], 4: "#CC79A7"}
+
+# The full palette, installed as matplotlib's default property cycle so that a
+# series drawn without an explicit colour -- the per-resilience-level hardware
+# measurements, for one -- comes out of the same system as the named ones rather
+# than out of the tab10 default the named colours were chosen to replace.
+OKABE_ITO: tuple[str, ...] = (
+    "#0072B2", "#E69F00", "#009E73", "#D55E00",
+    "#CC79A7", "#56B4E9", "#F0E442", "#000000",
+)
+
+# Condition-number series are separated by spatial dimension rather than by
+# solver, so they take their own three hues from the same palette.
+DIMENSION_COLOUR: dict[int, str] = {1: "#0072B2", 2: "#009E73", 3: "#D55E00"}
+
+# Sequential map for a scalar field, diverging map for a signed error. Both are
+# deliberate: viridis is perceptually uniform, so equal steps in potential are
+# equal steps in apparent brightness and it survives greyscale conversion; RdBu_r
+# is symmetric about its midpoint, so zero error is white and the sign of the
+# departure is read from the hue rather than inferred from a key.
+# Reference lines that mark a physical limit rather than a series: the
+# maximally mixed floor in the hardware figure. Reddish purple sits outside
+# the solver hues, so it cannot be mistaken for a measurement.
+FLOOR_COLOUR: str = "#CC79A7"
+
+FIELD_CMAP: str = "viridis"
+SIGNED_ERROR_CMAP: str = "RdBu_r"
 SOLVER_MARKER: dict[str, str] = {
     "Thomas": "s", "HHL": "o", "VQLS": "^", "QSVT": "D",
 }
@@ -130,6 +177,64 @@ DEGREE_KAPPA_THRESHOLD: float = 11.0
 # `hpc/runners/make_tables.py`, which is a round number rather than a measurement
 # and understates the true budget by a factor of about two.
 IBM_KINGSTON_TWO_QUBIT_ERROR: float = 1.956349128978227e-3
+
+# ── Typographic Calibration ────────────────────────────────────────────────────
+#
+# Every figure is rendered at the exact width of the dissertation's text block
+# and placed with `\includegraphics[width=\textwidth]`, so LaTeX applies a scale
+# factor of unity and a point in the figure is a point on the page. Rendering
+# wider and letting LaTeX shrink — the arrangement these figures previously used,
+# 10.5 in reduced to 0.92 \textwidth — multiplies every glyph by 0.55, which put
+# 9 pt axis text on the page at 5 pt, half the size of the caption beneath it.
+#
+# Geometry, from `usepackages.tex`: A4 with 2.5 cm margins on all four sides, so
+# the text block is 16.0 cm wide and 24.7 cm tall.
+TEXT_WIDTH_IN: float = 6.2992      # 16.0 cm, to the fourth decimal
+TEXT_HEIGHT_IN: float = 9.7244     # 24.7 cm
+
+# The document sets Helvetica (`helvet`) at `scaled=0.95` as the default family,
+# the departmental Arial requirement; Arial and Helvetica share metrics, so Arial
+# is the exact match on Windows and Liberation Sans on Linux. Ordered by
+# preference and resolved once against the installed set, because naming a face
+# matplotlib cannot find silently substitutes DejaVu Sans and the figure ships in
+# a different typeface from the body text.
+BODY_FONT_STACK: tuple[str, ...] = (
+    "Arial", "Helvetica", "Liberation Sans", "Nimbus Sans", "DejaVu Sans",
+)
+
+# Point sizes, all measured on the page because the scale factor is unity.
+#
+# The body and caption are set at 11 pt scaled by 0.95, so caption glyphs are
+# 10.45 pt. Axis labels and tick labels are therefore set at or above that: the
+# reader must not have to magnify the page to read an axis. Legends, in-panel
+# annotations and small-multiple titles are subordinate labelling and are allowed
+# below it, but not far below — 8 pt is the floor adopted here.
+AXIS_PT:   float = 11.0     # axis labels, panel titles
+TICK_PT:   float = 10.5     # tick labels; equals the caption glyph size exactly
+LEGEND_PT: float =  9.0     # legends
+ANNOT_PT:  float =  8.5     # in-panel annotations and small-multiple titles
+SMALL_PT:  float =  8.0     # densest small-multiple labelling only
+
+
+def _body_face() -> str:
+    """
+    Resolve the document's text face against the installed fonts.
+
+    Returns
+    -------
+    str
+        The first family in `BODY_FONT_STACK` matplotlib can actually load,
+        falling back on DejaVu Sans, which ships with matplotlib and is always
+        present.
+    """
+    from matplotlib import font_manager as fm
+
+    installed = {f.name for f in fm.fontManager.ttflist}
+    for name in BODY_FONT_STACK:
+        if name in installed:
+            return name
+    return "DejaVu Sans"
+
 
 # Whether a figure carries its own headline. A reference plot read on its own
 # needs one; the same plot set beside a LaTeX caption repeats it, which reads as
@@ -193,14 +298,61 @@ def _matplotlib():
         matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    face = _body_face()
     plt.rcParams.update({
         "figure.dpi":     140,
-        "savefig.dpi":    300,
-        "font.size":      9,
-        "axes.grid":      True,
-        "grid.alpha":     0.3,
-        "legend.frameon": False,
-        "axes.titlesize": 10,
+        "savefig.dpi":    400,
+
+        # Match the document's text face, and set mathtext in the same family so
+        # that "$e_\infty$" beside "algorithmic error" is one typeface rather
+        # than two. `mathtext.fontset = "custom"` is what allows the four math
+        # styles to be pointed at a named family at all.
+        "font.family":       "sans-serif",
+        "font.sans-serif":   list(BODY_FONT_STACK),
+        "mathtext.fontset":  "custom",
+        "mathtext.rm":       face,
+        "mathtext.it":       f"{face}:italic",
+        "mathtext.bf":       f"{face}:bold",
+        "mathtext.sf":       face,
+        "mathtext.default":  "it",
+
+        "font.size":        AXIS_PT,
+        "axes.labelsize":   AXIS_PT,
+        "axes.titlesize":   AXIS_PT,
+        "figure.titlesize": AXIS_PT,
+        "xtick.labelsize":  TICK_PT,
+        "ytick.labelsize":  TICK_PT,
+        "legend.fontsize":  LEGEND_PT,
+
+        "axes.prop_cycle":  __import__("cycler").cycler(color=list(OKABE_ITO)),
+
+        "axes.grid":        True,
+        "grid.alpha":       0.3,
+        "grid.linewidth":   0.6,
+        "legend.frameon":   False,
+        "legend.handlelength":  1.9,
+        "legend.borderaxespad": 0.4,
+        "legend.labelspacing":  0.35,
+        "axes.linewidth":   0.8,
+        "lines.linewidth":  1.7,
+        "lines.markersize": 5.5,
+        "xtick.major.width": 0.8,
+        "ytick.major.width": 0.8,
+
+        # Constrained layout packs the axes inside a canvas of fixed size, where
+        # `tight_layout` resizes the canvas to suit the axes. Only the former
+        # preserves the exact figure width the scale factor of unity depends on.
+        "figure.constrained_layout.use":    True,
+        "figure.constrained_layout.h_pad":  0.02,
+        "figure.constrained_layout.w_pad":  0.02,
+        "figure.constrained_layout.hspace": 0.03,
+        "figure.constrained_layout.wspace": 0.03,
+
+        # Embed TrueType outlines rather than Type 3 bitmapped subsets: Type 3 is
+        # what makes text in a submitted PDF unsearchable and renders poorly at
+        # print resolution.
+        "pdf.fonttype": 42,
+        "ps.fonttype":  42,
     })
     return plt
 
@@ -282,6 +434,128 @@ def _is_recovered(row: dict) -> bool:
     return "recovered" in str(row.get("notes") or "")
 
 
+def _qsvt_construction(row: dict) -> str:
+    """
+    Which QSP polynomial a recorded QSVT row was built from.
+
+    Two constructions are in use and they are not interchangeable. An *uncapped*
+    solve calls `pyqsp`'s 1/x generator, which targets a prescribed uniform error
+    ε and returns whatever degree that demands. A *capped* solve fits the
+    truncated Chebyshev expansion of 1/x directly at the degree given, padding up
+    to the cap where the natural degree is lower. At equal degree the capped
+    construction is the more accurate by seven to nine orders of magnitude on any
+    right-hand side with broadband spectral content, so a curve that mixes the
+    two is not a curve in one variable and must not be drawn as one.
+
+    Which construction a row used is not recorded directly; it follows from
+    whether a cap was set, since the cap is what selects the Chebyshev path.
+
+    Parameters
+    ----------
+    row : dict
+        One summary row.
+
+    Returns
+    -------
+    str
+        'capped' or 'uncapped'.
+    """
+    return "capped" if row.get("qsvt_max_degree") is not None else "uncapped"
+
+
+def _degree_over_kappa(row: dict) -> Optional[float]:
+    """
+    Ratio of QSP polynomial degree to operator condition number for one row.
+
+    Parameters
+    ----------
+    row : dict
+        One summary row.
+
+    Returns
+    -------
+    float or None
+        d/κ, or None where either quantity is unrecorded.
+    """
+    d = row.get("qsvt_degree")
+    k = row.get("kappa") or row.get("kappa_row")
+    if d is None or not k:
+        return None
+    try:
+        return float(d) / float(k)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+# Drawing style for the two QSP constructions, shared by F1 and F2 so the two
+# figures cannot come to disagree about which series is which.
+QSVT_CONSTRUCTION_STYLE: dict[str, dict] = {
+    "capped":   {"linestyle": "-",  "mfc": "none",
+                 "label": "QSVT (capped)"},
+    "uncapped": {"linestyle": ":",  "mfc": SOLVER_COLOUR["QSVT"],
+                 "label": "QSVT (uncapped)"},
+}
+
+
+def _plot_qsvt_by_construction(ax, recs: list[dict], value_of,
+                               annotate: bool = True) -> list[tuple]:
+    """
+    Draw the QSVT series as one line per QSP construction.
+
+    Parameters
+    ----------
+    ax : matplotlib axis
+        Target axis.
+    recs : list of dict
+        QSVT rows for one case and order, ordered by resolution.
+    value_of : callable
+        Maps a row to the ordinate in per cent, or to None to drop it.
+    annotate : bool
+        Whether to label each point with its d/κ ratio. The ratio is what
+        governs whether the polynomial inverts the operator at all, and it is
+        not recoverable from the abscissa.
+
+    Returns
+    -------
+    list of tuple
+        (construction, N, value, degree, d_over_kappa) per drawn point.
+    """
+    drawn: list[tuple] = []
+    first = True
+    for construction, style in QSVT_CONSTRUCTION_STYLE.items():
+        sub = [r for r in recs if _qsvt_construction(r) == construction]
+        pts = [(r["N"], value_of(r)) for r in sub]
+        keep = [(n, e) for n, e in pts if e is not None and e > 0.0]
+        if not keep:
+            continue
+        ax.loglog(*zip(*keep), marker=SOLVER_MARKER["QSVT"], lw=1.7,
+                  color=SOLVER_COLOUR["QSVT"],
+                  linestyle=style["linestyle"], mfc=style["mfc"],
+                  label=style["label"])
+        for (n, e), r in zip(keep, sub):
+            ratio = _degree_over_kappa(r)
+            drawn.append((construction, n, e, r.get("qsvt_degree"), ratio))
+            if annotate and ratio is not None:
+                # Offset away from the line on the side the construction sits,
+                # and set on an opaque patch: these labels cross the Thomas
+                # curve at several resolutions.
+                dy = 9 if construction == "uncapped" else -13
+                # The first label on the panel names the quantity, the rest
+                # give the value alone. A column of bare integers beside a curve
+                # is unreadable without the caption; repeating the symbol on
+                # every point would bury the curve it annotates.
+                text = (rf"$d/\kappa$ = {ratio:.0f}" if first
+                        else f"{ratio:.0f}")
+                first = False
+                ax.annotate(
+                    text, (n, e), textcoords="offset points",
+                    xytext=(4, dy), fontsize=SMALL_PT,
+                    color=SOLVER_COLOUR["QSVT"],
+                    bbox=dict(boxstyle="round,pad=0.12", fc="white",
+                              ec="none", alpha=0.75))
+    return drawn
+
+
 def _pct(value: Optional[float], already_pct: bool) -> Optional[float]:
     """
     Normalise an error to per cent.
@@ -333,6 +607,60 @@ def write_csv(path: Path, header: list[str], rows: list[list[Any]]) -> Path:
         writer.writerow(header)
         writer.writerows(rows)
     return path
+
+
+def _sci(value: float, sig: int = 2) -> str:
+    """
+    Render a number as a mathtext power of ten.
+
+    `f"{x:.2e}"` produces "1.96e-03", which typesets as an italic *e* beside a
+    minus sign and reads as a variable rather than as an exponent. This returns
+    the form a reader of a thesis expects.
+
+    Parameters
+    ----------
+    value : float
+        Quantity to render.
+    sig : int
+        Significant figures in the mantissa.
+
+    Returns
+    -------
+    str
+        A mathtext fragment, without the enclosing dollar signs.
+    """
+    mantissa, exponent = f"{value:.{sig}e}".split("e")
+    return rf"{mantissa} \times 10^{{{int(exponent)}}}"
+
+
+def _pct_label(value, sig: int = 2) -> str:
+    """
+    Render a per-cent value as mathtext, switching to a power of ten when the
+    decimal form would be unreadable.
+
+    QSVT's algorithmic error reaches 10 to the minus twelve, where `"%.2g"`
+    yields "1.1e-12" — an italic *e* against a minus sign, which reads as a
+    variable. Values within three decades of unity keep the plain decimal form,
+    which is shorter and needs no interpretation.
+
+    Parameters
+    ----------
+    value : float or None
+        Error in per cent.
+    sig : int
+        Significant figures.
+
+    Returns
+    -------
+    str
+        A mathtext fragment including the per-cent sign, or "n/a".
+    """
+    if value is None:
+        return "n/a"
+    plain = f"{value:.{sig}g}"
+    if "e" not in plain:
+        return f"{plain}%"
+    return rf"${_sci(float(value), sig - 1)}$%"
 
 
 def _label_n_axis(ax, ticks: tuple[int, ...] = (4, 8, 16, 32, 64)) -> None:
@@ -415,7 +743,7 @@ def figure_accuracy_vs_N(repo_root: Path, out_dir: Path,
     """
     plt = _matplotlib()
     case = PRIMARY_CASE[dim]
-    fig, axes = plt.subplots(1, 2, figsize=(10.5, 4.2), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 3.65), sharey=True)
 
     csv_rows: list[list[Any]] = []
     for ax, order in zip(axes, (2, 4)):
@@ -423,13 +751,32 @@ def figure_accuracy_vs_N(repo_root: Path, out_dir: Path,
         if not rows:
             ax.text(0.5, 0.5, f"order {order}: sweep pending",
                     transform=ax.transAxes, ha="center", va="center",
-                    fontsize=11, color="grey")
+                    fontsize=AXIS_PT, color="grey")
             continue
         anchor_N: list[int] = []
         anchor_e: list[float] = []
         for solver in SOLVERS:
             recs = [r for r in _series(rows, case, solver)
                     if not _is_recovered(r)]
+            if solver == "QSVT":
+                # Drawn as one line per QSP construction rather than one line
+                # per solver: see `_qsvt_construction`. The two differ by seven
+                # to nine orders at equal degree, so a single curve through both
+                # reports a change of algorithm as though it were a change of
+                # resolution.
+                for construction, n, e, degree, ratio in (
+                        _plot_qsvt_by_construction(
+                            ax, recs,
+                            lambda r: _pct(r.get("max_rel_err"),
+                                           already_pct=True))):
+                    src = next(r for r in recs if r["N"] == n)
+                    csv_rows.append([
+                        case, order, f"QSVT ({construction})", n,
+                        src.get("kappa") or src.get("kappa_row"), e,
+                        _pct(src.get("err_alg"), already_pct=False),
+                        _pct(src.get("err_disc"), already_pct=False),
+                        degree, ratio])
+                continue
             pts = [(r["N"], _pct(r.get("max_rel_err"), already_pct=True))
                    for r in recs]
             pts = [(n, e) for n, e in pts if e is not None and e > 0.0]
@@ -444,25 +791,33 @@ def figure_accuracy_vs_N(repo_root: Path, out_dir: Path,
                 csv_rows.append([case, order, solver, n, r.get("kappa")
                                  or r.get("kappa_row"), e,
                                  _pct(r.get("err_alg"), already_pct=False),
-                                 _pct(r.get("err_disc"), already_pct=False)])
+                                 _pct(r.get("err_disc"), already_pct=False),
+                                 None, None])
         _reference_slope(ax, anchor_N, anchor_e, order,
                          rf"$\mathcal{{O}}(h^{order})$")
         ax.set_title(f"Order-{order} stencil")
         ax.set_xlabel("$N$")
-        ax.legend(fontsize=8)
+        ax.legend(fontsize=SMALL_PT)
         ax.grid(alpha=0.3, which="both")
+        # Open the data limits before the ticks are chosen. The QSVT degree
+        # annotation sits a few points to the right of its marker, so the point
+        # at the largest N writes past the right spine otherwise, and the
+        # terminated-solve markers at N = 64 are clipped by the same edge.
+        # Applied before `_label_n_axis`, which reads the limits to decide which
+        # resolutions to tick.
+        ax.margins(x=0.13, y=0.09)
         _label_n_axis(ax)
 
     axes[0].set_ylabel(r"total relative error $e_\infty$  [%]")
     _headline(fig, f"Accuracy against resolution — {case}  ({dim}-D)",
                  fontweight="bold", fontsize=10)
-    fig.tight_layout()
 
     written = _save(fig, out_dir, f"F1_accuracy_vs_N_{dim}D", plt)
     written.append(write_csv(
         out_dir / f"F1_accuracy_vs_N_{dim}D.csv",
         ["case", "order", "solver", "N", "kappa",
-         "err_total_pct", "err_alg_pct", "err_disc_pct"],
+         "err_total_pct", "err_alg_pct", "err_disc_pct",
+         "qsvt_degree", "d_over_kappa"],
         csv_rows,
     ))
     return written
@@ -499,7 +854,7 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
     """
     plt = _matplotlib()
     case = PRIMARY_CASE[dim]
-    fig, axes = plt.subplots(1, 2, figsize=(10.5, 4.2), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 3.65), sharey=True)
 
     csv_rows: list[list[Any]] = []
     for ax, order in zip(axes, (2, 4)):
@@ -507,7 +862,7 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
         if not rows:
             ax.text(0.5, 0.5, f"order {order}: sweep pending",
                     transform=ax.transAxes, ha="center", va="center",
-                    fontsize=11, color="grey")
+                    fontsize=AXIS_PT, color="grey")
             continue
 
         disc = [(r["N"], _pct(r.get("err_disc"), already_pct=False))
@@ -517,11 +872,21 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
             ax.loglog(*zip(*disc), "k--s", lw=1.8, mfc="none",
                       label=r"$e_\mathrm{disc}$  (Thomas vs. exact)")
             for n, e in disc:
-                csv_rows.append([case, order, "Thomas", n, None, e])
+                csv_rows.append([case, order, "Thomas", n, None, e,
+                                 None, None])
 
         for solver in QUANTUM_SOLVERS:
             recs = [r for r in _series(rows, case, solver)
                     if not _is_recovered(r)]
+            if solver == "QSVT":
+                for construction, n, e, degree, ratio in (
+                        _plot_qsvt_by_construction(
+                            ax, recs,
+                            lambda r: _pct(r.get("err_alg"),
+                                           already_pct=False))):
+                    csv_rows.append([case, order, f"QSVT ({construction})",
+                                     n, e, None, degree, ratio])
+                continue
             pts = [(r["N"], _pct(r.get("err_alg"), already_pct=False))
                    for r in recs]
             pts = [(n, e) for n, e in pts if e is not None and e > 0.0]
@@ -531,12 +896,19 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
                       color=SOLVER_COLOUR[solver], mfc="none",
                       label=rf"$e_\mathrm{{alg}}$  {solver}")
             for n, e in pts:
-                csv_rows.append([case, order, solver, n, e, None])
+                csv_rows.append([case, order, solver, n, e, None, None, None])
 
         ax.set_title(f"Order-{order} stencil")
         ax.set_xlabel("$N$")
-        ax.legend(fontsize=8)
+        ax.legend(fontsize=SMALL_PT)
         ax.grid(alpha=0.3, which="both")
+        # Open the data limits before the ticks are chosen. The QSVT degree
+        # annotation sits a few points to the right of its marker, so the point
+        # at the largest N writes past the right spine otherwise, and the
+        # terminated-solve markers at N = 64 are clipped by the same edge.
+        # Applied before `_label_n_axis`, which reads the limits to decide which
+        # resolutions to tick.
+        ax.margins(x=0.13, y=0.09)
         _label_n_axis(ax)
 
     axes[0].set_ylabel("relative error  [%]")
@@ -544,12 +916,12 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
         fig,
         f"Algorithmic against discretisation error — {case}  ({dim}-D)",
         fontweight="bold", fontsize=10)
-    fig.tight_layout()
 
     written = _save(fig, out_dir, f"F2_error_decomposition_{dim}D", plt)
     written.append(write_csv(
         out_dir / f"F2_error_decomposition_{dim}D.csv",
-        ["case", "order", "solver", "N", "err_alg_pct", "err_disc_pct"],
+        ["case", "order", "solver", "N", "err_alg_pct", "err_disc_pct",
+         "qsvt_degree", "d_over_kappa"],
         csv_rows,
     ))
     return written
@@ -605,7 +977,7 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
         Files written.
     """
     plt = _matplotlib()
-    fig, ax = plt.subplots(figsize=(7.0, 4.8))
+    fig, ax = plt.subplots(figsize=(TEXT_WIDTH_IN, 4.30))
 
     # Right-hand sides that are eigenvectors of the discrete operator. The
     # inversion is then a single scalar division, exact for any polynomial that
@@ -614,7 +986,7 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
     eigenvector_rhs = {"1D_Poisson_fS_hom"}
 
     csv_rows: list[list[Any]] = []
-    for order, colour in ((2, SOLVER_COLOUR["QSVT"]), (4, "#7f2020")):
+    for order, colour in sorted(ORDER_COLOUR.items()):
         rows = load_rows(repo_root, 1, order)
         capped: list[tuple[float, float]] = []
         uncapped: list[tuple[float, float]] = []
@@ -657,14 +1029,13 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
                label=rf"$d/\kappa = {DEGREE_KAPPA_THRESHOLD:g}$")
     ax.axvspan(1e-2, DEGREE_KAPPA_THRESHOLD, color="grey", alpha=0.13)
     ax.annotate("under-resolved polynomial", xy=(0.04, 0.94),
-                xycoords="axes fraction", fontsize=8.5, color="dimgrey")
+                xycoords="axes fraction", fontsize=ANNOT_PT, color="dimgrey")
     ax.set_xlabel(r"degree-to-condition-number ratio  $d / \kappa(A)$")
     ax.set_ylabel(r"relative residual  $\|Au - b\|_2 / \|b\|_2$")
     _headline(ax, r"QSVT accuracy is set by $d/\kappa$, not by $N$ or the case",
                  fontsize=10)
     ax.grid(alpha=0.3, which="both")
-    ax.legend(fontsize=7.5, loc="lower left")
-    fig.tight_layout()
+    ax.legend(fontsize=SMALL_PT, loc="lower left", ncol=2)
 
     written = _save(fig, out_dir, "F3_qsvt_degree_threshold", plt)
     written.append(write_csv(
@@ -709,9 +1080,10 @@ def figure_kappa_scaling(repo_root: Path, out_dir: Path) -> list[Path]:
         Files written.
     """
     plt = _matplotlib()
-    fig, ax = plt.subplots(figsize=(6.8, 4.6))
+    fig, ax = plt.subplots(figsize=(TEXT_WIDTH_IN, 4.05))
 
-    styles = {1: ("#1f77b4", "o"), 2: ("#2ca02c", "s"), 3: ("#d62728", "^")}
+    styles = {dim: (DIMENSION_COLOUR[dim], marker)
+              for dim, marker in ((1, "o"), (2, "s"), (3, "^"))}
     csv_rows: list[list[Any]] = []
     for dim in (1, 2, 3):
         for order, ls in ((2, "-"), (4, "--")):
@@ -737,17 +1109,21 @@ def figure_kappa_scaling(repo_root: Path, out_dir: Path) -> list[Path]:
               label=r"$\mathcal{O}(N^2)$")
     ax.axhline(3.0, color="grey", ls="-.", lw=1.0)
     ax.annotate(r"$\kappa_\mathrm{row} \to 3$ (2-D)", xy=(0.55, 0.16),
-                xycoords="axes fraction", fontsize=8, color="dimgrey")
+                xycoords="axes fraction", fontsize=ANNOT_PT, color="dimgrey")
     ax.axhline(2.0, color="grey", ls="-.", lw=1.0)
     ax.annotate(r"$\kappa_\mathrm{row} \to 2$ (3-D)", xy=(0.55, 0.07),
-                xycoords="axes fraction", fontsize=8, color="dimgrey")
+                xycoords="axes fraction", fontsize=ANNOT_PT, color="dimgrey")
 
     ax.set_xlabel("$N$")
     ax.set_ylabel(r"condition number")
     _headline(ax, "Strip decomposition bounds the condition number", fontsize=10)
     ax.grid(alpha=0.3, which="both")
-    ax.legend(fontsize=7.5, ncol=2)
-    fig.tight_layout()
+    ax.legend(fontsize=SMALL_PT, ncol=2)
+    # The 2-D strip operator is measured out to N = 256, so this axis carries two
+    # resolutions beyond the 1-D sweep's range; the default decade ticks label
+    # none of the six actually run.
+    ax.margins(x=0.06)
+    _label_n_axis(ax, ticks=(4, 8, 16, 32, 64, 128, 256))
 
     written = _save(fig, out_dir, "F4_kappa_scaling", plt)
     written.append(write_csv(
@@ -788,7 +1164,7 @@ def figure_cost_vs_N(repo_root: Path, out_dir: Path,
     """
     plt = _matplotlib()
     case = PRIMARY_CASE[dim]
-    fig, axes = plt.subplots(1, 2, figsize=(10.5, 4.2), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 3.65), sharey=True)
 
     csv_rows: list[list[Any]] = []
     for ax, order in zip(axes, (2, 4)):
@@ -796,7 +1172,7 @@ def figure_cost_vs_N(repo_root: Path, out_dir: Path,
         if not rows:
             ax.text(0.5, 0.5, f"order {order}: sweep pending",
                     transform=ax.transAxes, ha="center", va="center",
-                    fontsize=11, color="grey")
+                    fontsize=AXIS_PT, color="grey")
             continue
         for solver in SOLVERS:
             done_n, done_t, cut_n, cut_t = [], [], [], []
@@ -818,14 +1194,20 @@ def figure_cost_vs_N(repo_root: Path, out_dir: Path,
                           label=f"{solver} (terminated at the cap)")
         ax.set_title(f"Order-{order} stencil")
         ax.set_xlabel("$N$")
-        ax.legend(fontsize=7.5)
+        ax.legend(fontsize=SMALL_PT)
         ax.grid(alpha=0.3, which="both")
+        # Open the data limits before the ticks are chosen. The QSVT degree
+        # annotation sits a few points to the right of its marker, so the point
+        # at the largest N writes past the right spine otherwise, and the
+        # terminated-solve markers at N = 64 are clipped by the same edge.
+        # Applied before `_label_n_axis`, which reads the limits to decide which
+        # resolutions to tick.
+        ax.margins(x=0.13, y=0.09)
         _label_n_axis(ax)
 
     axes[0].set_ylabel("wall time  [s]")
     _headline(fig, f"Computational cost — {case}  ({dim}-D)",
                  fontweight="bold", fontsize=10)
-    fig.tight_layout()
 
     written = _save(fig, out_dir, f"F5_cost_vs_N_{dim}D", plt)
     written.append(write_csv(
@@ -870,7 +1252,7 @@ def figure_hardware(repo_root: Path, out_dir: Path) -> list[Path]:
         Files written.
     """
     plt = _matplotlib()
-    fig, axes = plt.subplots(1, 2, figsize=(11.0, 4.4))
+    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 3.85))
 
     inv = repo_root / "results" / "investigations"
     csv_rows: list[list[Any]] = []
@@ -913,18 +1295,18 @@ def figure_hardware(repo_root: Path, out_dir: Path) -> list[Path]:
 
     if n_qubits:
         floor = 2.0 ** (-n_qubits)
-        axes[0].axhline(floor, color="crimson", ls=":", lw=1.3)
+        axes[0].axhline(floor, color=FLOOR_COLOUR, ls=":", lw=1.3)
         axes[0].annotate(rf"maximally mixed floor, $2^{{-{n_qubits}}}$",
-                         xy=(0.35, floor * 1.12), xycoords=("axes fraction",
+                         xy=(0.32, floor * 1.35), xycoords=("axes fraction",
                                                             "data"),
-                         fontsize=7.5, color="crimson")
+                         fontsize=ANNOT_PT, color=FLOOR_COLOUR)
 
     axes[0].set_yscale("log")
     axes[0].set_xlim(-1.5, 65)
     axes[0].set_xlabel("QSVT polynomial degree $d$")
     axes[0].set_ylabel("measured state fidelity $F_d$")
-    axes[0].set_title("(a)  Error composition on ibm_kingston")
-    axes[0].legend(fontsize=7)
+    axes[0].set_title("(a)  Error composition")
+    axes[0].legend(fontsize=SMALL_PT)
     axes[0].grid(alpha=0.3, which="both")
 
     # -- Right: transpiled gate count against the calibrated budget ------------
@@ -944,24 +1326,28 @@ def figure_hardware(repo_root: Path, out_dir: Path) -> list[Path]:
                              r["kappa"], None])
         axes[1].axhline(budget, color="black", ls="--", lw=1.3)
         axes[1].annotate(
-            f"budget {budget} gates  "
-            rf"($\varepsilon_2 = {IBM_KINGSTON_TWO_QUBIT_ERROR:.2e}$, $p = 0.5$)",
+            f"budget {budget} gates   "
+            rf"($\varepsilon_2 = {_sci(IBM_KINGSTON_TWO_QUBIT_ERROR)}$, "
+            rf"$p = 0.5$)",
             xy=(0.03, budget * 1.2), xycoords=("axes fraction", "data"),
-            fontsize=7.5)
+            fontsize=SMALL_PT)
     else:
         axes[1].text(0.5, 0.5, "transpiled feasibility sweep pending",
                      transform=axes[1].transAxes, ha="center", va="center",
-                     fontsize=11, color="grey")
+                     fontsize=AXIS_PT, color="grey")
 
     axes[1].set_xlabel("$N$")
     axes[1].set_ylabel("two-qubit gate count")
-    axes[1].set_title("(b)  Circuit size against the device budget")
-    axes[1].legend(fontsize=7.5)
+    # Without this the logarithmic axis labels the decade minor ticks, which over
+    # N = 4..32 is five overlapping "4 x 10^0"-style strings and no tick on any
+    # resolution that was actually run.
+    _label_n_axis(axes[1], ticks=(4, 8, 16, 32))
+    axes[1].set_title("(b)  Circuit size vs. budget")
+    axes[1].legend(fontsize=SMALL_PT)
     axes[1].grid(alpha=0.3, which="both")
 
     _headline(fig, "Hardware verification, IBM Kingston (156-qubit Heron)",
                  fontweight="bold", fontsize=10)
-    fig.tight_layout()
 
     written = _save(fig, out_dir, "F6_hardware_verification", plt)
     written.append(write_csv(
@@ -1183,18 +1569,65 @@ def _read_field_csv(path: Path):
     return grid("x_m"), grid("y_m"), grid("phi_V"), grid("signed_error_V")
 
 
+# Dimensions drawn in F7. Two dimensions was dropped from the main body once
+# `figure_resolution_grid_2d` covered the same case at four resolutions with its
+# error and cost attached; the CSVs for both are still exported, so widening this
+# back to (2, 3) restores the earlier two-row figure unchanged.
+DIMENSIONS_F7: tuple[int, ...] = (3,)
+
+
+def _attach_colourbar(fig, mappable, ax, label_size: float):
+    """
+    Attach a colour bar whose height tracks the axes box exactly.
+
+    `fig.colorbar(..., ax=ax)` sizes the bar from the *grid cell*, which is the
+    right answer until `set_box_aspect` shrinks the axes inside that cell to make
+    it square: the bar then overhangs the panel it belongs to. An inset placed in
+    axes coordinates follows the box instead, so bar and panel stay the same
+    height whatever the aspect.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure
+        Figure owning the axes.
+    mappable : matplotlib.cm.ScalarMappable
+        Artist whose colour scale is being drawn.
+    ax : matplotlib.axes.Axes
+        Panel the bar belongs to.
+    label_size : float
+        Point size for the bar's tick labels and its offset text.
+
+    Returns
+    -------
+    matplotlib.colorbar.Colorbar
+        The bar, so the caller can set a formatter on it.
+    """
+    cax = ax.inset_axes([1.05, 0.0, 0.055, 1.0])
+    bar = fig.colorbar(mappable, cax=cax)
+    bar.ax.tick_params(labelsize=label_size)
+    bar.ax.yaxis.get_offset_text().set_fontsize(label_size)
+    return bar
+
+
 def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
     """
-    Thruster potential and each solver's signed error, in two and three
-    dimensions.
+    Thruster potential and each solver's signed error, three dimensions.
 
     A norm collapses a field to one number and hides where the error sits. A
     signed map does not: a sign error, a boundary condition imposed on the wrong
     face, and convergence to the wrong fixed point each have a distinct
-    signature in the map and none in the norm. The top row is the axial–radial
-    plane of the two-dimensional case; the bottom is the mid-plane slice of the
-    three-dimensional case, normal to the azimuthal direction, which is the
-    plane the channel physics lives in.
+    signature in the map and none in the norm. The plane drawn is the mid-plane
+    slice of the three-dimensional case, normal to the azimuthal direction,
+    which is the plane the channel physics lives in.
+
+    The two-dimensional row this figure used to carry has been removed, not
+    lost: `figure_resolution_grid_2d` shows the same case across four
+    resolutions with per-panel error and cost, which subsumes a single-resolution
+    view of it. Restricting F7 to three dimensions leaves each figure with one
+    job — where the error sits, against how the solvers separate as the mesh
+    refines — and recovers most of a page in a chapter that has none to spare.
+    `DIMENSIONS_F7` governs this; the exported CSVs are still written for both
+    dimensions, so restoring the row is a one-line change.
 
     The leftmost column carries the manufactured solution itself, so the error
     maps beside it are read against the field they belong to. Each error map
@@ -1220,7 +1653,7 @@ def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
     plt = _matplotlib()
 
     panels = []
-    for dim in (2, 3):
+    for dim in DIMENSIONS_F7:
         case = HET_CASE[dim]
         found = sorted(out_dir.glob(f"F7_field_{dim}D_{case}_*.csv"))
         by_solver = {p.stem.rsplit("_", 2)[-2]: p for p in found}
@@ -1231,48 +1664,66 @@ def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
     if not panels:
         return []
 
-    ncol = 1 + len(QUANTUM_SOLVERS)
-    fig, axes = plt.subplots(len(panels), ncol,
-                             figsize=(3.05 * ncol, 3.0 * len(panels)),
+    # Four panels per dimension -- the reference field and one signed error per
+    # quantum solver -- tiled two by two rather than in a single row of four.
+    # Across the full text width a row of four leaves each panel 1.5 in wide,
+    # which cannot carry an axis label at the body point size; two by two leaves
+    # 2.5 in, which can.
+    ncol = 2
+    fig, axes = plt.subplots(2 * len(panels), ncol,
+                             figsize=(TEXT_WIDTH_IN, 2.85 * 2 * len(panels)),
                              squeeze=False)
 
-    for row, (dim, case, by_solver) in enumerate(panels):
-        X, Y, PHI, _ = _read_field_csv(by_solver["Thomas"])
-        ax = axes[row][0]
-        im = ax.pcolormesh(X * 1e3, Y * 1e3, PHI, shading="auto",
-                           cmap="viridis", rasterized=True)
-        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
-        ax.set_title(f"{dim}-D manufactured " + r"$\phi$  [V]", fontsize=9)
-        ax.set_ylabel("radial  [mm]" if dim == 2 else "radial, mid-plane  [mm]")
-        ax.grid(False)
+    for block, (dim, case, by_solver) in enumerate(panels):
+        cells = [axes[2 * block + k // ncol][k % ncol] for k in range(4)]
 
-        for col, solver in enumerate(QUANTUM_SOLVERS, start=1):
-            ax = axes[row][col]
+        X, Y, PHI, _ = _read_field_csv(by_solver["Thomas"])
+        ax = cells[0]
+        im = ax.pcolormesh(X * 1e3, Y * 1e3, PHI, shading="auto",
+                           cmap=FIELD_CMAP, rasterized=True)
+        _attach_colourbar(fig, im, ax, SMALL_PT)
+        ax.set_title(f"{dim}-D manufactured " + r"$\phi$  [V]")
+
+        for k, solver in enumerate(QUANTUM_SOLVERS, start=1):
+            ax = cells[k]
             if solver not in by_solver:
                 ax.set_axis_off()
                 ax.text(0.5, 0.5, f"{solver}\nnot recorded", ha="center",
-                        va="center", fontsize=8, color="dimgrey")
+                        va="center", fontsize=ANNOT_PT, color="dimgrey")
                 continue
             Xs, Ys, _, ERR = _read_field_csv(by_solver[solver])
             finite = ERR[np.isfinite(ERR)]
             scale = float(np.max(np.abs(finite))) if finite.size else 0.0
             scale = scale or 1.0
             im = ax.pcolormesh(Xs * 1e3, Ys * 1e3, ERR, shading="auto",
-                               cmap="RdBu_r", vmin=-scale, vmax=scale,
+                               cmap=SIGNED_ERROR_CMAP, vmin=-scale, vmax=scale,
                                rasterized=True)
-            cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
+            cb = _attach_colourbar(fig, im, ax, SMALL_PT)
             cb.formatter.set_powerlimits((-2, 2))
-            ax.set_title(f"{solver}  signed error  [V]", fontsize=9,
+            ax.set_title(f"{solver}  signed error  [V]",
                          color=SOLVER_COLOUR[solver])
-            ax.grid(False)
 
-        for ax in axes[row]:
-            ax.set_xlabel("axial  [mm]")
-            ax.tick_params(labelsize=7)
+        radial = "radial  [mm]" if dim == 2 else "radial, mid-plane  [mm]"
+        for k, ax in enumerate(cells):
+            ax.grid(False)
+            # The channel is twice as long axially as it is deep radially, but
+            # the mesh is N x N, so one cell of the computation is one square of
+            # the panel only on a square axes box. Drawn that way the radial
+            # coordinate is exaggerated twofold against the axial one, which is
+            # what makes the interior structure of the error legible at this
+            # size; the axis values state the true extent of each direction.
+            ax.set_box_aspect(1.0)
+            if k >= 2:
+                ax.set_xlabel("axial  [mm]")
+            else:
+                ax.tick_params(labelbottom=False)
+            if k % ncol == 0:
+                ax.set_ylabel(radial)
+            else:
+                ax.tick_params(labelleft=False)
 
     _headline(fig, "Thruster potential and where each solver puts its error",
               fontweight="bold", fontsize=10)
-    fig.tight_layout()
     return _save(fig, out_dir, "F7_het_fields", plt)
 
 
@@ -1333,33 +1784,397 @@ def figure_het_profile_1d(repo_root: Path, out_dir: Path,
     phi_ref = max(abs(v) for v in series["Thomas"]["phi"]) or 1.0
     E_ref = max(abs(v) for v in series["Thomas"]["E"]) or 1.0
 
+    def _rel_l2(values: list[float], reference: list[float]) -> float:
+        """Relative L² error against the classical reference, in per cent."""
+        a = np.asarray(values, dtype=float)
+        b = np.asarray(reference, dtype=float)
+        denom = float(np.linalg.norm(b))
+        return 100.0 * float(np.linalg.norm(a - b)) / denom if denom else np.nan
+
     plt = _matplotlib()
-    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.2))
-    for solver in SOLVERS:
+    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 3.40))
+    for solver in PROFILE_SOLVERS_1D:
         if solver not in series:
             continue
         s = series[solver]
         style = dict(color=SOLVER_COLOUR[solver], marker=SOLVER_MARKER[solver],
-                     mfc="none", ms=3.5, lw=1.5, label=solver)
-        axes[0].plot(s["z"], np.array(s["phi"]) / phi_ref, **style)
-        axes[1].plot(s["z"], np.array(s["E"]) / E_ref, **style)
+                     mfc="none", ms=3.5, lw=1.5)
+        # The error is carried in the legend of each panel separately, which is
+        # the whole argument of the figure: the same solve is accurate in the
+        # potential and inaccurate in the field derived from it.
+        if solver == "Thomas":
+            lab_phi = lab_E = "Thomas  (reference)"
+        else:
+            lab_phi = (rf"{solver}   $e_\phi$ = "
+                       f"{_rel_l2(s['phi'], series['Thomas']['phi']):.2g}%")
+            lab_E = (f"{solver}   $e_E$ = "
+                     f"{_rel_l2(s['E'], series['Thomas']['E']):.2g}%")
+        axes[0].plot(s["z"], np.array(s["phi"]) / phi_ref,
+                     label=lab_phi, **style)
+        axes[1].plot(s["z"], np.array(s["E"]) / E_ref, label=lab_E, **style)
 
-    axes[0].set_title("(a)  potential", fontsize=9)
+    axes[0].set_title("(a)  potential")
     axes[0].set_ylabel(r"$\phi\,/\,|\phi|^{\mathrm{Thomas}}_{\max}$")
-    axes[1].set_title("(b)  axial electric field", fontsize=9)
+    axes[1].set_title("(b)  axial electric field")
     axes[1].set_ylabel(r"$E\,/\,|E|^{\mathrm{Thomas}}_{\max}$")
     for ax in axes:
         ax.set_xlabel("axial position  [mm]")
         ax.grid(alpha=0.3)
-        ax.legend(fontsize=7.5)
+        ax.legend(fontsize=SMALL_PT)
 
     _headline(fig, f"HET axial profile, $N={N}$", fontweight="bold",
               fontsize=10)
-    fig.tight_layout()
     return _save(fig, out_dir, f"F8_het_1d_profile_N{N}", plt)
 
 
+# ── Figure 9: Resolution Against Solver Quality ────────────────────────────────
+
+# Resolutions carried in the F9 panel grid. Chosen as the four at which every
+# solver has an archive, and as the range over which the VQLS collapse develops:
+# it is invisible at N = 8, first legible at N = 32 and complete by N = 64.
+PANEL_RESOLUTIONS_2D: tuple[int, ...] = (8, 16, 32, 64)
+
+
+def _format_seconds(wall: Optional[float]) -> str:
+    """
+    Render a wall time for a figure annotation, at two significant figures.
+
+    A fixed number of decimal places cannot serve a range that runs from tens of
+    milliseconds for the classical solve to sixteen hours for VQLS at N = 64;
+    rounding the classical row to whole seconds prints "0 s", which reads as an
+    unmeasured entry rather than as a fast one.
+
+    Parameters
+    ----------
+    wall : float or None
+        Recorded simulation wall time in seconds, or None where not preserved.
+
+    Returns
+    -------
+    str
+        A mathtext label such as ``$t$ = 0.037 s`` or ``$t$ = n/a``.
+    """
+    if wall is None:
+        return "$t$ = n/a"
+    if wall >= 100.0:
+        return f"$t$ = {wall:.0f} s"
+    if wall >= 1.0:
+        return f"$t$ = {wall:.1f} s"
+    return f"$t$ = {wall:.2g} s"
+
+
+def figure_resolution_grid_2d(repo_root: Path, out_dir: Path) -> list[Path]:
+    """
+    Solver against resolution for the two-dimensional thruster potential.
+
+    A grid of solved fields, one row per solver and one column per resolution, on
+    a single shared colour scale. It carries two things at once that the scalar
+    figures separate. Down a column it shows what each algorithm does to the same
+    problem; across a row it shows the mesh resolving the potential. The two
+    together make the failure of a variational solver legible as a picture —
+    VQLS passes from indistinguishable at N = 8 to visibly granular at N = 32 and
+    to noise at N = 64 — where a table of norms records it only as a number
+    growing.
+
+    Every panel is annotated with the quantity diagnostic for its row. The
+    classical row carries the discretisation error e_disc against the analytical
+    solution, which is the floor the mesh alone achieves and the reason that row
+    sharpens from left to right. The quantum rows carry the algorithmic error
+    e_alg against the classical solution on the same mesh, which isolates the
+    solver from the stencil. The distinction is not cosmetic: at N = 8 the total
+    error of all four solvers agrees to two significant figures because the mesh
+    dominates it, so a total-error annotation would print four near-identical
+    numbers across a column whose algorithms differ by ten orders of magnitude.
+
+    Wall time is reported per panel as state-vector simulation time. Two panels
+    carry none: their summary rows were reconstructed from the solution archive
+    after the recording process was killed, and the instrumentation did not
+    survive the recovery.
+
+    The colour scale is fixed once from the classical field and shared by every
+    panel. A per-panel scale would renormalise a diverged solution back into the
+    same colours as a converged one and conceal precisely what the figure is for.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root.
+    out_dir : Path
+        Destination for the CSV files and the rendered figure.
+
+    Returns
+    -------
+    list of Path
+        Files written; empty where no field archive is present.
+    """
+    import numpy as np
+
+    sweep = repo_root / SWEEP_DIR[(2, 2)]
+    case = HET_CASE[2]
+    rows = load_rows(repo_root, 2, 2)
+
+    fields: dict[tuple[str, int], dict] = {}
+    for solver in SOLVERS:
+        for N in PANEL_RESOLUTIONS_2D:
+            path = sweep / f"solutions_{case}_{solver}_N{N}.npz"
+            if not path.exists():
+                continue
+            data = np.load(path, allow_pickle=False)
+            fields[(solver, N)] = {
+                "x":     data["x"],
+                "y":     data["y"],
+                "phi":   (data["phi_solver"] if "phi_solver" in data.files
+                          else data["u_solver"]),
+                "exact": (data["phi_exact"] if "phi_exact" in data.files
+                          else None),
+            }
+    if not fields:
+        log.warning("  no 2-D field archives for %s in %s; F9 not rendered",
+                    case, sweep)
+        return []
+
+    def _rel_l2(a, b) -> Optional[float]:
+        """Relative L2 error of `a` against `b`, in per cent."""
+        if a is None or b is None:
+            return None
+        denom = float(np.linalg.norm(b))
+        if denom == 0.0:
+            return None
+        return 100.0 * float(np.linalg.norm(a - b)) / denom
+
+    def _wall(solver: str, N: int) -> Optional[float]:
+        """Recorded simulation wall time, or None where it was not preserved."""
+        match = [r for r in rows if r.get("case") == case
+                 and r.get("solver") == solver and r.get("N") == N]
+        if not match:
+            return None
+        value = match[0].get("wall_time_s")
+        return None if value is None else float(value)
+
+    ref_key = max((k for k in fields if k[0] == "Thomas"),
+                  key=lambda k: k[1], default=None)
+    if ref_key is None:
+        log.warning("  no classical reference field for F9")
+        return []
+    ref_phi = fields[ref_key]["phi"]
+    vmin, vmax = float(np.min(ref_phi)), float(np.max(ref_phi))
+
+    plt = _matplotlib()
+    ncol = len(PANEL_RESOLUTIONS_2D)
+    nrow = len(SOLVERS)
+    # The channel cross-section is roughly twice as long axially as it is deep
+    # radially. Panels are drawn at equal aspect, so the canvas has to be sized
+    # from the domain or the figure is mostly margin.
+    ref_x, ref_y = fields[ref_key]["x"], fields[ref_key]["y"]
+    span_x = float(ref_x.max() - ref_x.min()) or 1.0
+    span_y = float(ref_y.max() - ref_y.min()) or 1.0
+    # Panels keep the true 2:1 aspect of the channel here, where F7 squares
+    # them. The two figures ask different questions: F7 is read for the interior
+    # structure of one error field, which needs the radial direction stretched,
+    # where this one is read across sixteen panels for the pattern of colour and
+    # the annotations above each, for which geometry is not the variable. Sixteen
+    # square panels would also add two and a half inches of page for nothing.
+    panel_w = (TEXT_WIDTH_IN - 1.30) / ncol
+    panel_h = panel_w * (span_y / span_x)
+    fig, axes = plt.subplots(nrow, ncol,
+                             figsize=(TEXT_WIDTH_IN, panel_h * nrow + 2.45))
+
+    scalar_rows: list[list[Any]] = []
+    field_rows: list[list[Any]] = []
+    mesh = None
+    for i, solver in enumerate(SOLVERS):
+        for j, N in enumerate(PANEL_RESOLUTIONS_2D):
+            ax = axes[i][j]
+            entry = fields.get((solver, N))
+            if entry is None:
+                ax.text(0.5, 0.5, "no archive", transform=ax.transAxes,
+                        ha="center", va="center", fontsize=ANNOT_PT, color="grey")
+                ax.set_xticks([])
+                ax.set_yticks([])
+                ax.grid(False)
+                continue
+
+            mesh = ax.pcolormesh(entry["x"] * 1e3, entry["y"] * 1e3,
+                                 entry["phi"], shading="auto",
+                                 vmin=vmin, vmax=vmax, rasterized=True)
+            ax.grid(False)
+            ax.set_aspect("equal")
+            ax.tick_params(labelsize=SMALL_PT)
+            if i != nrow - 1:
+                ax.set_xticklabels([])
+            if j != 0:
+                ax.set_yticklabels([])
+
+            classical = fields.get(("Thomas", N))
+            if solver == "Thomas":
+                err = _rel_l2(entry["phi"], entry["exact"])
+                err_label, err_kind = r"$e_\mathrm{disc}$", "disc"
+            else:
+                err = _rel_l2(entry["phi"],
+                              classical["phi"] if classical else None)
+                err_label, err_kind = r"$e_\mathrm{alg}$", "alg"
+            wall = _wall(solver, N)
+
+            # Stacked rather than joined by spaces: at N = 8 the joined
+            # string is wider than the panel, so adjacent columns' titles run
+            # into one another and read as one number.
+            parts = [f"{err_label} = {_pct_label(err)}"]
+            parts.append(_format_seconds(wall))
+            ax.set_title("\n".join(parts), fontsize=SMALL_PT,
+                         color=SOLVER_COLOUR[solver], pad=2,
+                         linespacing=1.25)
+
+            scalar_rows.append([case, solver, N, err_kind, err, wall])
+            xx, yy, pp = entry["x"], entry["y"], entry["phi"]
+            for a in range(pp.shape[0]):
+                for b in range(pp.shape[1]):
+                    field_rows.append([solver, N, float(xx[a, b] * 1e3),
+                                       float(yy[a, b] * 1e3), float(pp[a, b])])
+
+    for j, N in enumerate(PANEL_RESOLUTIONS_2D):
+        axes[0][j].text(0.5, 1.62, f"$N = {N}$",
+                        transform=axes[0][j].transAxes,
+                        ha="center", va="bottom", fontsize=AXIS_PT)
+    for i, solver in enumerate(SOLVERS):
+        axes[i][0].set_ylabel(f"{solver}\nradial  [mm]", fontsize=ANNOT_PT,
+                              color=SOLVER_COLOUR[solver])
+    for j in range(ncol):
+        axes[-1][j].set_xlabel("axial  [mm]", fontsize=ANNOT_PT)
+
+    if mesh is not None:
+        # `aspect` is length over width: the default of 20 gives a stub beside a
+        # grid four panels tall, so it is raised until the bar spans them.
+        cb = fig.colorbar(mesh, ax=axes, fraction=0.020, pad=0.015,
+                          aspect=55)
+        cb.set_label(r"$\phi$  [V]", fontsize=ANNOT_PT)
+        cb.ax.tick_params(labelsize=SMALL_PT)
+
+    _headline(fig, "Resolution against solver quality - two-dimensional "
+                   "thruster channel", fontweight="bold", fontsize=10)
+
+    written = _save(fig, out_dir, "F9_resolution_grid_2D", plt)
+    written.append(write_csv(
+        out_dir / "F9_resolution_grid_2D_metrics.csv",
+        ["case", "solver", "N", "error_kind", "error_pct", "wall_time_s"],
+        scalar_rows,
+    ))
+    written.append(write_csv(
+        out_dir / "F9_resolution_grid_2D_fields.csv",
+        ["solver", "N", "z_mm", "r_mm", "phi"],
+        field_rows,
+    ))
+    return written
+
+
 # ── Table Data ─────────────────────────────────────────────────────────────────
+
+# Parameter-study archives holding the equal-accuracy sweeps, per dimension, at
+# second order. One directory per dimension; the fourth-order studies live in the
+# `_4th` siblings and are not carried in the main body.
+STUDY_DIR_2ND: dict[int, str] = {
+    2: "results/2Dstudies",
+    3: "results/3Dstudies",
+}
+
+# The knob each solver is swept over by the equal-accuracy protocol, and how it
+# is written in a table. The protocol varies one parameter per solver and reports
+# the setting whose achieved residual first meets the target.
+EA_PARAMETER: dict[str, str] = {
+    "hhl":  r"$\varepsilon$",
+    "vqls": r"$n_\mathrm{layers}$",
+    "qsvt": r"$d_\mathrm{max}$",
+}
+
+
+def table_equal_accuracy_multi_d(repo_root: Path, out_dir: Path) -> list[Path]:
+    """
+    Cost at a matched residual target in two and three dimensions.
+
+    The one-dimensional equal-accuracy comparison is reported from the primary
+    sweep. This is its higher-dimensional counterpart, assembled from the
+    parameter studies, and it is the comparison the architecture of this work
+    actually delivers: every two- and three-dimensional solve is an outer
+    iteration over strips, so the quantity being priced is a whole coupled solve
+    rather than one inversion.
+
+    Reported per (dimension, case, solver): the swept parameter and the setting
+    the protocol selected, the residual achieved there, whether that residual
+    fell inside the acceptance band, and the wall time. A solver whose best
+    setting never reaches the band is recorded with `in_band` false rather than
+    omitted — an algorithm that cannot be made accurate enough at any available
+    setting is a result, and dropping it would flatter the comparison.
+
+    Two caveats travel with these numbers and are carried in the CSV so a reader
+    cannot separate them from it. `wall_clamped` marks a row whose outer
+    iteration was stopped at the study's wall-clock budget rather than
+    converging, so its wall time is the budget and its residual an upper bound.
+    `error_measure` names the error column deliberately: `max_rel_err_vs_thomas`
+    is a pointwise maximum of a relative error and is unbounded near a node of
+    the reference field, which on the three-dimensional thruster case makes it
+    read in the millions of per cent while the L² measure `err_alg` reads
+    10⁻³ %. Both are written; quote `err_alg` on that case.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root.
+    out_dir : Path
+        Destination for the CSV.
+
+    Returns
+    -------
+    list of Path
+        Files written; empty where no study archive is present.
+    """
+    rows: list[list[Any]] = []
+    for dim, rel in STUDY_DIR_2ND.items():
+        path = repo_root / rel / "equal_accuracy.json"
+        if not path.exists():
+            log.warning("  %s absent; skipped in the equal-accuracy table", path)
+            continue
+        meta = repo_root / rel / "run_metadata.json"
+        budgets: dict[str, float] = {}
+        for candidate in sorted((repo_root / rel).glob("run_metadata*.json")):
+            try:
+                payload = json.loads(candidate.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            config = payload.get("config", {})
+            budget = config.get("max_wall_s")
+            for solver in config.get("solvers", []):
+                if budget is not None:
+                    budgets[str(solver).lower()] = float(budget)
+        del meta
+
+        with open(path, encoding="utf-8") as fh:
+            records = json.load(fh)
+        for rec in records:
+            solver = str(rec.get("solver", "")).lower()
+            best = rec.get("best_result") or {}
+            budget = budgets.get(solver)
+            wall = best.get("wall_time_s")
+            clamped = (budget is not None and wall is not None
+                       and float(wall) >= budget - 5.0)
+            rows.append([
+                dim, best.get("case_id"), solver.upper(),
+                EA_PARAMETER.get(solver, ""), best.get("sensitivity_value"),
+                best.get("residual"), rec.get("r_target"), rec.get("in_band"),
+                wall, clamped,
+                best.get("err_alg"), best.get("max_rel_err_vs_thomas"),
+                rec.get("n_solver_calls"), rec.get("notes"),
+            ])
+
+    if not rows:
+        return []
+    rows.sort(key=lambda r: (r[0], str(r[1]), str(r[2])))
+    return [write_csv(
+        out_dir / "T4_equal_accuracy_2D3D.csv",
+        ["dim", "case", "solver", "parameter", "setting", "residual",
+         "r_target", "in_band", "wall_time_s", "wall_clamped",
+         "err_alg_pct", "max_rel_err_vs_thomas_pct", "n_solver_calls", "notes"],
+        rows,
+    )]
+
 
 def table_observed_order(repo_root: Path, out_dir: Path) -> list[Path]:
     """
@@ -1498,7 +2313,13 @@ def _save(fig, out_dir: Path, stem: str, plt) -> list[Path]:
     written = []
     for suffix in (".png", ".pdf"):
         path = (out_dir / stem).with_suffix(suffix)
-        fig.savefig(path, bbox_inches="tight")
+        # Deliberately *not* `bbox_inches="tight"`. That option crops the canvas
+        # to the drawn content, so the written width is whatever the content
+        # happened to need rather than `TEXT_WIDTH_IN`; `width=\textwidth` then
+        # rescales by an unknown factor and the point sizes calibrated above no
+        # longer hold on the page. Constrained layout keeps the margins tight
+        # instead, at a canvas size that is fixed.
+        fig.savefig(path)
         written.append(path)
     plt.close(fig)
     return written
@@ -1535,7 +2356,9 @@ def build_all(repo_root: Path, out_dir: Path) -> list[Path]:
     written += export_profiles_1d(repo_root, out_dir, N=32)
     written += figure_het_fields(repo_root, out_dir)
     written += figure_het_profile_1d(repo_root, out_dir, N=32)
+    written += figure_resolution_grid_2d(repo_root, out_dir)
     written += table_observed_order(repo_root, out_dir)
     written += table_primary_condensed(repo_root, out_dir)
+    written += table_equal_accuracy_multi_d(repo_root, out_dir)
 
     return written

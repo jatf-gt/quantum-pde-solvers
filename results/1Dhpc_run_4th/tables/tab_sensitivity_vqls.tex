@@ -1,0 +1,78 @@
+\begin{table}[htbp]
+  \centering
+  \caption{Sensitivity analysis for the VQLS algorithm at $N=8$. Each block varies one parameter while holding all others at the baseline value. $e_\infty$ is the maximum relative error against the analytical solution; $r$ is the relative residual.}
+  \label{tab:sensitivity}
+  \begin{tabular}{l S[table-format=3.3] S[table-format=1.2e2] S[table-format=6.0] S[table-format=4.2]}
+    \toprule
+    {Parameter value} & {$e_\infty$ [\%]} & {$r$} & {Depth} & {$t$ [s]} \\
+    \multicolumn{5}{l}{\textit{Varying $n_\mathrm{layers}$}}\\
+    \midrule
+    \text{1} & 94.779 & $9.61 \times 10^{-1}$ & {\text{---}} & 32.58 \\
+    \text{2} & 0.017 & $7.51 \times 10^{-6}$ & {\text{---}} & 60.53 \\
+    \text{3} & 0.018 & $2.92 \times 10^{-5}$ & {\text{---}} & 20.03 \\
+    \text{4} & 0.016 & $5.44 \times 10^{-6}$ & {\text{---}} & 23.20 \\
+    \text{5} & 0.017 & $1.25 \times 10^{-5}$ & {\text{---}} & 27.04 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $n_\mathrm{restarts}$}}\\
+    \midrule
+    \text{1} & 0.100 & $2.59 \times 10^{-3}$ & {\text{---}} & 24.40 \\
+    \text{2} & 0.100 & $2.59 \times 10^{-3}$ & {\text{---}} & 42.42 \\
+    \text{3} & 0.017 & $7.51 \times 10^{-6}$ & {\text{---}} & 59.09 \\
+    \text{5} & 0.017 & $7.51 \times 10^{-6}$ & {\text{---}} & 90.16 \\
+    \text{8} & 0.017 & $7.51 \times 10^{-6}$ & {\text{---}} & 149.19 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $\tau_\mathrm{COBYLA}$}}\\
+    \midrule
+    \text{0.0001} & 0.294 & $8.29 \times 10^{-3}$ & {\text{---}} & 40.10 \\
+    \text{1e-06} & 0.021 & $1.43 \times 10^{-4}$ & {\text{---}} & 51.60 \\
+    \text{1e-08} & 0.017 & $7.51 \times 10^{-6}$ & {\text{---}} & 57.03 \\
+    \text{1e-10} & 0.017 & $7.51 \times 10^{-6}$ & {\text{---}} & 59.44 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $n_\mathrm{layers}$}}\\
+    \midrule
+    \text{1} & 45.718 & $5.12 \times 10^{-1}$ & {\text{---}} & 39.81 \\
+    \text{2} & 25.143 & $1.86 \times 10^{-2}$ & {\text{---}} & 57.94 \\
+    \text{3} & 24.253 & $1.81 \times 10^{-2}$ & {\text{---}} & 72.35 \\
+    \text{4} & 18.677 & $1.27 \times 10^{-2}$ & {\text{---}} & 79.87 \\
+    \text{5} & 27.281 & $2.05 \times 10^{-2}$ & {\text{---}} & 91.99 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $n_\mathrm{restarts}$}}\\
+    \midrule
+    \text{1} & 79.306 & $6.87 \times 10^{-2}$ & {\text{---}} & 24.79 \\
+    \text{2} & 25.143 & $1.86 \times 10^{-2}$ & {\text{---}} & 40.86 \\
+    \text{3} & 25.143 & $1.86 \times 10^{-2}$ & {\text{---}} & 59.50 \\
+    \text{5} & 25.143 & $1.86 \times 10^{-2}$ & {\text{---}} & 98.70 \\
+    \text{8} & 25.143 & $1.86 \times 10^{-2}$ & {\text{---}} & 149.54 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $\tau_\mathrm{COBYLA}$}}\\
+    \midrule
+    \text{0.0001} & 25.374 & $1.89 \times 10^{-2}$ & {\text{---}} & 43.94 \\
+    \text{1e-06} & 25.190 & $1.87 \times 10^{-2}$ & {\text{---}} & 61.55 \\
+    \text{1e-08} & 25.143 & $1.86 \times 10^{-2}$ & {\text{---}} & 60.47 \\
+    \text{1e-10} & 25.143 & $1.86 \times 10^{-2}$ & {\text{---}} & 59.41 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $n_\mathrm{layers}$}}\\
+    \midrule
+    \text{1} & 87.971 & $7.12 \times 10^{-1}$ & {\text{---}} & 35.18 \\
+    \text{2} & 9.544 & $6.07 \times 10^{-3}$ & {\text{---}} & 56.95 \\
+    \text{3} & 63.066 & $3.99 \times 10^{-2}$ & {\text{---}} & 69.44 \\
+    \text{4} & 26.078 & $1.65 \times 10^{-2}$ & {\text{---}} & 80.07 \\
+    \text{5} & 10.347 & $6.53 \times 10^{-3}$ & {\text{---}} & 91.00 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $n_\mathrm{restarts}$}}\\
+    \midrule
+    \text{1} & 82.325 & $5.21 \times 10^{-2}$ & {\text{---}} & 23.99 \\
+    \text{2} & 9.544 & $6.07 \times 10^{-3}$ & {\text{---}} & 41.18 \\
+    \text{3} & 9.544 & $6.07 \times 10^{-3}$ & {\text{---}} & 61.46 \\
+    \text{5} & 3.824 & $2.42 \times 10^{-3}$ & {\text{---}} & 96.47 \\
+    \text{8} & 3.824 & $2.42 \times 10^{-3}$ & {\text{---}} & 148.96 \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Varying $\tau_\mathrm{COBYLA}$}}\\
+    \midrule
+    \text{0.0001} & 12.632 & $8.15 \times 10^{-3}$ & {\text{---}} & 21.64 \\
+    \text{1e-06} & 9.301 & $5.91 \times 10^{-3}$ & {\text{---}} & 60.58 \\
+    \text{1e-08} & 9.544 & $6.07 \times 10^{-3}$ & {\text{---}} & 58.00 \\
+    \text{1e-10} & 9.544 & $6.07 \times 10^{-3}$ & {\text{---}} & 61.30 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
