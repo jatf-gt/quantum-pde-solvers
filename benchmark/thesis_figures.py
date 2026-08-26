@@ -108,14 +108,16 @@ HET_CASE: dict[int, str] = {
 
 SOLVERS: tuple[str, ...] = ("Thomas", "HHL", "VQLS", "QSVT")
 
-# Solvers drawn in the one-dimensional thruster profile, F8. VQLS is excluded
-# there and only there. At N = 32 its solution has already collapsed, so it
-# contributes a flat line near zero in both panels — a reader spends longer
-# working out why a curve is horizontal than the omission would have cost, and
-# the finding it would carry is made far better by F9, which shows the same
-# collapse developing across four resolutions. The exported CSV retains all four
-# solvers; this governs the rendering only.
-PROFILE_SOLVERS_1D: tuple[str, ...] = ("Thomas", "HHL", "QSVT")
+# Solvers drawn in the one-dimensional thruster profile, F8, and the two
+# resolutions it is drawn at. Every solver appears. A single-resolution panel
+# had to omit VQLS, whose N = 32 solution has already collapsed and would have
+# arrived as an unexplained horizontal line; a coarse row beside a fine one
+# turns that line into the finding instead. The pair is chosen for what
+# separates it: at N = 8 all three quantum solvers overlie the classical profile
+# to a tenth of a per cent, and at N = 32 the same three have spread over six
+# orders of magnitude. The exported CSV retains all four solvers at both.
+PROFILE_SOLVERS_1D: tuple[str, ...] = ("Thomas", "HHL", "VQLS", "QSVT")
+PROFILE_RESOLUTIONS_1D: tuple[int, ...] = (8, 32)
 QUANTUM_SOLVERS: tuple[str, ...] = ("HHL", "VQLS", "QSVT")
 
 # Okabe--Ito, the qualitative palette designed to stay separable under the three
@@ -1727,48 +1729,24 @@ def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
     return _save(fig, out_dir, "F7_het_fields", plt)
 
 
-def figure_het_profile_1d(repo_root: Path, out_dir: Path,
-                          N: int = 32) -> list[Path]:
+def _read_profile_csv(path: Path) -> dict[str, dict[str, list]]:
     """
-    Axial potential and the electric field recovered from it, one dimension.
-
-    The point of the figure is the contrast between its two panels. The
-    potential is monotone and forgiving: a solver reproduces it to a fraction of
-    a per cent and looks acceptable. The field E = −dφ/dz is not, because
-    differentiation multiplies each Fourier component of the error by its
-    wavenumber, and the error a truncated Trotter product or a truncated QSP
-    polynomial introduces is concentrated at high wavenumber. A solver can
-    therefore be right in φ and plainly wrong in E, which is the quantity a
-    thruster designer uses.
-
-    Both quantities are drawn normalised against the classical solution's
-    extreme rather than in volts. Sub-case 3b does not carry a consistent
-    physical scale for φ — see `export_profiles_1d` — and a normalised ordinate
-    states exactly what the figure is for without asserting a unit the archive
-    does not support. The axial coordinate is physical.
+    Read one exported axial profile back as a series per solver.
 
     Parameters
     ----------
-    repo_root : Path
-        Repository root. Unused beyond signature symmetry with the other figure
-        builders; the exported CSV is read from `out_dir`.
-    out_dir : Path
-        Directory holding `F8_het_1d_profile_N<N>.csv` and receiving the figure.
-    N : int
-        Resolution whose exported profile is drawn.
+    path : Path
+        An `F8_het_1d_profile_N<N>.csv` written by `export_profiles_1d`.
 
     Returns
     -------
-    list of Path
-        Files written, empty where the exported profile is absent.
+    dict
+        Solver name to a dict of the three columns the figure plots, empty
+        where the file is absent or carries no classical reference.
     """
-    import numpy as np
-
-    path = out_dir / f"F8_het_1d_profile_N{N}.csv"
     if not path.exists():
-        log.warning("  %s absent; F8 not rendered", path)
-        return []
-
+        log.warning("  %s absent", path)
+        return {}
     with open(path, encoding="utf-8") as fh:
         recs = list(csv.DictReader(fh))
     series: dict[str, dict[str, list]] = {}
@@ -1778,11 +1756,61 @@ def figure_het_profile_1d(repo_root: Path, out_dir: Path,
         s["phi"].append(float(r["phi_code"]))
         s["E"].append(float(r["E_axial_code_per_mm"]))
     if "Thomas" not in series:
-        log.warning("  no classical reference in %s; F8 not rendered", path)
-        return []
+        log.warning("  no classical reference in %s", path)
+        return {}
+    return series
 
-    phi_ref = max(abs(v) for v in series["Thomas"]["phi"]) or 1.0
-    E_ref = max(abs(v) for v in series["Thomas"]["E"]) or 1.0
+
+def figure_het_profile_1d(repo_root: Path, out_dir: Path,
+                          Ns: tuple[int, ...] = PROFILE_RESOLUTIONS_1D
+                          ) -> list[Path]:
+    """
+    Axial potential and the electric field recovered from it, one dimension.
+
+    The figure argues along both of its axes. Across a row, the potential is
+    monotone and forgiving: a solver reproduces it to a fraction of a per cent
+    and looks acceptable. The field E = −dφ/dz is not, because differentiation
+    multiplies each Fourier component of the error by its wavenumber, and the
+    error a truncated Trotter product or a truncated QSP polynomial introduces
+    is concentrated at high wavenumber. A solver can therefore be right in φ and
+    plainly wrong in E, which is the quantity a thruster designer uses.
+
+    Down a column, the coarse mesh flatters every solver and the fine one
+    separates them. Reporting the fine row alone would understate how easily a
+    quantum solver passes a benchmark posed at low resolution; reporting the
+    coarse row alone would overstate what these solvers deliver. The pair is the
+    honest statement, and it is the mechanism of the two failures as well: HHL
+    degrades smoothly and flattens the peak field, VQLS collapses outright once
+    the ansatz can no longer represent the solution.
+
+    Both quantities are drawn normalised against the classical solution's
+    extreme at that resolution rather than in volts. Sub-case 3b does not carry
+    a consistent physical scale for φ — see `export_profiles_1d` — and a
+    normalised ordinate states exactly what the figure is for without asserting
+    a unit the archive does not support. The axial coordinate is physical.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root. Unused beyond signature symmetry with the other figure
+        builders; the exported CSVs are read from `out_dir`.
+    out_dir : Path
+        Directory holding `F8_het_1d_profile_N<N>.csv` and receiving the figure.
+    Ns : tuple of int
+        Resolutions drawn, one row of two panels each, coarse first.
+
+    Returns
+    -------
+    list of Path
+        Files written, empty where an exported profile is absent.
+    """
+    import numpy as np
+
+    rows = [(N, _read_profile_csv(out_dir / f"F8_het_1d_profile_N{N}.csv"))
+            for N in Ns]
+    if any(not series for _, series in rows):
+        log.warning("  F8 not rendered")
+        return []
 
     def _rel_l2(values: list[float], reference: list[float]) -> float:
         """Relative L² error against the classical reference, in per cent."""
@@ -1792,39 +1820,67 @@ def figure_het_profile_1d(repo_root: Path, out_dir: Path,
         return 100.0 * float(np.linalg.norm(a - b)) / denom if denom else np.nan
 
     plt = _matplotlib()
-    fig, axes = plt.subplots(1, 2, figsize=(TEXT_WIDTH_IN, 3.40))
-    for solver in PROFILE_SOLVERS_1D:
-        if solver not in series:
-            continue
-        s = series[solver]
-        style = dict(color=SOLVER_COLOUR[solver], marker=SOLVER_MARKER[solver],
-                     mfc="none", ms=3.5, lw=1.5)
-        # The error is carried in the legend of each panel separately, which is
-        # the whole argument of the figure: the same solve is accurate in the
-        # potential and inaccurate in the field derived from it.
-        if solver == "Thomas":
-            lab_phi = lab_E = "Thomas  (reference)"
-        else:
-            lab_phi = (rf"{solver}   $e_\phi$ = "
-                       f"{_rel_l2(s['phi'], series['Thomas']['phi']):.2g}%")
-            lab_E = (f"{solver}   $e_E$ = "
-                     f"{_rel_l2(s['E'], series['Thomas']['E']):.2g}%")
-        axes[0].plot(s["z"], np.array(s["phi"]) / phi_ref,
-                     label=lab_phi, **style)
-        axes[1].plot(s["z"], np.array(s["E"]) / E_ref, label=lab_E, **style)
+    # Two rows of two on a canvas 1.37 times the height of the single row it
+    # replaces, not twice: the panels lose a little height, the shared abscissa
+    # gives most of it back, and the figure stays under half the text block, so
+    # it can share a page with the paragraphs that read it. The curves are a
+    # bump and a sigmoid, both of which survive a squarer panel.
+    fig, axes = plt.subplots(2, 2, figsize=(TEXT_WIDTH_IN, 4.66),
+                             sharex=True, squeeze=False)
+    letters = "abcdefgh"
+    for i, (N, series) in enumerate(rows):
+        phi_ref = max(abs(v) for v in series["Thomas"]["phi"]) or 1.0
+        E_ref = max(abs(v) for v in series["Thomas"]["E"]) or 1.0
+        for solver in PROFILE_SOLVERS_1D:
+            if solver not in series:
+                continue
+            s = series[solver]
+            style = dict(color=SOLVER_COLOUR[solver],
+                         marker=SOLVER_MARKER[solver],
+                         mfc="none", ms=3.0, lw=1.4)
+            # The error is carried in the legend of each panel separately,
+            # which is the whole argument along a row: the same solve is
+            # accurate in the potential and inaccurate in the field derived
+            # from it.
+            if solver == "Thomas":
+                lab_phi = lab_E = "Thomas  (reference)"
+            else:
+                lab_phi = (rf"{solver}   $e_\phi$ = "
+                           f"{_rel_l2(s['phi'], series['Thomas']['phi']):.2g}%")
+                lab_E = (f"{solver}   $e_E$ = "
+                         f"{_rel_l2(s['E'], series['Thomas']['E']):.2g}%")
+            axes[i][0].plot(s["z"], np.array(s["phi"]) / phi_ref,
+                            label=lab_phi, **style)
+            axes[i][1].plot(s["z"], np.array(s["E"]) / E_ref,
+                            label=lab_E, **style)
 
-    axes[0].set_title("(a)  potential")
-    axes[0].set_ylabel(r"$\phi\,/\,|\phi|^{\mathrm{Thomas}}_{\max}$")
-    axes[1].set_title("(b)  axial electric field")
-    axes[1].set_ylabel(r"$E\,/\,|E|^{\mathrm{Thomas}}_{\max}$")
-    for ax in axes:
+        axes[i][0].set_title(f"({letters[2 * i]})  potential,  $N = {N}$")
+        axes[i][0].set_ylabel(r"$\phi\,/\,|\phi|^{\mathrm{Thomas}}_{\max}$")
+        axes[i][1].set_title(
+            f"({letters[2 * i + 1]})  axial electric field,  $N = {N}$")
+        axes[i][1].set_ylabel(r"$E\,/\,|E|^{\mathrm{Thomas}}_{\max}$")
+        # The potential rises to its maximum near mid-channel and the field is a
+        # monotone sigmoid, so the free corner differs between the two columns.
+        # The potential occupies (0, 1] with nothing below it, and the collapsed
+        # VQLS trace runs along the axis, so its legend needs a reserved band
+        # rather than a corner. Opening the ordinate to the same lower limit the
+        # field panel needs anyway costs no information and puts every panel of
+        # the figure on one normalised scale.
+        axes[i][0].set_ylim(-0.78, 1.06)
+        axes[i][0].set_yticks([0.0, 0.5, 1.0])
+        axes[i][0].legend(fontsize=SMALL_PT, loc="lower center", ncol=2,
+                          handlelength=1.4, labelspacing=0.25,
+                          columnspacing=1.0, borderpad=0.3, framealpha=0.85)
+        axes[i][1].legend(fontsize=SMALL_PT, loc="upper left",
+                          handlelength=1.4, labelspacing=0.25,
+                          borderpad=0.3, framealpha=0.85)
+        for ax in axes[i]:
+            ax.grid(alpha=0.3)
+    for ax in axes[-1]:
         ax.set_xlabel("axial position  [mm]")
-        ax.grid(alpha=0.3)
-        ax.legend(fontsize=SMALL_PT)
 
-    _headline(fig, f"HET axial profile, $N={N}$", fontweight="bold",
-              fontsize=10)
-    return _save(fig, out_dir, f"F8_het_1d_profile_N{N}", plt)
+    _headline(fig, "HET axial profile", fontweight="bold", fontsize=10)
+    return _save(fig, out_dir, "F8_het_1d_profile", plt)
 
 
 # ── Figure 9: Resolution Against Solver Quality ────────────────────────────────
@@ -2353,9 +2409,10 @@ def build_all(repo_root: Path, out_dir: Path) -> list[Path]:
     written += figure_hardware(repo_root, out_dir)
     written += export_fields(repo_root, out_dir, dim=2)
     written += export_fields(repo_root, out_dir, dim=3)
-    written += export_profiles_1d(repo_root, out_dir, N=32)
+    for N in PROFILE_RESOLUTIONS_1D:
+        written += export_profiles_1d(repo_root, out_dir, N=N)
     written += figure_het_fields(repo_root, out_dir)
-    written += figure_het_profile_1d(repo_root, out_dir, N=32)
+    written += figure_het_profile_1d(repo_root, out_dir)
     written += figure_resolution_grid_2d(repo_root, out_dir)
     written += table_observed_order(repo_root, out_dir)
     written += table_primary_condensed(repo_root, out_dir)
