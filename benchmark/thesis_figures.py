@@ -225,6 +225,18 @@ LEGEND_PT: float =  9.0     # legends
 ANNOT_PT:  float =  8.0     # in-panel annotations and small-multiple titles
 SMALL_PT:  float =  8.0     # densest small-multiple labelling only
 
+# Two grids pull the small-multiple size in opposite directions, so each
+# names its own. F9 is sixteen panels across the full text width and its
+# per-panel error and cost figures are the reading, so they carry a point
+# more; F7 is four panels at 0.84 of it and its titles were louder than
+# the caption beneath them, so they carry one less.
+F9_SMALL_PT: float = 9.0    # F9 panel titles and tick labels
+F9_LABEL_PT: float = 9.0    # F9 axis labels, N headings, colourbar
+F7_TITLE_PT: float = 9.0    # F7 panel titles
+F7_LABEL_PT: float = 8.8    # F7 axis labels
+F7_TICK_PT:  float = 8.5    # F7 tick labels
+F7_CBAR_PT:  float = 7.5    # F7 colourbar ticks
+
 # Widths for figures placed at less than \textwidth. A figure is rendered at
 # exactly the width it is placed at, so the scale factor stays one and the point
 # sizes above hold on the page; the LaTeX fraction and the fraction here must
@@ -828,7 +840,7 @@ def figure_accuracy_vs_N(repo_root: Path, out_dir: Path,
         ax.margins(x=0.13, y=0.09)
         _label_n_axis(ax)
 
-    axes[0].set_ylabel(r"total relative error $e_\infty$  [%]")
+    axes[0].set_ylabel(r"Total relative error $e_\infty$  [%]")
     _headline(fig, f"Accuracy against resolution — {case}  ({dim}-D)",
                  fontweight="bold", fontsize=10)
 
@@ -931,7 +943,7 @@ def figure_error_decomposition(repo_root: Path, out_dir: Path,
         ax.margins(x=0.13, y=0.09)
         _label_n_axis(ax)
 
-    axes[0].set_ylabel("relative error  [%]")
+    axes[0].set_ylabel("Relative error  [%]")
     _headline(
         fig,
         f"Algorithmic against discretisation error — {case}  ({dim}-D)",
@@ -997,7 +1009,10 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
         Files written.
     """
     plt = _matplotlib()
-    fig, ax = plt.subplots(figsize=(width_in(0.88), 3.62))
+    # Full text width, not 0.88: the legend belongs inside the band it
+    # describes, and on the narrower canvas it ran out through the
+    # threshold line.
+    fig, ax = plt.subplots(figsize=(width_in(1.0), 3.62))
 
     # Right-hand sides that are eigenvectors of the discrete operator. The
     # inversion is then a single scalar division, exact for any polynomial that
@@ -1048,13 +1063,13 @@ def figure_qsvt_degree_threshold(repo_root: Path, out_dir: Path) -> list[Path]:
     ax.axvline(DEGREE_KAPPA_THRESHOLD, color="black", ls="--", lw=1.3,
                label=rf"$d/\kappa = {DEGREE_KAPPA_THRESHOLD:g}$")
     ax.axvspan(1e-3, DEGREE_KAPPA_THRESHOLD, color="grey", alpha=0.13)
-    # No solve sits below d/kappa = 0.6, so a decade of empty grey on the left
-    # spends width the narrowed canvas no longer has.
-    ax.set_xlim(0.35, 4.0e2)
+    # Half a decade of clear margin below the lowest solve at d/kappa =
+    # 0.6, which is what gives the legend room inside the shaded band.
+    ax.set_xlim(0.10, 4.0e2)
     ax.annotate("under-resolved polynomial", xy=(0.03, 0.80),
                 xycoords="axes fraction", fontsize=ANNOT_PT, color="dimgrey")
-    ax.set_xlabel(r"degree-to-condition-number ratio  $d / \kappa(A)$")
-    ax.set_ylabel(r"relative residual  $\|Au - b\|_2 / \|b\|_2$")
+    ax.set_xlabel(r"Degree-to-condition-number ratio  $d / \kappa(A)$")
+    ax.set_ylabel(r"Relative residual  $\|Au - b\|_2 / \|b\|_2$")
     _headline(ax, r"QSVT accuracy is set by $d/\kappa$, not by $N$ or the case",
                  fontsize=10)
     ax.grid(alpha=0.3, which="both")
@@ -1141,11 +1156,16 @@ def figure_kappa_scaling(repo_root: Path, out_dir: Path) -> list[Path]:
                 xycoords="axes fraction", fontsize=ANNOT_PT, color="dimgrey")
 
     ax.set_xlabel("$N$")
-    ax.set_ylabel(r"condition number")
+    ax.set_ylabel(r"Condition number")
     _headline(ax, "Strip decomposition bounds the condition number", fontsize=10)
     ax.grid(alpha=0.3, which="both")
+    # Anchored rather than placed automatically: the 1-D series rises
+    # through the middle of the panel and "best" put the legend across
+    # it, while the band between that curve and the two bounded ones
+    # stayed empty.
     ax.legend(fontsize=LEGEND_PT, ncol=2, labelspacing=0.3,
-              handletextpad=0.5, columnspacing=1.0, borderpad=0.4)
+              handletextpad=0.5, columnspacing=1.0, borderpad=0.4,
+              loc="upper right", bbox_to_anchor=(1.0, 0.55))
     # The 2-D strip operator is measured out to N = 256, so this axis carries two
     # resolutions beyond the 1-D sweep's range; the default decade ticks label
     # none of the six actually run.
@@ -1232,7 +1252,7 @@ def figure_cost_vs_N(repo_root: Path, out_dir: Path,
         ax.margins(x=0.13, y=0.09)
         _label_n_axis(ax)
 
-    axes[0].set_ylabel("wall time  [s]")
+    axes[0].set_ylabel("Wall time  [s]")
     _headline(fig, f"Computational cost — {case}  ({dim}-D)",
                  fontweight="bold", fontsize=10)
 
@@ -1324,15 +1344,18 @@ def figure_hardware(repo_root: Path, out_dir: Path) -> list[Path]:
     if n_qubits:
         floor = 2.0 ** (-n_qubits)
         axes[0].axhline(floor, color=FLOOR_COLOUR, ls=":", lw=1.3)
+        # Right of the crossing and well clear above it: at d ~ 20 the
+        # measured curve is still descending through this height, and
+        # the label sat on top of it.
         axes[0].annotate(rf"maximally mixed floor, $2^{{-{n_qubits}}}$",
-                         xy=(0.32, floor * 1.35), xycoords=("axes fraction",
-                                                            "data"),
+                         xy=(0.54, floor * 2.7), xycoords=("axes fraction",
+                                                           "data"),
                          fontsize=ANNOT_PT, color=FLOOR_COLOUR)
 
     axes[0].set_yscale("log")
     axes[0].set_xlim(-1.5, 65)
     axes[0].set_xlabel("QSVT polynomial degree $d$")
-    axes[0].set_ylabel("measured state fidelity $F_d$")
+    axes[0].set_ylabel("Measured state fidelity $F_d$")
     axes[0].legend(fontsize=LEGEND_PT, labelspacing=0.3,
                    handletextpad=0.5, borderpad=0.4)
     axes[0].grid(alpha=0.3, which="both")
@@ -1635,10 +1658,15 @@ def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
     dimensions, so restoring the row is a one-line change.
 
     The leftmost column carries the manufactured solution itself, so the error
-    maps beside it are read against the field they belong to. Each error map
-    carries its own symmetric scale: the three solvers differ by orders of
-    magnitude, and one shared scale would render two of the three uniformly
-    flat.
+    maps beside it are read against the field they belong to. All three error
+    maps share one symmetric scale, set by the largest of them: their peaks
+    lie within twenty per cent of one another, so per-panel scales drew three
+    pictures that could not be compared and suggested a separation the
+    archives do not carry. What separates the solvers here is the pattern,
+    not the amplitude: QSVT reproduces the classical field to ten figures,
+    so its map is the discretisation error alone, where HHL and VQLS lay a
+    banded algorithmic error on top of it along the lines the decomposition
+    cuts.
 
     Parameters
     ----------
@@ -1687,29 +1715,42 @@ def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
         ax = cells[0]
         im = ax.pcolormesh(X * 1e3, Y * 1e3, PHI, shading="auto",
                            cmap=FIELD_CMAP, rasterized=True)
-        _attach_colourbar(fig, im, ax, SMALL_PT)
-        ax.set_title(f"{dim}-D manufactured " + r"$\phi$  [V]")
+        _attach_colourbar(fig, im, ax, F7_CBAR_PT)
+        ax.set_title(f"{dim}-D manufactured " + r"$\phi$  [V]",
+                     fontsize=F7_TITLE_PT)
+
+        # One symmetric scale across the three error maps, not one each.
+        # The peaks differ by under twenty per cent, so per-panel scales
+        # gave three pictures that could not be read against one another
+        # and implied a separation that is not there.
+        maps = {}
+        for solver in QUANTUM_SOLVERS:
+            if solver in by_solver:
+                Xs, Ys, _, ERR = _read_field_csv(by_solver[solver])
+                maps[solver] = (Xs, Ys, ERR)
+        peaks = [float(np.max(np.abs(E[np.isfinite(E)])))
+                 for _, _, E in maps.values() if np.isfinite(E).any()]
+        scale = max(peaks) if peaks else 1.0
 
         for k, solver in enumerate(QUANTUM_SOLVERS, start=1):
             ax = cells[k]
-            if solver not in by_solver:
+            if solver not in maps:
                 ax.set_axis_off()
                 ax.text(0.5, 0.5, f"{solver}\nnot recorded", ha="center",
                         va="center", fontsize=ANNOT_PT, color="dimgrey")
                 continue
-            Xs, Ys, _, ERR = _read_field_csv(by_solver[solver])
-            finite = ERR[np.isfinite(ERR)]
-            scale = float(np.max(np.abs(finite))) if finite.size else 0.0
-            scale = scale or 1.0
+            Xs, Ys, ERR = maps[solver]
             im = ax.pcolormesh(Xs * 1e3, Ys * 1e3, ERR, shading="auto",
                                cmap=SIGNED_ERROR_CMAP, vmin=-scale, vmax=scale,
                                rasterized=True)
-            cb = _attach_colourbar(fig, im, ax, SMALL_PT)
+            cb = _attach_colourbar(fig, im, ax, F7_CBAR_PT)
             cb.formatter.set_powerlimits((-2, 2))
             ax.set_title(f"{solver}  signed error  [V]",
-                         color=SOLVER_COLOUR[solver])
+                         color=SOLVER_COLOUR[solver],
+                         fontsize=F7_TITLE_PT)
 
-        radial = "radial  [mm]" if dim == 2 else "radial, mid-plane  [mm]"
+        radial = ("Radial  [mm]" if dim == 2
+                  else "Radial, mid-plane  [mm]")
         for k, ax in enumerate(cells):
             ax.grid(False)
             # The channel is twice as long axially as it is deep radially, but
@@ -1719,12 +1760,13 @@ def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
             # what makes the interior structure of the error legible at this
             # size; the axis values state the true extent of each direction.
             ax.set_box_aspect(1.0)
+            ax.tick_params(labelsize=F7_TICK_PT)
             if k >= 2:
-                ax.set_xlabel("axial  [mm]")
+                ax.set_xlabel("Axial  [mm]", fontsize=F7_LABEL_PT)
             else:
                 ax.tick_params(labelbottom=False)
             if k % ncol == 0:
-                ax.set_ylabel(radial)
+                ax.set_ylabel(radial, fontsize=F7_LABEL_PT)
             else:
                 ax.tick_params(labelleft=False)
 
@@ -1884,7 +1926,7 @@ def figure_het_profile_1d(repo_root: Path, out_dir: Path,
         for ax in axes[i]:
             ax.grid(alpha=0.3)
     for ax in axes[-1]:
-        ax.set_xlabel("axial position  [mm]")
+        ax.set_xlabel("Axial position  [mm]")
 
     _headline(fig, "HET axial profile", fontweight="bold", fontsize=10)
     return _save(fig, out_dir, "F8_het_1d_profile", plt)
@@ -2062,7 +2104,7 @@ def figure_resolution_grid_2d(repo_root: Path, out_dir: Path) -> list[Path]:
                                  vmin=vmin, vmax=vmax, rasterized=True)
             ax.grid(False)
             ax.set_aspect("equal")
-            ax.tick_params(labelsize=SMALL_PT)
+            ax.tick_params(labelsize=F9_SMALL_PT)
             if i != nrow - 1:
                 ax.set_xticklabels([])
             if j != 0:
@@ -2083,7 +2125,7 @@ def figure_resolution_grid_2d(repo_root: Path, out_dir: Path) -> list[Path]:
             # into one another and read as one number.
             parts = [f"{err_label} = {_pct_label(err)}"]
             parts.append(_format_seconds(wall))
-            ax.set_title("\n".join(parts), fontsize=SMALL_PT,
+            ax.set_title("\n".join(parts), fontsize=F9_SMALL_PT,
                          color=SOLVER_COLOUR[solver], pad=2,
                          linespacing=1.25)
 
@@ -2097,20 +2139,20 @@ def figure_resolution_grid_2d(repo_root: Path, out_dir: Path) -> list[Path]:
     for j, N in enumerate(PANEL_RESOLUTIONS_2D):
         axes[0][j].text(0.5, 1.62, f"$N = {N}$",
                         transform=axes[0][j].transAxes,
-                        ha="center", va="bottom", fontsize=ANNOT_PT)
+                        ha="center", va="bottom", fontsize=F9_LABEL_PT)
     for i, solver in enumerate(SOLVERS):
-        axes[i][0].set_ylabel(f"{solver}\nradial  [mm]", fontsize=ANNOT_PT,
+        axes[i][0].set_ylabel(f"{solver}\nRadial  [mm]", fontsize=F9_LABEL_PT,
                               color=SOLVER_COLOUR[solver])
     for j in range(ncol):
-        axes[-1][j].set_xlabel("axial  [mm]", fontsize=ANNOT_PT)
+        axes[-1][j].set_xlabel("Axial  [mm]", fontsize=F9_LABEL_PT)
 
     if mesh is not None:
         # `aspect` is length over width: the default of 20 gives a stub beside a
         # grid four panels tall, so it is raised until the bar spans them.
         cb = fig.colorbar(mesh, ax=axes, fraction=0.020, pad=0.015,
                           aspect=55)
-        cb.set_label(r"$\phi$  [V]", fontsize=ANNOT_PT)
-        cb.ax.tick_params(labelsize=SMALL_PT)
+        cb.set_label(r"$\phi$  [V]", fontsize=F9_LABEL_PT)
+        cb.ax.tick_params(labelsize=F9_SMALL_PT)
 
     _headline(fig, "Resolution against solver quality - two-dimensional "
                    "thruster channel", fontweight="bold", fontsize=10)
