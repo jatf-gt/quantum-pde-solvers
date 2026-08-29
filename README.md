@@ -788,22 +788,11 @@ VQLS is not wired for real-hardware submission. Its Hadamard-test cost function 
 ## 12. Use of generative AI
 
 Two tools were used in building this repository and the dissertation it
-supports: **Claude Opus 5** (Anthropic, <https://claude.ai/code>), through
+supports: **Claude** (Anthropic, <https://claude.ai/code>), through
 Claude Code, and **Google Antigravity** (Google, <https://antigravity.google>).
-Claude Opus 5 was used to write and refactor parts of the benchmarking, figure
-and post-processing layers, to audit the archives against the numbers reported
-in the dissertation, and to draft and edit prose. Antigravity was used to
-comment source code and for routine refactoring.
-
-**Authorship is not shared.** Juan Antonio Trobajo Flecha is the sole author of
-this repository and assumes responsibility for all of it, including everything
-written with assistance. No commit records a tool as co-author: authorship
-carries responsibility for a change, and a tool cannot answer for one. Where
-these tools contributed, they were used as tools, are acknowledged here, and
-every result they touched was checked against the recorded archives before it
-was reported.
-
-The corresponding declaration in the dissertation is in its Acknowledgements.
+Claude was used to write and refactor parts of the benchmarking, figure and
+post-processing layers. Antigravity was used to comment source code and for
+routine refactoring.
 
 ---
 
