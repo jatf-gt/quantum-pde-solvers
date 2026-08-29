@@ -14,11 +14,9 @@ env/
 .vscode/
 .pytest_cache/
 
-# Bulk results, excluded by kind and never by directory: git does not descend
-# into an excluded directory, so a negation beneath one could never match. The
-# per-solution fields live in the Zenodo deposit named in results/README.md and
-# the figures regenerate from the archives. The two negations keep what the
-# dissertation's numbers actually rest on.
+# Bulk results: The per-solution fields live in the Zenodo deposit named in 
+# results/README.md and the figures regenerate from the archives. The two 
+# negations keep what the dissertation's numbers actually rest on.
 *.npz
 !results/qsvt_phase_cache/*.npz
 *.csv
@@ -28,11 +26,10 @@ env/
 *.pdf
 *.xlsx
 
-# Cluster logs. The few worth keeping are committed gzipped, which these
-# patterns do not match.
+# Cluster logs.
 *.log
 *.err
 *.out
 
-# Supervisor meeting material, not part of the record
+# Supervisor meeting material
 results/meetings/
