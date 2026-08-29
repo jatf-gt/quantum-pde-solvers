@@ -196,13 +196,19 @@ IBM_KINGSTON_TWO_QUBIT_ERROR: float = 1.956349128978227e-3
 # 10.5 in reduced to 0.92 \textwidth — multiplies every glyph by 0.55, which put
 # 9 pt axis text on the page at 5 pt, half the size of the caption beneath it.
 #
-# Geometry, from `usepackages.tex`: A4 with 2.5 cm margins on all four sides, so
-# the text block is 16.0 cm wide and 24.7 cm tall.
-TEXT_WIDTH_IN: float = 6.2992      # 16.0 cm, to the fourth decimal
+# Geometry, from `usepackages.tex`: A4 with 2.5 cm top and bottom and 2.25 cm
+# left and right, so the text block is 16.5 cm wide and 24.7 cm tall. The side
+# margins narrowed on 2026-08-28, when the body went to a true 11 pt and the
+# page count had to be bought back. A figure rendered at the former 16.0 cm and
+# placed at \textwidth is scaled up by 3.1 per cent, which lands every
+# calibrated point size 3 per cent above its specification and costs vertical
+# space the chapter does not have. Re-render on any geometry change; never let
+# LaTeX do the scaling.
+TEXT_WIDTH_IN: float = 6.4961      # 16.5 cm, to the fourth decimal
 TEXT_HEIGHT_IN: float = 9.7244     # 24.7 cm
 
-# The document sets Helvetica (`helvet`) at `scaled=0.95` as the default family,
-# the departmental Arial requirement; Arial and Helvetica share metrics, so Arial
+# The document sets Helvetica (`helvet`) as the default family, the departmental
+# Arial requirement; Arial and Helvetica share metrics, so Arial
 # is the exact match on Windows and Liberation Sans on Linux. Ordered by
 # preference and resolved once against the installed set, because naming a face
 # matplotlib cannot find silently substitutes DejaVu Sans and the figure ships in
@@ -213,8 +219,12 @@ BODY_FONT_STACK: tuple[str, ...] = (
 
 # Point sizes, all measured on the page because the scale factor is unity.
 #
-# The body is 11 pt scaled by 0.95, so it reaches the page at 10.45 pt, and the
-# caption is that at \small, near 9.5 pt. Axis text belongs between the two: a
+# The body reaches the page at a true 11 pt, and the caption is that at \small,
+# near 10 pt; both rose on 2026-08-28 when the 0.95 scaling came off. The sizes
+# below were calibrated against the former 10.45 pt body and are left where they
+# are, which now places axis text a little under the caption rather than between
+# caption and body. That is the safe direction, and moving them would disturb
+# legend placements tuned panel by panel. Axis text belongs between the two: a
 # figure whose axis labels are larger than the body text it sits in reads as a
 # poster rather than as an illustration, which is what the first calibration
 # produced at 11 and 10.5 pt. Legends, in-panel annotations and small-multiple
