@@ -183,7 +183,6 @@ quantum-pde-solvers/
 +-- .zenodo.json                     # Metadata for the per-solution field deposit
 +-- CITATION.cff
 +-- requirements.txt
-+-- pytest.ini
 +-- README.md
 ```
 
@@ -191,7 +190,7 @@ quantum-pde-solvers/
 
 ## 2. Prerequisites and installation
 
-Python 3.11 is recommended (3.10 and 3.12 are compatible but untested locally; CX3 uses 3.12.3 via `Python/3.12.3-GCCcore-13.3.0`).
+Python 3.11 or newer. The floor is set by the pinned stack, not by preference: numpy, scipy and PennyLane each declare `requires-python >= 3.11`. CX3 uses 3.12.3 via `Python/3.12.3-GCCcore-13.3.0`.
 
 **Clone with submodule**
 
@@ -242,7 +241,7 @@ Local pinned versions (`qiskit==1.4.5`, `qiskit-aer==0.17.2`, `pennylane==0.45.0
 
 ## 3. Local execution
 
-All scripts run from the repository root. `pytest.ini` sets `pythonpath = .`, so `core`, `problems`, `solvers`, and `benchmark` resolve as top-level packages.
+All scripts run from the repository root. `pyproject.toml` sets pytest's `pythonpath = ["."]`, so `core`, `problems`, `solvers` and `benchmark` resolve as top-level packages.
 
 ### 3.1 `tutorial.py` -- start here
 

@@ -1,84 +1,38 @@
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-# Virtual environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-qiskit_hw/
-.vscode/
-*.pdf
-*.csv
-*.xlsx
-*.dat
-*.png
-*.jpg
 *.egg-info/
-results/meetings/
-results/hpc_run/
-results_hpc_copy/
-# The sweep and study directories are NOT excluded wholesale. They were until
-# 2026-08-20, which kept every recorded number out of the repository: a reader
-# checking a figure had no way to reach the archive it was drawn from. What is
-# excluded instead is the BULK, by kind, in the rules further down --- the
-# per-solution `.npz` fields (182 MB), the cluster logs (162 MB) and the
-# diagnostic figure sets (48 MB). The summaries, tables and tidy figure datasets
-# that remain come to about 7 MB, and are the provenance of every number quoted
-# in the dissertation.
-#
-# Excluding by kind rather than by directory is deliberate and not
-# interchangeable with it. Git does not descend into an excluded directory, so a
-# negation beneath one can never match --- which is exactly why the `docs/*`
-# rule below has never tracked anything despite promising to. Any rule added
-# here that names a directory forfeits the ability to keep anything inside it.
-#
-# The full set including the `.npz` fields belongs in a data deposit; see
-# results/README.md.
-!results/**/*.csv
-updated*
-CLAUDE.md
-.agents
-.claude
-context/
-# Documentation prose is tracked; generated artefacts under docs/ are not.
-# The directory itself must stay un-excluded, otherwise git will not descend
-# into it and the negation below can never match.
-# Internal artefacts and temporary workspace files are excluded by default.
-docs/*
 
-# Ad hoc backup copies made before a cleanup or a rerun. One such directory was
-# named "results.backup." with a TRAILING DOT, which Windows cannot create: once
-# committed, no Windows clone could check the branch out at all, and git aborted
-# with "invalid path" before any merge or rebase could begin. Excluded by pattern
-# so that a hand-made backup can never be committed again.
-results.backup*/
-results_backup*/
-*.backup/
-*.bak
-*.tar.gz
+# Virtual environments. qiskit_hw/ is the second, Qiskit 2.x environment used
+# only for real-device submission; see README section 2.1.
+qiskit_hw/
+.venv*/
+venv/
+env/
 
-# The rules above match a backup FILE ("*.bak") and a directory whose name ends
-# exactly in ".backup", but not the dated convention actually used before a
-# re-run -- results/2Dstudies.bak_20260819 -- whose name ends in the date. Such a
-# directory holds .json and .csv, neither excluded by kind below, so it surfaced
-# as untracked content and the preflight refused the tree: a backup taken to make
-# a submission safe was what stopped the submission. Match the name wherever it
-# occurs and however it is suffixed.
-*.bak*/
-*_backup*/
+# Editor and tool caches
+.vscode/
+.pytest_cache/
 
-# Generated cluster output, excluded by kind rather than by directory name.
-# The per-directory rules above only protect the six sweep directories that
-# exist today; a job writing to a new directory (a wave, a resumed sweep, a
-# fresh order) would otherwise commit its solution archives and logs. The QSVT
-# phase cache is the sole deliberate exception: those archives are the expensive
-# precompute and are tracked on purpose.
+# Bulk results, excluded by kind and never by directory: git does not descend
+# into an excluded directory, so a negation beneath one could never match. The
+# per-solution fields live in the Zenodo deposit named in results/README.md and
+# the figures regenerate from the archives. The two negations keep what the
+# dissertation's numbers actually rest on.
 *.npz
 !results/qsvt_phase_cache/*.npz
+*.csv
+!results/**/*.csv
+*.png
+*.jpg
+*.pdf
+*.xlsx
+
+# Cluster logs. The few worth keeping are committed gzipped, which these
+# patterns do not match.
 *.log
 *.err
 *.out
+
+# Supervisor meeting material, not part of the record
+results/meetings/

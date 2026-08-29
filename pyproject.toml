@@ -5,7 +5,29 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quantum-pde-solvers"
 version = "0.1.0"
-requires-python = ">=3.9"
+# The pinned stack sets the floor: numpy, scipy and PennyLane each declare
+# requires-python >= 3.11.
+requires-python = ">=3.11"
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--tb=short --strict-markers -q"
+markers = [
+    "quantum: tests that construct and simulate quantum circuits, needing a working Qiskit/PennyLane backend. Deselect with -m 'not quantum' for a purely classical run covering problem assembly, the classical solvers and the outer-iteration layer.",
+    # PennyLane applies the markers below at import time. They are registered
+    # defensively so that --strict-markers does not raise on them.
+    "autograd: PennyLane interface marker.",
+    "torch: PennyLane interface marker.",
+    "tf: PennyLane interface marker.",
+    "jax: PennyLane interface marker.",
+    "all_interfaces: PennyLane interface marker.",
+    "qchem: PennyLane submodule marker.",
+    "qcut: PennyLane submodule marker.",
+]
