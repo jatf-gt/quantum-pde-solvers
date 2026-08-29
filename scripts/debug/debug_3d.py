@@ -26,15 +26,15 @@ solve is the reference), so it reports "n/a" in the "vs exact%" column.
 
 Usage
 -----
-    python scripts/debug_3d.py --case cube --N 16
-    python scripts/debug_3d.py --case het  --N 16 --inner qsvt
-    python scripts/debug_3d.py --case all  --N 8  --inner all
-    python scripts/debug_3d.py --hierarchy --case het --N 32
-    python scripts/debug_3d.py --convergence-study --case cube
-    python scripts/debug_3d.py --N 16 --inner qsvt -I max_degree=300
-    python scripts/debug_3d.py --noise-study --N 16
-    python scripts/debug_3d.py --polish-study --N 16
-    python scripts/debug_3d.py --list-cases
+    python scripts/debug/debug_3d.py --case cube --N 16
+    python scripts/debug/debug_3d.py --case het  --N 16 --inner qsvt
+    python scripts/debug/debug_3d.py --case all  --N 8  --inner all
+    python scripts/debug/debug_3d.py --hierarchy --case het --N 32
+    python scripts/debug/debug_3d.py --convergence-study --case cube
+    python scripts/debug/debug_3d.py --N 16 --inner qsvt -I max_degree=300
+    python scripts/debug/debug_3d.py --noise-study --N 16
+    python scripts/debug/debug_3d.py --polish-study --N 16
+    python scripts/debug/debug_3d.py --list-cases
 
 Deliberate remaining asymmetry with debug_2d.py: field plotting. --plot here
 writes only the dimension-agnostic convergence/cost figure

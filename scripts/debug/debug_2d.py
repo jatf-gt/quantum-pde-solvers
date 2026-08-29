@@ -14,42 +14,42 @@ dimension-specific comparison table, and wires the CLI together.
 Usage
 -----
     # scheme comparison with the classical inner solver (fast, no quantum)
-    python scripts/debug_2d.py --case square --N 64
+    python scripts/debug/debug_2d.py --case square --N 64
 
     # reproduce the original validated line-Jacobi behaviour
-    python scripts/debug_2d.py --case square --N 8 --scheme jacobi \
+    python scripts/debug/debug_2d.py --case square --N 8 --scheme jacobi \
            --criterion delta --tol 1e-6
 
     # one quantum solver, all schemes
-    python scripts/debug_2d.py --case het --N 8 --inner hhl
+    python scripts/debug/debug_2d.py --case het --N 8 --inner hhl
 
     # everything
-    python scripts/debug_2d.py --case all --N 8 --inner all --plot
+    python scripts/debug/debug_2d.py --case all --N 8 --inner all --plot
 
     # tune the inner solvers: -I applies to the selected solver,
     # -I solver.key=value targets one solver in a multi-solver sweep
-    python scripts/debug_2d.py --N 32 --inner qsvt -I max_degree=300
-    python scripts/debug_2d.py --N 32 --inner all \
+    python scripts/debug/debug_2d.py --N 32 --inner qsvt -I max_degree=300
+    python scripts/debug/debug_2d.py --N 32 --inner all \
            -I qsvt.max_degree=300 -I hhl.epsilon=0.05 -I vqls.n_restarts=2
 
     # tune the outer scheme
-    python scripts/debug_2d.py --N 64 --scheme fmg -S nu1=2 -S n_coarse=8
+    python scripts/debug/debug_2d.py --N 64 --scheme fmg -S nu1=2 -S n_coarse=8
 
     # list every tunable parameter, or every registered 2-D case
-    python scripts/debug_2d.py --list-options
-    python scripts/debug_2d.py --list-cases
+    python scripts/debug/debug_2d.py --list-options
+    python scripts/debug/debug_2d.py --list-cases
 
     # how much inner-solver error each scheme tolerates (no quantum needed)
-    python scripts/debug_2d.py --noise-study --N 32
+    python scripts/debug/debug_2d.py --noise-study --N 32
 
     # does finishing a multigrid solve with SOR/Jacobi help?  (it does not)
-    python scripts/debug_2d.py --polish-study --N 64
+    python scripts/debug/debug_2d.py --polish-study --N 64
 
     # check the hierarchy that would be built
-    python scripts/debug_2d.py --hierarchy --N 64
+    python scripts/debug/debug_2d.py --hierarchy --N 64
 
     # confirm second-order discretisation and grid-independent FMG cycles
-    python scripts/debug_2d.py --convergence-study --case square
+    python scripts/debug/debug_2d.py --convergence-study --case square
 
 `--case` accepts the short aliases `square` (poisson_2d_sin_pi) and `het`
 (het_2d_mms_spt100) used by the original tool, or any full name from

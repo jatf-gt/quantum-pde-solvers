@@ -18,21 +18,21 @@ validated registry, and the same timing/diagnostics collection apply here too.
 
 Usage
 -----
-    python scripts/debug_1d.py --case poisson_1d_fS_hom --N 8
-    python scripts/debug_1d.py --case het_1d_3c_neumann --N 16 --inner qsvt
-    python scripts/debug_1d.py --case all --N 8 --inner all
-    python scripts/debug_1d.py --N 8 --inner qsvt -I max_degree=300
-    python scripts/debug_1d.py --N 32 --inner all \
+    python scripts/debug/debug_1d.py --case poisson_1d_fS_hom --N 8
+    python scripts/debug/debug_1d.py --case het_1d_3c_neumann --N 16 --inner qsvt
+    python scripts/debug/debug_1d.py --case all --N 8 --inner all
+    python scripts/debug/debug_1d.py --N 8 --inner qsvt -I max_degree=300
+    python scripts/debug/debug_1d.py --N 32 --inner all \
            -I qsvt.max_degree=300 -I hhl.epsilon=0.05 -I vqls.n_restarts=2
 
     # node-by-node solution and pointwise error
-    python scripts/debug_1d.py --dump --case het_1d_3a_linear --N 8 --inner qsvt
+    python scripts/debug/debug_1d.py --dump --case het_1d_3a_linear --N 8 --inner qsvt
 
     # kappa(N) against the plain-TST theoretical (4/pi^2)(N+1)^2, every case
-    python scripts/debug_1d.py --kappa-table
+    python scripts/debug/debug_1d.py --kappa-table
 
-    python scripts/debug_1d.py --list-cases
-    python scripts/debug_1d.py --list-options
+    python scripts/debug/debug_1d.py --list-cases
+    python scripts/debug/debug_1d.py --list-options
 
 QSVT phase cache
 ----------------

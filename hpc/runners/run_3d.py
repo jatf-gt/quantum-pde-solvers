@@ -110,9 +110,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  pid=%(process)-6d  %(levelname)-8s  %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    # Append, never truncate. A single PBS job invokes this runner several times
-    # in sequence (submit_3d_wave1.sh runs three steps), and under mode="w" each
-    # step destroyed its predecessor's log, leaving only the last. The history is
+    # Append, never truncate. A single PBS job may invoke this runner several
+    # times in sequence, and under mode="w" each step destroyed its
+    # predecessor's log, leaving only the last. The history is
     # the sole record of how far a walltime-killed step had progressed. Sessions
     # are delimited by `_log_session_header`.
     handlers=[logging.StreamHandler(sys.stdout),

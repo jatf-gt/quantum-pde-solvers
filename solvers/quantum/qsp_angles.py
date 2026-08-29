@@ -136,7 +136,7 @@ _DISK_CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "results" / "q
 # already computed, with zero code changes at the call site.
 _ENABLE_DISK_READ: bool = True
 
-# Writing is opt-in. Flip this (e.g. from precompute_qsvt_phases.py) to
+# Writing is opt-in. Flip this (e.g. from hpc/runners/precompute_phases.py) to
 # populate the cache; leave it off for interactive/exploratory runs so
 # they don't silently write files.
 _ENABLE_DISK_WRITE: bool = False

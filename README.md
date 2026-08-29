@@ -39,6 +39,7 @@ Solves a 2D Poisson problem, compares outer schemes, and prints results in secon
 9. [Methodological notes](#9-methodological-notes)
 10. [Hardware results](#10-hardware-results)
 11. [References](#11-references)
+12. [Use of generative AI](#12-use-of-generative-ai)
 
 ---
 
@@ -47,14 +48,18 @@ Solves a 2D Poisson problem, compares outer schemes, and prints results in secon
 Data flows in one direction: `core` -> `problems` -> `solvers` -> `benchmark` -> `scripts`.
 
 ```
-poisson_hhl/
+quantum-pde-solvers/
 |
 +-- core/                            # PDE-agnostic shared infrastructure
 |   +-- cases.py                     # 27-case registry (1D/2D/3D); register/get/available/describe
 |   +-- config.py                    # SimConfig1D, SimConfig2D; N must be a power of 2
 |   +-- exact_solutions.py           # Analytical solutions: 1D (fS, fL, fH) and 2D sinusoidal
+|   +-- execution.py                 # Post-selection and state recovery: statevector, shots, device
+|   +-- hardware.py                  # Device-side primitives: post-selection counts, batched estimation
 |   +-- het_config.py                # HET physical constants; HETConfig, HETPhysicalConfig
 |   +-- het_geometry.py              # Single SPT-100 geometry shared across all dimensions
+|   +-- noise.py                     # Depolarising and shot-noise models for the robustness sweeps
+|   +-- resources.py                 # Gate-count and qubit-count models; device budget from calibration
 |   +-- source_functions.py          # Source functions fS, fL, fH; HET charge-density profiles
 |
 +-- problems/                        # Operator assembly and domain discretisation
@@ -76,12 +81,13 @@ poisson_hhl/
 |   |   +-- result.py                # SolverResult, VQLSSolverResult, QSVTSolverResult
 |   |   +-- hhl_1d.py                # HHL for 2nd-order 1D TST systems
 |   |   +-- hhl_1d_4th.py            # HHL for 4th-order 1D pentadiagonal systems
+|   |   +-- trotter_pinning.py       # Pins the Trotter step count against epsilon drift
 |   |   +-- vqls_utils.py            # LCU Pauli decomposition, ansatz, cost function
 |   |   +-- vqls_1d.py               # VQLS 2nd-order solver; VQLSConfig1D
 |   |   +-- vqls_1d_4th.py           # VQLS 4th-order solver
 |   |   +-- vqls_hadamard.py         # Circuit-level Hadamard-test cost evaluation (opt-in)
 |   |   +-- block_encoding.py        # Sz.-Nagy unitary dilation for TST and pentadiagonal A
-|   |   +-- qsp_angles.py            # QSP phase angles via pyqsp / Chebyshev fallback
+|   |   +-- qsp_angles.py            # QSP phase angles via pyqsp / Chebyshev fallback; disk cache
 |   |   +-- qsvt_1d.py               # QSVT 2nd-order solver; QSVTConfig1D
 |   |   +-- qsvt_1d_4th.py           # QSVT 4th-order solver
 |   +-- outer/                       # Single 2D/3D architecture: strip decomposition
@@ -102,52 +108,79 @@ poisson_hhl/
 |   +-- diagnostics.py               # Comparison-table / study primitives for debug scripts
 |   +-- reference_2d.py              # Fine-mesh FMG reference solution for 2D error metrics
 |   +-- hpc_plotting.py              # HPC sweep post-processing: load -> reshape -> draw -> save
+|   +-- study_plotting.py            # Equal-accuracy and sensitivity study figures
+|   +-- thesis_figures.py            # The dissertation's main-body figures and their tidy CSVs
 |   +-- hpc_archive.py               # Legacy on-disk schema for existing HPC run directories
 |   +-- results_io.py                # Publication archive schema (new runs); read + write
 |
 +-- scripts/                         # Laptop-scale entry points
 |   +-- tutorial.py                  # START HERE -- --dim {1,2,3}, --inner, --scheme
-|   +-- debug_1d.py                  # 1D diagnostics: raw (A,b) cases, kappa tables, QSVT dump
-|   +-- debug_1d_4th.py              # 4th-order 1D diagnostics; convergence-order verification
-|   +-- debug_2d.py                  # 2D scheme comparison, noise study, polish study
-|   +-- debug_3d.py                  # 3D equivalent of debug_2d.py
-|   +-- example_report.py            # Copy-me template for a small laptop-scale report
-|   +-- gap_analysis.py              # Scans HPC result directories; emits rerun manifests
-|   +-- resource_feasibility_1d.py   # Circuit-depth and qubit feasibility estimates
-|   +-- robustness_sweep_1d.py       # Shot-noise and noise-model robustness sweeps
-|   +-- hhl_shot_overhead.py         # HHL measurement overhead analysis
-|   +-- block_encoding_fidelity.py   # Block-encoding unitarity and fidelity checks
-|   +-- delta_amplification_hardware.py  # Hardware-adapted amplitude amplification
-|   +-- qsvt_2d_line_degree_sweep.py # 2D row-matrix QSVT degree vs N
-|   +-- archive/                     # Superseded scripts; see archive/README.md
+|   +-- make_thesis_figures.py       # Builds every main-body figure and its CSV from the archives
+|   +-- debug/                       # Interactive per-dimension diagnostics
+|   |   +-- debug_1d.py              # 1D: raw (A,b) cases, kappa tables, QSVT dump
+|   |   +-- debug_1d_4th.py          # 4th-order 1D; convergence-order verification
+|   |   +-- debug_2d.py              # 2D scheme comparison, noise study, polish study
+|   |   +-- debug_3d.py              # 3D equivalent of debug_2d.py
+|   +-- studies/                     # The parameter studies reported in the dissertation
+|   |   +-- resource_feasibility_1d.py   # Transpiled gate counts against the device budget
+|   |   +-- robustness_sweep_1d.py       # Shot noise, depolarising sweep, fake backend
+|   |   +-- hhl_shot_overhead.py         # Post-selection overhead, measured against 1/kappa^2
+|   |   +-- vqls_noisy_convergence_1d.py # Does COBYLA converge on a shot-based cost?
+|   |   +-- qsvt_2d_line_degree_sweep.py # QSVT degree against accuracy and device fidelity
+|   +-- hardware/                    # Real-device submission (second environment; see 2.1)
+|   |   +-- ibm_hardware_run.py          # Submission entry point
+|   |   +-- block_encoding_fidelity.py   # Direct fidelity estimation of one block encoding
+|   |   +-- qsvt_degree_composition_hardware.py # Fidelity against degree; the composition law
+|   |   +-- delta_amplification_hardware.py     # Amplitude-amplification feasibility
+|   |   +-- compare_mitigation.py        # Paired run with and without readout mitigation
+|   +-- utils/                       # Archive maintenance and auditing
+|   |   +-- circuit_census.py            # Transpiled depth and two-qubit counts, merged into a sweep
+|   |   +-- gap_analysis.py              # What a sweep is missing; writes a rerun manifest
+|   |   +-- recover_orphan_rows.py       # Rebuilds summary rows from surviving .npz fields
+|   |   +-- normalise_recovered_metrics.py # Recomputes recovered rows through the runner's metrics
+|   |   +-- check_geometry_impact.py     # Which cases a geometry change actually moves
+|   |   +-- make_zenodo_package.py       # Builds the per-solution field deposit
+|   |   +-- zenodo_upload.py             # Uploads it against .zenodo.json
+|   +-- matlab/                      # Optional MATLAB re-rendering of the tidy CSVs
 |
-+-- tests/                           # Pytest suite: ~480 tests, ~30 s
 +-- hpc/                             # Cluster deployment for Imperial CX3 -- see hpc/README.md
 |   +-- setup_hpc_env.sh             # One-time env setup: CPU qpde + GPU qpde-gpu venvs
-|   +-- runners/                     # Python driver code (portable)
+|   +-- runners/                     # Python driver code (portable; no PBS dependency)
 |   |   +-- run_1d.py                # Full 1D sweep: N=4..64, all solvers
 |   |   +-- run_2d.py                # Full 2D sweep
 |   |   +-- run_3d.py                # Full 3D sweep
-|   |   +-- precompute_phases.py     # QSVT phase-angle precompute; --dim {1,2}
-|   |   +-- plot_results.py          # Post-processing; --dim {1,2,3}
+|   |   +-- run_studies.py           # Equal-accuracy and sensitivity studies
+|   |   +-- precompute_phases.py     # QSVT phase-angle precompute; --dim {1,2,3}, --order {2,4}
+|   |   +-- plot_results.py          # Sweep post-processing; --dim {1,2,3}
+|   |   +-- plot_studies.py          # Study post-processing
+|   |   +-- make_tables.py           # Renders the booktabs tables into results/*/tables/
 |   +-- jobs/                        # PBS Pro job scripts (site-specific)
 |       +-- _preflight.sh            # Git-state and module gate; sourced by every job
+|       +-- submit_precompute_hpc.sh # 1D QSVT phase-angle precompute
+|       +-- submit_precompute_2D.sh  # 2D QSVT phase-angle precompute
+|       +-- submit_precompute_4th.sh # 4th-order phase-angle precompute; DIM selects dimension
 |       +-- submit_hpc_1D.sh         # Full 1D CPU sweep
 |       +-- submit_hpc_gpu.sh        # Full 1D GPU sweep (L40S / cuStateVec)
 |       +-- submit_hpc_2D.sh         # Full 2D sweep
 |       +-- submit_hpc_3D.sh         # Full 3D sweep
-|       +-- submit_hpc_1D_4th.sh     # 4th-order 1D sweep (blocked; see docs/HPC_REPAIR_PLAN.md)
-|       +-- submit_hpc_2D_4th.sh     # 4th-order 2D sweep (blocked; see docs/HPC_REPAIR_PLAN.md)
-|       +-- submit_hpc_3D_4th.sh     # 4th-order 3D sweep (blocked; see docs/HPC_REPAIR_PLAN.md)
-|       +-- submit_{1d,2d,3d}_wave1.sh  # Manifest-driven gap-fill resubmission
-|       +-- submit_precompute_hpc.sh # 1D QSVT phase-angle precompute
-|       +-- submit_precompute_2D.sh  # 2D QSVT phase-angle precompute
-|       +-- submit_precompute_4th.sh # 4th-order phase-angle precompute
+|       +-- submit_hpc_1D_4th.sh     # 4th-order 1D sweep
+|       +-- submit_hpc_2D_4th.sh     # 4th-order 2D sweep
+|       +-- submit_hpc_3D_4th.sh     # 4th-order 3D sweep
+|       +-- submit_studies.sh        # Equal-accuracy and sensitivity studies; DIM selects dimension
+|       +-- submit_census.sh         # Transpiled gate counts merged into an existing sweep
 |
-+-- docs/
-|   +-- HPC_REPAIR_PLAN.md           # Root causes and fixes for defective HPC pipeline
-|   +-- HPC_OPERATIONAL_ISSUES.md    # Open cluster faults (log visibility, filesystem)
-+-- context/                         # Reference material; not part of the repository proper
++-- results/                         # Recorded measurements -- see results/README.md
+|   +-- {1,2,3}Dhpc_run{,_4th}/      # The sweeps: summaries, metadata, tidy CSVs
+|   +-- {1,2,3}Dstudies{,_4th}/      # Equal-accuracy and sensitivity studies
+|   +-- thesis/                      # One tidy CSV per main-body figure, F1-F9
+|   +-- qsvt_phase_cache/            # QSP phase angles, keyed (kappa, epsilon, method, max_degree)
+|   +-- investigations/              # ibm_kingston hardware runs and calibration
+|   +-- manifests/                   # Recorded gap-analysis scopes
+|
++-- tests/                           # Pytest suite: 742 tests
++-- quantum_linear_solvers/          # Submodule: the patched Carrera Vazquez et al. fork
++-- .zenodo.json                     # Metadata for the per-solution field deposit
++-- CITATION.cff
 +-- requirements.txt
 +-- pytest.ini
 +-- README.md
@@ -200,7 +233,7 @@ pip install -e quantum_linear_solvers/
 
 The pinned environment (`qiskit==1.4.5`) produces every simulator and HPC result, and it is the environment the regression baseline is locked against. 
 
-A **second environment** with `qiskit >= 2.x` and `qiskit-ibm-runtime >= 0.40` is required *only* for real-hardware submission (`scripts/ibm_hardware_run.py`, `scripts/qsvt_degree_composition_hardware.py`). Hardware scripts deliberately avoid importing PennyLane-dependent modules so they run cleanly in this minimal second environment.
+A **second environment** with `qiskit >= 2.x` and `qiskit-ibm-runtime >= 0.40` is required *only* for real-hardware submission (everything under `scripts/hardware/`). Hardware scripts deliberately avoid importing PennyLane-dependent modules so they run cleanly in this minimal second environment.
 
 Local pinned versions (`qiskit==1.4.5`, `qiskit-aer==0.17.2`, `pennylane==0.45.0`, `pyqsp==0.2.0`) differ from the HPC venv (`qiskit==0.45.3`). The two environments are not required to match.
 
@@ -222,66 +255,73 @@ python scripts/tutorial.py --list-options     # all tunable inner/scheme paramet
 
 **Runtime:** seconds for classical; under a minute for one quantum solver at $N \le 16$.
 
-### 3.2 `debug_1d.py` -- 2nd-order 1D diagnostics
+### 3.2 `debug/debug_1d.py` -- 2nd-order 1D diagnostics
 
 Runs any of the 11 registered 1D cases (including raw-matrix sub-cases 3b and 3c) through the inner-solver registry.
 
 ```bash
-python scripts/debug_1d.py --case poisson_1d_fS_hom --N 8
-python scripts/debug_1d.py --case het_1d_3c_neumann --N 16 --inner qsvt
-python scripts/debug_1d.py --dump --case het_1d_3a_linear --N 8 --inner qsvt
-python scripts/debug_1d.py --kappa-table      # kappa(N) vs O(N^2) scaling
+python scripts/debug/debug_1d.py --case poisson_1d_fS_hom --N 8
+python scripts/debug/debug_1d.py --case het_1d_3c_neumann --N 16 --inner qsvt
+python scripts/debug/debug_1d.py --dump --case het_1d_3a_linear --N 8 --inner qsvt
+python scripts/debug/debug_1d.py --kappa-table      # kappa(N) vs O(N^2) scaling
 ```
 
-### 3.3 `debug_1d_4th.py` -- 4th-order 1D diagnostics
+### 3.3 `debug/debug_1d_4th.py` -- 4th-order 1D diagnostics
 
 Verifies $\mathcal{O}(h^4)$ convergence for the pentadiagonal discretisation across all three solvers. Checks boundary closure, condition number, and polynomial degree relative to 2nd-order.
 
 ```bash
-python scripts/debug_1d_4th.py --N 8
-python scripts/debug_1d_4th.py --convergence-order --solver qsvt
+python scripts/debug/debug_1d_4th.py --N 8
+python scripts/debug/debug_1d_4th.py --convergence-order --solver qsvt
 ```
 
-### 3.4 `debug_2d.py` / `debug_3d.py` -- outer-scheme diagnostics
+### 3.4 `debug/debug_2d.py` / `debug/debug_3d.py` -- outer-scheme diagnostics
 
 Compares inner solvers and outer schemes on line-decomposed problems: scheme comparison table, multigrid hierarchy inspection, inner-solver noise tolerance, polish studies.
 
 ```bash
-python scripts/debug_2d.py --case square --N 64
-python scripts/debug_2d.py --case het --N 8 --inner hhl
-python scripts/debug_2d.py --N 64 --scheme fmg -S nu1=2 -S n_coarse=8
-python scripts/debug_2d.py --noise-study --N 32
-python scripts/debug_3d.py --case cube --N 16
-python scripts/debug_3d.py --convergence-study --case cube
+python scripts/debug/debug_2d.py --case square --N 64
+python scripts/debug/debug_2d.py --case het --N 8 --inner hhl
+python scripts/debug/debug_2d.py --N 64 --scheme fmg -S nu1=2 -S n_coarse=8
+python scripts/debug/debug_2d.py --noise-study --N 32
+python scripts/debug/debug_3d.py --case cube --N 16
+python scripts/debug/debug_3d.py --convergence-study --case cube
 ```
 
 Pass `--scheme jacobi` to reproduce the originally published line-Jacobi results at correspondingly higher cost.
 
-### 3.5 `gap_analysis.py` -- HPC result gap detection
+### 3.5 `utils/gap_analysis.py` -- HPC result gap detection
 
-Scans an HPC result directory and emits a rerun manifest listing configurations whose output `.npz` is absent. This is the only safe way to identify what needs resubmission; without it, a partial sweep and a broken filename convention are indistinguishable.
+Scans a sweep directory and emits a rerun manifest. It separates a row that was never computed from one whose solution `.npz` survived a walltime kill while its summary row did not, because the second is recoverable without recomputing anything. This is the only safe way to identify what needs resubmission; without it, a partial sweep and a broken filename convention are indistinguishable.
 
 ```bash
-python scripts/gap_analysis.py --dim 2 --results-dir results/2Dhpc_run
+python scripts/utils/gap_analysis.py --dim 2 --results-dir results/2Dhpc_run
 ```
 
 ### 3.6 Further diagnostic scripts
 
 | Script | Purpose |
 | --- | --- |
-| `resource_feasibility_1d.py` | Circuit-depth and qubit-count estimates across $N$ and $\kappa$ |
-| `robustness_sweep_1d.py` | Noise-model sensitivity for all three quantum solvers |
-| `hhl_shot_overhead.py` | Post-selection overhead and effective shot count for HHL |
-| `block_encoding_fidelity.py` | Unitarity and fidelity checks for the Sz.-Nagy block encoding |
-| `delta_amplification_hardware.py` | Hardware-adapted amplitude amplification feasibility |
-| `qsvt_2d_line_degree_sweep.py` | QSVT polynomial degree vs $N$ for 2D row matrices |
-| `example_report.py` | Copy-me template for a laptop-scale benchmark report |
+| `studies/resource_feasibility_1d.py` | Transpiled two-qubit counts against the measured device budget |
+| `studies/robustness_sweep_1d.py` | Shot noise, depolarising sweep and fake backend |
+| `studies/hhl_shot_overhead.py` | Post-selection overhead, measured against the $1/\kappa^2$ expectation |
+| `studies/vqls_noisy_convergence_1d.py` | Whether COBYLA still converges on a shot-based cost function |
+| `studies/qsvt_2d_line_degree_sweep.py` | QSVT degree against algorithmic accuracy and device fidelity |
+| `hardware/block_encoding_fidelity.py` | Unitarity and direct fidelity estimation for the Sz.-Nagy encoding |
+| `hardware/delta_amplification_hardware.py` | Hardware-adapted amplitude amplification feasibility |
+| `utils/circuit_census.py` | Transpiled depth and gate counts, merged into an existing sweep |
+| `make_thesis_figures.py` | Every main-body figure and its tidy CSV, from the recorded archives |
+
+The three scripts under `utils/` that maintain the archive rather than measure
+anything — `recover_orphan_rows.py`, `normalise_recovered_metrics.py` and
+`check_geometry_impact.py` — are provenance for rows already in `results/`, not
+part of a fresh run. A replication does not need them.
 
 ### 3.7 Test suite
 
 ```bash
-pytest                         # ~480 tests, ~30 s
-pytest -m "not quantum"        # ~400 classical tests, ~10 s, no backend needed
+pytest                         # 742 tests
+pytest -m "not quantum"        # the classical subset, no backend needed
 pytest tests/test_outer.py -v  # single file
 pytest tests/test_hhl_1d.py::TestHHL1D::test_agrees_with_thomas_loose -v
 ```
@@ -327,7 +367,7 @@ export MAX_N=16;      qsub -v MAX_N hpc/jobs/submit_hpc_1D.sh
 export SKIP_QSVT=1;   qsub -v SKIP_QSVT hpc/jobs/submit_hpc_1D.sh
 ```
 
-Results write incrementally: each `.npz` is saved as produced; `results_full.json` and `results_summary.csv` are written only on completion. A walltime kill loses the summary but not the per-solution archives.
+Results write incrementally: each `.npz` is saved as produced, and `results_full.json` is rewritten after every completed work unit, so a walltime kill loses neither. Restrict the scope of a resubmission and the runner merges into what is already there; see `hpc/README.md`.
 
 ### 4.3 1D sweep (GPU)
 
@@ -346,7 +386,7 @@ qsub hpc/jobs/submit_hpc_2D.sh
 qsub hpc/jobs/submit_hpc_3D.sh
 ```
 
-Mirror the 1D driver's incremental-write behaviour. A walltime kill loses only the summary JSON/CSV.
+Mirror the 1D driver's incremental-write behaviour.
 
 The 2D and 3D cost profile differs from 1D: a 2D/3D configuration is an outer iteration over many strip solves, so the outer scheme choice matters more than the solver. Use `--scheme fmg` unless reproducing published line-Jacobi results, for which `--scheme jacobi` exists.
 
@@ -390,11 +430,67 @@ The on-disk schema — filename convention, field-name aliases (`u_solver` / `ph
 
 ### 4.7 4th-order HPC sweeps
 
-`submit_hpc_1D_4th.sh`, `submit_hpc_2D_4th.sh`, and `submit_hpc_3D_4th.sh` are present but currently blocked. Five defects in the original pipeline have been fixed (see `docs/HPC_REPAIR_PLAN.md`): upstream package divergence, operator truncation, wall-clock cap failure, dirty git state execution, and benchmarking-protocol faults. Submission is gated on `_preflight.sh` confirming a clean tree and a correctly deployed local fork.
+```bash
+qsub -v DIM=1 hpc/jobs/submit_precompute_4th.sh   # phase angles first
+qsub hpc/jobs/submit_hpc_1D_4th.sh
+```
 
-Gap-fill resubmission for wave-1 manifests uses `submit_{1d,2d,3d}_wave1.sh`.
+The pentadiagonal sweeps produce every fourth-order number in the dissertation.
+Each is gated on the fourth-order phase cache: a cache miss degrades silently to
+a reduced-degree solve, so the job refuses to start QSVT without it. In 1-D the
+angles must be staged smallest-$N$ first, and $N \le 16$ computed **uncapped**
+while $N \ge 32$ is capped, because the cap forms part of the cache key. In 2-D
+and 3-D $\kappa \le 3.14$ and the whole set computes in seconds, but one
+resolution contributes several keys — two strip operators in 2-D, up to four in
+3-D — and a sweep requests all of them.
 
-### 4.8 Monitoring
+### 4.8 Reproducing the study end to end
+
+The order below is the whole campaign. Stages 2 and 3 are independent of each
+other; everything else is sequential. Wall-clock totals are cluster time, not
+elapsed time, and the 3-D sweep dominates.
+
+```bash
+# 1. Phase angles. Sweeps refuse to run QSVT without them.
+export N_VALUES="4,8,16"; qsub -v N_VALUES hpc/jobs/submit_precompute_hpc.sh
+export N_VALUES="32";     qsub -v N_VALUES hpc/jobs/submit_precompute_hpc.sh
+export N_VALUES="64";     qsub -v N_VALUES hpc/jobs/submit_precompute_hpc.sh
+qsub hpc/jobs/submit_precompute_2D.sh
+qsub -v DIM=1 hpc/jobs/submit_precompute_4th.sh
+qsub -v DIM=2 hpc/jobs/submit_precompute_4th.sh
+qsub -v DIM=3 hpc/jobs/submit_precompute_4th.sh
+
+# 2. Second-order sweeps.
+qsub hpc/jobs/submit_hpc_1D.sh
+qsub hpc/jobs/submit_hpc_2D.sh
+qsub hpc/jobs/submit_hpc_3D.sh
+
+# 3. Fourth-order sweeps.
+qsub hpc/jobs/submit_hpc_1D_4th.sh
+qsub hpc/jobs/submit_hpc_2D_4th.sh
+qsub hpc/jobs/submit_hpc_3D_4th.sh
+
+# 4. Equal-accuracy and sensitivity studies, per dimension.
+for d in 1 2 3; do qsub -v DIM=$d hpc/jobs/submit_studies.sh; done
+
+# 5. Transpiled gate counts, merged into the sweeps. Always set N_VALUES.
+export N_VALUES="4,8,16,32"; qsub -v N_VALUES hpc/jobs/submit_census.sh
+
+# 6. Post-processing and the dissertation figures. No cluster job needed.
+for d in 1 2 3; do python hpc/runners/plot_results.py --dim $d; done
+python hpc/runners/make_tables.py
+python scripts/make_thesis_figures.py --no-titles --out-dir <figures-dir>
+```
+
+The device measurements of Section 10 are separate and need the second
+environment of Section 2.1 plus an IBM Quantum account; they are not part of
+the simulator campaign and nothing in the dissertation's main results depends
+on them.
+
+After every stage, `python scripts/utils/gap_analysis.py --dim {1,2,3}` reports
+what is missing before you conclude a stage is done.
+
+### 4.9 Monitoring
 
 ```bash
 qstat -u $USER
@@ -403,7 +499,7 @@ tail -f results/2Dhpc_run_pbs.log     # PBS stdout stream; usually readable
 ls -la --time-style=full-iso results/2Dhpc_run/*.npz | tail -5   # vital check
 ```
 
-> **Known issue.** On CX3's network filesystems, `run.log` is sometimes listed by `ls` but unreadable by `tail` due to metadata caching. The `.npz` modification-time check is the reliable progress indicator: if `.npz` mtimes are advancing, the job is doing real work. See `docs/HPC_OPERATIONAL_ISSUES.md` for a full diagnostic sequence.
+> **Known issue.** On CX3's network filesystems, `run.log` is sometimes listed by `ls` but unreadable by `tail` due to metadata caching. The `.npz` modification-time check is the reliable progress indicator: if `.npz` mtimes are advancing, the job is doing real work.
 
 ---
 
@@ -550,28 +646,59 @@ A naive comparison at nominally equal precision parameters is methodologically u
 ## 8. Test suite
 
 ```bash
-pytest                          # ~480 tests, ~30 s
-pytest -m "not quantum"         # ~400 classical tests, ~10 s
+pytest                          # 742 tests
+pytest -m "not quantum"         # the classical subset, no backend needed
 pytest tests/test_outer.py -v
 pytest tests/test_hhl_1d.py::TestHHL1D::test_agrees_with_thomas_loose -v
 ```
 
-`quantum` is the only marker; it is applied to every test that builds and simulates a circuit. There is no `slow` marker: every test completes in under six seconds.
+`quantum` is the only marker; it is applied to every test that builds and simulates a circuit. There is no `slow` marker.
 
 ### Coverage by file
 
-| File | Coverage | Tests | Runtime |
-| --- | --- | --- | --- |
-| `test_problem_setup.py` | 1D matrix structure, grid, RHS, config validation, exact solutions | 41 | ~1 s |
-| `test_classical_solvers.py` | Thomas 1D accuracy, NumPy agreement | 9 | ~1 s |
-| `test_line_problems.py` | `PoissonLine2D/3D`: operators, Dirichlet absorption, periodicity, conditioning, coarsening | 36 | ~1 s |
-| `test_outer.py` | `solvers/outer`: work accounting, stagnation, strip sweep, option registry, stationary schemes, multigrid transfer operators and cycles | 84 | ~8 s |
-| `test_hhl_1d.py` | HHL solution shape, sign, proportionality recovery | 11 | ~8 s |
-| `test_vqls_1d.py` | VQLS cost convergence, parameter shape, reproducibility | 15 | ~5 s |
-| `test_qsvt_1d.py` | Block-encoding unitarity, QSP angle shape, QSVT solver correctness | 24 | ~4 s |
-| `test_het_problem.py` | HET config derived quantities, matrix structure, solver compatibility | 22 | ~4 s |
-| `test_integration.py` | End-to-end pipelines (1D and 2D), `BenchmarkResult` consistency | 17 | ~5 s |
-| **Total** | | **~480** | **~30 s** |
+Counted with `pytest --collect-only`, not from memory.
+
+| File | Coverage | Tests |
+| --- | --- | --- |
+| `test_cases.py` | Every registered case: identity, geometry, source, boundary data, solvability | 230 |
+| `test_outer.py` | `solvers/outer`: work accounting, stagnation, strip sweep, option registry, stationary schemes, multigrid transfer operators and cycles | 84 |
+| `test_problem_setup.py` | 1D matrix structure, grid, RHS, config validation, exact solutions | 41 |
+| `test_poisson_line_4th.py` | 4th-order 2D/3D line operators, transverse stencil, boundary closure | 40 |
+| `test_line_problems.py` | `PoissonLine2D/3D`: operators, Dirichlet absorption, periodicity, conditioning, coarsening | 36 |
+| `test_hpc_archive.py` | The legacy on-disk sweep schema and its field aliases | 30 |
+| `test_qsvt_1d.py` | Block-encoding unitarity, QSP angle shape, QSVT solver correctness | 24 |
+| `test_execution.py` | Post-selection and state recovery across statevector, shot and device paths | 23 |
+| `test_order4_wiring.py` | That a 4th-order request reaches a 4th-order operator and solver | 23 |
+| `test_resources.py` | Gate-count and qubit-count models against the device budget | 22 |
+| `test_het_problem.py` | HET config derived quantities, matrix structure, solver compatibility | 22 |
+| `test_poisson_1d_4th.py` | The pentadiagonal 1D operator and its closure | 21 |
+| `test_delta_amplification.py` | Amplitude amplification and its hardware adaptation | 18 |
+| `test_vqls_1d.py` | VQLS cost convergence, parameter shape, reproducibility | 17 |
+| `test_noise.py` | Depolarising and shot-noise models | 17 |
+| `test_gap_analysis.py` | Missing rows, orphan rows, manifest generation | 15 |
+| `test_hpc_runners.py` | Runner argument handling and the append/merge contract | 14 |
+| `test_vqls_hadamard.py` | Circuit-level Hadamard-test cost evaluation | 13 |
+| `test_hardware.py` | The device adapter, gated so it never submits | 13 |
+| `test_neumann_encoding.py` | The Neumann sub-case and its encoding | 12 |
+| `test_hhl_1d.py` | HHL solution shape, sign, proportionality recovery | 11 |
+| `test_classical_solvers.py` | Thomas 1D accuracy, NumPy agreement | 9 |
+| `test_regression_baseline.py` | The locked tagged numbers in `tests/baselines/baseline_v1.json` | 7 |
+| **Total** | | **742** |
+
+**A known coverage gap.** There is no end-to-end regression test of the 2-D
+chain from `PoissonLine2D` through `solvers.outer.solve` to the reporting
+adapter. The module that covered it was written against the pre-Phase-8
+reporting schema, could not import after that rewrite, and had been inert
+behind a module-level skip ever since; it is removed rather than left to be
+counted as cover it does not provide. Its components are covered
+(`test_line_problems.py`, `test_outer.py`); the assembled chain is not.
+
+**`pyqsp` is a hard dependency of the QSVT tests.** It is listed in
+`requirements.txt`, and without it every test that builds real QSP angles fails
+on import: twelve in `test_qsvt_1d.py` and two in `test_neumann_encoding.py`.
+`solvers/quantum/qsp_angles.py` falls back to a Chebyshev construction for
+ordinary use, so the rest of the suite passes without it, but a green run
+requires it installed.
 
 ### Two load-bearing tests
 
@@ -631,7 +758,7 @@ A hardware measurement campaign on IBM `ibm_kingston` (Heron r2, 156 qubits) was
 | Depth ceiling | $d \lesssim 21$ | Fidelity saturates at the depolarisation floor ($1/2^n = 0.125$) past $\approx 780$ gates. Deep points yield noise, an instrumental limit |
 | Readout mitigation | Inconclusive | Intercept shifts physical bounds ($0.963 \to 1.033$); slope difference ($1.7\sigma$) is unresolved |
 
-These validations underpin the resource estimates in `core/resources.py` and predictions in `scripts/block_encoding_fidelity.py`. The raw hardware result archives are stored under `results/`.
+These validations underpin the resource estimates in `core/resources.py` and predictions in `scripts/hardware/block_encoding_fidelity.py`. The raw hardware result archives are under `results/investigations/`.
 
 ### Known limitation: VQLS hardware viability
 VQLS is not wired for real-hardware submission. Its Hadamard-test cost function evaluates $2L + 2L^2$ individual circuits per step. Routing PennyLane QNodes one-at-a-time via `qiskit.remote` is impractically slow. Viable hardware execution requires rebuilding those circuits natively in Qiskit for batched evaluation via `core.hardware.hardware_estimate_batch` (documented in `core/hardware.py`).
@@ -650,3 +777,25 @@ VQLS is not wired for real-hardware submission. Its Hadamard-test cost function 
 8. Brearley, P. and Laizet, S. (2024). Quantum algorithm for solving the advection equation using Hamiltonian simulation. *Physical Review A*, 110, 012430.
 9. Over, P., Bengoechea, S., Brearley, P., Laizet, S. and Rung, T. (2025). Quantum algorithm for the advection-diffusion equation by direct block encoding of the time-marching operator. *Physical Review A*, 112, L010401.
 10. Tennie, F., Laizet, S., Lloyd, S. and Magri, L. (2025). Quantum computing for nonlinear differential equations and turbulence. *Nature Reviews Physics*, 7, 220-230.
+
+---
+
+## 12. Use of generative AI
+
+Two tools were used in building this repository and the dissertation it
+supports: **Claude Opus 5** (Anthropic, <https://claude.ai/code>), through
+Claude Code, and **Google Antigravity** (Google, <https://antigravity.google>).
+Claude Opus 5 was used to write and refactor parts of the benchmarking, figure
+and post-processing layers, to audit the archives against the numbers reported
+in the dissertation, and to draft and edit prose. Antigravity was used to
+comment source code and for routine refactoring.
+
+**Authorship is not shared.** Juan Antonio Trobajo Flecha is the sole author of
+this repository and assumes responsibility for all of it, including everything
+written with assistance. No commit records a tool as co-author: authorship
+carries responsibility for a change, and a tool cannot answer for one. Where
+these tools contributed, they were used as tools, are acknowledged here, and
+every result they touched was checked against the recorded archives before it
+was reported.
+
+The corresponding declaration in the dissertation is in its Acknowledgements.

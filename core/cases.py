@@ -1487,9 +1487,8 @@ register(Case(
     default_N=(4, 8, 16, 32, 64),
     notes=(
         "Closed form φ = −f/(2π²). The standard 2D verification case, previously\n"
-        "duplicated in four places: scripts/debug_outer_2d.py:79,\n"
-        "scripts/run_hpc_2Dfull.py:308-313, tests/conftest.py:89 and\n"
-        "scripts/archive/debug_2d_solvers.py:84 — all numerically identical.\n"
+        "duplicated in four places across the pre-consolidation scripts and in\n"
+        "tests/conftest.py:89 — all numerically identical.\n"
         "NOT the same source as poisson_2d_fS_10sin2pi, despite both having been\n"
         "described as 'the 2D sinusoidal source'.\n"
         "HPC case id '2D_Poisson_sin_hom'."

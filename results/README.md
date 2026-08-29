@@ -61,20 +61,20 @@ solution field or to re-derive a metric that was not recorded at the time.
 | `1Dhpc_run_degcap5000/` | Uniform-degree QSVT ladder, a fixed cap of 5001 across every N. |
 | `{1,2,3}Dstudies/` | Equal-accuracy and one-at-a-time sensitivity studies, second order. |
 | `{1,2,3}Dstudies_4th/` | The same at fourth order. Each carries a `PROVENANCE.md`. |
-| `3Dstudies_vqls_sens/` | A study still in flight, held apart until it completes. See its `PROVENANCE.md`. |
-| `thesis/` | The main-body figure datasets, `F1`–`F8`, and the `T2`/`T3` table data. One tidy CSV per figure, written by `scripts/make_thesis_figures.py`. |
+| `thesis/` | The main-body figure datasets, `F1`–`F9`, and the `T2`/`T3`/`T4` table data. One tidy CSV per figure, written by `scripts/make_thesis_figures.py`. |
 | `qsvt_phase_cache/` | QSP phase angles, keyed `(κ, ε, method, max_degree)`. |
-| `manifests/` | Re-run scopes: which rows of which sweep a repair job was asked to replace. |
+| `manifests/` | Re-run scopes written by `scripts/utils/gap_analysis.py`: which rows of which sweep were outstanding, and were subsequently recomputed. Kept as the record of what each sweep was missing and when. |
 | `investigations/` | One-off studies outside the main sweeps, including the `ibm_kingston` hardware runs and calibration. |
 | `meetings/` | Supervisor meeting material. Excluded from the repository in full. |
 
 A studies directory is named for the dimension, the discretisation order and the
-run tag together — `1Dstudies`, `1Dstudies_4th`, `3Dstudies_vqls_sens` — because
-none of the three is recoverable from the filenames within it. A tagged directory
-holds a run that has not yet been merged into its untagged counterpart, either
-because it is unfinished or because it has not been reviewed. `2Dstudies_vqls/`
-was such a directory until its job completed on 2026-08-24; it is now merged into
-`2Dstudies/` and the tagged copy is gone.
+run tag together — `1Dstudies`, `1Dstudies_4th` — because none of the three is
+recoverable from the filenames within it. A tag beyond the order marks a run not
+yet merged into its untagged counterpart, either because it is unfinished or
+because it has not been reviewed; `2Dstudies_vqls/` and `3Dstudies_vqls_sens/`
+were such directories until their jobs completed, and both are now merged into
+their untagged counterparts with the tagged copies gone. No tagged directory
+remains.
 
 The on-disk schema — filename convention, field-name aliases, the `missing()`
 report — is declared once in `benchmark/results_io.py` and is the contract to

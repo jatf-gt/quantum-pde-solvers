@@ -1309,7 +1309,7 @@ def figure_hardware(repo_root: Path, out_dir: Path) -> list[Path]:
         Files written.
     """
     plt = _matplotlib()
-    fig, ax0 = plt.subplots(figsize=(width_in(0.74), 3.05))
+    fig, ax0 = plt.subplots(figsize=(width_in(0.80), 3.05))
     axes = [ax0]
 
     inv = repo_root / "results" / "investigations"
@@ -1714,7 +1714,7 @@ def figure_het_fields(repo_root: Path, out_dir: Path) -> list[Path]:
     # 2.5 in, which can.
     ncol = 2
     fig, axes = plt.subplots(2 * len(panels), ncol,
-                             figsize=(width_in(0.84),
+                             figsize=(width_in(0.85),
                                       2.25 * 2 * len(panels)),
                              squeeze=False)
 

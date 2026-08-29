@@ -106,7 +106,7 @@ def _rel_err(u: np.ndarray, ref: np.ndarray) -> float:
 
 def _load_driver(dim: int):
     """
-    Imports scripts/debug_2d.py or scripts/debug_3d.py by explicit file path.
+    Imports scripts/debug/debug_2d.py or scripts/debug/debug_3d.py by explicit file path.
 
     Deliberately not a bare `import debug_2d`: that form only resolves because
     Python puts a running script's own directory on sys.path first, which is

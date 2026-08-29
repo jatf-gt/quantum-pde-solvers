@@ -97,10 +97,9 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        # Append, never truncate. A single PBS job invokes this runner several
-        # times in sequence (submit_2d_wave1.sh runs five steps), and under
-        # mode="w" each step destroyed its predecessor's log, leaving only the
-        # last. The history is the sole record of how far a walltime-killed step
+        # Append, never truncate. A single PBS job may invoke this runner
+        # several times in sequence, and under mode="w" each step destroyed its
+        # predecessor's log, leaving only the last. The history is the sole record of how far a walltime-killed step
         # had progressed. Sessions are delimited by `_log_session_header`.
         logging.FileHandler(LOG_FILE, mode="a"),
     ],
@@ -975,11 +974,11 @@ def _dedupe_results(results) -> list:
 
     `--append` merges the previous ``results_full.json`` ahead of the rows produced
     by the current invocation, so the later occurrence of any key is by
-    construction the newer measurement. Without this step a wave that revisits a
-    partially-completed (section, N) - which `submit_2d_wave1.sh` does at
-    section 3, N=32, where three of four solvers are missing - wrote two rows for
-    every solver that was already present, and the plotting and gap-analysis
-    layers had no basis on which to choose between them.
+    construction the newer measurement. Without this step a run that revisits a
+    partially-completed (section, N) - a gap fill covering the solvers a killed
+    job never reached - wrote two rows for every solver that was already
+    present, and the plotting and gap-analysis layers had no basis on which to
+    choose between them.
 
     Parameters
     ----------

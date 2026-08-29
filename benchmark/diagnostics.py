@@ -3,7 +3,7 @@ Shared comparison-table and study primitives for the interactive debug drivers.
 
 Purpose
 -------
-``scripts/debug_2d.py`` and ``scripts/debug_3d.py`` both compare inner solvers
+``scripts/debug/debug_2d.py`` and ``scripts/debug/debug_3d.py`` both compare inner solvers
 and outer schemes on a line-decomposed problem, print a results table, and
 characterise how the choice of outer scheme affects sensitivity to inner-solver
 error and to a post-hoc stationary "polish". That machinery does not depend on

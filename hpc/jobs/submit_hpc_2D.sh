@@ -18,7 +18,7 @@
 #  Phase 2 uses QSVT only because it is by far the cheapest inner solver:
 #  circuit depth is O(kappa) rather than the O(kappa^2) of HHL, and its
 #  measured per-strip cost exponent is alpha~0.6 versus ~2.35 (HHL) and
-#  ~1.29 (VQLS) - see run_hpc_2Dfull.py::COST_ALPHA. Running HHL or VQLS
+#  ~1.29 (VQLS) - measured in the 2-D sweep. Running HHL or VQLS
 #  at N=256 is not a matter of a longer walltime, it is not practical.
 #
 #  Both phases use the outer scheme set by OUTER_SCHEME (default: fmg, full
@@ -27,7 +27,7 @@
 #  scheme in both phases keeps every N in the run directly comparable.
 #
 #  QSVT_MAX_DEGREE (default 500) is passed explicitly to BOTH phases, rather
-#  than relying on the per-N default table inside run_hpc_2Dfull.py, so the
+#  than relying on the runner's per-N default table, so the
 #  run is fully self-documenting and reproducible from this script alone.
 #
 #  Theoretical justification for max_degree=500 up to N=256:

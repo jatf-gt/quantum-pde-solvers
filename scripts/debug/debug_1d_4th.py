@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #!/usr/bin/env python3
 """
-scripts/debug_1d_4th.py
+scripts/debug/debug_1d_4th.py
 -----------------------
 Debug and validation script for the fourth-order 1D Poisson solver.
 
@@ -12,31 +12,31 @@ Thomas, VQLS, and QSVT solvers on the fourth-order system.
 Usage
 -----
     # Thomas only (fast, no quantum backend needed):
-    python scripts/debug_1d_4th.py --N 4
+    python scripts/debug/debug_1d_4th.py --N 4
 
     # Thomas + VQLS:
-    python scripts/debug_1d_4th.py --N 4 --inner vqls
+    python scripts/debug/debug_1d_4th.py --N 4 --inner vqls
 
     # Thomas + QSVT (proof-of-concept, epsilon=0.01):
-    python scripts/debug_1d_4th.py --N 4 --inner qsvt
+    python scripts/debug/debug_1d_4th.py --N 4 --inner qsvt
 
     # Thomas + QSVT with degree cap (faster, less accurate):
-    python scripts/debug_1d_4th.py --N 4 --inner qsvt --max-degree 200
+    python scripts/debug/debug_1d_4th.py --N 4 --inner qsvt --max-degree 200
 
     # All solvers:
-    python scripts/debug_1d_4th.py --N 4 --inner all
+    python scripts/debug/debug_1d_4th.py --N 4 --inner all
 
     # Different source function:
-    python scripts/debug_1d_4th.py --N 8 --source fL --inner all
+    python scripts/debug/debug_1d_4th.py --N 8 --source fL --inner all
 
     # Accuracy/kappa comparison table across multiple N:
-    python scripts/debug_1d_4th.py --compare-orders --N-values 4 8 16
+    python scripts/debug/debug_1d_4th.py --compare-orders --N-values 4 8 16
 
     # Verify matrix assembly (print A and b for N=4):
-    python scripts/debug_1d_4th.py --N 4 --dump-matrix
+    python scripts/debug/debug_1d_4th.py --N 4 --dump-matrix
 
     # Produce solution profile plots (saved to results/debugging/):
-    python scripts/debug_1d_4th.py --N 4 --inner all --plot
+    python scripts/debug/debug_1d_4th.py --N 4 --inner all --plot
 """
 
 from __future__ import annotations
