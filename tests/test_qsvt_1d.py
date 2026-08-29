@@ -289,9 +289,9 @@ class TestQSPAngles:
 
 class TestQSVT1D:
 
-    def test_returns_qsvt_solver_result(self):
+    def test_returns_qsvt_solver_result(self, problem_1d_N4_fS, qsvt_cfg_fast):
         """
-        Verifies that the QSVT execution pipeline successfully returns the standard 
+        Verifies that the QSVT execution pipeline successfully returns the standard
         result container type, ensuring type coherence across solver frameworks.
         """
         r = qsvt_solve(problem_1d_N4_fS, config=qsvt_cfg_fast)

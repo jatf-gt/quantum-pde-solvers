@@ -14,9 +14,15 @@ authors:
     given-names: "Juan"
     affiliation: "Department of Aeronautics, Imperial College London"
 repository-code: "https://github.com/jatf-gt/quantum-pde-solvers"
-# No LICENSE file exists in the repository, so none is asserted here. Add one
-# and name it on this line before citing the software: a public repository
-# without a licence grants no rights to reuse it, whatever the citation says.
+# MIT covers this repository's own code; see LICENSE. The dataset deposit
+# referenced below stays CC-BY-4.0, which is the right licence for data and the
+# wrong one for software. The submodule `quantum_linear_solvers/` is a separate
+# repository under Apache-2.0 and keeps its own terms.
+#
+# No licence can compel an academic citation. MIT requires only that the
+# copyright notice travel with the code; the citation is a request, and this
+# file is where it is made.
+license: MIT
 keywords:
   - quantum computing
   - quantum linear systems

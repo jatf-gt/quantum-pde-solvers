@@ -40,6 +40,7 @@ Solves a 2D Poisson problem, compares outer schemes, and prints results in secon
 10. [Hardware results](#10-hardware-results)
 11. [References](#11-references)
 12. [Use of generative AI](#12-use-of-generative-ai)
+13. [Licence and citation](#13-licence-and-citation)
 
 ---
 
@@ -693,12 +694,17 @@ behind a module-level skip ever since; it is removed rather than left to be
 counted as cover it does not provide. Its components are covered
 (`test_line_problems.py`, `test_outer.py`); the assembled chain is not.
 
+On the pinned environment of Section 2 the suite runs clean: 742 collected, no
+failures. Three checks skip themselves when the archive they read against is
+not in the checkout, so a run may report a few skips rather than a full pass.
+
 **`pyqsp` is a hard dependency of the QSVT tests.** It is listed in
 `requirements.txt`, and without it every test that builds real QSP angles fails
 on import: twelve in `test_qsvt_1d.py` and two in `test_neumann_encoding.py`.
 `solvers/quantum/qsp_angles.py` falls back to a Chebyshev construction for
 ordinary use, so the rest of the suite passes without it, but a green run
-requires it installed.
+requires it installed. Those fourteen are also the slow ones: generating real
+angles, rather than the fallback, is most of the suite's runtime.
 
 ### Two load-bearing tests
 
@@ -799,3 +805,27 @@ every result they touched was checked against the recorded archives before it
 was reported.
 
 The corresponding declaration in the dissertation is in its Acknowledgements.
+
+---
+
+## 13. Licence and citation
+
+**Code: MIT** (see `LICENSE`). Use it, change it, build on it, commercially or
+not. The one condition is that the copyright notice travels with it.
+
+**Data: CC-BY-4.0.** The per-solution field deposit on Zenodo
+([10.5281/zenodo.22071066](https://doi.org/10.5281/zenodo.22071066)) is a
+dataset, and CC-BY is the right instrument for data as MIT is for code.
+Creative Commons themselves advise against CC licences for software, which is
+why the two differ.
+
+**The submodule is not covered by either.** `quantum_linear_solvers/` is a
+separate repository, a fork of the Carrera Vázquez et al. implementation, under
+**Apache-2.0**. It keeps its own terms.
+
+**On citation.** No open-source licence can compel an academic citation. MIT
+requires attribution only in the narrow legal sense that the copyright notice
+must be retained in copies. If you use this work in research, please cite it as
+well; `CITATION.cff` carries the metadata, and GitHub's "Cite this repository"
+button reads it. Cite the software and the dataset separately if you use both —
+they have different identifiers, and the dataset DOI names exact bytes.
