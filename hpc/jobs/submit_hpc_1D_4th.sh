@@ -54,6 +54,14 @@
 #    export N_VALUES="4,8"; qsub -v N_VALUES hpc/jobs/submit_hpc_1D_4th.sh
 #    export SOLVERS="vqls,qsvt"; qsub -v SOLVERS hpc/jobs/submit_hpc_1D_4th.sh
 #
+#    # Capped low-N ladder, written to its own directory so the capped rows do
+#    # not --append over the uncapped ones the dissertation cites. The cap comes
+#    # from QSVT_MAX_DEGREE_BY_N_ORDER4 in run_1d.py, not from a variable here,
+#    # and the phase-cache gate below refuses to start without the entries:
+#    export N_VALUES="4,8" SOLVERS="qsvt"
+#    export RESULTS_DIR="results/1Dhpc_run_4th_degcap_lowN" PHASE_TAG="degcap14999"
+#    qsub -v N_VALUES,SOLVERS,RESULTS_DIR,PHASE_TAG hpc/jobs/submit_hpc_1D_4th.sh
+#
 #  Comma-separated values must be passed as `qsub -v NAME` (bare name, value from
 #  the exported shell variable); `-v NAME=value` breaks on PBS's comma splitting.
 #
@@ -110,7 +118,14 @@ source "${VENV_PATH}/bin/activate"
 # That single omission cost a 21 h job in which every HHL row failed.
 ORDER=4 bash hpc/jobs/_preflight.sh || exit 1
 
-RESULTS_SUBDIR="results/1Dhpc_run_4th"
+# RESULTS_DIR redirects the whole run -- summary, per-solution archives and
+# run.log -- to a variant directory, matching submit_hpc_1D.sh. Without it a
+# re-run at a different degree cap would --append over the archive's rows on
+# (case, solver, N) and silently replace them: the uncapped N=4 and N=8 rows are
+# still cited by the dissertation, so they must survive a capped re-run. The
+# #PBS -o/-e paths above are resolved at submission time and cannot follow it;
+# run.log does.
+RESULTS_SUBDIR="${RESULTS_DIR:-results/1Dhpc_run_4th}"
 mkdir -p "${RESULTS_SUBDIR}"
 
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
@@ -123,6 +138,7 @@ HHL_TIMEOUT_S="${HHL_TIMEOUT_S:-5400}"
 ALLOW_INLINE_PHASES="${ALLOW_INLINE_PHASES:-0}"
 
 echo ""
+echo "  RESULTS         : ${RESULTS_SUBDIR}"
 echo "  N_VALUES        : ${N_VALUES}"
 echo "  SECTIONS        : ${SECTIONS}"
 echo "  SOLVERS         : ${SOLVERS}"
@@ -204,7 +220,8 @@ run_step () {
     echo "------------------------------------------------------------"
     python3 hpc/runners/run_1d.py \
         --order 4 \
-        --append --phase-tag "order4_n${nval}" \
+        --results-dir "${RESULTS_SUBDIR}" \
+        --append --phase-tag "${PHASE_TAG:-order4_n${nval}}" \
         --n-values "${nval}" \
         --sections "${SECTIONS}" \
         --solvers "${SOLVERS}" \

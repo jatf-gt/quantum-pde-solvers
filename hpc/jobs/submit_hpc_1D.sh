@@ -29,6 +29,10 @@
 #    N=128 is reachable only by naming it in N_VALUES (see N_VALUES_EXTRA in
 #    run_1d.py); it is deliberately absent from the default sweep.
 #
+#    The job now REFUSES to start if any requested resolution has no cached
+#    phases at the cap it will ask for, since a miss is silent at run time.
+#    ALLOW_INLINE_PHASES=1 accepts the reduced-degree fallback deliberately.
+#
 #    NOTE: the #PBS -o/-e paths below are resolved by PBS at submission time and
 #    cannot follow RESULTS_DIR, so the PBS logs of a variant run still land in
 #    results/1Dhpc_run/. The run's own log, run.log, follows RESULTS_DIR.
@@ -147,6 +151,81 @@ mkdir -p "${RESULTS_SUBDIR}"
 # threads as there are physical cores on the node.
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}
 echo "OMP_NUM_THREADS = ${OMP_NUM_THREADS}"
+
+# ============================================================
+#  QSVT phase-cache coverage
+# ============================================================
+# run_1d.py::_resolve_qsvt_max_degree honours the requested cap ONLY on a cache
+# hit. On a miss it substitutes max(100, min(5000, 15*kappa)) and the sweep
+# proceeds at a lower degree, producing rows that look capped and are not: the
+# low-N job of 2026-09-03 asked for 5000, ran at 142 and 482, and nothing said
+# so until the results were read. submit_hpc_1D_4th.sh has had this gate since
+# it was written; this is the same check at order 2.
+#
+# Sub-case 3c is not covered: its Neumann row gives it a different kappa than
+# the standard TST matrix at the same N, it is never precomputed, and the
+# fallback there is deliberate.
+QSVT_REQUESTED=1
+[ "${SKIP_QSVT:-0}" = "1" ] && QSVT_REQUESTED=0
+case ",${SOLVERS:-hhl,vqls,qsvt}," in *,qsvt,*) ;; *) QSVT_REQUESTED=0 ;; esac
+
+if [ "${QSVT_REQUESTED}" = "1" ]; then
+    echo ""
+    echo "------------------------------------------------------------"
+    echo "  QSVT phase-cache coverage (order 2)"
+    echo "------------------------------------------------------------"
+    python3 - "${N_VALUES}" "${MAX_N}" "${QSVT_MAX_DEGREE}" "${ALLOW_INLINE_PHASES:-0}" <<'PY' || exit 1
+import sys
+
+sys.path.insert(0, ".")
+sys.path.insert(0, "hpc/runners")
+
+import run_1d
+import precompute_phases as pp
+import solvers.quantum.qsp_angles as qa
+
+n_arg, max_n, override, allow_arg = (a.strip() for a in sys.argv[1:5])
+allow = allow_arg == "1"
+
+if n_arg:
+    n_values = sorted({int(tok) for tok in n_arg.split(",") if tok.strip()})
+else:
+    n_values = list(run_1d.N_VALUES_ALL)
+    if max_n:
+        n_values = [n for n in n_values if n <= int(max_n)]
+
+epsilon = round(run_1d.HHL_EPSILON, 8)
+
+print(f"  {'N':>5} {'kappa':>12} {'key':>10} {'cached':>8}")
+print("  " + "-" * 38)
+
+missing = []
+for N in n_values:
+    cap = int(override) if override else run_1d.qsvt_max_degree(N, 2)
+    tag = cap if cap is not None else -1
+    kappa = pp.kappa_1d(N, 2)
+    cached = qa._load_disk((round(kappa, 4), epsilon, "auto", tag)) is not None
+    print(f"  {N:>5} {kappa:>12.4f} {'d' + str(tag):>10} {str(cached):>8}")
+    if not cached:
+        missing.append(N)
+
+if not missing:
+    print("\n  All requested resolutions are cached.")
+    sys.exit(0)
+
+print(f"\n  No precomputed phases for N={missing} at order 2.")
+if allow:
+    print("  ALLOW_INLINE_PHASES=1: proceeding. QSVT will run at the fallback")
+    print("  degree max(100, min(5000, 15*kappa)), NOT at the degree requested.")
+    print("  Rows so produced are not comparable with rows from the cache.")
+    sys.exit(0)
+
+print("  Submit hpc/jobs/submit_precompute_hpc.sh first, with MAX_DEGREE set to")
+print("  the same cap this job requests, or set ALLOW_INLINE_PHASES=1 to accept")
+print("  the reduced-degree fallback, or drop qsvt from SOLVERS.")
+sys.exit(1)
+PY
+fi
 
 # ============================================================
 #  Run the benchmark

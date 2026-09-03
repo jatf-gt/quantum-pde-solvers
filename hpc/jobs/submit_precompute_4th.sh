@@ -277,7 +277,10 @@ case "${DIM}" in
 esac
 MAX_DEGREE="${MAX_DEGREE:-}"
 SWEEP_EPSILON="${SWEEP_EPSILON:-0.01}"
-EXTRA_EPSILONS="${EXTRA_EPSILONS:-0.5,0.1}"
+# ":-" would substitute the default for an explicitly empty value, so pass 2
+# could not be switched off from the command line. "-" substitutes only when
+# the variable is unset, which is what EXTRA_EPSILONS="" is asking for.
+EXTRA_EPSILONS="${EXTRA_EPSILONS-0.5,0.1}"
 
 # ============================================================
 #  Cache-key guard
