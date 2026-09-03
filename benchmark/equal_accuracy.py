@@ -824,7 +824,26 @@ OUTER_PRECISION_KNOB: dict[str, str] = {
 # outer iteration performs N (or N²) inner solves, so a two-dimensional
 # layer/restart grid would multiply an already expensive sweep by four.
 OUTER_EQUAL_ACCURACY_GRIDS: dict[str, list] = {
-    "hhl":  [0.1, 0.05, 0.01, 0.005],
+    # Extended to 1e-3 on 2026-09-03. The grid stopped at 0.005, and three of the
+    # four 2-D/3-D cases reached their smallest residual there while still ABOVE
+    # the band -- 3.861e-03 (2-D Poisson), 4.967e-03 and 5.050e-03 (both 3-D)
+    # against a ceiling of 3.00e-03. That is a statement about where the grid
+    # stopped, not about HHL, and it is the one out-of-band group in the study.
+    #
+    # 2-D Poisson is already answered by the Trotter sweep in
+    # results/2Dstudies/sensitivity_hhl.json, which pins the mapping: epsilon=0.1
+    # and n_T=2 give the identical residual, as do epsilon=0.005 and n_T=8, so
+    # halving epsilon doubles the simulated Trotter count. n_T=16 is measured at
+    # 1.020e-03 in 1601 s, comfortably inside the band, so epsilon=0.0025 lands.
+    # The 3-D cases have no Trotter sweep, but their response over 0.01 -> 0.005
+    # is also a factor ~1.8 per halving, which puts 0.0025 at ~2.8e-03 -- inside
+    # the band but only just. 0.001 is the entry that makes them safe.
+    #
+    # Selection is the CHEAPEST in-band point, not the nearest to target, so
+    # adding entries cannot degrade a case that already passes: 2-D HET stays on
+    # epsilon=0.01 at 296 s. The cost is that the sweep evaluates every point
+    # with no early exit, so each addition is a full extra outer solve per case.
+    "hhl":  [0.1, 0.05, 0.01, 0.005, 0.0025, 0.001],
     "vqls": [1, 2, 3, 4, 5],
     # Extended below 50 for the same reason as the 1-D grid, and further,
     # because the strip operator is far better conditioned: kappa_row is bounded
