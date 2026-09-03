@@ -286,11 +286,32 @@ QSVT_MAX_DEGREE_BY_N: dict[int, Optional[int]] = {
 # at the same value so that both stages of hpc/jobs/submit_precompute_4th.sh
 # share one cache tag (d14999) and cannot be staged inconsistently.
 #
-# N=4 and N=8 stay uncapped: their entries are already computed and committed
-# (results/qsvt_phase_cache/k11p9477_*, k42p1378_*, both tag d-1), and moving
-# them would discard that work to change a ratio that is already ~150.
+# N=4 and N=8 were left uncapped until 2026-09-03, on the reasoning that their
+# entries were already computed (results/qsvt_phase_cache/k11p9477_*,
+# k42p1378_*, tag d-1) and that a ratio of ~150 was ample. That reasoning
+# confused a ratio with a construction. The cap does not scale the same
+# polynomial down; it selects the truncated-Chebyshev fit over
+# PolyOneOverX.generate, and the two differ by orders of magnitude in the
+# residual at equal degree -- the point the comment above makes and this entry
+# then ignored. Measured on the order-2 accuracy case, at the SAME resolution:
+#
+#      N=16  d=19289  uncapped   residual 6.85e-06   rel L2 2.21e-04
+#      N=16  d= 5001  cap 5000   residual 1.52e-12   rel L2 1.44e-04  (= Thomas)
+#
+# So a sweep that reads uncapped rows at N<=8 and capped rows at N>=16 is not one
+# ladder, and no figure may plot it as one. Capping every resolution at 14999
+# makes the order-4 ladder uniform in construction, which is what the comparison
+# requires; the d-1 entries stay on disk and stay valid for anything that wants
+# the PolyOneOverX path.
+#
+# Cost: the phases at kappa=11.9477 and 42.1378 are NOT cached at this tag and
+# must be precomputed (hpc/jobs/submit_precompute_4th.sh, stage 1, which is
+# already defaulted to N_VALUES="4,8"). Budget ~4 h per (kappa, epsilon) pair at
+# degree 14999, measured from the d14999 entries written on 2026-09-03. Pass 1
+# of that script computes epsilon=0.01 alone, which is the only pair the sweep
+# reads.
 QSVT_MAX_DEGREE_BY_N_ORDER4: dict[int, Optional[int]] = {
-    4: None, 8: None,
+    4: 14999, 8: 14999,
     16: 14999, 32: 14999, 64: 14999,
 }
 
