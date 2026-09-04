@@ -1,13 +1,13 @@
 {
-  "timestamp": "2026-09-03 06:04:29",
-  "hostname": "cx3-5-20",
-  "platform": "Linux-4.18.0-553.144.1.el8_10.x86_64-x86_64-with-glibc2.28",
+  "timestamp": "2026-09-03 19:13:39",
+  "hostname": "cx3-15-15",
+  "platform": "Linux-4.18.0-553.76.1.el8_10.x86_64-x86_64-with-glibc2.28",
   "python": "3.12.3 (main, Oct 30 2024, 13:22:10) [GCC 13.3.0]",
   "numpy": "2.5.1",
   "cpu_count": 128,
   "omp_threads": "1",
   "use_gpu": true,
-  "pbs_jobid": "3975835.pbs-7",
+  "pbs_jobid": "3978841.pbs-7",
   "pbs_queue": "v1_small24",
   "N_values": [
     4,
@@ -45,6 +45,6 @@
   "qiskit_aer": "0.17.2",
   "pyqsp": "not installed",
   "scipy": "1.18.0",
-  "git_commit": "807d70f4275c7c8d2584af72bdfaa72aa42e9328",
+  "git_commit": "0b9ea4c962a332e62bc647906833e7f8a652f875",
   "git_dirty": true
 }
