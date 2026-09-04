@@ -1,13 +1,13 @@
 dim,case,solver,parameter,setting,residual,r_target,in_band,wall_time_s,wall_clamped,err_alg_pct,max_rel_err_vs_thomas_pct,n_solver_calls,notes
-2,2D_HET_MMS_SPT100,HHL,$\varepsilon$,0.01,0.001563971226718221,0.001,True,295.7771015353501,False,0.07846353919565638,0.22180987883624062,4,2 of 4 configuration(s) did not reach r_target
+2,2D_HET_MMS_SPT100,HHL,$\varepsilon$,0.0025,0.000652232004221467,0.001,True,168.27044198382646,False,0.032359526981634926,0.07986654450708021,6,2 of 6 configuration(s) did not reach r_target
 2,2D_HET_MMS_SPT100,QSVT,$d_\mathrm{max}$,5.0,0.0005717761744134137,0.001,True,1.139576816931367,False,0.03465871627256803,0.06934461577041721,8,
 2,2D_HET_MMS_SPT100,VQLS,$n_\mathrm{layers}$,3.0,0.0005608231381643649,0.001,True,193.14528973214328,False,0.03382634708343497,0.07561224554076168,5,1 of 5 configuration(s) did not reach r_target
-2,2D_Poisson_sin_hom,HHL,$\varepsilon$,0.005,0.003861446186554572,0.001,False,629.286877354607,False,0.028259636339483547,0.06417807072354421,4,"no configuration reached r_target: best residual = 3.8614e-03, target = 1.00e-03"
+2,2D_Poisson_sin_hom,HHL,$\varepsilon$,0.001,0.0008129384289422589,0.001,True,502.022806587629,False,0.006239276844347917,0.01365541864073202,6,4 of 6 configuration(s) did not reach r_target
 2,2D_Poisson_sin_hom,QSVT,$d_\mathrm{max}$,5.0,0.0002689687987794778,0.001,True,1.6237792279571295,False,0.006128323186749706,0.01445071863331994,8,
 2,2D_Poisson_sin_hom,VQLS,$n_\mathrm{layers}$,3.0,7.287276600102311e-05,0.001,True,280.2920561134815,False,0.0019465613354044784,0.005246594371584875,5,1 of 5 configuration(s) did not reach r_target
-3,3D_HET_MMS_SPT100,HHL,$\varepsilon$,0.005,0.005049725975219426,0.001,False,2984.86148895137,False,0.07842643234781191,25900070.00618233,4,"no configuration reached r_target: best residual = 5.0497e-03, target = 1.00e-03"
+3,3D_HET_MMS_SPT100,HHL,$\varepsilon$,0.0025,0.0018998887818199649,0.001,True,3429.9759472347796,False,0.029455562453739842,9387523.42864981,6,4 of 6 configuration(s) did not reach r_target
 3,3D_HET_MMS_SPT100,QSVT,$d_\mathrm{max}$,5.0,0.0005410779721373106,0.001,True,12.151336422073655,False,0.008213114246828218,120290913.56531696,8,
 3,3D_HET_MMS_SPT100,VQLS,$n_\mathrm{layers}$,3.0,0.0005357706950295655,0.001,True,1962.6610847499687,False,0.00815679456668471,119858181.19519953,5,2 of 5 configuration(s) did not reach r_target
-3,3D_Poisson_TripleSin_cube,HHL,$\varepsilon$,0.005,0.004967125530461522,0.001,False,3240.7218282986432,False,0.05475656159297425,0.13516018263787152,4,"no configuration reached r_target: best residual = 4.9671e-03, target = 1.00e-03"
+3,3D_Poisson_TripleSin_cube,HHL,$\varepsilon$,0.001,0.0011805387610563259,0.001,True,5561.670868834015,False,0.012541869315475353,0.030237086504354433,6,5 of 6 configuration(s) did not reach r_target
 3,3D_Poisson_TripleSin_cube,QSVT,$d_\mathrm{max}$,5.0,0.0003328699476130944,0.001,True,7.378460307954811,False,0.01912710154116011,0.03638619368996565,8,
 3,3D_Poisson_TripleSin_cube,VQLS,$n_\mathrm{layers}$,3.0,0.0002998454569075168,0.001,True,1413.7366603878327,False,0.018289413531604796,0.03257106793996254,5,2 of 5 configuration(s) did not reach r_target

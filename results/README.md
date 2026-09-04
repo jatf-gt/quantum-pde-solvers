@@ -59,6 +59,9 @@ solution field or to re-derive a metric that was not recorded at the time.
 | `{1,2,3}Dhpc_run/` | Primary sweep, second-order stencil, per dimension. |
 | `{1,2,3}Dhpc_run_4th/` | The same at fourth order. |
 | `1Dhpc_run_degcap5000/` | Uniform-degree QSVT ladder, a fixed cap of 5001 across every N. |
+| `1Dhpc_run_degcap5000_lowN/` | The same ladder at N = 4 and 8, which the run above did not cover. Second order. |
+| `1Dhpc_run_4th_degcap_lowN/` | Fourth-order ladder at N = 4 and 8, cap 14999. |
+| `{2,3}Dstudies_hhldeep/` | HHL equal-accuracy re-runs on the epsilon grid extended to 1e-3. Merged into `{2,3}Dstudies/` on the record key; kept as the raw archive. |
 | `{1,2,3}Dstudies/` | Equal-accuracy and one-at-a-time sensitivity studies, second order. |
 | `{1,2,3}Dstudies_4th/` | The same at fourth order. Each carries a `PROVENANCE.md`. |
 | `thesis/` | The main-body figure datasets, `F1`–`F9`, and the `T2`/`T3`/`T4` table data. One tidy CSV per figure, written by `scripts/make_thesis_figures.py`. |
@@ -66,6 +69,15 @@ solution field or to re-derive a metric that was not recorded at the time.
 | `manifests/` | Re-run scopes written by `scripts/utils/gap_analysis.py`: which rows of which sweep were outstanding, and were subsequently recomputed. Kept as the record of what each sweep was missing and when. |
 | `investigations/` | One-off studies outside the main sweeps, including the `ibm_kingston` hardware runs and calibration. |
 | `meetings/` | Supervisor meeting material. Excluded from the repository in full. |
+
+The two `_lowN` directories are separate archives rather than rows appended to
+their parents because a capped QSP degree is not a ceiling on an uncapped one:
+`qsp_angles` truncates the target Chebyshev polynomial to `max_degree` and fits
+it by least squares, where the uncapped path calls `PolyOneOverX.generate`. The
+two constructions differ by orders of magnitude in the residual at comparable
+degree/κ, so their rows must not be mixed into one series. `poster_build`'s
+accuracy figure admits a QSVT row only if it records the cap its ladder is
+defined at.
 
 A studies directory is named for the dimension, the discretisation order and the
 run tag together — `1Dstudies`, `1Dstudies_4th` — because none of the three is

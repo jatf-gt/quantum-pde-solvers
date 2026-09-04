@@ -123,3 +123,37 @@ not contain: residual 5.30 × 10⁻¹ → 1.02 × 10⁻³ on the manufactured ca
 
 Neither case reaches the r_target = 10⁻³ band on the manufactured source; the
 HET case does.
+
+## HHL records replaced 2026-09-03, at a residual finally inside the band
+
+Job 3978844.pbs-7, `DIM=2 SOLVERS=hhl STUDY=equal-accuracy RUN_TAG=hhldeep
+MAX_WALL_S=10800`, at commit 0b9ea4c. Metadata retained verbatim as
+`run_metadata.hhl_3978844.json`. Only the two `equal_accuracy.json` HHL records
+are replaced; `sensitivity_hhl.json` is untouched and still describes the
+2026-08-20 submission.
+
+The superseded records were not wrong, they were truncated: the epsilon grid in
+`benchmark/equal_accuracy.py` stopped at 0.005, and `2D_Poisson_sin_hom` reached
+its smallest residual there at 3.861e-03, above the band ceiling of 3.00e-03.
+Commit 0b9ea4c extends the grid to `[0.1, 0.05, 0.01, 0.005, 0.0025, 0.001]`.
+Both cases now land in band:
+
+| case | eps | residual | wall | previously |
+|---|---|---|---|---|
+| `2D_Poisson_sin_hom` | 0.001 | 8.1294e-04 | 502.0 s | 0.005, 3.861e-03, out of band |
+| `2D_HET_MMS_SPT100` | 0.0025 | 6.5223e-04 | 168.3 s | 0.01, 1.564e-03, in band at 295.8 s |
+
+**Wall time is not monotone in epsilon here, and the non-monotonicity is the
+protocol working rather than noise.** `sweep_outer_equal_accuracy` sets the outer
+tolerance to `r_target`, so a grid point whose inner solver is too imprecise
+never closes the outer iteration and burns its whole budget, while the next
+point down converges early and costs less. On the manufactured case eps = 0.0025
+gives residual 2.1245e-03 in 961 s and eps = 0.001 gives 8.1294e-04 in 502 s; on
+the HET case eps = 0.005 gives 1.5640e-03 in 413 s and eps = 0.0025 gives
+6.5223e-04 in 168 s. Selection is the cheapest in-band point, so both cases take
+the cheaper, more accurate setting, and the HET row's cost falls against the
+superseded record.
+
+Every row of `results/thesis/T4_equal_accuracy_2D3D.csv` is now in band and none
+is wall-clamped, which is the first time the 2-D/3-D equal-accuracy comparison
+has been like-for-like across all three solvers.

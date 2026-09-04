@@ -179,3 +179,28 @@ before it is plotted, keyed on the signature — null `vqls_cost_final` together
 with an error against Thomas at round-off — rather than on the parameter value,
 so a re-measured `n_restarts` = 1 point is admitted without an edit there. The
 main-body thesis figures never read these files, so they were never affected.
+
+## HHL records replaced 2026-09-03, at a residual finally inside the band
+
+Job 3978845.pbs-7, `DIM=3 SOLVERS=hhl STUDY=equal-accuracy RUN_TAG=hhldeep
+MAX_WALL_S=18000`, at commit 0b9ea4c. Metadata retained verbatim as
+`run_metadata.hhl_3978845.json`. Only the two `equal_accuracy.json` HHL records
+are replaced; `sensitivity_hhl.json` is untouched.
+
+Both 3-D cases previously bottomed out at the grid's last point, eps = 0.005,
+above the band ceiling of 3.00e-03. Commit 0b9ea4c extends the grid to
+`[0.1, 0.05, 0.01, 0.005, 0.0025, 0.001]` and both now land in band:
+
+| case | eps | residual | wall | previously |
+|---|---|---|---|---|
+| `3D_Poisson_TripleSin_cube` | 0.001 | 1.1805e-03 | 5561.7 s | 0.005, 4.967e-03, out of band |
+| `3D_HET_MMS_SPT100` | 0.0025 | 1.8999e-03 | 3430.0 s | 0.005, 5.050e-03, out of band |
+
+`3D_HET_MMS_SPT100` also has an eps = 0.001 point at 1.0735e-03 in 4960 s, in
+band and more accurate but more expensive; selection takes the cheapest in-band
+point, which is eps = 0.0025. Unlike the 2-D cases, wall time rises monotonically
+with 1/eps on both 3-D cases, because no grid point closes the outer iteration
+early enough to offset the extra Trotter cost.
+
+`MAX_WALL_S=18000` was set so the deepest point would not be truncated; the
+largest recorded solve is 5 561.7 s, so no row is wall-clamped.
